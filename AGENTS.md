@@ -7,6 +7,8 @@ Server-authoritative incremental game built with Elixir/Phoenix/Postgres and an 
 
 The `legacy/` directory is a prototype reference, not the desired architecture.
 
+The new game must match the legacy game's functionality exactly. Change the code organization, authority model, and implementation quality, not the player-visible behavior, rules, save-slot model, or feature set unless explicitly ordered to do so.
+
 ## Core Rule
 
 The server owns truth. The client owns projection, rendering, input, and reversible UI state.
@@ -49,9 +51,9 @@ The server should not tick every frame. Prefer lazy advancement on commands, boo
 ## Hidden outcomes Contract (Showing Card pick Bonus game as example)
 
 The client must never receive hidden outcomes.
-Example: The card pick bonus game has 36 hidden cards. The player perceives it as if they are selecting cards from a pre-calculated set. Instead what happens is that the player selects 2 cards and the result + the other 34 "missed cards" are calculated on reveal.
+Example: The card pick bonus game has 36 hidden cards. The player perceives it as if they are selecting cards from a pre-calculated set. Instead what happens is that the client tells the server the picked count at reveal time, and the server calculates 36 results. The first X results are the picked cards, and the rest are the "missed cards".
 
-The client may store selected indexes as UI intent. The server validates selections and calculates or reveals selected outcomes only when the reveal command is processed.
+The client may store selected indexes as UI intent only. The server does not receive or store selected indexes. The server validates the picked count against the server-owned session phase and calculates reveal outcomes only when the reveal command is processed.
 
 Snapshots and responses must include only information the player is allowed to know.
 
@@ -72,11 +74,33 @@ feature/
 
 `render.ts` draws only. `interactions.ts` converts hit tests to command intents. `view-model.ts` derives renderable data from server snapshots.
 
+## Persistence Guidance
+
+Prefer `save_slots` with versioned `jsonb` game state while rules are still evolving.
+
+Anonymous players should have 4 save slots.
+
+Use a `game_commands` table for idempotent command processing and auditability.
+
+Avoid over-normalizing gameplay state early unless a stable query or integrity need justifies a relational table.
+
 ## Protocol Guidance
 
-Use command envelopes with idempotency keys and state versions.
+The only gameplay communication pattern is: client sends a command, server sends a result.
 
-Use server snapshots for authoritative state and server events for animation triggers.
+Client messages send only command intent plus minimal visible UI intent required by that command.
+
+The server owns command ids, idempotency, active save slot, queue order, replay state, and state versions.
+
+Do not require the client to send command ids, active save slots, snapshot versions, state versions, or generic payload envelopes.
+
+Every client command must receive a server result.
+
+Server results must include the minimum required authoritative state for that command. They do not need to include a full snapshot every time.
+
+`command.ack` means the client applied the current command result; it must not include a client-known command id. Cosmetic animations do not need to finish before ACK.
+
+Use server snapshots when full state is required, such as boot or reconnect. Server results may include game-result events that the client can animate.
 
 Client commands should describe player intent, not calculated results.
 
@@ -93,3 +117,5 @@ For hidden-information features, especially Card Pick, add tests that prove unre
 Refer to `plans/migrate_from_legacy_to_canvas_elixir.md` before porting features.
 
 Do not turn `legacy/game/game.js` into a new monolith. Port one feature at a time, keeping server rules and frontend presentation separate.
+
+Use `legacy/` as the behavioral specification. Replace the legacy AI-slop structure with clean, best-practice architecture while preserving exact functionality.

@@ -2,9 +2,9 @@
 
 ## Goal
 
-Recreate the legacy game as a properly structured incremental game using the repo-wide rules in `AGENTS.md`.
+Recreate the legacy game with exactly the same functionality using the repo-wide rules in `AGENTS.md`.
 
-The legacy prototype in `legacy/game` has useful feature work and visual direction, but its structure is not suitable for the real game. In particular, `legacy/game/game.js` combines boot, game loop, input routing, persistence, feature orchestration, modal state, and visual effects. The migration should preserve the feel while replacing the architecture.
+The legacy prototype in `legacy/game` is the behavioral specification, but its structure is not suitable for the real game. In particular, `legacy/game/game.js` combines boot, game loop, input routing, persistence, feature orchestration, modal state, and visual effects. The migration must preserve exact player-visible functionality while replacing the legacy AI-slop structure with clean, best-practice architecture.
 
 ## Progress Implementation Notes
 
@@ -56,13 +56,10 @@ Preferred model:
 
 ```txt
 client: card_pick.start
-server: creates hidden session, returns session id, pick count, selectable indexes
+server: creates hidden session and returns visible session state
 
-client: card_pick.select indexes
-server: validates indexes, stores selected indexes, returns accepted selection
-
-client: card_pick.reveal
-server: calculates selected outcomes at reveal time, persists, returns only revealed outcomes
+client: card_pick.reveal with picked count
+server: validates the picked count against the server-owned session phase, calculates, and returns all 36 reveal results. The first X results are the picked cards; the rest are the missed cards.
 
 client: card_pick.advance_or_complete
 server: decides whether bonus phase starts, updates session, returns visible phase data
@@ -110,7 +107,8 @@ Recommended initial persistence:
 
 - `accounts` or simple users table.
 - `save_slots` with `state` as versioned `jsonb`.
-- `game_commands` table for idempotent command processing and auditability.
+- `game_commands` table for idempotent command processing and short-term replay.
+- Every hour, remove ACKed `game_commands` rows older than 48 hours.
 
 Avoid over-normalizing early. The rules are still evolving, and a versioned JSON state is easier to migrate during game design iteration.
 
@@ -170,14 +168,40 @@ Frontend state categories:
 
 ### Phase 1: Foundation
 
-- Add frontend build tooling under `assets/`.
-- Add Phoenix Channel support.
-- Define the game command and snapshot protocol.
-- Add `save_slots` and `game_commands` migrations.
-- Implement state versioning and idempotent command handling.
+- Add frontend build tooling under `assets/` without changing the command/result protocol.
+- Remove/replace the `/api/clicks` prototype; it is not part of legacy game functionality.
+- Use Phoenix Channels as the Phase 1 transport.
+- Define the game command/result protocol: the only gameplay communication pattern is client command -> server result.
+- Client commands send only command intent, not command ids, active save slots, snapshot versions, or generic payload envelopes.
+- Server assigns command ids, active save slot, queue order, replay state, and result tracking.
+- Every client command must receive a server result.
+- Server results include the minimum required authoritative state for that command; they do not need to include a full snapshot every time.
+- Use full snapshots when full state is required, such as boot or reconnect.
+- Add `save_slots` and `game_commands` persistence.
+- Implement 4 anonymous save slots per player.
+- Match legacy save-slot boot selection: last valid slot, else first populated slot, else slot 0.
+- Implement save-slot switching and reset confirmation flow.
+- Do not require boot/reconnect to send all 4 save-slot summaries.
+- Save screen visible info is presentation state and is not authoritative gameplay state. The server overwrites with authoritative slot state when a slot is loaded.
+- Autosave the current slot before switching slots.
+- Save UI may be an acceptable MVP in Phase 1, but behavior and visible slot information must match legacy.
+- Add a per-player FIFO command queue backed by `game_commands`.
+- Process only one command at a time for each player.
+- Allow up to 10 queued commands per player.
+- Reject new commands with `queue_full` when the player already has 10 queued commands.
+- Commands execute once. Until the client acknowledges receipt, reconnect re-sends the stored command result instead of re-running game rules.
+- Add explicit client `command.ack` messages after the client applies a command result. ACK means "I applied the current result"; it must not include a client-known command id.
+- ACK requires the authoritative result to be applied, not cosmetic animations to finish.
+- Process the next queued command only after the server receives ACK for the current command result.
+- Withholding ACKs must not duplicate rewards or state changes; it only keeps the player blocked on the same queued result.
+- Keep unacked commands indefinitely; continue blocking/replaying until ACK.
+- Store command result data needed for replay, including the server result, internal state version, and success/error.
+- Add the hourly cleanup job that removes ACKed `game_commands` older than 48 hours.
+- Implement server-owned state versioning and execute-once replay handling.
+- Add backend tests for FIFO ordering, execute-once replay, ACK-gated advancement, queue full rejection, reconnect replay, and ACKed-only cleanup.
 - Create a minimal Canvas boot that renders from a server snapshot.
 
-Deliverable: client connects, receives a snapshot, renders basic HUD, and can send no-op commands.
+Deliverable: client connects, selects the correct active save slot, receives required authoritative state, renders basic HUD/save UI, can switch or reset slots, and can send no-op commands.
 
 ### Phase 2: Progress Loop
 
@@ -255,8 +279,11 @@ Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
 
 - Replace the legacy client-board model.
 - Server stores session state.
-- Client sends selected indexes only.
-- Server calculates or reveals selected card outcomes only when reveal is requested.
+- Client sends reveal intent with picked count only, not selected indexes.
+- Server accepts the picked count only if it matches the server-owned session phase.
+- Client may remember which visible card positions the player clicked as UI state, then map server reveal results onto those positions.
+- Server calculates reveal outcomes only when reveal is requested.
+- Reveal response includes all 36 results: picked results first, then missed results.
 - Bonus phases reveal only allowed information.
 
 Deliverable: Card Pick session lifecycle and reveal flow are ported.
@@ -266,7 +293,7 @@ Deliverable: Card Pick session lifecycle and reveal flow are ported.
 - Move particles, floating text, and WebGL effects into render/effects modules.
 - Trigger effects from server events and local cosmetic input events.
 
-Deliverable: prototype feel is restored on the new architecture.
+Deliverable: legacy visual effects and player-visible behavior are restored on the new architecture.
 
 ### Phase 12: Legacy Removal
 
@@ -281,6 +308,12 @@ Deliverable: the real game no longer depends on `legacy/game`.
 
 Backend rule tests:
 
+- Command queue FIFO ordering.
+- Execute-once command replay.
+- ACK-gated queue advancement.
+- Queue full rejection.
+- Reconnect replay for unacked command results.
+- ACKed-only command cleanup.
 - Progress lazy advancement.
 - Progress full verification.
 - Claim reward not-ready correction.
