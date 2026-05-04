@@ -178,6 +178,9 @@ Frontend state categories:
 - Server results include the minimum required authoritative state for that command; they do not need to include a full snapshot every time.
 - Use full snapshots when full state is required, such as boot or reconnect.
 - Add `save_slots` and `game_commands` persistence.
+- Identify anonymous players with a server-issued anonymous player token. Persist this token in localStorage.
+This token then becomes persisted in the players table when the player chooses to create a user account.
+Tokens without player are deleted after 1 month of inactivity.
 - Implement 4 anonymous save slots per player.
 - Match legacy save-slot boot selection: last valid slot, else first populated slot, else slot 0.
 - Implement save-slot switching and reset confirmation flow.
