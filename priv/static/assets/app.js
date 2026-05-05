@@ -1,340 +1,370 @@
-const canvas = document.querySelector("#game-canvas");
-const ctx = canvas.getContext("2d");
-const usernameInput = document.querySelector("#username-input");
-const clickButton = document.querySelector("#click-button");
-const clickCount = document.querySelector("#click-count");
-const statusLine = document.querySelector("#status-line");
+const tokenKey = "incrementalist.anonymousPlayerToken";
+const heartbeatIntervalMs = 25000;
 
-const state = {
-  clicks: 0,
-  pending: 0,
-  status: "",
-  statusTone: "",
-  lastClickAt: 0,
-  pulses: [],
-  sparks: [],
+const canvas = document.querySelector("#game-canvas");
+const context = canvas.getContext("2d");
+const statusLine = document.querySelector("#status-line");
+const levelValue = document.querySelector("#level-value");
+const slotValue = document.querySelector("#slot-value");
+const noopButton = document.querySelector("#noop-button");
+const saveButton = document.querySelector("#save-button");
+const resetButton = document.querySelector("#reset-button");
+const slotList = document.querySelector("#slot-list");
+
+const colors = {
+  ink: "#162026",
+  muted: "#5b6570",
+  panelStrong: "#ffffff",
+  blue: "#1f6f8b",
+  gold: "#edb83d",
+  sky: "#dceff4",
+  grass: "#eef3dc",
+  background: "#f7f8f3"
+};
+
+const serverState = {
+  snapshot: null,
+  slots: [],
+  status: "Connecting...",
+  statusTone: ""
+};
+
+const canvasState = {
   width: 0,
   height: 0,
   pixelRatio: 1
 };
 
-let loadTimer = 0;
-let requestId = 0;
+let channel = null;
+let busy = false;
 
-function currentUsername() {
-  return usernameInput.value.trim();
-}
+class GameChannel {
+  constructor(token) {
+    this.token = token;
+    this.socket = null;
+    this.ref = 0;
+    this.joinRef = null;
+    this.waiters = new Map();
+    this.heartbeatId = 0;
+  }
 
-function setStatus(message, tone = "") {
-  state.status = message;
-  state.statusTone = tone;
-  statusLine.textContent = message;
-  statusLine.dataset.tone = tone;
-}
+  connect() {
+    const params = new URLSearchParams({ vsn: "2.0.0" });
+    if (this.token) params.set("anonymous_player_token", this.token);
 
-function setClicks(nextClicks) {
-  state.clicks = Math.max(0, Number(nextClicks) || 0);
-  clickCount.textContent = state.clicks.toLocaleString();
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+    this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
+
+    return new Promise((resolve, reject) => {
+      this.socket.addEventListener("open", () => {
+        this.startHeartbeat();
+        this.join().then(resolve, reject);
+      });
+      this.socket.addEventListener("message", (event) => this.handleMessage(event));
+      this.socket.addEventListener("error", () => reject(new Error("Socket error")));
+      this.socket.addEventListener("close", () => this.stopHeartbeat());
+    });
+  }
+
+  push(event, payload = {}) {
+    return this.send("game", event, payload);
+  }
+
+  join() {
+    this.joinRef = this.nextRef();
+    return this.send("game", "phx_join", {}, this.joinRef);
+  }
+
+  send(topic, event, payload, joinRef = this.joinRef) {
+    const ref = this.nextRef();
+    const message = [joinRef, ref, topic, event, payload];
+
+    return new Promise((resolve, reject) => {
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        reject(new Error("Channel is not connected"));
+        return;
+      }
+
+      this.waiters.set(ref, { resolve, reject });
+      this.socket.send(JSON.stringify(message));
+    });
+  }
+
+  handleMessage(event) {
+    const [_joinRef, ref, _topic, eventName, payload] = JSON.parse(event.data);
+    if (eventName !== "phx_reply" || !ref) return;
+
+    const waiter = this.waiters.get(ref);
+    if (!waiter) return;
+
+    this.waiters.delete(ref);
+
+    if (payload.status === "ok") {
+      waiter.resolve(payload.response);
+    } else {
+      waiter.reject(new Error("Channel command failed"));
+    }
+  }
+
+  nextRef() {
+    this.ref += 1;
+    return String(this.ref);
+  }
+
+  startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatId = window.setInterval(() => {
+      this.send("phoenix", "heartbeat", {}).catch(() => {});
+    }, heartbeatIntervalMs);
+  }
+
+  stopHeartbeat() {
+    if (this.heartbeatId) window.clearInterval(this.heartbeatId);
+    this.heartbeatId = 0;
+  }
 }
 
 function resizeCanvas() {
-  state.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  state.width = window.innerWidth;
-  state.height = window.innerHeight;
-  canvas.width = Math.floor(state.width * state.pixelRatio);
-  canvas.height = Math.floor(state.height * state.pixelRatio);
-  canvas.style.width = `${state.width}px`;
-  canvas.style.height = `${state.height}px`;
-  ctx.setTransform(state.pixelRatio, 0, 0, state.pixelRatio, 0, 0);
+  canvasState.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+  canvasState.width = window.innerWidth;
+  canvasState.height = window.innerHeight;
+  canvas.width = Math.floor(canvasState.width * canvasState.pixelRatio);
+  canvas.height = Math.floor(canvasState.height * canvasState.pixelRatio);
+  canvas.style.width = `${canvasState.width}px`;
+  canvas.style.height = `${canvasState.height}px`;
+  context.setTransform(canvasState.pixelRatio, 0, 0, canvasState.pixelRatio, 0, 0);
 }
 
-async function requestJson(path, options = {}) {
-  const response = await fetch(path, {
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json"
-    },
-    ...options
-  });
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Request failed");
-  }
-
-  return data;
+function renderDom() {
+  const snapshot = serverState.snapshot;
+  statusLine.textContent = serverState.status;
+  statusLine.dataset.tone = serverState.statusTone;
+  levelValue.textContent = String(snapshot?.state.level ?? 1);
+  slotValue.textContent = String((snapshot?.active_save_slot ?? 0) + 1);
+  renderSaveSlots(createSaveSlotsViewModel(snapshot, serverState.slots));
 }
 
-async function loadClicks() {
-  const username = currentUsername();
-  const id = ++requestId;
+function createSaveSlotsViewModel(snapshot, slots) {
+  const activeSlot = snapshot?.active_save_slot ?? 0;
+  if (slots.length > 0) return { activeSlot, slots };
 
-  if (!username) {
-    setClicks(0);
-    setStatus("Enter a username to play.");
-    return;
-  }
-
-  setStatus("Syncing...");
-
-  try {
-    const data = await requestJson(`/api/clicks?username=${encodeURIComponent(username)}`);
-
-    if (id === requestId) {
-      setClicks(data.clicks);
-      setStatus("Ready.");
-    }
-  } catch (error) {
-    if (id === requestId) {
-      setStatus(error.message, "error");
-    }
-  }
-}
-
-async function sendClick() {
-  const username = currentUsername();
-
-  if (!username) {
-    setStatus("Enter a username to play.", "error");
-    usernameInput.focus();
-    return;
-  }
-
-  state.pending += 1;
-  state.lastClickAt = performance.now();
-  addBurst();
-  setStatus("Saving...");
-
-  try {
-    const data = await requestJson("/api/clicks", {
-      method: "POST",
-      body: JSON.stringify({ username })
-    });
-
-    if (username === currentUsername()) {
-      setClicks(Math.max(state.clicks, data.clicks));
-      setStatus("Saved.");
-    }
-  } catch (error) {
-    setStatus(error.message, "error");
-  } finally {
-    state.pending = Math.max(0, state.pending - 1);
-  }
-}
-
-function scheduleLoad() {
-  window.clearTimeout(loadTimer);
-  loadTimer = window.setTimeout(() => {
-    loadClicks();
-  }, 250);
-}
-
-function addBurst() {
-  const center = machineCenter();
-  state.pulses.push({ x: center.x, y: center.y, age: 0, life: 520 });
-
-  for (let index = 0; index < 12; index += 1) {
-    const angle = -Math.PI / 2 + (index - 5.5) * 0.18;
-    const speed = 1.6 + Math.random() * 2.8;
-    state.sparks.push({
-      x: center.x,
-      y: center.y - 22,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      age: 0,
-      life: 520 + Math.random() * 260,
-      size: 5 + Math.random() * 8
-    });
-  }
-}
-
-function machineCenter() {
-  const hudRoom = state.width < 720 ? 280 : 430;
   return {
-    x: state.width < 720 ? state.width * 0.5 : state.width * 0.66,
-    y: Math.max(160, (state.height - hudRoom) * 0.48)
+    activeSlot,
+    slots: [0, 1, 2, 3].map((slotIndex) => ({
+      slot_index: slotIndex,
+      file_index: slotIndex,
+      is_current: slotIndex === activeSlot,
+      has_data: slotIndex === activeSlot,
+      level: snapshot?.state.level ?? 1,
+      rewards_claimed: snapshot?.state.progress_bar.rewards_claimed ?? 0,
+      saved_at: snapshot?.state.saved_at ?? null,
+      state_version: snapshot?.state_version ?? 0
+    }))
   };
 }
 
-function drawBackground(time) {
-  ctx.fillStyle = "#f7f8f3";
-  ctx.fillRect(0, 0, state.width, state.height);
+function renderSaveSlots(viewModel) {
+  slotList.replaceChildren(
+    ...viewModel.slots.map((slot) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "slot-button";
+      button.dataset.slotIndex = String(slot.slot_index);
+      button.dataset.current = String(slot.is_current || slot.slot_index === viewModel.activeSlot);
 
-  ctx.fillStyle = "#dceff4";
-  ctx.fillRect(0, 0, state.width, Math.max(180, state.height * 0.4));
+      const title = document.createElement("span");
+      title.textContent = `File ${slot.slot_index + 1}`;
 
-  ctx.fillStyle = "#eef3dc";
-  ctx.beginPath();
-  ctx.moveTo(0, state.height * 0.54);
-  ctx.bezierCurveTo(
-    state.width * 0.2,
-    state.height * 0.46,
-    state.width * 0.46,
-    state.height * 0.62,
-    state.width,
-    state.height * 0.48
+      const level = document.createElement("strong");
+      level.textContent = slot.has_data ? `Level ${slot.level}` : "Empty";
+
+      const rewards = document.createElement("small");
+      rewards.textContent = `Rewards ${slot.rewards_claimed}`;
+
+      button.append(title, level, rewards);
+      return button;
+    })
   );
-  ctx.lineTo(state.width, state.height);
-  ctx.lineTo(0, state.height);
-  ctx.closePath();
-  ctx.fill();
+}
 
-  ctx.strokeStyle = "rgba(23, 32, 38, 0.09)";
-  ctx.lineWidth = 1;
-  const offset = (time * 0.018) % 36;
+function applyResult(result) {
+  if (result.snapshot) {
+    serverState.snapshot = result.snapshot;
+  }
 
-  for (let x = -36 + offset; x < state.width + 36; x += 36) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + state.height * 0.25, state.height);
-    ctx.stroke();
+  if (result.slots) {
+    serverState.slots = result.slots;
+  } else if (result.snapshot?.save_slot) {
+    serverState.slots = upsertSlot(serverState.slots, result.snapshot.save_slot);
+  }
+
+  serverState.statusTone = result.status === "error" ? "error" : "ok";
+  serverState.status = statusForResult(result);
+}
+
+function upsertSlot(slots, slot) {
+  const next = slots.filter((candidate) => candidate.slot_index !== slot.slot_index);
+  next.push(slot);
+  return next.sort((a, b) => a.slot_index - b.slot_index);
+}
+
+function statusForResult(result) {
+  if (result.status === "error") return result.reason || "Command rejected";
+  if (result.type === "command.queued") return "Queued";
+  if (result.type === "game.noop.result") return "Synced";
+  if (result.type === "save_slots.list.result") return "Save files";
+  if (result.type === "save_slot.switch.result") return "Save file loaded";
+  if (result.type === "save_slot.reset.result") return "Save file reset";
+  return "Ready";
+}
+
+async function applyAndAck(result) {
+  applyResult(result);
+  renderDom();
+
+  if (!result.requires_ack) return;
+
+  let next = (await channel.push("command.ack")).next_result ?? null;
+  while (next) {
+    applyResult(next);
+    renderDom();
+    next = next.requires_ack ? (await channel.push("command.ack")).next_result ?? null : null;
   }
 }
 
-function roundedRect(x, y, width, height, radius) {
+async function runCommand(command) {
+  if (busy) return;
+  busy = true;
+  setButtonsBusy(true);
+
+  try {
+    await applyAndAck(await command());
+  } catch (error) {
+    serverState.statusTone = "error";
+    serverState.status = error instanceof Error ? error.message : "Command failed";
+    renderDom();
+  } finally {
+    busy = false;
+    setButtonsBusy(false);
+  }
+}
+
+function setButtonsBusy(nextBusy) {
+  for (const button of [noopButton, saveButton, resetButton]) {
+    button.disabled = nextBusy;
+    button.setAttribute("aria-busy", String(nextBusy));
+  }
+}
+
+function renderCanvas(time) {
+  const { width, height } = canvasState;
+  const snapshot = serverState.snapshot;
+
+  context.fillStyle = colors.background;
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = colors.sky;
+  context.fillRect(0, 0, width, Math.max(180, height * 0.4));
+
+  context.fillStyle = colors.grass;
+  context.beginPath();
+  context.moveTo(0, height * 0.58);
+  context.bezierCurveTo(width * 0.18, height * 0.47, width * 0.56, height * 0.66, width, height * 0.5);
+  context.lineTo(width, height);
+  context.lineTo(0, height);
+  context.closePath();
+  context.fill();
+
+  const centerX = width < 720 ? width * 0.5 : width * 0.68;
+  const centerY = Math.max(150, height * 0.38 + Math.sin(time / 600) * 4);
+
+  context.fillStyle = "rgba(22, 32, 38, 0.15)";
+  context.beginPath();
+  context.ellipse(centerX, centerY + 95, 150, 24, 0, 0, Math.PI * 2);
+  context.fill();
+
+  roundRect(centerX - 140, centerY - 52, 280, 128, 8);
+  context.fillStyle = colors.ink;
+  context.fill();
+
+  roundRect(centerX - 106, centerY - 86, 212, 92, 8);
+  context.fillStyle = colors.blue;
+  context.fill();
+
+  roundRect(centerX - 76, centerY - 58, 152, 42, 6);
+  context.fillStyle = colors.panelStrong;
+  context.fill();
+
+  context.fillStyle = colors.ink;
+  context.font = "800 22px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(`Level ${snapshot?.state.level ?? 1}`, centerX, centerY - 37);
+
+  context.fillStyle = colors.gold;
+  const progress = snapshot?.state.progress_bar.fill ?? 0;
+  roundRect(centerX - 86, centerY + 26, 172, 18, 5);
+  context.strokeStyle = "rgba(255,255,255,0.8)";
+  context.lineWidth = 2;
+  context.stroke();
+  context.fillRect(centerX - 84, centerY + 28, Math.max(0, Math.min(168, progress * 1.68)), 14);
+
+  window.requestAnimationFrame(renderCanvas);
+}
+
+function roundRect(x, y, width, height, radius) {
   const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + width, y, x + width, y + height, r);
-  ctx.arcTo(x + width, y + height, x, y + height, r);
-  ctx.arcTo(x, y + height, x, y, r);
-  ctx.arcTo(x, y, x + width, y, r);
-  ctx.closePath();
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
 }
 
-function drawMachine(time) {
-  const center = machineCenter();
-  const scale = Math.max(0.72, Math.min(1.2, state.width / 1060));
-  const thump = Math.max(0, 1 - (time - state.lastClickAt) / 180);
-  const lift = Math.sin(time / 320) * 3 - thump * 5;
-  const baseWidth = 330 * scale;
-  const baseHeight = 150 * scale;
+async function boot() {
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
 
-  ctx.save();
-  ctx.translate(center.x, center.y + lift);
-  ctx.scale(scale, scale);
+  channel = new GameChannel(window.localStorage.getItem(tokenKey));
+  const bootResult = await channel.connect();
 
-  ctx.fillStyle = "rgba(23, 32, 38, 0.16)";
-  ctx.beginPath();
-  ctx.ellipse(0, 130, 170, 26, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#172026";
-  roundedRect(-baseWidth / 2 / scale, 34, baseWidth / scale, baseHeight / scale, 8);
-  ctx.fill();
-
-  ctx.fillStyle = "#1f7a8c";
-  roundedRect(-132, -52, 264, 118, 8);
-  ctx.fill();
-
-  ctx.fillStyle = "#ffffff";
-  roundedRect(-96, -28, 192, 54, 6);
-  ctx.fill();
-
-  ctx.fillStyle = "#172026";
-  ctx.font = "900 26px Inter, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(String(state.clicks), 0, 0);
-
-  ctx.fillStyle = "#edb83d";
-  for (let index = 0; index < 5; index += 1) {
-    roundedRect(-148 + index * 26, 75 - index * 6, 70, 18, 6);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(23, 32, 38, 0.18)";
-    ctx.stroke();
+  if (bootResult.anonymous_player_token) {
+    window.localStorage.setItem(tokenKey, bootResult.anonymous_player_token);
   }
 
-  ctx.save();
-  ctx.translate(104, 64);
-  ctx.rotate(time / 950);
-  ctx.fillStyle = "#dd5f46";
-  roundedRect(-44, -44, 88, 88, 8);
-  ctx.fill();
-  ctx.fillStyle = "#f7f8f3";
-  ctx.fillRect(-7, -48, 14, 96);
-  ctx.fillRect(-48, -7, 96, 14);
-  ctx.restore();
+  serverState.snapshot = bootResult.snapshot;
+  serverState.slots = [bootResult.snapshot.save_slot];
+  serverState.status = "Ready";
+  renderDom();
 
-  ctx.fillStyle = "#277a55";
-  roundedRect(-32, -112 - thump * 14, 64, 74, 7);
-  ctx.fill();
+  if (bootResult.pending_result) {
+    await applyAndAck(bootResult.pending_result);
+  }
 
-  ctx.fillStyle = "#172026";
-  ctx.fillRect(-9, -46 - thump * 7, 18, 28);
-
-  ctx.restore();
+  window.requestAnimationFrame(renderCanvas);
 }
 
-function drawPulses(delta) {
-  state.pulses = state.pulses.filter((pulse) => {
-    pulse.age += delta;
-    const progress = pulse.age / pulse.life;
+noopButton.addEventListener("click", () => runCommand(() => channel.push("game.noop")));
+saveButton.addEventListener("click", () => runCommand(() => channel.push("save_slots.list")));
+resetButton.addEventListener("click", () => {
+  if (window.confirm("Reset the active save file?")) {
+    runCommand(() => channel.push("save_slot.reset"));
+  }
+});
+slotList.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const button = event.target.closest("[data-slot-index]");
+  if (!button) return;
 
-    if (progress >= 1) {
-      return false;
-    }
+  const slotIndex = Number(button.dataset.slotIndex);
+  if (Number.isInteger(slotIndex)) {
+    runCommand(() => channel.push("save_slot.switch", { slot_index: slotIndex }));
+  }
+});
 
-    ctx.save();
-    ctx.globalAlpha = 1 - progress;
-    ctx.strokeStyle = "#1f7a8c";
-    ctx.lineWidth = 4;
-    roundedRect(
-      pulse.x - 55 - progress * 90,
-      pulse.y - 70 - progress * 38,
-      110 + progress * 180,
-      128 + progress * 76,
-      8
-    );
-    ctx.stroke();
-    ctx.restore();
-    return true;
-  });
-}
-
-function drawSparks(delta) {
-  state.sparks = state.sparks.filter((spark) => {
-    spark.age += delta;
-    spark.x += spark.vx * delta * 0.07;
-    spark.y += spark.vy * delta * 0.07;
-    spark.vy += 0.008 * delta;
-
-    const progress = spark.age / spark.life;
-
-    if (progress >= 1) {
-      return false;
-    }
-
-    ctx.save();
-    ctx.globalAlpha = 1 - progress;
-    ctx.translate(spark.x, spark.y);
-    ctx.rotate(progress * Math.PI * 2);
-    ctx.fillStyle = progress < 0.5 ? "#edb83d" : "#dd5f46";
-    ctx.fillRect(-spark.size / 2, -spark.size / 2, spark.size, spark.size);
-    ctx.restore();
-    return true;
-  });
-}
-
-let previousTime = performance.now();
-
-function render(time) {
-  const delta = Math.min(40, time - previousTime);
-  previousTime = time;
-
-  drawBackground(time);
-  drawPulses(delta);
-  drawMachine(time);
-  drawSparks(delta);
-
-  window.requestAnimationFrame(render);
-}
-
-usernameInput.value = "player";
-resizeCanvas();
-loadClicks();
-
-window.addEventListener("resize", resizeCanvas);
-usernameInput.addEventListener("input", scheduleLoad);
-clickButton.addEventListener("click", sendClick);
-window.requestAnimationFrame(render);
+boot().catch((error) => {
+  serverState.statusTone = "error";
+  serverState.status = error instanceof Error ? error.message : "Boot failed";
+  renderDom();
+});

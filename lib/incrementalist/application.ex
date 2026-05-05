@@ -8,6 +8,7 @@ defmodule Incrementalist.Application do
     children = [
       Incrementalist.Repo,
       {Phoenix.PubSub, name: Incrementalist.PubSub},
+      Incrementalist.Game.Persistence.CommandLog.Cleanup,
       IncrementalistWeb.Endpoint
     ]
 

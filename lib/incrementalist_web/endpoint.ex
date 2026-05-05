@@ -1,6 +1,10 @@
 defmodule IncrementalistWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :incrementalist
 
+  socket "/socket", IncrementalistWeb.UserSocket,
+    websocket: true,
+    longpoll: false
+
   @session_options [
     store: :cookie,
     key: "_incrementalist_key",
