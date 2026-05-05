@@ -10,35 +10,12 @@ The legacy prototype in `legacy/game` is the behavioral specification, but its s
 
 Store enough information to lazily derive current progress when a command arrives.
 
-Server stores durable progress state:
-
-```txt
-fill
-last_progress_at
-```
+Server stores durable progress state.
 
 Fill rate is derived from current authoritative save facts, such as idle mode,
-Sisu, level, and first-played time. Do not persist a separate
-`fill_rate_parameters` object unless a current rule needs facts that are not
-already durable state.
+Sisu, sisu decay, level, last_claimed_at.
 
-`can_claim` is derived by the server after lazy advancement and may be sent in
-snapshots/results as visible confirmed state. Do not persist it as a separate
-save field: progress at `100%` is claimable.
-
-Server sends snapshots with enough projection data:
-
-```json
-{
-  "progress": {
-    "fill": 42.5,
-    "fill_rate": 0.8,
-    "estimated_full_at": "2026-05-04T14:05:12Z",
-    "can_claim": false
-  },
-  "server_time": "2026-05-04T14:03:55Z"
-}
-```
+`can_claim` is derived by the server after lazy advancement. Do not persist it as a separate save field: progress at `100%` is claimable.
 
 Client projection state machine:
 
@@ -56,16 +33,29 @@ is collectible. Until the server confirms, the player must not see `ACT!` or
 the WebGL 100% burst animation. After confirmation, the client shows the legacy
 100% burst animation and `ACT!`.
 
-Claim flow:
+### Claim flow:
 
-1. Client sends `progress.claim_reward`.
-2. Server lazily advances progress to server now.
-3. If not collectible, server returns `not_ready` and a corrected snapshot.
-4. If collectible, server calculates rewards, applies level-ups, resets progress, persists, and returns only the final authoritative values that changed for this command.
+#### Check if claim is possible
+1. Client sends `progress.can_claim`.
+2. Server checks `can_claim_at` and responds with `can_claim_in` (delta until claim).
+3. If `can_claim_in == 0`, allow claim in the Client, play burst animation and display the ACT! label. Otherwise postpone claim animation etc by `can_claim_in`.
 
-`progress.claim_reward.result` is not a full snapshot. It should include changed
-final values only, such as `coins`, `exp`, `shards`, `cores`, plus changed
-progress fields such as progress fill and rewards claimed. The client may derive
+#### When the player can claim:
+4. User claims reward => Client sends `progress.claim_reward`.
+6. Server calculates the reward and responds with minimum slice of final values, progress.claim_result, not delta, for example:
+```
+{
+  coins: 220434,
+  exp: 40030423,
+  shards: 100439,
+  cores: 1432
+}
+```
+7. Client sets the new values for coins, exp, etc. and sends ACK
+8. When server receives ACK, it sets last_claimed_at, rewards_claimed, etc. and calculates can_claim_at from the player's server state.
+
+`progress.claim_result` is not a full snapshot. It should include changed
+final values only, such as `coins`, `exp`, `shards`, `cores`. The client may derive
 popup deltas from the previous authoritative values for display, but the result
 itself should remain a narrow command result.
 
@@ -99,21 +89,15 @@ lib/incrementalist/
     sessions.ex
     snapshots.ex
     time.ex
-    data/
-      areas.ex
-      achievement_defs.ex
-      quest_defs.ex
-      shop_items.ex
-      daily_bonus_defs.ex
-    rules/
-      progress_bar.ex
-      progression.ex
-      sisu.ex
-      shop.ex
-      quests.ex
-      achievements.ex
-      daily_bonus.ex
-      card_pick.ex
+    features/
+      areas/
+      achievements/
+      quests/
+      shops/
+      daily_bonus/
+      progress/
+        bar/
+        sisu/
     persistence/
       save_slots.ex
       command_log.ex
