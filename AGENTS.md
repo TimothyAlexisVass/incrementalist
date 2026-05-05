@@ -98,11 +98,15 @@ Avoid over-normalizing gameplay state early unless a stable query or integrity n
 
 The only gameplay communication pattern is: client sends a command, server sends a result.
 
-Client messages send only command intent plus minimal visible UI intent required by that command.
+Client messages send only command intent, a client-generated integer `command_id`, and minimal visible UI intent required by that command.
 
-The server owns command ids, idempotency, active save slot, queue order, and replay state.
+Client command ids are the indexes of a 10-slot local boolean queue: `true` means waiting for the authoritative result, `false` means not waiting for that result.
+Client command ids exist only to pair a queued command/result/ACK with the client's local transport queue slot. They are not durable gameplay authority and must not be stored in LocalStorage.
 
-Do not require the client to send command ids, active save slots, version markers, or generic payload envelopes.
+The server owns durable command sequencing, idempotent execution, active save slot, FIFO queue order, and replay state.
+The server persists command results and replays those results until ACK instead of re-running game rules.
+
+Do not require the client to send active save slots, version markers, or generic payload envelopes.
 The client may send cache-presence hints, such as which save slots have cached snapshots, only to reduce snapshot payload size. Cache hints must never be treated as authoritative state.
 
 Every client command must receive a server result.
@@ -114,12 +118,13 @@ Do not add speculative bookkeeping fields, counters, versions, audit metadata, o
 Protocol types must be exact discriminated unions keyed by `type`. Do not model server results as one generic object with optional fields for unrelated variants. A field belongs only on the result type that actually sends it.
 
 ACK-ability is part of the command queue contract, not a generic optional boolean. A processed queued command result is ACKed. Queue acceptance, queue rejection, and ACK responses are not themselves ACKed.
+Queue acceptance returns `command.queued` with only `command_id`; it must not expose command type or queue position.
 
 Error reasons must be machine-readable fields on explicit error result types, not optional text on every result.
 
 Follow-on command results released by `command.ack` must be named by what happened at the queue boundary, such as `released_result`, not vague transport wording like `next_result`.
 
-`command.ack` means the client applied the current command result; it must not include a client-known command id. Cosmetic animations do not need to finish before ACK.
+`command.ack` means the client applied the current command result; its payload is only the applied client `command_id`. Cosmetic animations do not need to finish before ACK.
 
 Use server snapshots when full state is required, such as boot or reconnect. Server results may include game-result events that the client can animate.
 

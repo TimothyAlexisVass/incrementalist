@@ -127,7 +127,6 @@ assets/src/
     snapshots.ts
     commands.ts
   render/
-    canvas/
     webgl/
     effects/
     layout/
@@ -217,7 +216,7 @@ Deliverable: client connects, selects the correct active save slot, receives req
 
 ### Phase 2: Progress Loop
 
-- Port progress state and progression rules to Elixir.
+- Port progress bar and progression rules to Elixir.
 - Implement lazy progress advancement.
 - Implement `progress.verify_full`.
 - Implement `progress.claim_reward`.
