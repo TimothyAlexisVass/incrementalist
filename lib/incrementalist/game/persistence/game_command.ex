@@ -1,4 +1,16 @@
 defmodule Incrementalist.Game.Persistence.GameCommand do
+  @moduledoc """
+  Durable command queue row.
+
+  Status meanings:
+  - `queued`: stored intent, no game rules have run.
+  - `succeeded` or `failed`: rules ran once and `result` is ready for the client.
+  - `acked`: the client reported that the processed result was applied.
+
+  `result` is part of the durability model, not a cache. It is what reconnect
+  replay returns while a processed row remains unacknowledged.
+  """
+
   use Ecto.Schema
 
   import Ecto.Changeset
@@ -13,7 +25,6 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     field :intent, :map, default: %{}
     field :status, :string, default: "queued"
     field :result, :map
-    field :state_version, :integer
     field :queued_at, :utc_datetime
     field :processed_at, :utc_datetime
     field :acked_at, :utc_datetime
@@ -35,7 +46,6 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
       :intent,
       :status,
       :result,
-      :state_version,
       :queued_at,
       :processed_at,
       :acked_at,

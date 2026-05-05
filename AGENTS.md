@@ -31,7 +31,9 @@ Do not implement client-side truth for:
 - Hidden card or board outcomes.
 - Durable save state.
 
-LocalStorage may be used only for harmless preferences.
+LocalStorage may store harmless preferences, server-issued anonymous identity tokens, and non-authoritative cached gameplay snapshots for each save slot.
+Cached gameplay snapshots are a rendering/startup optimization only. They may be used to draw immediately after boot or slot switch, but any server snapshot or command result overwrites them.
+LocalStorage must never store command ids, server queue position, reward eligibility, hidden outcomes, or any value the client can use to authorize durable gameplay transitions.
 
 ## Progress Bar Contract
 
@@ -63,6 +65,10 @@ Backend game code must live under `lib/incrementalist/game/` and be split into d
 
 Frontend game code must live under `assets/src/` and be split into core, net, render, ui, features, and theme.
 
+The game UI is Canvas/WebGL. HTML elements may host the canvas and non-game browser shell only. Do not build gameplay display, menus, overlays, buttons, hit testing, hover state, or modal-like flows as DOM UI.
+
+Temporary HTML gameplay controls may exist only as bootstrap scaffolding before the matching Canvas surface is ported. Do not extend or build new gameplay functionality on top of that scaffolding. When the Canvas surface for that feature is introduced, replace the temporary DOM controls.
+
 For frontend features, prefer this shape:
 
 ```txt
@@ -90,17 +96,30 @@ The only gameplay communication pattern is: client sends a command, server sends
 
 Client messages send only command intent plus minimal visible UI intent required by that command.
 
-The server owns command ids, idempotency, active save slot, queue order, replay state, and state versions.
+The server owns command ids, idempotency, active save slot, queue order, and replay state.
 
-Do not require the client to send command ids, active save slots, snapshot versions, state versions, or generic payload envelopes.
+Do not require the client to send command ids, active save slots, version markers, or generic payload envelopes.
+The client may send cache-presence hints, such as which save slots have cached snapshots, only to reduce snapshot payload size. Cache hints must never be treated as authoritative state.
 
 Every client command must receive a server result.
 
 Server results must include the minimum required authoritative state for that command. They do not need to include a full snapshot every time.
 
+Do not add speculative bookkeeping fields, counters, versions, audit metadata, or "might be useful later" values. Every persisted field and every protocol field must support a concrete current behavior, invariant, or query. If it does not, leave it out.
+
+Protocol types must be exact discriminated unions keyed by `type`. Do not model server results as one generic object with optional fields for unrelated variants. A field belongs only on the result type that actually sends it.
+
+ACK-ability is part of the command queue contract, not a generic optional boolean. A processed queued command result is ACKed. Queue acceptance, queue rejection, and ACK responses are not themselves ACKed.
+
+Error reasons must be machine-readable fields on explicit error result types, not optional text on every result.
+
+Follow-on command results released by `command.ack` must be named by what happened at the queue boundary, such as `released_result`, not vague transport wording like `next_result`.
+
 `command.ack` means the client applied the current command result; it must not include a client-known command id. Cosmetic animations do not need to finish before ACK.
 
 Use server snapshots when full state is required, such as boot or reconnect. Server results may include game-result events that the client can animate.
+
+Prefer using cached client snapshots for boot or save-slot loading when the client already has visible state for that slot. If the cached state is stale, later authoritative command results overwrite it.
 
 Client commands should describe player intent, not calculated results.
 

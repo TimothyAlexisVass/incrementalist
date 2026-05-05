@@ -1,4 +1,12 @@
 defmodule Incrementalist.Game.Persistence.SaveSlot do
+  @moduledoc """
+  One of the four anonymous save files.
+
+  `state == nil` means the slot is visibly empty. Once initialized, `state` is
+  versioned JSON so gameplay data can evolve without requiring a relational
+  schema change for every rule tweak.
+  """
+
   use Ecto.Schema
 
   import Ecto.Changeset
@@ -10,7 +18,6 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
   schema "save_slots" do
     field :slot_index, :integer
     field :state, :map
-    field :state_version, :integer, default: 0
     field :last_saved_at, :utc_datetime
 
     belongs_to :player, Player
@@ -20,10 +27,9 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
 
   def changeset(save_slot, attrs) do
     save_slot
-    |> cast(attrs, [:player_id, :slot_index, :state, :state_version, :last_saved_at])
-    |> validate_required([:player_id, :slot_index, :state_version])
+    |> cast(attrs, [:player_id, :slot_index, :state, :last_saved_at])
+    |> validate_required([:player_id, :slot_index])
     |> validate_inclusion(:slot_index, @slot_indexes)
-    |> validate_number(:state_version, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:player_id)
     |> unique_constraint([:player_id, :slot_index])
   end

@@ -21,6 +21,27 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(boot, "slots")
     assert boot["snapshot"]["active_save_slot"] == 0
     assert boot["snapshot"]["save_slot"]["has_data"]
+    refute Map.has_key?(boot["snapshot"], "state_version")
+    refute Map.has_key?(boot["snapshot"]["save_slot"], "state_version")
+  end
+
+  test "boot can omit a full snapshot when the active slot is cached by the client" do
+    session = Sessions.authenticate_anonymous(nil, @now)
+    _initial_boot = Sessions.boot_player(session.player.id, session.anonymous_player_token, @now)
+
+    cached_boot =
+      Sessions.boot_player(
+        session.player.id,
+        session.anonymous_player_token,
+        MapSet.new([0]),
+        @now
+      )
+
+    assert cached_boot["active_save_slot"] == 0
+    assert cached_boot["save_slot"]["slot_index"] == 0
+    assert cached_boot["save_slot"]["has_data"]
+    assert cached_boot["snapshot"] == nil
+    refute Map.has_key?(cached_boot, "slots")
   end
 
   test "boot selection uses last valid slot, then first populated slot, then slot zero" do
@@ -61,20 +82,57 @@ defmodule Incrementalist.Game.CommandsTest do
     third = Commands.enqueue(player.id, "save_slot.switch", %{"slot_index" => 1}, @now)
 
     assert first["type"] == "game.noop.result"
-    assert first["requires_ack"]
+    refute Map.has_key?(first, "requires_ack")
     assert second["type"] == "command.queued"
+    refute Map.has_key?(second, "requires_ack")
     assert third["type"] == "command.queued"
     assert command_statuses(player.id) == ["succeeded", "queued", "queued"]
 
     ack = Commands.ack(player.id, @now)
     assert ack["acked"]
-    assert ack["next_result"]["type"] == "save_slots.list.result"
+    refute Map.has_key?(ack, "next_result")
+    refute Map.has_key?(ack, "requires_ack")
+    assert ack["released_result"]["type"] == "save_slots.list.result"
     assert command_statuses(player.id) == ["acked", "succeeded", "queued"]
 
     ack = Commands.ack(player.id, @now)
-    assert ack["next_result"]["type"] == "save_slot.switch.result"
-    assert ack["next_result"]["snapshot"]["active_save_slot"] == 1
+    assert ack["released_result"]["type"] == "save_slot.switch.result"
+    assert ack["released_result"]["snapshot"]["active_save_slot"] == 1
     assert command_statuses(player.id) == ["acked", "acked", "succeeded"]
+  end
+
+  test "slot switch trusts cache hints only to omit snapshots for populated slots" do
+    player = create_player()
+
+    slot_1 = SaveSlots.get_slot!(player.id, 1)
+    put_slot_state(slot_1, State.new(@now), @now)
+
+    cached_result =
+      Commands.enqueue(
+        player.id,
+        "save_slot.switch",
+        %{"slot_index" => 1, "has_cached_snapshot" => true},
+        @now
+      )
+
+    assert cached_result["type"] == "save_slot.switch.result"
+    assert cached_result["active_save_slot"] == 1
+    assert cached_result["save_slot"]["slot_index"] == 1
+    assert length(cached_result["slots"]) == 4
+    refute Map.has_key?(cached_result, "snapshot")
+
+    Commands.ack(player.id, @now)
+
+    empty_slot_result =
+      Commands.enqueue(
+        player.id,
+        "save_slot.switch",
+        %{"slot_index" => 2, "has_cached_snapshot" => true},
+        @now
+      )
+
+    assert empty_slot_result["type"] == "save_slot.switch.result"
+    assert empty_slot_result["snapshot"]["active_save_slot"] == 2
   end
 
   test "stored results replay without re-executing command rules" do
@@ -91,8 +149,8 @@ defmodule Incrementalist.Game.CommandsTest do
     command = Repo.one!(GameCommand)
     assert command.replay_count == 2
 
-    active_slot = SaveSlots.get_slot!(player.id, 0)
-    assert active_slot.state_version == result["snapshot"]["state_version"]
+    refute Map.has_key?(result["snapshot"], "state_version")
+    refute Map.has_key?(command, :state_version)
 
     Commands.ack(player.id, @now)
     assert Commands.replay_pending(player.id) == nil
@@ -111,6 +169,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert rejected["type"] == "command.rejected"
     assert rejected["reason"] == "queue_full"
+    refute Map.has_key?(rejected, "requires_ack")
     assert Repo.aggregate(GameCommand, :count) == 10
   end
 
@@ -173,7 +232,6 @@ defmodule Incrementalist.Game.CommandsTest do
     slot
     |> SaveSlot.changeset(%{
       state: state,
-      state_version: slot.state_version + 1,
       last_saved_at: now
     })
     |> Repo.update!()

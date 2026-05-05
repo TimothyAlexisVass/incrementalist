@@ -17,7 +17,6 @@ fill
 last_progress_at
 fill_rate_parameters
 can_claim
-state_version
 ```
 
 Server sends snapshots with enough projection data:
@@ -30,8 +29,7 @@ Server sends snapshots with enough projection data:
     "estimated_full_at": "2026-05-04T14:05:12Z",
     "can_claim": false
   },
-  "server_time": "2026-05-04T14:03:55Z",
-  "state_version": 18
+  "server_time": "2026-05-04T14:03:55Z"
 }
 ```
 
@@ -164,6 +162,13 @@ Frontend state categories:
 - `uiState`: open modals, hover, selected indexes, focused controls.
 - `effectState`: particles, floating text, WebGL bursts, transitions.
 
+Canvas-only UI contract:
+
+- The game UI is Canvas/WebGL. HTML elements may exist only as temporary bootstrap scaffolding around the canvas while a feature's real Canvas surface has not been ported.
+- Do not build new gameplay functionality on top of Phase 1 HTML buttons, status text, slot lists, or other DOM controls.
+- When a Canvas surface for a feature is introduced, it must replace the temporary HTML for that feature rather than wrapping, styling, or extending the DOM scaffolding.
+- DOM may host the canvas and non-game browser shell only. Gameplay display, menus, overlays, buttons, hit testing, hover state, and modal-like flows belong in Canvas/WebGL modules.
+
 ## Migration Phases
 
 ### Phase 1: Foundation
@@ -187,7 +192,7 @@ Tokens without player are deleted after 1 month of inactivity.
 - Do not require boot/reconnect to send all 4 save-slot summaries.
 - Save screen visible info is presentation state and is not authoritative gameplay state. The server overwrites with authoritative slot state when a slot is loaded.
 - Autosave the current slot before switching slots.
-- Save UI may be an acceptable MVP in Phase 1, but behavior and visible slot information must match legacy.
+- Any HTML status, button, or save-slot UI used in Phase 1 is temporary scaffolding only. It must not become the extension point for later features.
 - Add a per-player FIFO command queue backed by `game_commands`.
 - Process only one command at a time for each player.
 - Allow up to 10 queued commands per player.
@@ -198,13 +203,13 @@ Tokens without player are deleted after 1 month of inactivity.
 - Process the next queued command only after the server receives ACK for the current command result.
 - Withholding ACKs must not duplicate rewards or state changes; it only keeps the player blocked on the same queued result.
 - Keep unacked commands indefinitely; continue blocking/replaying until ACK.
-- Store command result data needed for replay, including the server result, internal state version, and success/error.
+- Store command result data needed for replay, including the server result, queue status, and success/error.
 - Add the hourly cleanup job that removes ACKed `game_commands` older than 48 hours.
-- Implement server-owned state versioning and execute-once replay handling.
+- Implement execute-once replay handling.
 - Add backend tests for FIFO ordering, execute-once replay, ACK-gated advancement, queue full rejection, reconnect replay, and ACKed-only cleanup.
 - Create a minimal Canvas boot that renders from a server snapshot.
 
-Deliverable: client connects, selects the correct active save slot, receives required authoritative state, renders basic HUD/save UI, can switch or reset slots, and can send no-op commands.
+Deliverable: client connects, selects the correct active save slot, receives required authoritative state, renders a minimal Canvas scene, can switch or reset slots through temporary scaffolding, and can send no-op commands. The temporary HTML controls are explicitly not product UI.
 
 ### Phase 2: Progress Loop
 
@@ -226,24 +231,37 @@ Deliverable: the core incremental loop works with server-authorized collectibili
 
 Deliverable: level, exp, coins, shards, and cores are durable server state.
 
-### Phase 4: Shop and Locked Elements
+### Phase 4: Canvas Menu Shell and Save Files
+
+- Port the legacy bottom menu button and overlay shell to Canvas.
+- Implement Canvas hit testing and keyboard handling for opening and closing the menu overlay.
+- Implement the Save Files tab in the Canvas menu overlay.
+- Replace the temporary Phase 1 HTML save-slot list, save button, reset button, slot readout, and related DOM click handling with Canvas-rendered save-file UI and Canvas hit tests.
+- Keep save-file visible info as presentation state. Slot switching and reset confirmation still use server commands.
+- Move reset confirmation into the Canvas overlay flow, matching legacy behavior.
+- Remove temporary DOM gameplay controls that are no longer needed once the Canvas menu owns save files.
+
+Deliverable: save-file selection and reset live in the Canvas menu overlay, and the temporary HTML save-slot UI is gone.
+
+### Phase 5: Shop and Locked Elements
 
 - Port feature shop definitions to Elixir.
 - Implement `shop.purchase`.
+- Render the Shop tab inside the Canvas menu overlay.
 - Implement unlock destination metadata in snapshots.
 - Keep locked-element UI as presentation only.
 - Highlight unlock destination on client based on server metadata.
 
 Deliverable: Idle Mode, Sisu Generator, and Bonus Time unlocks are server-authorized.
 
-### Phase 5: Idle Mode
+### Phase 6: Idle Mode
 
 - Implement `progress.set_idle_mode`.
 - Make idle-mode fill rate part of server-issued projection parameters.
 
 Deliverable: idle mode changes fill pacing and updates the HUD smoothly.
 
-### Phase 6: Sisu
+### Phase 7: Sisu
 
 - Port Sisu state, refill tiers, max upgrade costs, and decay to Elixir.
 - Use lazy time advancement for Sisu decay.
@@ -252,7 +270,7 @@ Deliverable: idle mode changes fill pacing and updates the HUD smoothly.
 
 Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
 
-### Phase 7: Areas
+### Phase 8: Areas
 
 - Port area definitions and unlock requirements to Elixir.
 - Implement `area.select`.
@@ -261,24 +279,26 @@ Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
 
 Deliverable: area selection and unlock visibility work without client rule ownership.
 
-### Phase 8: Quests and Achievements
+### Phase 9: Quests and Achievements
 
 - Port quest and achievement definitions to Elixir.
 - Implement server-side evaluation after relevant commands.
 - Implement `quest.claim` and `quest.claim_all`.
+- Render Quests and Achievements tabs inside the Canvas menu overlay.
 - Return achievement-unlocked and quest-claimed events for animation.
 
 Deliverable: reward multiplier is server-derived from quest and achievement state.
 
-### Phase 9: Daily Bonus
+### Phase 10: Daily Bonus
 
 - Port daily token rotation, streaks, reward counts, and one-shot games.
 - Implement `daily_bonus.open`, `daily_bonus.play`, and game-specific commands.
+- Render the Daily tab and daily bonus interactions in Canvas.
 - Keep client animations reveal-only.
 
 Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
 
-### Phase 10: Card Pick
+### Phase 11: Card Pick
 
 - Replace the legacy client-board model.
 - Server stores session state.
@@ -291,19 +311,20 @@ Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
 
 Deliverable: Card Pick session lifecycle and reveal flow are ported.
 
-### Phase 11: WebGL and Visual Polish
+### Phase 12: WebGL and Visual Polish
 
 - Move particles, floating text, and WebGL effects into render/effects modules.
 - Trigger effects from server events and local cosmetic input events.
 
 Deliverable: legacy visual effects and player-visible behavior are restored on the new architecture.
 
-### Phase 12: Legacy Removal
+### Phase 13: Legacy Removal
 
 - Keep `legacy/` as a reference until all features are ported.
 - Once parity is achieved, move any remaining assets into the new asset pipeline.
 - Remove old localStorage save code.
 - Remove old monolithic game bootstrap.
+- Remove any remaining temporary HTML gameplay scaffolding. The app shell should host the Canvas/WebGL surface, not gameplay controls.
 
 Deliverable: the real game no longer depends on `legacy/game`.
 
@@ -336,6 +357,7 @@ Frontend tests:
 - Snapshot to view-model conversion.
 - Progress projection state machine.
 - Hit testing for buttons, dropdowns, cards, and overlays.
+- Canvas menu and Save Files tab hit testing.
 - Rendering smoke tests for nonblank Canvas/WebGL.
 
 ## Non-Goals During Migration

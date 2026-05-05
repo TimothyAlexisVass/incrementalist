@@ -36,11 +36,54 @@ const canvasState = {
 };
 
 let channel = null;
+let snapshotCache = null;
 let busy = false;
 
-class GameChannel {
+class SnapshotCache {
   constructor(token) {
     this.token = token;
+  }
+
+  cachedSlotIndexes() {
+    if (!this.token) return [];
+
+    const indexes = [];
+    for (let slotIndex = 0; slotIndex < 4; slotIndex += 1) {
+      if (this.load(slotIndex)) {
+        indexes.push(slotIndex);
+      }
+    }
+    return indexes;
+  }
+
+  load(slotIndex) {
+    if (!this.token) return null;
+
+    try {
+      const encoded = window.localStorage.getItem(this.key(slotIndex));
+      if (!encoded) return null;
+
+      const snapshot = JSON.parse(encoded);
+      return snapshot?.type === "game.snapshot" && snapshot.active_save_slot === slotIndex ? snapshot : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  save(snapshot) {
+    if (!this.token) return;
+    window.localStorage.setItem(this.key(snapshot.active_save_slot), JSON.stringify(snapshot));
+  }
+
+  key(slotIndex) {
+    return `incrementalist.snapshot.${this.token}.${slotIndex}`;
+  }
+}
+
+class GameChannel {
+  constructor(token, cachedSaveSlots = []) {
+    this.token = token;
+    this.cachedSaveSlots = cachedSaveSlots;
     this.socket = null;
     this.ref = 0;
     this.joinRef = null;
@@ -51,6 +94,7 @@ class GameChannel {
   connect() {
     const params = new URLSearchParams({ vsn: "2.0.0" });
     if (this.token) params.set("anonymous_player_token", this.token);
+    if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
@@ -157,8 +201,7 @@ function createSaveSlotsViewModel(snapshot, slots) {
       has_data: slotIndex === activeSlot,
       level: snapshot?.state.level ?? 1,
       rewards_claimed: snapshot?.state.progress_bar.rewards_claimed ?? 0,
-      saved_at: snapshot?.state.saved_at ?? null,
-      state_version: snapshot?.state_version ?? 0
+      saved_at: snapshot?.state.saved_at ?? null
     }))
   };
 }
@@ -218,17 +261,31 @@ function statusForResult(result) {
   return "Ready";
 }
 
+function isAckableResult(result) {
+  return (
+    result.type === "game.noop.result" ||
+    result.type === "save_slots.list.result" ||
+    result.type === "save_slot.switch.result" ||
+    result.type === "save_slot.reset.result" ||
+    result.type === "command.error"
+  );
+}
+
 async function applyAndAck(result) {
+  hydrateSnapshotFromCache(result);
   applyResult(result);
+  cacheSnapshotFromResult(result);
   renderDom();
 
-  if (!result.requires_ack) return;
+  if (!isAckableResult(result)) return;
 
-  let next = (await channel.push("command.ack")).next_result ?? null;
+  let next = (await channel.push("command.ack")).released_result ?? null;
   while (next) {
+    hydrateSnapshotFromCache(next);
     applyResult(next);
+    cacheSnapshotFromResult(next);
     renderDom();
-    next = next.requires_ack ? (await channel.push("command.ack")).next_result ?? null : null;
+    next = (await channel.push("command.ack")).released_result ?? null;
   }
 }
 
@@ -326,15 +383,19 @@ async function boot() {
   resizeCanvas();
   window.addEventListener("resize", resizeCanvas);
 
-  channel = new GameChannel(window.localStorage.getItem(tokenKey));
+  const token = window.localStorage.getItem(tokenKey);
+  snapshotCache = new SnapshotCache(token);
+  channel = new GameChannel(token, snapshotCache.cachedSlotIndexes());
   const bootResult = await channel.connect();
 
   if (bootResult.anonymous_player_token) {
     window.localStorage.setItem(tokenKey, bootResult.anonymous_player_token);
+    snapshotCache = new SnapshotCache(bootResult.anonymous_player_token);
   }
 
-  serverState.snapshot = bootResult.snapshot;
-  serverState.slots = [bootResult.snapshot.save_slot];
+  serverState.snapshot = bootResult.snapshot ?? snapshotCache.load(bootResult.active_save_slot);
+  if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);
+  serverState.slots = [bootResult.save_slot];
   serverState.status = "Ready";
   renderDom();
 
@@ -359,9 +420,29 @@ slotList.addEventListener("click", (event) => {
 
   const slotIndex = Number(button.dataset.slotIndex);
   if (Number.isInteger(slotIndex)) {
-    runCommand(() => channel.push("save_slot.switch", { slot_index: slotIndex }));
+    runCommand(() =>
+      channel.push("save_slot.switch", {
+        slot_index: slotIndex,
+        has_cached_snapshot: Boolean(snapshotCache.load(slotIndex))
+      })
+    );
   }
 });
+
+function hydrateSnapshotFromCache(result) {
+  if (result.type !== "save_slot.switch.result" || result.snapshot) return;
+
+  const cachedSnapshot = snapshotCache.load(result.active_save_slot);
+  if (cachedSnapshot) {
+    serverState.snapshot = cachedSnapshot;
+  }
+}
+
+function cacheSnapshotFromResult(result) {
+  if (result.snapshot) {
+    snapshotCache.save(result.snapshot);
+  }
+}
 
 boot().catch((error) => {
   serverState.statusTone = "error";

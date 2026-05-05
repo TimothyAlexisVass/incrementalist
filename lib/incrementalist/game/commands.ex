@@ -1,4 +1,17 @@
 defmodule Incrementalist.Game.Commands do
+  @moduledoc """
+  Executes gameplay commands through a durable, server-owned FIFO queue.
+
+  Each command is inserted with a server-assigned sequence before any game rule
+  runs. Once a command leaves `queued`, its `result` column is the durable wire
+  response for that command. Reconnects and withheld acknowledgements return
+  that stored result exactly, so rule execution remains once-only.
+
+  The client never names the command being acknowledged. `command.ack` means
+  "the current blocking result was applied", and the server decides which row
+  that is from the player's queue.
+  """
+
   import Ecto.Query
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
@@ -13,6 +26,8 @@ defmodule Incrementalist.Game.Commands do
   def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now())
       when is_binary(command_type) do
     Repo.transaction(fn ->
+      # Locking the player row gives every queue mutation the same serialization point.
+      # Without this, two sockets could both see an empty queue and execute out of order.
       player = lock_player!(player_id)
 
       if pending_command_count(player.id) >= @queue_limit do
@@ -42,16 +57,17 @@ defmodule Incrementalist.Game.Commands do
             "type" => "command.ack.result",
             "status" => "ok",
             "acked" => false,
-            "next_result" => nil,
-            "requires_ack" => false
+            "released_result" => nil
           }
 
         command ->
+          # Acknowledgement is intentionally implicit: the oldest processed,
+          # unacked row is the only result the client is allowed to acknowledge.
           command
           |> GameCommand.changeset(%{status: "acked", acked_at: now})
           |> Repo.update!()
 
-          next_result =
+          released_result =
             case process_next_queued(player, now) do
               {:processed, next_command} -> next_command.result
               :blocked -> nil
@@ -61,8 +77,7 @@ defmodule Incrementalist.Game.Commands do
             "type" => "command.ack.result",
             "status" => "ok",
             "acked" => true,
-            "next_result" => next_result,
-            "requires_ack" => false
+            "released_result" => released_result
           }
       end
     end)
@@ -78,6 +93,8 @@ defmodule Incrementalist.Game.Commands do
           nil
 
         command ->
+          # Replay must not consult rule code or reload current save facts. The
+          # saved result is the exact response the client failed to acknowledge.
           {1, _} =
             Repo.update_all(
               from(game_command in GameCommand, where: game_command.id == ^command.id),
@@ -92,6 +109,8 @@ defmodule Incrementalist.Game.Commands do
 
   defp process_next_queued(%Player{} = player, now) do
     if current_unacked_command(player.id) do
+      # A processed-but-unacked result is backpressure, not a retry request.
+      # The next command waits so durable effects cannot be duplicated by silence.
       :blocked
     else
       case next_queued_command(player.id) do
@@ -107,7 +126,9 @@ defmodule Incrementalist.Game.Commands do
   end
 
   defp execute_command(%GameCommand{} = command, %Player{} = player, now) do
-    {status, result, state_version, save_slot_id} =
+    # The tuple captures the execution boundary: queue status, replayable client
+    # payload, and the save slot affected by the command.
+    {status, result, save_slot_id} =
       case command.command_type do
         "game.noop" ->
           active_slot = active_slot(player, now)
@@ -117,10 +138,8 @@ defmodule Incrementalist.Game.Commands do
              "type" => "game.noop.result",
              "status" => "ok",
              "server_time" => Time.iso8601(now),
-             "state_version" => active_slot.state_version,
-             "events" => [],
-             "requires_ack" => true
-           }, active_slot.state_version, active_slot.id}
+             "events" => []
+           }, active_slot.id}
 
         "save_slots.list" ->
           active_slot = active_slot(player, now)
@@ -131,10 +150,8 @@ defmodule Incrementalist.Game.Commands do
              "status" => "ok",
              "server_time" => Time.iso8601(now),
              "active_save_slot" => active_slot.slot_index,
-             "slots" => SaveSlots.summaries(player.id, active_slot.slot_index),
-             "state_version" => active_slot.state_version,
-             "requires_ack" => true
-           }, active_slot.state_version, active_slot.id}
+             "slots" => SaveSlots.summaries(player.id, active_slot.slot_index)
+           }, active_slot.id}
 
         "save_slot.switch" ->
           execute_switch(player, command.intent, now)
@@ -147,16 +164,14 @@ defmodule Incrementalist.Game.Commands do
 
           {"failed",
            error_result("unknown_command", %{
-             "command_type" => command.command_type,
-             "state_version" => active_slot.state_version
-           }), active_slot.state_version, active_slot.id}
+             "command_type" => command.command_type
+           }), active_slot.id}
       end
 
     command
     |> GameCommand.changeset(%{
       status: status,
       result: result,
-      state_version: state_version,
       save_slot_id: save_slot_id,
       processed_at: now
     })
@@ -167,25 +182,30 @@ defmodule Incrementalist.Game.Commands do
     active_slot = active_slot(player, now)
 
     with {:ok, slot_index} <- fetch_slot_index(intent) do
+      # Switching is a command because the current active slot is server truth.
+      # The previous slot is saved before the active pointer moves.
+      target_had_state = SaveSlots.get_slot!(player.id, slot_index).state |> is_map()
+      use_cached_snapshot = target_had_state and cached_snapshot_hint?(intent)
       target_slot = SaveSlots.switch_player_to_slot(player, slot_index, now)
 
-      {"succeeded",
-       %{
-         "type" => "save_slot.switch.result",
-         "status" => "ok",
-         "server_time" => Time.iso8601(now),
-         "snapshot" => Snapshots.full(target_slot, target_slot.slot_index, now),
-         "slots" => SaveSlots.summaries(player.id, target_slot.slot_index),
-         "state_version" => target_slot.state_version,
-         "requires_ack" => true
-       }, target_slot.state_version, target_slot.id}
+      result =
+        %{
+          "type" => "save_slot.switch.result",
+          "status" => "ok",
+          "server_time" => Time.iso8601(now),
+          "active_save_slot" => target_slot.slot_index,
+          "save_slot" => Incrementalist.Game.State.summary(target_slot, target_slot.slot_index),
+          "slots" => SaveSlots.summaries(player.id, target_slot.slot_index)
+        }
+        |> maybe_put_snapshot(target_slot, now, use_cached_snapshot)
+
+      {"succeeded", result, target_slot.id}
     else
       {:error, reason} ->
         {"failed",
          error_result(reason, %{
-           "state_version" => active_slot.state_version,
            "active_save_slot" => active_slot.slot_index
-         }), active_slot.state_version, active_slot.id}
+         }), active_slot.id}
     end
   end
 
@@ -199,10 +219,8 @@ defmodule Incrementalist.Game.Commands do
        "status" => "ok",
        "server_time" => Time.iso8601(now),
        "snapshot" => Snapshots.full(reset_slot, reset_slot.slot_index, now),
-       "slots" => SaveSlots.summaries(player.id, reset_slot.slot_index),
-       "state_version" => reset_slot.state_version,
-       "requires_ack" => true
-     }, reset_slot.state_version, reset_slot.id}
+       "slots" => SaveSlots.summaries(player.id, reset_slot.slot_index)
+     }, reset_slot.id}
   end
 
   defp insert_command(player_id, command_type, intent, now) do
@@ -229,6 +247,8 @@ defmodule Incrementalist.Game.Commands do
   end
 
   defp active_slot(%Player{} = player, now) do
+    # Commands such as slot switching can update the active pointer in this
+    # transaction; reloading avoids using a stale struct for follow-up snapshots.
     player = Repo.get!(Player, player.id)
     SaveSlots.determine_active_slot(player, now)
   end
@@ -304,13 +324,22 @@ defmodule Incrementalist.Game.Commands do
 
   defp normalize_intent(_intent), do: %{}
 
+  defp cached_snapshot_hint?(%{"has_cached_snapshot" => true}), do: true
+  defp cached_snapshot_hint?(%{has_cached_snapshot: true}), do: true
+  defp cached_snapshot_hint?(_intent), do: false
+
+  defp maybe_put_snapshot(result, _target_slot, _now, true), do: result
+
+  defp maybe_put_snapshot(result, target_slot, now, false) do
+    Map.put(result, "snapshot", Snapshots.full(target_slot, target_slot.slot_index, now))
+  end
+
   defp queued_result(%GameCommand{} = command, position) do
     %{
       "type" => "command.queued",
       "status" => "ok",
       "command_type" => command.command_type,
-      "queue_position" => position,
-      "requires_ack" => false
+      "queue_position" => position
     }
   end
 
@@ -318,8 +347,7 @@ defmodule Incrementalist.Game.Commands do
     %{
       "type" => "command.rejected",
       "status" => "error",
-      "reason" => "queue_full",
-      "requires_ack" => false
+      "reason" => "queue_full"
     }
   end
 
@@ -328,8 +356,7 @@ defmodule Incrementalist.Game.Commands do
     |> Map.merge(%{
       "type" => "command.error",
       "status" => "error",
-      "reason" => reason,
-      "requires_ack" => true
+      "reason" => reason
     })
   end
 

@@ -26,7 +26,6 @@ defmodule Incrementalist.Repo.Migrations.CreateGameFoundation do
       add(:player_id, references(:players, on_delete: :delete_all), null: false)
       add(:slot_index, :integer, null: false)
       add(:state, :map)
-      add(:state_version, :integer, null: false, default: 0)
       add(:last_saved_at, :utc_datetime)
 
       timestamps(type: :utc_datetime)
@@ -47,8 +46,8 @@ defmodule Incrementalist.Repo.Migrations.CreateGameFoundation do
       add(:command_type, :string, null: false)
       add(:intent, :map, null: false, default: %{})
       add(:status, :string, null: false, default: "queued")
+      # Processed rows need a durable response so reconnect replay never re-runs rules.
       add(:result, :map)
-      add(:state_version, :integer)
       add(:queued_at, :utc_datetime, null: false)
       add(:processed_at, :utc_datetime)
       add(:acked_at, :utc_datetime)

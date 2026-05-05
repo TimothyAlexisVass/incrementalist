@@ -1,4 +1,13 @@
 defmodule Incrementalist.Game.Persistence.SaveSlots do
+  @moduledoc """
+  Persistence helpers for the four-slot save model.
+
+  Each player always has rows for slots 0 through 3. Empty slots are represented
+  by `state == nil`, which lets the save screen show all files without inventing
+  durable gameplay state. Loading an empty slot initializes its JSON state on the
+  server before a snapshot is returned.
+  """
+
   import Ecto.Query
 
   alias Incrementalist.Game.{Snapshots, State, Time}
@@ -8,12 +17,13 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   @slot_indexes 0..3
 
   def ensure_four_slots(player_id, now \\ Time.now()) do
+    # The unique index on {player_id, slot_index} makes this safe on every boot.
+    # Missing rows are repaired, existing rows and their state are left untouched.
     rows =
       Enum.map(@slot_indexes, fn slot_index ->
         %{
           player_id: player_id,
           slot_index: slot_index,
-          state_version: 0,
           inserted_at: now,
           updated_at: now
         }
@@ -59,6 +69,8 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   def determine_active_slot(%Player{} = player, now \\ Time.now()) do
     slots = ensure_four_slots(player.id, now)
 
+    # Boot must never trust a stale active pointer that targets an empty slot.
+    # The visible behavior is: last valid slot, else first populated slot, else slot zero.
     selected_slot =
       Enum.find(slots, &(&1.slot_index == player.active_save_slot and is_map(&1.state))) ||
         Enum.find(slots, &is_map(&1.state)) ||
@@ -81,7 +93,6 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.new(now),
-      state_version: save_slot.state_version + 1,
       last_saved_at: now
     })
     |> Repo.update!()
@@ -93,7 +104,6 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.touch_saved_at(save_slot.state, now),
-      state_version: save_slot.state_version + 1,
       last_saved_at: now
     })
     |> Repo.update!()
@@ -103,7 +113,6 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.new(now),
-      state_version: save_slot.state_version + 1,
       last_saved_at: now
     })
     |> Repo.update!()
@@ -112,6 +121,8 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   def switch_player_to_slot(%Player{} = player, slot_index, now \\ Time.now())
       when slot_index in @slot_indexes do
     current_slot = get_slot!(player.id, player.active_save_slot)
+    # Switching slots is also an autosave boundary for the outgoing active file.
+    # The target can be empty, but the old slot must be durable first.
     _current_slot = autosave(current_slot, now)
 
     target_slot =

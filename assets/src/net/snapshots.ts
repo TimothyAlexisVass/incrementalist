@@ -16,14 +16,19 @@ export function createServerState(): ServerState {
   };
 }
 
+// Applies whatever authoritative state the result contains, and leaves everything
+// else unchanged. This matches the protocol: narrow command results should not
+// force the server to resend a full snapshot just to update UI status.
 export function applyResult(state: ServerState, result: ServerResult) {
-  if (result.snapshot) {
+  if ("snapshot" in result && result.snapshot) {
     state.snapshot = result.snapshot;
   }
 
-  if (result.slots) {
+  if ("slots" in result) {
     state.slots = result.slots;
-  } else if (result.snapshot?.save_slot) {
+  } else if ("snapshot" in result && result.snapshot) {
+    // Results are allowed to be partial. Keep previous slot summaries unless the
+    // server sends replacements, and only patch the slot covered by a full snapshot.
     state.slots = upsertSlot(state.slots, result.snapshot.save_slot);
   }
 

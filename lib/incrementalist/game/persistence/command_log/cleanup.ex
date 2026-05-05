@@ -1,4 +1,11 @@
 defmodule Incrementalist.Game.Persistence.CommandLog.Cleanup do
+  @moduledoc """
+  Hourly maintenance process for expired anonymous tokens and acknowledged commands.
+
+  Cleanup is deliberately outside command execution so queue correctness does
+  not depend on this process running on time.
+  """
+
   use GenServer
 
   alias Incrementalist.Game.Persistence.CommandLog

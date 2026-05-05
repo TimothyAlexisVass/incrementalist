@@ -8,6 +8,8 @@ export type CanvasState = {
 };
 
 export function resizeCanvas(canvas: HTMLCanvasElement, state: CanvasState) {
+  // The canvas covers the viewport, so unbounded devicePixelRatio can multiply
+  // memory and fill cost without making this UI meaningfully clearer.
   state.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   state.width = window.innerWidth;
   state.height = window.innerHeight;
@@ -70,6 +72,8 @@ export function renderHudCanvas(
   context.fillText(`Level ${snapshot?.state.level ?? 1}`, centerX, centerY - 37);
 
   context.fillStyle = colors.gold;
+  // This is display-only fill from the latest server snapshot. Reaching full on
+  // the client must not grant anything; collectibility requires a command result.
   const progress = snapshot?.state.progress_bar.fill ?? 0;
   roundRect(context, centerX - 86, centerY + 26, 172, 18, 5);
   context.strokeStyle = "rgba(255,255,255,0.8)";

@@ -1,4 +1,12 @@
 defmodule Incrementalist.Game.State do
+  @moduledoc """
+  Versioned JSON save-state shape used while rules are still moving.
+
+  The persisted JSON can contain internal fields that are not part of the wire
+  contract. Snapshots and save summaries are separate projections that include
+  only data the player is allowed to render.
+  """
+
   alias Incrementalist.Game.Time
 
   @current_version 1
@@ -49,6 +57,8 @@ defmodule Incrementalist.Game.State do
   def visible_state(state) when is_map(state) do
     progress_bar = Map.get(state, "progress_bar", %{})
 
+    # Save JSON can outlive code versions. Coercion here keeps the wire contract
+    # stable even when older saves contain strings, floats, or missing fields.
     %{
       "area" => string(state, "area", "sage"),
       "level" => integer(state, "level", 1),
@@ -73,6 +83,8 @@ defmodule Incrementalist.Game.State do
     state = slot.state
     progress_bar = if is_map(state), do: Map.get(state, "progress_bar", %{}), else: %{}
 
+    # The save UI may cache this client-side, but these facts are regenerated
+    # from the authoritative slot whenever the server sends a summary.
     %{
       "slot_index" => slot.slot_index,
       "file_index" => slot.slot_index,
@@ -80,8 +92,7 @@ defmodule Incrementalist.Game.State do
       "has_data" => is_map(state),
       "level" => integer(state || %{}, "level", 1),
       "rewards_claimed" => integer(progress_bar, "rewards_claimed", 0),
-      "saved_at" => Time.iso8601(slot.last_saved_at),
-      "state_version" => slot.state_version
+      "saved_at" => Time.iso8601(slot.last_saved_at)
     }
   end
 

@@ -1,4 +1,12 @@
 defmodule Incrementalist.Game.Persistence.AnonymousPlayerToken do
+  @moduledoc """
+  Hashed anonymous browser token tied to a player.
+
+  The raw token is a bearer credential held by the browser. Only its hash is
+  stored, and expiry is based on activity so abandoned anonymous identities can
+  be removed without touching the save-slot model.
+  """
+
   use Ecto.Schema
 
   import Ecto.Changeset

@@ -1,4 +1,12 @@
 defmodule Incrementalist.Game.Persistence.Player do
+  @moduledoc """
+  Player identity and active save-slot pointer.
+
+  Gameplay state belongs to a player, not to a browser tab or request. The active
+  save slot lives here so clients cannot switch durable context by sending slot
+  claims with individual commands.
+  """
+
   use Ecto.Schema
 
   import Ecto.Changeset

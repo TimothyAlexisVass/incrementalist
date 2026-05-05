@@ -1,5 +1,8 @@
 import type { BootResult, ServerResult } from "./protocol";
 
+// Phoenix's raw websocket frame is [joinRef, messageRef, topic, event, payload].
+// This client uses the refs only to resolve Promises. Gameplay ordering is not
+// inferred from websocket timing; the server persists its own command sequence.
 type PhoenixMessage = [string | null, string | null, string, string, unknown];
 
 const heartbeatIntervalMs = 25_000;
@@ -11,11 +14,15 @@ export class GameChannel {
   private waiters = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   private heartbeatId = 0;
 
-  constructor(private readonly token: string | null) {}
+  constructor(
+    private readonly token: string | null,
+    private readonly cachedSaveSlots: number[] = []
+  ) {}
 
   connect(): Promise<BootResult> {
     const params = new URLSearchParams({ vsn: "2.0.0" });
     if (this.token) params.set("anonymous_player_token", this.token);
+    if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
@@ -33,8 +40,11 @@ export class GameChannel {
     });
   }
 
-  push(event: string, payload: Record<string, unknown> = {}): Promise<ServerResult> {
-    return this.send("game", event, payload) as Promise<ServerResult>;
+  push<TResponse extends ServerResult = ServerResult>(
+    event: string,
+    payload: Record<string, unknown> = {}
+  ): Promise<TResponse> {
+    return this.send("game", event, payload) as Promise<TResponse>;
   }
 
   close() {
@@ -45,6 +55,8 @@ export class GameChannel {
 
   private join(): Promise<BootResult> {
     this.joinRef = this.nextRef();
+    // Joining the game topic is the point where authenticated identity turns
+    // into a visible snapshot and optional replay result.
     return this.send("game", "phx_join", {}, this.joinRef) as Promise<BootResult>;
   }
 
@@ -58,6 +70,8 @@ export class GameChannel {
         return;
       }
 
+      // This map is transport bookkeeping only. It must not be used to infer
+      // whether a gameplay command is current, processed, or acknowledged.
       this.waiters.set(ref, { resolve, reject });
       this.socket.send(JSON.stringify(message));
     });
@@ -90,6 +104,8 @@ export class GameChannel {
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatId = window.setInterval(() => {
+      // Heartbeats keep the socket alive. Gameplay recovery happens through
+      // reconnect replay, not by retrying whatever was in flight here.
       this.send("phoenix", "heartbeat", {}).catch(() => {});
     }, heartbeatIntervalMs);
   }

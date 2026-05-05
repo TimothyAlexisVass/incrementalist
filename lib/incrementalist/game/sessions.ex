@@ -1,4 +1,15 @@
 defmodule Incrementalist.Game.Sessions do
+  @moduledoc """
+  Owns anonymous player identity and boot payload construction.
+
+  Anonymous identity is intentionally separate from save authority. The browser
+  may cache visible snapshots for faster rendering, but the token only
+  identifies a player. It cannot choose the active slot or queued command.
+
+  The database stores a hash of the token so a DB row is not itself a usable
+  browser credential.
+  """
+
   import Ecto.Query
 
   alias Incrementalist.Game.Persistence.{AnonymousPlayerToken, Player, SaveSlots}
@@ -19,13 +30,30 @@ defmodule Incrementalist.Game.Sessions do
     |> unwrap_transaction()
   end
 
-  def boot_player(player_id, anonymous_player_token, now \\ Time.now()) do
+  def boot_player(
+        player_id,
+        anonymous_player_token,
+        cached_save_slots \\ MapSet.new(),
+        now \\ Time.now()
+      )
+
+  def boot_player(player_id, anonymous_player_token, %DateTime{} = now, _now) do
+    boot_player(player_id, anonymous_player_token, MapSet.new(), now)
+  end
+
+  def boot_player(player_id, anonymous_player_token, cached_save_slots, now) do
     player = Repo.get!(Player, player_id)
-    snapshot = SaveSlots.snapshot_for_player(player, now)
+    active_slot = SaveSlots.determine_active_slot(player, now)
+    active_slot_index = active_slot.slot_index
+    snapshot = snapshot_unless_cached(active_slot, cached_save_slots, now)
 
     %{
       "type" => "game.boot",
+      # A raw token is returned only when one was minted during this connection.
+      # Returning it on every boot would expose a bearer credential needlessly.
       "anonymous_player_token" => anonymous_player_token,
+      "active_save_slot" => active_slot_index,
+      "save_slot" => Incrementalist.Game.State.summary(active_slot, active_slot_index),
       "snapshot" => snapshot
     }
   end
@@ -48,6 +76,8 @@ defmodule Incrementalist.Game.Sessions do
         join: player in assoc(anonymous_token, :player),
         preload: [player: player],
         where: anonymous_token.token_hash == ^token_hash and anonymous_token.expires_at > ^now,
+        # Multiple tabs can connect with the same token. Lock the token row while
+        # refreshing activity timestamps so expiry and player touch stay coherent.
         lock: "FOR UPDATE"
     )
   end
@@ -97,6 +127,7 @@ defmodule Incrementalist.Game.Sessions do
 
     %{
       player: player,
+      # Returning nil here preserves the boot shape without re-sending the credential.
       anonymous_player_token: nil,
       anonymous_token: anonymous_token
     }
@@ -111,6 +142,14 @@ defmodule Incrementalist.Game.Sessions do
   defp hash_token(token) do
     :crypto.hash(:sha256, token)
     |> Base.encode16(case: :lower)
+  end
+
+  defp snapshot_unless_cached(active_slot, cached_save_slots, now) do
+    if MapSet.member?(cached_save_slots, active_slot.slot_index) do
+      nil
+    else
+      Incrementalist.Game.Snapshots.full(active_slot, active_slot.slot_index, now)
+    end
   end
 
   defp unwrap_transaction({:ok, value}), do: value

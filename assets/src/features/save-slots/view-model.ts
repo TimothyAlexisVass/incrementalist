@@ -15,6 +15,8 @@ export function createSaveSlotsViewModel(
     return { activeSlot, slots };
   }
 
+  // The server may boot with only the active slot summary. Missing summaries are
+  // placeholders for layout only and are replaced when `save_slots.list` returns.
   return {
     activeSlot,
     slots: [0, 1, 2, 3].map((slotIndex) => ({
@@ -24,8 +26,7 @@ export function createSaveSlotsViewModel(
       has_data: slotIndex === activeSlot,
       level: snapshot?.state.level ?? 1,
       rewards_claimed: snapshot?.state.progress_bar.rewards_claimed ?? 0,
-      saved_at: snapshot?.state.saved_at ?? null,
-      state_version: snapshot?.state_version ?? 0
+      saved_at: snapshot?.state.saved_at ?? null
     }))
   };
 }
