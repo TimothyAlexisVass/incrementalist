@@ -1,4 +1,3 @@
-import { GameLoop } from "./core/game-loop";
 import { onClick } from "./core/input";
 import { bindSaveSlotClicks } from "./features/save-slots/interactions";
 import { renderSaveSlots } from "./features/save-slots/render";
@@ -8,13 +7,11 @@ import { ackAppliedResult, listSaveSlots, resetSaveSlot, sendNoop, switchSaveSlo
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "./net/protocol";
 import { applyResult, createServerState } from "./net/snapshots";
 import { SnapshotCache } from "./net/snapshot-cache";
-import { resizeCanvas, renderHudCanvas, type CanvasState } from "./render/canvas/hud";
 import { setButtonBusy } from "./ui/components/button";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
 const tokenKey = "incrementalist.anonymousPlayerToken";
-const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
 const statusLine = requiredElement<HTMLElement>("#status-line");
 const levelValue = requiredElement<HTMLElement>("#level-value");
 const slotValue = requiredElement<HTMLElement>("#slot-value");
@@ -22,10 +19,8 @@ const noopButton = requiredElement<HTMLButtonElement>("#noop-button");
 const saveButton = requiredElement<HTMLButtonElement>("#save-button");
 const resetButton = requiredElement<HTMLButtonElement>("#reset-button");
 const slotList = requiredElement<HTMLElement>("#slot-list");
-const context = requiredCanvasContext(canvas);
 
 const serverState = createServerState();
-const canvasState: CanvasState = { width: 0, height: 0, pixelRatio: 1 };
 let channel: GameChannel;
 let snapshotCache: SnapshotCache;
 let busy = false;
@@ -95,9 +90,6 @@ async function runCommand(command: () => Promise<ServerResult>, loadingMessage: 
 }
 
 async function boot() {
-  resizeCanvas(canvas, canvasState);
-  window.addEventListener("resize", () => resizeCanvas(canvas, canvasState));
-
   const token = window.localStorage.getItem(tokenKey);
   snapshotCache = new SnapshotCache(token);
   channel = new GameChannel(token, snapshotCache.cachedSlotIndexes());
@@ -119,8 +111,6 @@ async function boot() {
     // first keeps the server queue and the rendered snapshot on the same boundary.
     await applyAndAck(bootResult.pending_result);
   }
-
-  new GameLoop((time) => renderHudCanvas(context, canvasState, serverState, time)).start();
 }
 
 onClick("#noop-button", () => runCommand(() => sendNoop(channel)));
@@ -157,12 +147,6 @@ function requiredElement<TElement extends Element>(selector: string) {
   const element = document.querySelector<TElement>(selector);
   if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
   return element;
-}
-
-function requiredCanvasContext(canvas: HTMLCanvasElement) {
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas 2D context unavailable");
-  return context;
 }
 
 boot().catch((error) => {

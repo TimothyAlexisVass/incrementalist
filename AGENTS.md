@@ -67,6 +67,8 @@ Backend game code must live under `lib/incrementalist/game/` and be split into d
 
 Frontend game code must live under `assets/src/` and be split into core, net, render, ui, features, and theme.
 
+Frontend source and generated static assets must stay in sync. When editing frontend source or theme files under `assets/src/`, rebuild from `assets/` with `npm run build` so `priv/static/assets/app.js` and `priv/static/assets/app.css` match the source. Do not hand-edit generated static assets unless the matching source change is also made.
+
 The game UI is Canvas/WebGL. HTML elements may host the canvas and non-game browser shell only. Do not build gameplay display, menus, overlays, buttons, hit testing, hover state, or modal-like flows as DOM UI.
 
 Temporary HTML gameplay controls may exist only as bootstrap scaffolding before the matching Canvas surface is ported. Do not extend or build new gameplay functionality on top of that scaffolding. When the Canvas surface for that feature is introduced, replace the temporary DOM controls.
