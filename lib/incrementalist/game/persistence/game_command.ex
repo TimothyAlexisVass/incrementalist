@@ -7,6 +7,10 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
   - `succeeded` or `failed`: rules ran once and `result` is ready for the client.
   - `acked`: the client reported that the processed result was applied.
 
+  `command_id` is the client's ten-slot queue index, 0 through 9, and is unique
+  only among that player's unacked commands. `sequence` remains the server's
+  FIFO ordering.
+
   `result` is part of the durability model, not a cache. It is what reconnect
   replay returns while a processed row remains unacknowledged.
   """
@@ -20,6 +24,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
   @statuses ~w(queued succeeded failed acked)
 
   schema "game_commands" do
+    field :command_id, :integer
     field :sequence, :integer
     field :command_type, :string
     field :intent, :map, default: %{}
@@ -41,6 +46,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     |> cast(attrs, [
       :player_id,
       :save_slot_id,
+      :command_id,
       :sequence,
       :command_type,
       :intent,
@@ -51,12 +57,22 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
       :acked_at,
       :replay_count
     ])
-    |> validate_required([:player_id, :sequence, :command_type, :intent, :status, :queued_at])
+    |> validate_required([
+      :player_id,
+      :command_id,
+      :sequence,
+      :command_type,
+      :intent,
+      :status,
+      :queued_at
+    ])
     |> validate_inclusion(:status, @statuses)
+    |> validate_number(:command_id, greater_than_or_equal_to: 0, less_than: 10)
     |> validate_number(:sequence, greater_than: 0)
     |> validate_number(:replay_count, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:player_id)
     |> foreign_key_constraint(:save_slot_id)
+    |> unique_constraint(:command_id, name: :game_commands_player_id_command_id_unacked_index)
     |> unique_constraint([:player_id, :sequence])
   end
 end

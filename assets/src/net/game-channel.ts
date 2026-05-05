@@ -1,4 +1,4 @@
-import type { BootResult, ServerResult } from "./protocol";
+import type { BootResult, CommandAckResult, ServerResult } from "./protocol";
 
 // Phoenix's raw websocket frame is [joinRef, messageRef, topic, event, payload].
 // This client uses the refs only to resolve Promises. Gameplay ordering is not
@@ -6,6 +6,7 @@ import type { BootResult, ServerResult } from "./protocol";
 type PhoenixMessage = [string | null, string | null, string, string, unknown];
 
 const heartbeatIntervalMs = 25_000;
+const commandQueueLimit = 10;
 
 export class GameChannel {
   private socket: WebSocket | null = null;
@@ -13,6 +14,7 @@ export class GameChannel {
   private joinRef: string | null = null;
   private waiters = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   private heartbeatId = 0;
+  private readonly commandQueue = Array<boolean>(commandQueueLimit).fill(false);
 
   constructor(
     private readonly token: string | null,
@@ -45,6 +47,31 @@ export class GameChannel {
     payload: Record<string, unknown> = {}
   ): Promise<TResponse> {
     return this.send("game", event, payload) as Promise<TResponse>;
+  }
+
+  pushCommand<TResponse extends ServerResult = ServerResult>(
+    event: string,
+    payload: Record<string, unknown> = {}
+  ): Promise<TResponse> {
+    const commandId = this.reserveCommandId();
+
+    return this.send("game", event, { ...payload, command_id: commandId }).then(
+      (response) => {
+        this.trackCommandResult(response as ServerResult);
+        return response as TResponse;
+      },
+      (error) => {
+        this.forgetCommand(commandId);
+        throw error;
+      }
+    );
+  }
+
+  async ackCommand(commandId: number): Promise<CommandAckResult> {
+    const ack = (await this.send("game", "command.ack", commandId)) as CommandAckResult;
+    this.forgetCommand(commandId);
+    if (ack.released_result) this.trackCommandResult(ack.released_result);
+    return ack;
   }
 
   close() {
@@ -99,6 +126,29 @@ export class GameChannel {
   private nextRef() {
     this.ref += 1;
     return String(this.ref);
+  }
+
+  private reserveCommandId() {
+    const commandId = this.commandQueue.findIndex((waitingForResult) => waitingForResult === false);
+    if (commandId < 0) throw new Error("Command queue is full");
+
+    this.commandQueue[commandId] = true;
+    return commandId;
+  }
+
+  private trackCommandResult(result: ServerResult) {
+    if (!("command_id" in result)) return;
+    if (result.command_id < 0 || result.command_id >= commandQueueLimit) return;
+    this.commandQueue[result.command_id] = result.type === "command.queued";
+  }
+
+  private forgetCommand(commandId: number) {
+    if (commandId < 0 || commandId >= commandQueueLimit) return;
+    this.commandQueue[commandId] = false;
+  }
+
+  clearCommandQueue() {
+    this.commandQueue.fill(false);
   }
 
   private startHeartbeat() {

@@ -3,9 +3,9 @@ defmodule IncrementalistWeb.GameChannel do
   Command/result transport for gameplay.
 
   The Phoenix event name is the command type and the payload is visible intent
-  for that command. There is no generic client envelope: player identity comes
-  from the socket, command ids and ordering come from persistence, and each push
-  receives exactly one server result.
+  plus the client-generated integer command id for that command. Player identity
+  comes from the socket, while FIFO ordering and replay state stay in
+  persistence.
 
   Phoenix refs only correlate websocket replies with browser promises. They are
   not gameplay command ids and are never stored.
@@ -31,15 +31,19 @@ defmodule IncrementalistWeb.GameChannel do
   end
 
   @impl true
-  def handle_in("command.ack", _payload, socket) do
-    # The payload is ignored on purpose: the server acknowledges the current
-    # blocking result for this player and may release the next queued command.
-    {:reply, {:ok, Commands.ack(socket.assigns.player_id)}, socket}
+  def handle_in("command.ack", command_id, socket) do
+    # ACK payload is intentionally just the client command id whose result was
+    # applied. The server still refuses to advance unless that id is current.
+    reply_command(Commands.ack(socket.assigns.player_id, command_id), socket)
   end
 
   def handle_in(command_type, payload, socket) when is_binary(command_type) do
-    # Arbitrary event names are treated as command types; validation and rejection
-    # happen inside the command executor so every command-shaped push gets a result.
-    {:reply, {:ok, Commands.enqueue(socket.assigns.player_id, command_type, payload)}, socket}
+    # Arbitrary event names are treated as command types; game-rule validation
+    # happens inside the command executor.
+    reply_command(Commands.enqueue(socket.assigns.player_id, command_type, payload), socket)
   end
+
+  defp reply_command(:queue_full, socket), do: {:reply, {:error, %{}}, socket}
+  defp reply_command(:invalid_command_id, socket), do: {:reply, {:error, %{}}, socket}
+  defp reply_command(result, socket), do: {:reply, {:ok, result}, socket}
 end

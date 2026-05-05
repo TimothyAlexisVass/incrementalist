@@ -1,5 +1,6 @@
 const tokenKey = "incrementalist.anonymousPlayerToken";
 const heartbeatIntervalMs = 25000;
+const commandQueueLimit = 10;
 
 const canvas = document.querySelector("#game-canvas");
 const context = canvas.getContext("2d");
@@ -26,7 +27,8 @@ const serverState = {
   snapshot: null,
   slots: [],
   status: "Connecting...",
-  statusTone: ""
+  statusTone: "",
+  loadingMessage: null
 };
 
 const canvasState = {
@@ -89,6 +91,7 @@ class GameChannel {
     this.joinRef = null;
     this.waiters = new Map();
     this.heartbeatId = 0;
+    this.commandQueue = Array(commandQueueLimit).fill(false);
   }
 
   connect() {
@@ -112,6 +115,32 @@ class GameChannel {
 
   push(event, payload = {}) {
     return this.send("game", event, payload);
+  }
+
+  pushCommand(event, payload = {}) {
+    const commandId = this.reserveCommandId();
+
+    return this.send("game", event, { ...payload, command_id: commandId }).then(
+      (response) => {
+        this.trackCommandResult(response);
+        return response;
+      },
+      (error) => {
+        this.forgetCommand(commandId);
+        throw error;
+      }
+    );
+  }
+
+  async ackCommand(commandId) {
+    const ack = await this.send("game", "command.ack", commandId);
+    this.forgetCommand(commandId);
+    if (ack.released_result) this.trackCommandResult(ack.released_result);
+    return ack;
+  }
+
+  clearCommandQueue() {
+    this.commandQueue.fill(false);
   }
 
   join() {
@@ -155,6 +184,25 @@ class GameChannel {
     return String(this.ref);
   }
 
+  reserveCommandId() {
+    const commandId = this.commandQueue.findIndex((waitingForResult) => waitingForResult === false);
+    if (commandId < 0) throw new Error("Command queue is full");
+
+    this.commandQueue[commandId] = true;
+    return commandId;
+  }
+
+  trackCommandResult(result) {
+    if (!("command_id" in result)) return;
+    if (result.command_id < 0 || result.command_id >= commandQueueLimit) return;
+    this.commandQueue[result.command_id] = result.type === "command.queued";
+  }
+
+  forgetCommand(commandId) {
+    if (commandId < 0 || commandId >= commandQueueLimit) return;
+    this.commandQueue[commandId] = false;
+  }
+
   startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatId = window.setInterval(() => {
@@ -181,11 +229,15 @@ function resizeCanvas() {
 
 function renderDom() {
   const snapshot = serverState.snapshot;
-  statusLine.textContent = serverState.status;
+  statusLine.textContent = serverState.loadingMessage ?? serverState.status;
   statusLine.dataset.tone = serverState.statusTone;
   levelValue.textContent = String(snapshot?.state.level ?? 1);
   slotValue.textContent = String((snapshot?.active_save_slot ?? 0) + 1);
   renderSaveSlots(createSaveSlotsViewModel(snapshot, serverState.slots));
+  slotList.querySelectorAll("button").forEach((button) => {
+    button.disabled = busy;
+    button.setAttribute("aria-busy", String(busy));
+  });
 }
 
 function createSaveSlotsViewModel(snapshot, slots) {
@@ -279,20 +331,25 @@ async function applyAndAck(result) {
 
   if (!isAckableResult(result)) return;
 
-  let next = (await channel.push("command.ack")).released_result ?? null;
+  let next = (await channel.ackCommand(result.command_id)).released_result ?? null;
+  if (clearsCommandQueue(result)) channel.clearCommandQueue();
   while (next) {
     hydrateSnapshotFromCache(next);
     applyResult(next);
     cacheSnapshotFromResult(next);
     renderDom();
-    next = (await channel.push("command.ack")).released_result ?? null;
+    const applied = next;
+    next = (await channel.ackCommand(applied.command_id)).released_result ?? null;
+    if (clearsCommandQueue(applied)) channel.clearCommandQueue();
   }
 }
 
-async function runCommand(command) {
+async function runCommand(command, loadingMessage = null) {
   if (busy) return;
   busy = true;
+  serverState.loadingMessage = loadingMessage;
   setButtonsBusy(true);
+  renderDom();
 
   try {
     await applyAndAck(await command());
@@ -301,8 +358,10 @@ async function runCommand(command) {
     serverState.status = error instanceof Error ? error.message : "Command failed";
     renderDom();
   } finally {
+    serverState.loadingMessage = null;
     busy = false;
     setButtonsBusy(false);
+    renderDom();
   }
 }
 
@@ -365,6 +424,16 @@ function renderCanvas(time) {
   context.stroke();
   context.fillRect(centerX - 84, centerY + 28, Math.max(0, Math.min(168, progress * 1.68)), 14);
 
+  if (serverState.loadingMessage) {
+    context.fillStyle = "rgba(22, 32, 38, 0.58)";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = colors.panelStrong;
+    context.font = "850 24px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(serverState.loadingMessage, width / 2, height / 2);
+  }
+
   window.requestAnimationFrame(renderCanvas);
 }
 
@@ -406,11 +475,11 @@ async function boot() {
   window.requestAnimationFrame(renderCanvas);
 }
 
-noopButton.addEventListener("click", () => runCommand(() => channel.push("game.noop")));
-saveButton.addEventListener("click", () => runCommand(() => channel.push("save_slots.list")));
+noopButton.addEventListener("click", () => runCommand(() => channel.pushCommand("game.noop")));
+saveButton.addEventListener("click", () => runCommand(() => channel.pushCommand("save_slots.list")));
 resetButton.addEventListener("click", () => {
   if (window.confirm("Reset the active save file?")) {
-    runCommand(() => channel.push("save_slot.reset"));
+    runCommand(() => channel.pushCommand("save_slot.reset"), "Loading save file...");
   }
 });
 slotList.addEventListener("click", (event) => {
@@ -421,10 +490,11 @@ slotList.addEventListener("click", (event) => {
   const slotIndex = Number(button.dataset.slotIndex);
   if (Number.isInteger(slotIndex)) {
     runCommand(() =>
-      channel.push("save_slot.switch", {
+      channel.pushCommand("save_slot.switch", {
         slot_index: slotIndex,
         has_cached_snapshot: Boolean(snapshotCache.load(slotIndex))
-      })
+      }),
+      "Loading save file..."
     );
   }
 });
@@ -442,6 +512,10 @@ function cacheSnapshotFromResult(result) {
   if (result.snapshot) {
     snapshotCache.save(result.snapshot);
   }
+}
+
+function clearsCommandQueue(result) {
+  return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
 }
 
 boot().catch((error) => {

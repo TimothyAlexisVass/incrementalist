@@ -5,6 +5,7 @@ export type ServerState = {
   slots: SaveSlotSummary[];
   status: string;
   statusTone: "ok" | "error" | "";
+  loadingMessage: string | null;
 };
 
 export function createServerState(): ServerState {
@@ -12,7 +13,8 @@ export function createServerState(): ServerState {
     snapshot: null,
     slots: [],
     status: "Connecting...",
-    statusTone: ""
+    statusTone: "",
+    loadingMessage: null
   };
 }
 
@@ -20,20 +22,30 @@ export function createServerState(): ServerState {
 // else unchanged. This matches the protocol: narrow command results should not
 // force the server to resend a full snapshot just to update UI status.
 export function applyResult(state: ServerState, result: ServerResult) {
-  if ("snapshot" in result && result.snapshot) {
-    state.snapshot = result.snapshot;
+  const snapshot = snapshotFromResult(result);
+
+  if (snapshot) {
+    state.snapshot = snapshot;
   }
 
   if ("slots" in result) {
     state.slots = result.slots;
-  } else if ("snapshot" in result && result.snapshot) {
+  } else if (snapshot) {
     // Results are allowed to be partial. Keep previous slot summaries unless the
     // server sends replacements, and only patch the slot covered by a full snapshot.
-    state.slots = upsertSlot(state.slots, result.snapshot.save_slot);
+    state.slots = upsertSlot(state.slots, snapshot.save_slot);
   }
 
   state.statusTone = result.status === "error" ? "error" : "ok";
   state.status = statusForResult(result);
+}
+
+function snapshotFromResult(result: ServerResult): GameSnapshot | null {
+  if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+    return result.snapshot ?? null;
+  }
+
+  return null;
 }
 
 function upsertSlot(slots: SaveSlotSummary[], slot: SaveSlotSummary) {

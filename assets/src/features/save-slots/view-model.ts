@@ -26,7 +26,7 @@ export function createSaveSlotsViewModel(
       has_data: slotIndex === activeSlot,
       level: snapshot?.state.level ?? 1,
       rewards_claimed: snapshot?.state.progress_bar.rewards_claimed ?? 0,
-      saved_at: snapshot?.state.saved_at ?? null
+      saved_at: snapshot?.save_slot.saved_at ?? null
     }))
   };
 }

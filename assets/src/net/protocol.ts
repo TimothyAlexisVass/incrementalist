@@ -36,6 +36,7 @@ export type GameSnapshot = {
 export type GameNoopResult = {
   type: "game.noop.result";
   status: "ok";
+  command_id: number;
   server_time: string;
   events: unknown[];
 };
@@ -43,6 +44,7 @@ export type GameNoopResult = {
 export type SaveSlotsListResult = {
   type: "save_slots.list.result";
   status: "ok";
+  command_id: number;
   server_time: string;
   active_save_slot: number;
   slots: SaveSlotSummary[];
@@ -51,6 +53,7 @@ export type SaveSlotsListResult = {
 export type SaveSlotSwitchResult = {
   type: "save_slot.switch.result";
   status: "ok";
+  command_id: number;
   server_time: string;
   active_save_slot: number;
   save_slot: SaveSlotSummary;
@@ -60,6 +63,7 @@ export type SaveSlotSwitchResult = {
 export type SaveSlotResetResult = {
   type: "save_slot.reset.result";
   status: "ok";
+  command_id: number;
   server_time: string;
   snapshot: GameSnapshot;
   slots: SaveSlotSummary[];
@@ -70,9 +74,9 @@ export type CommandErrorReason = "unknown_command" | "slot_index_required" | "in
 export type CommandErrorResult = {
   type: "command.error";
   status: "error";
+  command_id: number;
   reason: CommandErrorReason;
   active_save_slot?: number;
-  command_type?: string;
 };
 
 export type AckableCommandResult =
@@ -85,34 +89,25 @@ export type AckableCommandResult =
 export type CommandQueuedResult = {
   type: "command.queued";
   status: "ok";
-  command_type: string;
-  queue_position: number;
-};
-
-export type CommandRejectedResult = {
-  type: "command.rejected";
-  status: "error";
-  reason: "queue_full";
+  command_id: number;
 };
 
 export type CommandAckResult = {
   type: "command.ack.result";
   status: "ok";
-  acked: boolean;
+  command_id: number;
   released_result: AckableCommandResult | null;
 };
 
 export type CommandPushResult<TExecuted extends AckableCommandResult> =
   | TExecuted
-  | CommandQueuedResult
-  | CommandRejectedResult;
+  | CommandQueuedResult;
 
 // Command result shapes are exact. Fields that only make sense for one result
 // stay on that result instead of becoming optional baggage on every response.
 export type ServerResult =
   | AckableCommandResult
   | CommandQueuedResult
-  | CommandRejectedResult
   | CommandAckResult;
 
 export type BootResult = {

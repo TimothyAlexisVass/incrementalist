@@ -80,6 +80,16 @@ export function renderHudCanvas(
   context.lineWidth = 2;
   context.stroke();
   context.fillRect(centerX - 84, centerY + 28, Math.max(0, Math.min(168, progress * 1.68)), 14);
+
+  if (serverState.loadingMessage) {
+    context.fillStyle = "rgba(22, 32, 38, 0.58)";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = colors.panelStrong;
+    context.font = "850 24px system-ui, sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(serverState.loadingMessage, width / 2, height / 2);
+  }
 }
 
 function roundRect(

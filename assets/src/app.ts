@@ -5,7 +5,7 @@ import { renderSaveSlots } from "./features/save-slots/render";
 import { createSaveSlotsViewModel } from "./features/save-slots/view-model";
 import { GameChannel } from "./net/game-channel";
 import { ackAppliedResult, listSaveSlots, resetSaveSlot, sendNoop, switchSaveSlot } from "./net/commands";
-import { isAckableCommandResult, type ServerResult } from "./net/protocol";
+import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "./net/protocol";
 import { applyResult, createServerState } from "./net/snapshots";
 import { SnapshotCache } from "./net/snapshot-cache";
 import { resizeCanvas, renderHudCanvas, type CanvasState } from "./render/canvas/hud";
@@ -14,21 +14,15 @@ import { setButtonBusy } from "./ui/components/button";
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
 const tokenKey = "incrementalist.anonymousPlayerToken";
-const canvas = document.querySelector<HTMLCanvasElement>("#game-canvas");
-const statusLine = document.querySelector<HTMLElement>("#status-line");
-const levelValue = document.querySelector<HTMLElement>("#level-value");
-const slotValue = document.querySelector<HTMLElement>("#slot-value");
-const noopButton = document.querySelector<HTMLButtonElement>("#noop-button");
-const saveButton = document.querySelector<HTMLButtonElement>("#save-button");
-const resetButton = document.querySelector<HTMLButtonElement>("#reset-button");
-const slotList = document.querySelector<HTMLElement>("#slot-list");
-
-if (!canvas || !statusLine || !levelValue || !slotValue || !noopButton || !saveButton || !resetButton || !slotList) {
-  throw new Error("Game shell is missing required elements");
-}
-
-const context = canvas.getContext("2d");
-if (!context) throw new Error("Canvas 2D context unavailable");
+const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
+const statusLine = requiredElement<HTMLElement>("#status-line");
+const levelValue = requiredElement<HTMLElement>("#level-value");
+const slotValue = requiredElement<HTMLElement>("#slot-value");
+const noopButton = requiredElement<HTMLButtonElement>("#noop-button");
+const saveButton = requiredElement<HTMLButtonElement>("#save-button");
+const resetButton = requiredElement<HTMLButtonElement>("#reset-button");
+const slotList = requiredElement<HTMLElement>("#slot-list");
+const context = requiredCanvasContext(canvas);
 
 const serverState = createServerState();
 const canvasState: CanvasState = { width: 0, height: 0, pixelRatio: 1 };
@@ -38,11 +32,14 @@ let busy = false;
 
 function renderDom() {
   const snapshot = serverState.snapshot;
-  statusLine.textContent = serverState.status;
+  statusLine.textContent = serverState.loadingMessage ?? serverState.status;
   statusLine.dataset.tone = serverState.statusTone;
   levelValue.textContent = String(snapshot?.state.level ?? 1);
   slotValue.textContent = String((snapshot?.active_save_slot ?? 0) + 1);
   renderSaveSlots(slotList, createSaveSlotsViewModel(snapshot, serverState.slots));
+  slotList.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
+    setButtonBusy(button, busy);
+  });
 }
 
 async function applyAndAck(result: ServerResult) {
@@ -55,7 +52,8 @@ async function applyAndAck(result: ServerResult) {
 
   // Acknowledgement is the crash boundary. If the browser dies before this push,
   // reconnect will receive the same result again and apply it from the stored payload.
-  let next = await ackAppliedResult(channel);
+  let next = await ackAppliedResult(channel, result.command_id);
+  if (clearsCommandQueue(result)) channel.clearCommandQueue();
   while (next) {
     hydrateSnapshotFromCache(next);
     applyResult(serverState, next);
@@ -63,18 +61,22 @@ async function applyAndAck(result: ServerResult) {
     renderDom();
     // The server releases at most one queued result per acknowledgement so the
     // client cannot accidentally skip over a command result.
-    next = await ackAppliedResult(channel);
+    const applied = next;
+    next = await ackAppliedResult(channel, applied.command_id);
+    if (clearsCommandQueue(applied)) channel.clearCommandQueue();
   }
 }
 
-async function runCommand(command: () => Promise<ServerResult>) {
+async function runCommand(command: () => Promise<ServerResult>, loadingMessage: string | null = null) {
   if (busy) return;
-  // This guard is only UI backpressure. Correct queue ordering still lives on
-  // the server, so duplicate clicks cannot become client-side authority.
+  // This guard is UI backpressure. Save-slot boundaries also rely on it so no
+  // previous-slot command can be sent while the load/switch result is pending.
   busy = true;
+  serverState.loadingMessage = loadingMessage;
   setButtonBusy(noopButton, true);
   setButtonBusy(saveButton, true);
   setButtonBusy(resetButton, true);
+  renderDom();
 
   try {
     await applyAndAck(await command());
@@ -83,10 +85,12 @@ async function runCommand(command: () => Promise<ServerResult>) {
     serverState.status = error instanceof Error ? error.message : "Command failed";
     renderDom();
   } finally {
+    serverState.loadingMessage = null;
     busy = false;
     setButtonBusy(noopButton, false);
     setButtonBusy(saveButton, false);
     setButtonBusy(resetButton, false);
+    renderDom();
   }
 }
 
@@ -123,11 +127,11 @@ onClick("#noop-button", () => runCommand(() => sendNoop(channel)));
 onClick("#save-button", () => runCommand(() => listSaveSlots(channel)));
 onClick("#reset-button", () => {
   if (window.confirm("Reset the active save file?")) {
-    runCommand(() => resetSaveSlot(channel));
+    runCommand(() => resetSaveSlot(channel), "Loading save file...");
   }
 });
 bindSaveSlotClicks(slotList, (slotIndex) =>
-  runCommand(() => switchSaveSlot(channel, slotIndex, Boolean(snapshotCache.load(slotIndex))))
+  runCommand(() => switchSaveSlot(channel, slotIndex, Boolean(snapshotCache.load(slotIndex))), "Loading save file...")
 );
 
 function hydrateSnapshotFromCache(result: ServerResult) {
@@ -143,6 +147,22 @@ function cacheSnapshotFromResult(result: ServerResult) {
   if ("snapshot" in result && result.snapshot) {
     snapshotCache.save(result.snapshot);
   }
+}
+
+function clearsCommandQueue(result: AckableCommandResult) {
+  return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
+}
+
+function requiredElement<TElement extends Element>(selector: string) {
+  const element = document.querySelector<TElement>(selector);
+  if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
+  return element;
+}
+
+function requiredCanvasContext(canvas: HTMLCanvasElement) {
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas 2D context unavailable");
+  return context;
 }
 
 boot().catch((error) => {

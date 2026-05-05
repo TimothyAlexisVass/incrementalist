@@ -177,9 +177,10 @@ Canvas-only UI contract:
 - Remove/replace the `/api/clicks` prototype; it is not part of legacy game functionality.
 - Use Phoenix Channels as the Phase 1 transport.
 - Define the game command/result protocol: the only gameplay communication pattern is client command -> server result.
-- Client commands send only command intent, not command ids, active save slots, snapshot versions, or generic payload envelopes.
-- Server assigns command ids, active save slot, queue order, replay state, and result tracking.
-- Every client command must receive a server result.
+- Client commands send command intent plus a client-generated integer `command_id`, not active save slots, snapshot versions, or generic payload envelopes.
+- Client command ids are the indexes of a 10-slot local boolean queue: `true` means waiting for the authoritative result, `false` means not waiting for that result.
+- Server owns active save slot, FIFO queue order, replay state, and result tracking.
+- Every accepted client command must receive a server result.
 - Server results include the minimum required authoritative state for that command; they do not need to include a full snapshot every time.
 - Use full snapshots when full state is required, such as boot or reconnect.
 - Add `save_slots` and `game_commands` persistence.
@@ -196,12 +197,15 @@ Tokens without player are deleted after 1 month of inactivity.
 - Add a per-player FIFO command queue backed by `game_commands`.
 - Process only one command at a time for each player.
 - Allow up to 10 queued commands per player.
-- Reject new commands with `queue_full` when the player already has 10 queued commands.
+- `command.queued` includes only `command_id`; it must not expose command type or queue position.
+- Queue-full or invalid command-id rejections are transport errors, not gameplay result variants.
 - Commands execute once. Until the client acknowledges receipt, reconnect re-sends the stored command result instead of re-running game rules.
-- Add explicit client `command.ack` messages after the client applies a command result. ACK means "I applied the current result"; it must not include a client-known command id.
+- Add explicit client `command.ack` messages after the client applies a command result. ACK payload is only the applied `command_id`.
 - ACK requires the authoritative result to be applied, not cosmetic animations to finish.
 - Process the next queued command only after the server receives ACK for the current command result.
 - Withholding ACKs must not duplicate rewards or state changes; it only keeps the player blocked on the same queued result.
+- Save-slot load, switch, and reset commands are exclusive boundaries: once sent, the client must block further commands behind a loading state until the result is applied and ACKed.
+- Save-slot load, switch, and reset results clear pending command queues on both client and server so commands from one save cannot carry over into another save.
 - Keep unacked commands indefinitely; continue blocking/replaying until ACK.
 - Store command result data needed for replay, including the server result, queue status, and success/error.
 - Add the hourly cleanup job that removes ACKed `game_commands` older than 48 hours.

@@ -1,6 +1,8 @@
 # Critical
 If you notice a repository convention or principle that is missing in this file, you MUST ask me about it and suggest adding it under the appropriate section – or suggest a new section for it – in this AGENTS.md file!
 
+NEVER STAGE CHANGES UNLESS EXPLICITLY ORDERED TO DO SO.
+
 ## Project description
 
 Server-authoritative incremental game built with Elixir/Phoenix/Postgres and an HTML5 Canvas/WebGL frontend.
