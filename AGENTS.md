@@ -11,6 +11,8 @@ The `legacy/` directory is a prototype reference, not the desired architecture.
 
 The new game must match the legacy game's functionality exactly. Change the code organization, authority model, and implementation quality, not the player-visible behavior, rules, save-slot model, or feature set unless explicitly ordered to do so.
 
+If repo docs, plans, or implementation details conflict with legacy player-visible behavior, treat the legacy behavior as the specification unless explicitly ordered otherwise. Fix the conflicting artifact or implementation rather than narrowing behavior.
+
 ## Core Rule
 
 The server owns truth. The client owns projection, rendering, input, and reversible UI state.
@@ -44,11 +46,19 @@ The client may calculate projected progress fill for display. When projected fil
 Required flow:
 
 1. Client projects fill from server snapshot data.
-2. Client reaches projected full and enters a loading/verifying state.
+2. Client reaches projected full and internally waits for server authority.
 3. Client sends a verify command.
 4. Server lazily advances progress to server now.
 5. Server either confirms collectibility or returns a corrected snapshot.
-6. Client shows the full burst and `ACT!` only after server confirmation.
+6. Client shows the legacy 100% burst animation and `ACT!` only after server confirmation.
+
+Do not invent player-facing progress states, labels, or messages. The
+player-visible progress UI is the legacy progress bar and percent counter; when
+the server confirms collectibility, the client shows the legacy burst animation
+and `ACT!`. While verification is in flight, the client must not tell the player
+the reward is collectible and must not run the WebGL 100% burst animation.
+
+Legacy collection input must remain intact: once the server has confirmed collectibility, any manual player activity may claim the reward, including click, pointer movement, and key press. Collection is not limited to clicking directly on the progress bar.
 
 The server should not tick every frame. Prefer lazy advancement on commands, boot, reconnect, sync, and verify.
 
@@ -98,7 +108,13 @@ Avoid over-normalizing gameplay state early unless a stable query or integrity n
 
 The only gameplay communication pattern is: client sends a command, server sends a result.
 
+The protocol contract is:
+
+- Client command: "The user did this."
+- Server result: "Set these authoritative values."
+
 Client messages send only command intent, a client-generated integer `command_id`, and minimal visible UI intent required by that command.
+Do not send client UI display details such as anchors, hover state, popup placement, animation choices, or cosmetic timing.
 
 Client command ids are the indexes of a 10-slot local boolean queue: `true` means waiting for the authoritative result, `false` means not waiting for that result.
 Client command ids exist only to pair a queued command/result/ACK with the client's local transport queue slot. They are not durable gameplay authority and must not be stored in LocalStorage.
@@ -111,7 +127,8 @@ The client may send cache-presence hints, such as which save slots have cached s
 
 Every client command must receive a server result.
 
-Server results must include the minimum required authoritative state for that command. They do not need to include a full snapshot every time.
+Server results must include the minimum required authoritative values to set for that command. They do not need to include a full snapshot every time.
+Server results must not include UI display instructions, animation directives, popup semantics, layout anchors, or presentation-only events. The client derives rendering and effects from authoritative values plus local reversible UI state.
 
 Do not add speculative bookkeeping fields, counters, versions, audit metadata, or "might be useful later" values. Every persisted field and every protocol field must support a concrete current behavior, invariant, or query. If it does not, leave it out.
 
@@ -126,7 +143,7 @@ Follow-on command results released by `command.ack` must be named by what happen
 
 `command.ack` means the client applied the current command result; its payload is only the applied client `command_id`. Cosmetic animations do not need to finish before ACK.
 
-Use server snapshots when full state is required, such as boot or reconnect. Server results may include game-result events that the client can animate.
+Use server snapshots when full state is required, such as boot or reconnect. Ordinary command results should remain narrow value-setting results.
 
 Prefer using cached client snapshots for boot or save-slot loading when the client already has visible state for that slot. If the cached state is stale, later authoritative command results overwrite it.
 

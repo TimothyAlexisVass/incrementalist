@@ -15,9 +15,16 @@ Server stores durable progress state:
 ```txt
 fill
 last_progress_at
-fill_rate_parameters
-can_claim
 ```
+
+Fill rate is derived from current authoritative save facts, such as idle mode,
+Sisu, level, and first-played time. Do not persist a separate
+`fill_rate_parameters` object unless a current rule needs facts that are not
+already durable state.
+
+`can_claim` is derived by the server after lazy advancement and may be sent in
+snapshots/results as visible confirmed state. Do not persist it as a separate
+save field: progress at `100%` is claimable.
 
 Server sends snapshots with enough projection data:
 
@@ -36,17 +43,35 @@ Server sends snapshots with enough projection data:
 Client projection state machine:
 
 ```txt
-filling -> verifying_full -> collectible
-                    |
-                    -> corrected_filling
+projecting -> awaiting_server_confirmation -> confirmed_collectible
+                                  |
+                                  -> corrected_projection
 ```
+
+These states are implementation-only. They must not introduce player-facing
+labels, messages, or alternate progress modes. The player sees the legacy
+progress bar and percent counter. When client-projected fill reaches `100%`,
+the client immediately asks the server whether it may tell the player the bar
+is collectible. Until the server confirms, the player must not see `ACT!` or
+the WebGL 100% burst animation. After confirmation, the client shows the legacy
+100% burst animation and `ACT!`.
 
 Claim flow:
 
 1. Client sends `progress.claim_reward`.
 2. Server lazily advances progress to server now.
 3. If not collectible, server returns `not_ready` and a corrected snapshot.
-4. If collectible, server calculates rewards, applies level-ups, resets progress, persists, and returns reward events plus the next snapshot.
+4. If collectible, server calculates rewards, applies level-ups, resets progress, persists, and returns only the final authoritative values that changed for this command.
+
+`progress.claim_reward.result` is not a full snapshot. It should include changed
+final values only, such as `coins`, `exp`, `shards`, `cores`, plus changed
+progress fields such as progress fill and rewards claimed. The client may derive
+popup deltas from the previous authoritative values for display, but the result
+itself should remain a narrow command result.
+
+The server result must not include UI display instructions, popup anchors,
+animation directives, or reward-display events. The command says what the user
+did; the result says which authoritative values to set.
 
 ## Card Pick Implementation Notes
 
@@ -205,6 +230,7 @@ Tokens without player are deleted after 1 month of inactivity.
 - Withholding ACKs must not duplicate rewards or state changes; it only keeps the player blocked on the same queued result.
 - Save-slot load, switch, and reset commands are exclusive boundaries: once sent, the client must block further commands behind a loading state until the result is applied and ACKed.
 - Save-slot load, switch, and reset results clear pending command queues on both client and server so commands from one save cannot carry over into another save.
+- Save-slot load, switch, and reset also clear save-local client activity state, including progress verification waits, confirmed-collectible flags, pending claim intent, input-derived activity, and cosmetic effects. Activity from one save file must never complete after another save file becomes active.
 - Keep unacked commands indefinitely; continue blocking/replaying until ACK.
 - Store command result data needed for replay, including the server result, queue status, and success/error.
 - Add the hourly cleanup job that removes ACKed `game_commands` older than 48 hours.
@@ -220,16 +246,23 @@ Deliverable: client connects, selects the correct active save slot, receives req
 - Implement lazy progress advancement.
 - Implement `progress.verify_full`.
 - Implement `progress.claim_reward`.
-- Add frontend projection and verifying/loading state.
-- Add full-burst and `ACT!` only after server confirmation.
+- `progress.claim_reward` must apply the full legacy progress-bar reward mutation on the server: EXP, coins, shards, cores, level-up application, reward counters, and progress reset.
+- `progress.claim_reward.result` must return only changed final authoritative values, not a full snapshot.
+- `progress.claim_reward.result` must not include UI display instructions, popup anchors, animation directives, or presentation-only events.
+- Add frontend projection and an internal server-confirmation wait.
+- Add the legacy 100% burst animation and `ACT!` only after server confirmation; do not add player-facing loading, verifying, or alternate progress text.
+- Match legacy collection input: once the server has confirmed collectibility, any manual player activity on the Canvas surface can send claim intent, including click, pointer movement, and key press. Collection is not limited to clicking directly on the progress bar.
+- Match legacy input ordering: manual activity attempts progress collection before that input is routed to feature-specific click, hover, modal, overlay, or keyboard handling.
+- Render the progress-claim reward display exactly like legacy for the progress reward itself, including popup placement, fade-out, and movement behavior.
 
 Deliverable: the core incremental loop works with server-authorized collectibility and rewards.
 
 ### Phase 3: Currencies, Levels, and Rewards
 
-- Port level-up formula and level-up rewards.
-- Return reward and level-up events from the server.
-- Render top HUD, reward popups, and level-up effects from events.
+- Port or refine level-up reward events that need distinct presentation beyond the Phase 2 claim mutation.
+- Return changed final authoritative values from the server; do not send presentation-only reward or level-up events.
+- Render the top HUD currency and level display from authoritative snapshots and command results.
+- Render top-HUD resource counters and level-up reward presentation by deriving display behavior from authoritative values and local reversible UI state.
 - Add rule tests for deterministic reward paths.
 
 Deliverable: level, exp, coins, shards, and cores are durable server state.
