@@ -36,6 +36,13 @@ export function applyResult(state: ServerState, result: ServerResult) {
     state.slots = upsertSlot(state.slots, snapshot.save_slot);
   }
 
+  if (result.type === "progress.claim_reward.result" && state.snapshot) {
+    state.snapshot.state.coins = result.coins;
+    state.snapshot.state.exp = result.exp;
+    state.snapshot.state.shards = result.shards;
+    state.snapshot.state.cores = result.cores;
+  }
+
   state.statusTone = result.status === "error" ? "error" : "ok";
   state.status = statusForResult(result);
 }

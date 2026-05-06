@@ -17,6 +17,7 @@ defmodule Incrementalist.Game.Commands do
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
   alias Incrementalist.Game.{Snapshots, Time}
+  alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Repo
 
   @queue_limit 10
@@ -65,6 +66,28 @@ defmodule Incrementalist.Game.Commands do
 
         case current_unacked_command(player.id) do
           %GameCommand{command_id: ^command_id} = command ->
+            if command.command_type == "progress.claim_reward" and command.status == "processed" do
+              if command.result["type"] == "progress.claim_reward.result" do
+                slot = SaveSlots.get_slot!(player.id, command.save_slot_id)
+                state = slot.state
+
+                progress_bar = Map.get(state, "progress_bar", %{})
+                rewards_claimed = Map.get(progress_bar, "rewards_claimed", 0) + 1
+                updated_progress_bar = Map.put(progress_bar, "rewards_claimed", rewards_claimed)
+
+                new_state = state
+                            |> Map.put("progress_bar", updated_progress_bar)
+                            |> Map.put("last_claimed_at", Time.iso8601(now))
+
+                next_can_claim_at = Bar.calculate_next_can_claim_at(new_state, now)
+                new_state = Map.put(new_state, "can_claim_at", next_can_claim_at)
+
+                slot
+                |> Ecto.Changeset.change(state: new_state, last_saved_at: now)
+                |> Repo.update!()
+              end
+            end
+
             command
             |> GameCommand.changeset(%{status: "acked", acked_at: now})
             |> Repo.update!()
@@ -142,6 +165,48 @@ defmodule Incrementalist.Game.Commands do
              "server_time" => Time.iso8601(now),
              "events" => []
            }, active_slot.id}
+
+        "progress.claim_in" ->
+          active_slot = active_slot(player, now)
+          can_claim_in = Bar.can_claim_in(active_slot.state, now)
+
+          {"succeeded",
+           %{
+             "type" => "progress.claim_in.result",
+             "command_id" => command.command_id,
+             "can_claim_in" => can_claim_in
+           }, active_slot.id}
+
+        "progress.claim_reward" ->
+          active_slot = active_slot(player, now)
+
+          if Bar.can_claim_in(active_slot.state, now) <= 0 do
+            # Compute changes and apply state logic
+            new_state = Bar.claim_reward(active_slot.state)
+
+            # Only save to memory and persist the state here.
+            # Timing changes handled in ACK.
+            updated_slot = Ecto.Changeset.change(active_slot, state: new_state, last_saved_at: now)
+            Repo.update!(updated_slot)
+
+            {"succeeded",
+             %{
+               "type" => "progress.claim_reward.result",
+               "command_id" => command.command_id,
+               "coins" => Map.get(new_state, "coins"),
+               "exp" => Map.get(new_state, "exp"),
+               "shards" => Map.get(new_state, "shards"),
+               "cores" => Map.get(new_state, "cores")
+             }, active_slot.id}
+          else
+            {"failed",
+             %{
+               "type" => "command.error",
+               "status" => "error",
+               "command_id" => command.command_id,
+               "reason" => "claim_not_ready"
+             }, active_slot.id}
+          end
 
         "save_slots.list" ->
           active_slot = active_slot(player, now)

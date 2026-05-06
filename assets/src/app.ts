@@ -8,6 +8,12 @@ import { isAckableCommandResult, type AckableCommandResult, type ServerResult } 
 import { applyResult, createServerState } from "./net/snapshots";
 import { SnapshotCache } from "./net/snapshot-cache";
 import { setButtonBusy } from "./ui/components/button";
+import { updateProjectedFill, getStateFromSnapshot, handleClaimInResult, handleClaimRewardResult } from "./features/progress/view-model";
+import { handleProgressLoop, tryClaimReward } from "./features/progress/interactions";
+import { renderProgressBar } from "./features/progress/render";
+import { progressClaimIn, progressClaimReward } from "./net/commands";
+import { initWebGLEffectsLayer, updateWebGLEffects, renderWebGLEffects } from "./render/webgl-effects";
+import { triggerProgressBarCollectionEffect } from "./features/progress/render";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -19,11 +25,17 @@ const noopButton = requiredElement<HTMLButtonElement>("#noop-button");
 const saveButton = requiredElement<HTMLButtonElement>("#save-button");
 const resetButton = requiredElement<HTMLButtonElement>("#reset-button");
 const slotList = requiredElement<HTMLElement>("#slot-list");
+const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
+const effectsCanvas = requiredElement<HTMLCanvasElement>("#effects-canvas");
+const ctx = canvas.getContext("2d");
 
 const serverState = createServerState();
 let channel: GameChannel;
 let snapshotCache: SnapshotCache;
 let busy = false;
+
+// Initialize the WebGL layer
+initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
 
 function renderDom() {
   const snapshot = serverState.snapshot;
@@ -41,6 +53,20 @@ async function applyAndAck(result: ServerResult) {
   hydrateSnapshotFromCache(result);
   applyResult(serverState, result);
   cacheSnapshotFromResult(result);
+
+  if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+    if (serverState.snapshot) {
+      getStateFromSnapshot(serverState.snapshot);
+    }
+  }
+
+  if (result.type === "progress.claim_in.result") {
+    handleClaimInResult(result);
+  } else if (result.type === "progress.claim_reward.result") {
+    handleClaimRewardResult();
+    triggerProgressBarCollectionEffect(canvas);
+  }
+
   renderDom();
 
   if (!isAckableCommandResult(result)) return;
@@ -53,6 +79,11 @@ async function applyAndAck(result: ServerResult) {
     hydrateSnapshotFromCache(next);
     applyResult(serverState, next);
     cacheSnapshotFromResult(next);
+    if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
+      if (serverState.snapshot) {
+        getStateFromSnapshot(serverState.snapshot);
+      }
+    }
     renderDom();
     // The server releases at most one queued result per acknowledgement so the
     // client cannot accidentally skip over a command result.
@@ -104,6 +135,11 @@ async function boot() {
   if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);
   serverState.slots = [bootResult.save_slot];
   serverState.status = "Ready";
+
+  if (serverState.snapshot) {
+    getStateFromSnapshot(serverState.snapshot);
+  }
+
   renderDom();
 
   if (bootResult.pending_result) {
@@ -130,6 +166,7 @@ function hydrateSnapshotFromCache(result: ServerResult) {
   const cachedSnapshot = snapshotCache.load(result.active_save_slot);
   if (cachedSnapshot) {
     serverState.snapshot = cachedSnapshot;
+    getStateFromSnapshot(cachedSnapshot);
   }
 }
 
@@ -148,6 +185,46 @@ function requiredElement<TElement extends Element>(selector: string) {
   if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
   return element;
 }
+
+const handleAnyInput = () => {
+  if (channel && tryClaimReward(channel)) {
+    runCommand(() => progressClaimReward(channel));
+  }
+};
+
+window.addEventListener("click", handleAnyInput);
+window.addEventListener("pointermove", handleAnyInput);
+window.addEventListener("keydown", handleAnyInput);
+window.addEventListener("touchstart", handleAnyInput);
+
+let lastTime = performance.now();
+
+function gameLoop(time: number) {
+  requestAnimationFrame(gameLoop);
+
+  const dt = time - lastTime;
+  lastTime = time;
+
+  // Advance client-side estimation of progress bar fill
+  updateProjectedFill(dt);
+
+  // Check if projection expects bar to be full, and queue command if so
+  if (channel && handleProgressLoop(channel)) {
+     runCommand(() => progressClaimIn(channel));
+  }
+
+  // Render the core 2D progress bar UI (fill ratio and legacy text)
+  if (ctx && canvas) {
+     ctx.clearRect(0, 0, canvas.width, canvas.height);
+     renderProgressBar(ctx, canvas);
+  }
+
+  // Update and render legacy hardware-accelerated reward collection effects
+  updateWebGLEffects(dt);
+  renderWebGLEffects();
+}
+
+requestAnimationFrame(gameLoop);
 
 boot().catch((error) => {
   serverState.statusTone = "error";

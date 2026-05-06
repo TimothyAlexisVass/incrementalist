@@ -24,7 +24,6 @@ export type GameSnapshot = {
     shards: number;
     cores: number;
     progress_bar: {
-      fill: number;
       sisu: number;
       reward_multiplier: number;
       rewards_claimed: number;
@@ -69,6 +68,21 @@ export type SaveSlotResetResult = {
   slots: SaveSlotSummary[];
 };
 
+export type ProgressClaimInResult = {
+  type: "progress.claim_in.result";
+  command_id: number;
+  can_claim_in: number;
+};
+
+export type ProgressClaimRewardResult = {
+  type: "progress.claim_reward.result";
+  command_id: number;
+  coins: number;
+  exp: number;
+  shards: number;
+  cores: number;
+};
+
 export type CommandErrorReason = "unknown_command" | "slot_index_required" | "invalid_slot_index";
 
 export type CommandErrorResult = {
@@ -84,6 +98,8 @@ export type AckableCommandResult =
   | SaveSlotsListResult
   | SaveSlotSwitchResult
   | SaveSlotResetResult
+  | ProgressClaimInResult
+  | ProgressClaimRewardResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -125,6 +141,8 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "save_slots.list.result" ||
     result.type === "save_slot.switch.result" ||
     result.type === "save_slot.reset.result" ||
+    result.type === "progress.claim_in.result" ||
+    result.type === "progress.claim_reward.result" ||
     result.type === "command.error"
   );
 }

@@ -5,7 +5,9 @@ import type {
   GameNoopResult,
   SaveSlotResetResult,
   SaveSlotsListResult,
-  SaveSlotSwitchResult
+  SaveSlotSwitchResult,
+  ProgressClaimInResult,
+  ProgressClaimRewardResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -29,6 +31,14 @@ export function switchSaveSlot(channel: GameChannel, slotIndex: number, hasCache
 
 export function resetSaveSlot(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<SaveSlotResetResult>>("save_slot.reset");
+}
+
+export function progressClaimIn(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<ProgressClaimInResult>>("progress.claim_in");
+}
+
+export function progressClaimReward(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<ProgressClaimRewardResult | CommandErrorResult>>("progress.claim_reward");
 }
 
 export async function ackAppliedResult(
