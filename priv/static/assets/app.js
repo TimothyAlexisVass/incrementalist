@@ -1054,7 +1054,11 @@
     if (!WEBGL_EFFECTS.ready) return;
     const gl = WEBGL_EFFECTS.gl;
     const particles = WEBGL_EFFECTS.particles;
+    const uniforms = WEBGL_EFFECTS.uniforms;
     const visible = options.visible !== false;
+    if (!gl || !uniforms?.resolution) {
+      return;
+    }
     gl.viewport(0, 0, WEBGL_EFFECTS.canvas.width, WEBGL_EFFECTS.canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);
     if (!visible) {
@@ -1088,7 +1092,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, drawCount * PARTICLE_FLOATS), gl.DYNAMIC_DRAW);
     bindParticleAttributes(gl);
     gl.uniform2f(
-      WEBGL_EFFECTS.uniforms.resolution,
+      uniforms.resolution,
       WEBGL_EFFECTS.canvas.width,
       WEBGL_EFFECTS.canvas.height
     );
@@ -1194,7 +1198,8 @@
   function renderLiquidBubbles(gl) {
     const bubbles = WEBGL_EFFECTS.liquidBubbles;
     const clipRect = WEBGL_EFFECTS.liquidClipRect;
-    if (!WEBGL_EFFECTS.bubbleProgram || !clipRect || bubbles.length === 0 || clipRect.width <= 0 || clipRect.height <= 0) {
+    const bubbleUniforms = WEBGL_EFFECTS.bubbleUniforms;
+    if (!WEBGL_EFFECTS.bubbleProgram || !bubbleUniforms?.resolution || !clipRect || bubbles.length === 0 || clipRect.width <= 0 || clipRect.height <= 0) {
       return;
     }
     const drawCount = Math.min(bubbles.length, MAX_GPU_LIQUID_BUBBLES);
@@ -1224,7 +1229,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, drawCount * BUBBLE_FLOATS), gl.DYNAMIC_DRAW);
     bindBubbleAttributes(gl);
     gl.uniform2f(
-      WEBGL_EFFECTS.bubbleUniforms.resolution,
+      bubbleUniforms.resolution,
       WEBGL_EFFECTS.canvas.width,
       WEBGL_EFFECTS.canvas.height
     );
@@ -1233,7 +1238,9 @@
   }
   function renderProgressBarGlow(gl) {
     const glow = WEBGL_EFFECTS.progressBarGlow;
-    if (!WEBGL_EFFECTS.glowProgram || !glow || glow.width <= 0 || glow.height <= 0 || glow.intensity <= 0) {
+    const glowUniforms = WEBGL_EFFECTS.glowUniforms;
+    const glowAttributes = WEBGL_EFFECTS.glowAttributes;
+    if (!WEBGL_EFFECTS.glowProgram || !glowUniforms?.resolution || !glowUniforms.rect || !glowUniforms.color || !glowUniforms.intensity || !glowUniforms.radius || !glowAttributes?.position || !glow || glow.width <= 0 || glow.height <= 0 || glow.intensity <= 0) {
       return;
     }
     const radius = glow.radius;
@@ -1258,17 +1265,17 @@
     gl.useProgram(WEBGL_EFFECTS.glowProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, WEBGL_EFFECTS.glowBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(WEBGL_EFFECTS.glowAttributes.position);
-    gl.vertexAttribPointer(WEBGL_EFFECTS.glowAttributes.position, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(glowAttributes.position);
+    gl.vertexAttribPointer(glowAttributes.position, 2, gl.FLOAT, false, 0, 0);
     gl.uniform2f(
-      WEBGL_EFFECTS.glowUniforms.resolution,
+      glowUniforms.resolution,
       WEBGL_EFFECTS.canvas.width,
       WEBGL_EFFECTS.canvas.height
     );
-    gl.uniform4f(WEBGL_EFFECTS.glowUniforms.rect, glow.x, glow.y, glow.width, glow.height);
-    gl.uniform3f(WEBGL_EFFECTS.glowUniforms.color, glow.color[0], glow.color[1], glow.color[2]);
-    gl.uniform1f(WEBGL_EFFECTS.glowUniforms.intensity, glow.intensity);
-    gl.uniform1f(WEBGL_EFFECTS.glowUniforms.radius, radius);
+    gl.uniform4f(glowUniforms.rect, glow.x, glow.y, glow.width, glow.height);
+    gl.uniform3f(glowUniforms.color, glow.color[0], glow.color[1], glow.color[2]);
+    gl.uniform1f(glowUniforms.intensity, glow.intensity);
+    gl.uniform1f(glowUniforms.radius, radius);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
   function updateGpuLaserBursts(deltaTime) {
@@ -1288,7 +1295,8 @@
   }
   function renderLaserBursts(gl) {
     const laserBursts = WEBGL_EFFECTS.laserBursts;
-    if (!WEBGL_EFFECTS.laserRectProgram || laserBursts.length === 0) {
+    const laserRectUniforms = WEBGL_EFFECTS.laserRectUniforms;
+    if (!WEBGL_EFFECTS.laserRectProgram || !laserRectUniforms?.resolution || laserBursts.length === 0) {
       return;
     }
     const data = WEBGL_EFFECTS.laserRectData;
@@ -1347,7 +1355,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, offset), gl.DYNAMIC_DRAW);
     bindLaserRectAttributes(gl);
     gl.uniform2f(
-      WEBGL_EFFECTS.laserRectUniforms.resolution,
+      laserRectUniforms.resolution,
       WEBGL_EFFECTS.canvas.width,
       WEBGL_EFFECTS.canvas.height
     );
@@ -1360,6 +1368,9 @@
       return null;
     }
     const program = gl.createProgram();
+    if (!program) {
+      return null;
+    }
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);
     gl.linkProgram(program);
@@ -1372,6 +1383,9 @@
   }
   function createShader(gl, type, source) {
     const shader = gl.createShader(type);
+    if (!shader) {
+      return null;
+    }
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -1384,6 +1398,7 @@
   function bindParticleAttributes(gl) {
     const stride = PARTICLE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
     const attributes = WEBGL_EFFECTS.attributes;
+    if (!attributes) return;
     gl.enableVertexAttribArray(attributes.position);
     gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(attributes.size);
@@ -1394,6 +1409,7 @@
   function bindBubbleAttributes(gl) {
     const stride = BUBBLE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
     const attributes = WEBGL_EFFECTS.bubbleAttributes;
+    if (!attributes) return;
     gl.enableVertexAttribArray(attributes.position);
     gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(attributes.size);
@@ -1404,6 +1420,7 @@
   function bindLaserRectAttributes(gl) {
     const stride = LASER_RECT_FLOATS * Float32Array.BYTES_PER_ELEMENT;
     const attributes = WEBGL_EFFECTS.laserRectAttributes;
+    if (!attributes) return;
     gl.enableVertexAttribArray(attributes.center);
     gl.vertexAttribPointer(attributes.center, 2, gl.FLOAT, false, stride, 0);
     gl.enableVertexAttribArray(attributes.axis);
@@ -1416,7 +1433,7 @@
     gl.vertexAttribPointer(attributes.color, 4, gl.FLOAT, false, stride, 8 * Float32Array.BYTES_PER_ELEMENT);
   }
   function pushGpuParticle(options) {
-    const color = options.color || [1, 1, 1];
+    const color = normalizeColor(options.color ?? [1, 1, 1]);
     WEBGL_EFFECTS.particles.push({
       x: options.x,
       y: options.y,
@@ -1435,7 +1452,7 @@
     });
   }
   function pushGpuLaserRect(options) {
-    const color = options.color || [1, 1, 1];
+    const color = normalizeColor(options.color ?? [1, 1, 1]);
     WEBGL_EFFECTS.laserBursts.push({
       originX: Number(options.originX) || 0,
       originY: Number(options.originY) || 0,

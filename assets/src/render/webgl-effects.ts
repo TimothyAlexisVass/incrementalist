@@ -1,6 +1,73 @@
 import { COLORS } from '../colors';
 
 type AnyRecord = Record<string, any>;
+type Rgb = [number, number, number];
+type ColorInput = Rgb | readonly [number, number, number] | string;
+type ParticleOptions = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  drag: number;
+  size: number;
+  color?: ColorInput;
+  alpha?: number;
+  fadePower?: number;
+  gravity?: number;
+  lifeMs: number;
+};
+type LaserRectOptions = {
+  originX: number;
+  originY: number;
+  angle: number;
+  baseLength: number;
+  growLength: number;
+  baseThickness: number;
+  growThickness: number;
+  travel?: number;
+  travelX?: number;
+  travelY?: number;
+  color?: ColorInput;
+  alpha?: number;
+  delayMs?: number;
+  growDurationScale?: number;
+  lifeMs?: number;
+};
+type GpuParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  drag: number;
+  size: number;
+  r: number;
+  g: number;
+  b: number;
+  alpha: number;
+  fadePower: number;
+  gravity: number;
+  elapsedMs: number;
+  lifeMs: number;
+};
+type GpuLaserRect = {
+  originX: number;
+  originY: number;
+  angle: number;
+  baseLength: number;
+  growLength: number;
+  baseThickness: number;
+  growThickness: number;
+  travelX: number;
+  travelY: number;
+  color: Rgb;
+  alpha: number;
+  delayMs: number;
+  elapsedMs: number;
+  growDurationScale: number;
+  lifeMs: number;
+};
+type AttributeLocations<T extends string> = Record<T, number>;
+type UniformLocations<T extends string> = Record<T, WebGLUniformLocation | null>;
 
 const MAX_GPU_PARTICLES = 4096;
 const MAX_GPU_LIQUID_BUBBLES = 96;
@@ -194,7 +261,53 @@ const LASER_RECT_FRAGMENT_SHADER_SOURCE = `
   }
 `;
 
-const WEBGL_EFFECTS: AnyRecord = {
+const WEBGL_EFFECTS: {
+  canvas: HTMLCanvasElement | null;
+  gl: WebGLRenderingContext | null;
+  program: WebGLProgram | null;
+  bubbleProgram: WebGLProgram | null;
+  glowProgram: WebGLProgram | null;
+  laserRectProgram: WebGLProgram | null;
+  buffer: WebGLBuffer | null;
+  bubbleBuffer: WebGLBuffer | null;
+  glowBuffer: WebGLBuffer | null;
+  laserRectBuffer: WebGLBuffer | null;
+  particles: GpuParticle[];
+  laserBursts: GpuLaserRect[];
+  liquidBubbles: {
+    x: number;
+    y: number;
+    radius: number;
+    speed: number;
+    phase: number;
+    alpha: number;
+    ageMs: number;
+  }[];
+  liquidBubbleSpawnAccumulator: number;
+  liquidClipRect: { x: number; y: number; width: number; height: number } | null;
+  progressBarGlow: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    radius: number;
+    intensity: number;
+    color: Rgb;
+  } | null;
+  data: Float32Array;
+  bubbleData: Float32Array;
+  glowData: Float32Array;
+  laserRectData: Float32Array;
+  attributes: AttributeLocations<"position" | "size" | "color"> | null;
+  bubbleAttributes: AttributeLocations<"position" | "size" | "alpha"> | null;
+  glowAttributes: AttributeLocations<"position"> | null;
+  laserRectAttributes: AttributeLocations<"center" | "axis" | "perp" | "local" | "color"> | null;
+  uniforms: UniformLocations<"resolution"> | null;
+  bubbleUniforms: UniformLocations<"resolution"> | null;
+  glowUniforms: UniformLocations<"resolution" | "rect" | "color" | "intensity" | "radius"> | null;
+  laserRectUniforms: UniformLocations<"resolution"> | null;
+  ready: boolean;
+} = {
   canvas: null,
   gl: null,
   program: null,
@@ -389,7 +502,12 @@ export function renderWebGLEffects(options: AnyRecord = {}) {
 
   const gl = WEBGL_EFFECTS.gl;
   const particles = WEBGL_EFFECTS.particles;
+  const uniforms = WEBGL_EFFECTS.uniforms;
   const visible = options.visible !== false;
+
+  if (!gl || !uniforms?.resolution) {
+    return;
+  }
 
   gl.viewport(0, 0, WEBGL_EFFECTS.canvas.width, WEBGL_EFFECTS.canvas.height);
   gl.clear(gl.COLOR_BUFFER_BIT);
@@ -432,7 +550,7 @@ export function renderWebGLEffects(options: AnyRecord = {}) {
 
   bindParticleAttributes(gl);
   gl.uniform2f(
-    WEBGL_EFFECTS.uniforms.resolution,
+    uniforms.resolution,
     WEBGL_EFFECTS.canvas.width,
     WEBGL_EFFECTS.canvas.height
   );
@@ -665,9 +783,11 @@ export function spawnGpuProgressCollectionLaserBurst(
 function renderLiquidBubbles(gl: WebGLRenderingContext) {
   const bubbles = WEBGL_EFFECTS.liquidBubbles;
   const clipRect = WEBGL_EFFECTS.liquidClipRect;
+  const bubbleUniforms = WEBGL_EFFECTS.bubbleUniforms;
 
   if (
     !WEBGL_EFFECTS.bubbleProgram ||
+    !bubbleUniforms?.resolution ||
     !clipRect ||
     bubbles.length === 0 ||
     clipRect.width <= 0 ||
@@ -707,7 +827,7 @@ function renderLiquidBubbles(gl: WebGLRenderingContext) {
 
   bindBubbleAttributes(gl);
   gl.uniform2f(
-    WEBGL_EFFECTS.bubbleUniforms.resolution,
+    bubbleUniforms.resolution,
     WEBGL_EFFECTS.canvas.width,
     WEBGL_EFFECTS.canvas.height
   );
@@ -717,9 +837,17 @@ function renderLiquidBubbles(gl: WebGLRenderingContext) {
 
 function renderProgressBarGlow(gl: WebGLRenderingContext) {
   const glow = WEBGL_EFFECTS.progressBarGlow;
+  const glowUniforms = WEBGL_EFFECTS.glowUniforms;
+  const glowAttributes = WEBGL_EFFECTS.glowAttributes;
 
   if (
     !WEBGL_EFFECTS.glowProgram ||
+    !glowUniforms?.resolution ||
+    !glowUniforms.rect ||
+    !glowUniforms.color ||
+    !glowUniforms.intensity ||
+    !glowUniforms.radius ||
+    !glowAttributes?.position ||
     !glow ||
     glow.width <= 0 ||
     glow.height <= 0 ||
@@ -753,17 +881,17 @@ function renderProgressBarGlow(gl: WebGLRenderingContext) {
   gl.bindBuffer(gl.ARRAY_BUFFER, WEBGL_EFFECTS.glowBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
 
-  gl.enableVertexAttribArray(WEBGL_EFFECTS.glowAttributes.position);
-  gl.vertexAttribPointer(WEBGL_EFFECTS.glowAttributes.position, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(glowAttributes.position);
+  gl.vertexAttribPointer(glowAttributes.position, 2, gl.FLOAT, false, 0, 0);
   gl.uniform2f(
-    WEBGL_EFFECTS.glowUniforms.resolution,
+    glowUniforms.resolution,
     WEBGL_EFFECTS.canvas.width,
     WEBGL_EFFECTS.canvas.height
   );
-  gl.uniform4f(WEBGL_EFFECTS.glowUniforms.rect, glow.x, glow.y, glow.width, glow.height);
-  gl.uniform3f(WEBGL_EFFECTS.glowUniforms.color, glow.color[0], glow.color[1], glow.color[2]);
-  gl.uniform1f(WEBGL_EFFECTS.glowUniforms.intensity, glow.intensity);
-  gl.uniform1f(WEBGL_EFFECTS.glowUniforms.radius, radius);
+  gl.uniform4f(glowUniforms.rect, glow.x, glow.y, glow.width, glow.height);
+  gl.uniform3f(glowUniforms.color, glow.color[0], glow.color[1], glow.color[2]);
+  gl.uniform1f(glowUniforms.intensity, glow.intensity);
+  gl.uniform1f(glowUniforms.radius, radius);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
@@ -790,9 +918,11 @@ function updateGpuLaserBursts(deltaTime: number) {
 
 function renderLaserBursts(gl: WebGLRenderingContext) {
   const laserBursts = WEBGL_EFFECTS.laserBursts;
+  const laserRectUniforms = WEBGL_EFFECTS.laserRectUniforms;
 
   if (
     !WEBGL_EFFECTS.laserRectProgram ||
+    !laserRectUniforms?.resolution ||
     laserBursts.length === 0
   ) {
     return;
@@ -865,7 +995,7 @@ function renderLaserBursts(gl: WebGLRenderingContext) {
 
   bindLaserRectAttributes(gl);
   gl.uniform2f(
-    WEBGL_EFFECTS.laserRectUniforms.resolution,
+    laserRectUniforms.resolution,
     WEBGL_EFFECTS.canvas.width,
     WEBGL_EFFECTS.canvas.height
   );
@@ -905,6 +1035,9 @@ function createProgram(gl: WebGLRenderingContext, vertexSource: string, fragment
   }
 
   const program = gl.createProgram();
+  if (!program) {
+    return null;
+  }
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
   gl.linkProgram(program);
@@ -920,6 +1053,9 @@ function createProgram(gl: WebGLRenderingContext, vertexSource: string, fragment
 
 function createShader(gl: WebGLRenderingContext, type: number, source: string) {
   const shader = gl.createShader(type);
+  if (!shader) {
+    return null;
+  }
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
 
@@ -935,6 +1071,7 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string) {
 function bindParticleAttributes(gl: WebGLRenderingContext) {
   const stride = PARTICLE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
   const attributes = WEBGL_EFFECTS.attributes;
+  if (!attributes) return;
 
   gl.enableVertexAttribArray(attributes.position);
   gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride, 0);
@@ -949,6 +1086,7 @@ function bindParticleAttributes(gl: WebGLRenderingContext) {
 function bindBubbleAttributes(gl: WebGLRenderingContext) {
   const stride = BUBBLE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
   const attributes = WEBGL_EFFECTS.bubbleAttributes;
+  if (!attributes) return;
 
   gl.enableVertexAttribArray(attributes.position);
   gl.vertexAttribPointer(attributes.position, 2, gl.FLOAT, false, stride, 0);
@@ -963,6 +1101,7 @@ function bindBubbleAttributes(gl: WebGLRenderingContext) {
 function bindLaserRectAttributes(gl: WebGLRenderingContext) {
   const stride = LASER_RECT_FLOATS * Float32Array.BYTES_PER_ELEMENT;
   const attributes = WEBGL_EFFECTS.laserRectAttributes;
+  if (!attributes) return;
 
   gl.enableVertexAttribArray(attributes.center);
   gl.vertexAttribPointer(attributes.center, 2, gl.FLOAT, false, stride, 0);
@@ -980,8 +1119,8 @@ function bindLaserRectAttributes(gl: WebGLRenderingContext) {
   gl.vertexAttribPointer(attributes.color, 4, gl.FLOAT, false, stride, 8 * Float32Array.BYTES_PER_ELEMENT);
 }
 
-function pushGpuParticle(options: AnyRecord) {
-  const color = options.color || [1, 1, 1];
+function pushGpuParticle(options: ParticleOptions) {
+  const color = normalizeColor(options.color ?? [1, 1, 1]);
 
   WEBGL_EFFECTS.particles.push({
     x: options.x,
@@ -1001,8 +1140,8 @@ function pushGpuParticle(options: AnyRecord) {
   });
 }
 
-function pushGpuLaserRect(options: AnyRecord) {
-  const color = options.color || [1, 1, 1];
+function pushGpuLaserRect(options: LaserRectOptions) {
+  const color = normalizeColor(options.color ?? [1, 1, 1]);
 
   WEBGL_EFFECTS.laserBursts.push({
     originX: Number(options.originX) || 0,

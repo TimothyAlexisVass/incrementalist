@@ -240,7 +240,7 @@ function getProgressColorArray(percent: number): Rgb {
   const end = COLORS.bar.progress.fillEnd;
   const clampedPercent = clampNumber(percent, 0, 100);
 
-  let color;
+  let color: Rgb;
 
   if (clampedPercent < 50) {
     const t = clampedPercent / 50;
