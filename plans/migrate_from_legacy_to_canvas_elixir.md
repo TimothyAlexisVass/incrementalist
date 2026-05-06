@@ -228,15 +228,12 @@ Deliverable: client connects, selects the correct active save slot, receives req
 
 - Port progress bar and progression rules to Elixir.
 - Implement lazy progress advancement.
-- Implement `progress.verify_full`.
-- Implement `progress.claim_reward`.
 - `progress.claim_reward` must apply the full legacy progress-bar reward mutation on the server: EXP, coins, shards, cores, level-up application, reward counters, and progress reset.
 - `progress.claim_reward.result` must return only changed final authoritative values, not a full snapshot.
 - `progress.claim_reward.result` must not include UI display instructions, popup anchors, animation directives, or presentation-only events.
 - Add frontend projection and an internal server-confirmation wait.
 - Add the legacy 100% burst animation and `ACT!` only after server confirmation; do not add player-facing loading, verifying, or alternate progress text.
 - Match legacy collection input: once the server has confirmed collectibility, any manual player activity on the Canvas surface can send claim intent, including click, pointer movement, and key press. Collection is not limited to clicking directly on the progress bar.
-- Match legacy input ordering: manual activity attempts progress collection before that input is routed to feature-specific click, hover, modal, overlay, or keyboard handling.
 - Render the progress-claim reward display exactly like legacy for the progress reward itself, including popup placement, fade-out, and movement behavior.
 
 Deliverable: the core incremental loop works with server-authorized collectibility and rewards.
