@@ -517,9 +517,9 @@
       const completed = Math.max(0, duration - currentViewModel.canClaimInMs);
       currentViewModel.projectedFill = Math.min(100, completed / duration * 100);
       if (currentViewModel.canClaimInMs <= 0) {
-        currentViewModel.state = "awaiting_server_confirmation";
-        currentViewModel.canClaimInMs = null;
-        currentViewModel.nextVerifyAtMs = Date.now();
+        currentViewModel.state = "confirmed_collectible";
+        currentViewModel.canClaimInMs = 0;
+        currentViewModel.nextVerifyAtMs = 0;
         currentViewModel.projectedFill = 100;
       }
     }
@@ -576,7 +576,7 @@
   }
   function handleClaimNotReadyError(canClaimInMs = null) {
     currentViewModel.state = "awaiting_server_confirmation";
-    currentViewModel.projectedFill = 100;
+    currentViewModel.projectedFill = 0;
     currentViewModel.canClaimInMs = null;
     const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
     currentViewModel.nextVerifyAtMs = Date.now() + delay;
@@ -2521,7 +2521,6 @@
       handleClaimInResult(result);
     } else if (result.type === "progress.claim_reward.result") {
       handleClaimRewardResult();
-      triggerProgressBarCollectionEffect(canvas);
       if (ctx && previousAmounts) {
         spawnProgressClaimRewardEffects(floatingTexts, canvas, ctx, previousAmounts, {
           exp: result.exp,
@@ -2622,6 +2621,7 @@
     if (!channel) return;
     if (!tryClaimReward(channel)) return;
     pendingClaimPopupPoint = lastPointerPoint;
+    triggerProgressBarCollectionEffect(canvas);
     beginAsyncClaimResolution();
     void resolveClaimAsync();
   };
@@ -2656,11 +2656,6 @@
     if (!channel || claimResolutionInFlight) return;
     claimResolutionInFlight = true;
     try {
-      const verify = await runCommand(() => progressClaimIn(channel));
-      const canClaimIn = verify && verify.type === "progress.claim_in.result" ? verify.can_claim_in : 0;
-      if (canClaimIn > 100) {
-        await sleep(canClaimIn);
-      }
       let reward = await runCommand(() => progressClaimReward(channel));
       while (reward && reward.type === "command.error" && reward.reason === "claim_not_ready" && typeof reward.can_claim_in === "number" && reward.can_claim_in > 0) {
         await sleep(reward.can_claim_in);

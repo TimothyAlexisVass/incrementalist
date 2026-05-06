@@ -67,10 +67,10 @@ export function updateProjectedFill(deltaTimeMs: number) {
     currentViewModel.projectedFill = Math.min(100, (completed / duration) * 100);
 
     if (currentViewModel.canClaimInMs <= 0) {
-      // Projection reached the boundary; server still decides collectibility.
-      currentViewModel.state = "awaiting_server_confirmation";
-      currentViewModel.canClaimInMs = null;
-      currentViewModel.nextVerifyAtMs = Date.now();
+      // Local projection reached 100%. Show legacy full state immediately.
+      currentViewModel.state = "confirmed_collectible";
+      currentViewModel.canClaimInMs = 0;
+      currentViewModel.nextVerifyAtMs = 0;
       currentViewModel.projectedFill = 100;
     }
   }
@@ -138,7 +138,9 @@ export function beginAsyncClaimResolution() {
 
 export function handleClaimNotReadyError(canClaimInMs: number | null = null) {
   currentViewModel.state = "awaiting_server_confirmation";
-  currentViewModel.projectedFill = 100;
+  // After a collect attempt, stay visually reset at 0% while waiting for
+  // authoritative reward readiness from the server.
+  currentViewModel.projectedFill = 0;
   currentViewModel.canClaimInMs = null;
   const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
   currentViewModel.nextVerifyAtMs = Date.now() + delay;

@@ -151,7 +151,6 @@ function applyProgressResultEffects(result: ServerResult, previousAmounts: Resou
     handleClaimInResult(result);
   } else if (result.type === "progress.claim_reward.result") {
     handleClaimRewardResult();
-    triggerProgressBarCollectionEffect(canvas);
 
     if (ctx && previousAmounts) {
       spawnProgressClaimRewardEffects(floatingTexts, canvas, ctx, previousAmounts, {
@@ -276,6 +275,7 @@ const handleAnyInput = (event: Event) => {
   if (!channel) return;
   if (!tryClaimReward(channel)) return;
   pendingClaimPopupPoint = lastPointerPoint;
+  triggerProgressBarCollectionEffect(canvas);
   beginAsyncClaimResolution();
   void resolveClaimAsync();
 };
@@ -327,16 +327,8 @@ async function resolveClaimAsync() {
   claimResolutionInFlight = true;
 
   try {
-    const verify = await runCommand(() => progressClaimIn(channel));
-    const canClaimIn =
-      verify && verify.type === "progress.claim_in.result"
-        ? verify.can_claim_in
-        : 0;
-
-    if (canClaimIn > 100) {
-      await sleep(canClaimIn);
-    }
-
+    // Claim first once local projection reaches ACT!.
+    // If server says "not ready", hold at 0% and retry after can_claim_in.
     let reward = await runCommand(() => progressClaimReward(channel));
     while (
       reward &&
