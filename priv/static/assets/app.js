@@ -1240,7 +1240,7 @@
     const glow = WEBGL_EFFECTS.progressBarGlow;
     const glowUniforms = WEBGL_EFFECTS.glowUniforms;
     const glowAttributes = WEBGL_EFFECTS.glowAttributes;
-    if (!WEBGL_EFFECTS.glowProgram || !glowUniforms?.resolution || !glowUniforms.rect || !glowUniforms.color || !glowUniforms.intensity || !glowUniforms.radius || !glowAttributes?.position || !glow || glow.width <= 0 || glow.height <= 0 || glow.intensity <= 0) {
+    if (!WEBGL_EFFECTS.glowProgram || !glowUniforms?.resolution || !glowUniforms.rect || !glowUniforms.color || !glowUniforms.intensity || !glowUniforms.radius || glowAttributes?.position == null || !glow || glow.width <= 0 || glow.height <= 0 || glow.intensity <= 0) {
       return;
     }
     const radius = glow.radius;
@@ -1433,7 +1433,7 @@
     gl.vertexAttribPointer(attributes.color, 4, gl.FLOAT, false, stride, 8 * Float32Array.BYTES_PER_ELEMENT);
   }
   function pushGpuParticle(options) {
-    const color = normalizeColor(options.color ?? [1, 1, 1]);
+    const color = toRgbTuple(options.color);
     WEBGL_EFFECTS.particles.push({
       x: options.x,
       y: options.y,
@@ -1452,7 +1452,7 @@
     });
   }
   function pushGpuLaserRect(options) {
-    const color = normalizeColor(options.color ?? [1, 1, 1]);
+    const color = toRgbTuple(options.color);
     WEBGL_EFFECTS.laserBursts.push({
       originX: Number(options.originX) || 0,
       originY: Number(options.originY) || 0,
@@ -1500,6 +1500,16 @@
           (value & 255) / 255
         ];
       }
+    }
+    return [1, 1, 1];
+  }
+  function toRgbTuple(color) {
+    if (Array.isArray(color)) {
+      return [color[0], color[1], color[2]];
+    }
+    if (typeof color === "string") {
+      const normalized = normalizeColor(color);
+      return [normalized[0] * 255, normalized[1] * 255, normalized[2] * 255];
     }
     return [1, 1, 1];
   }
