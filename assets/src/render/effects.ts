@@ -12,8 +12,8 @@ import {
   TOP_HUD_COINS_COUNTER_RIGHT,
   CANVAS_WIDTH,
   REWARD_POPUP_FONT,
-} from './config';
-import { COLORS } from './colors';
+} from '../config';
+import { COLORS } from '../colors';
 
 const TWO_PI = Math.PI * 2;
 const CLICK_BURST_COLORS = Object.freeze([

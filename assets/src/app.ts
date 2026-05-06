@@ -24,6 +24,8 @@ import { renderProgressBar } from "./features/progress/render";
 import { progressClaimIn, progressClaimReward } from "./net/commands";
 import { initWebGLEffectsLayer, resizeWebGLEffectsLayer, updateWebGLEffects, renderWebGLEffects } from "./render/webgl-effects";
 import { triggerProgressBarCollectionEffect } from "./features/progress/render";
+import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "./render/effects";
+import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./features/progress/claim-effects";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -44,6 +46,9 @@ let channel: GameChannel;
 let snapshotCache: SnapshotCache;
 let busy = false;
 let claimResolutionInFlight = false;
+const floatingTexts = createFloatingTextState();
+let lastPointerPoint: { x: number; y: number } | null = null;
+let pendingClaimPopupPoint: { x: number; y: number } | null = null;
 
 // Initialize the WebGL layer
 resizeGameCanvases();
@@ -85,6 +90,7 @@ function renderDom() {
 
 async function applyAndAck(result: ServerResult) {
   hydrateSnapshotFromCache(result);
+  const previousAmounts = result.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
   applyResult(serverState, result);
   cacheSnapshotFromResult(result);
 
@@ -94,7 +100,7 @@ async function applyAndAck(result: ServerResult) {
     }
   }
 
-  applyProgressResultEffects(result);
+  applyProgressResultEffects(result, previousAmounts);
 
   renderDom();
 
@@ -106,9 +112,10 @@ async function applyAndAck(result: ServerResult) {
   if (clearsCommandQueue(result)) channel.clearCommandQueue();
   while (next) {
     hydrateSnapshotFromCache(next);
+    const previousAmounts = next.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
     applyResult(serverState, next);
     cacheSnapshotFromResult(next);
-    applyProgressResultEffects(next);
+    applyProgressResultEffects(next, previousAmounts);
     if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
       if (serverState.snapshot) {
         getStateFromSnapshot(serverState.snapshot);
@@ -123,12 +130,35 @@ async function applyAndAck(result: ServerResult) {
   }
 }
 
-function applyProgressResultEffects(result: ServerResult) {
+function snapshotAmounts(): ResourceAmounts | null {
+  const snapshot = serverState.snapshot;
+  if (!snapshot) return null;
+
+  return {
+    exp: snapshot.state.exp,
+    coins: snapshot.state.coins,
+    shards: snapshot.state.shards,
+    cores: snapshot.state.cores
+  };
+}
+
+function applyProgressResultEffects(result: ServerResult, previousAmounts: ResourceAmounts | null) {
   if (result.type === "progress.claim_in.result") {
     handleClaimInResult(result);
   } else if (result.type === "progress.claim_reward.result") {
     handleClaimRewardResult();
     triggerProgressBarCollectionEffect(canvas);
+
+    if (ctx && previousAmounts) {
+      spawnProgressClaimRewardEffects(floatingTexts, canvas, ctx, previousAmounts, {
+        exp: result.exp,
+        coins: result.coins,
+        shards: result.shards,
+        cores: result.cores
+      }, pendingClaimPopupPoint);
+    }
+
+    pendingClaimPopupPoint = null;
   } else if (result.type === "command.error" && result.reason === "claim_not_ready") {
     handleClaimNotReadyError(result.can_claim_in ?? null);
   }
@@ -233,9 +263,15 @@ function requiredElement<TElement extends Element>(selector: string) {
   return element;
 }
 
-const handleAnyInput = () => {
+const handleAnyInput = (event: Event) => {
+  const pointerPoint = getCanvasPointFromInputEvent(event, canvas);
+  if (pointerPoint) {
+    lastPointerPoint = pointerPoint;
+  }
+
   if (!channel) return;
   if (!tryClaimReward(channel)) return;
+  pendingClaimPopupPoint = lastPointerPoint;
   beginAsyncClaimResolution();
   void resolveClaimAsync();
 };
@@ -269,9 +305,15 @@ function gameLoop(time: number) {
      renderProgressBar(ctx, canvas);
   }
 
+  updateFloatingTexts(floatingTexts, dt);
+
   // Update and render legacy hardware-accelerated reward collection effects
   updateWebGLEffects(dt);
   renderWebGLEffects();
+
+  if (ctx) {
+    renderFloatingTexts(ctx, floatingTexts);
+  }
 }
 
 requestAnimationFrame(gameLoop);
@@ -312,6 +354,37 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, Math.max(0, ms));
   });
+}
+
+function getCanvasPointFromInputEvent(
+  event: Event,
+  targetCanvas: HTMLCanvasElement
+): { x: number; y: number } | null {
+  const rect = targetCanvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  let clientX: number | null = null;
+  let clientY: number | null = null;
+
+  if (event instanceof MouseEvent || event instanceof PointerEvent) {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  } else if (event instanceof TouchEvent && event.touches.length > 0) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  }
+
+  if (clientX === null || clientY === null) return null;
+
+  const scaleX = targetCanvas.width / rect.width;
+  const scaleY = targetCanvas.height / rect.height;
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+
+  return {
+    x: Math.min(Math.max(0, x), targetCanvas.width),
+    y: Math.min(Math.max(0, y), targetCanvas.height)
+  };
 }
 
 boot().catch((error) => {

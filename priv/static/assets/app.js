@@ -21,6 +21,12 @@
   var BAR_RESET_LERP_SPEED = 7;
   var BAR_FULL_PULSE_SPEED = 0.3;
   var BAR_COLLECTION_GLOW_FADE_MULTIPLIER = 5;
+  var REWARD_POPUP_HOLD_MS = 2e3;
+  var REWARD_POPUP_FLY_MS = 500;
+  var REWARD_POPUP_HOLD_RISE_SPEED = 12;
+  var GENERIC_FLOAT_LIFE_MS = 2500;
+  var GENERIC_FLOAT_RISE_SPEED = 16;
+  var REWARD_POPUP_FONT = "25px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
   var CANVAS_WIDTH = 1280;
@@ -37,6 +43,10 @@
   var TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
   var TOP_HUD_CURRENCY_ICON_SIZE = 32;
   var TOP_HUD_CURRENCY_ICON_Y = Math.floor((TOP_HUD_HEIGHT - TOP_HUD_CURRENCY_ICON_SIZE) / 2);
+  var TOP_HUD_COIN_COUNTER_Y = 30;
+  var TOP_HUD_COINS_COUNTER_RIGHT = 350;
+  var TOP_HUD_SHARDS_COUNTER_RIGHT = 180;
+  var TOP_HUD_CORES_COUNTER_RIGHT = 10;
   var PROGRESS_BAR_WIDTH = 40;
 
   // src/colors.ts
@@ -642,6 +652,44 @@
   function toFiniteNumber(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  function formatNumber(value, fallback = 0) {
+    const number = toFiniteNumber(value, fallback);
+    const sign = number < 0 ? "-" : "";
+    const absolute = Math.abs(number);
+    if (absolute < 1e3) {
+      return `${sign}${Math.floor(absolute)}`;
+    }
+    const tier = Math.floor(Math.log10(absolute) / 3);
+    const suffix = getSuffix(tier);
+    const scaled = absolute / 10 ** (tier * 3);
+    return `${sign}${Math.round(scaled * 1e3) / 1e3}${suffix}`;
+  }
+  function getSuffix(tier) {
+    const base = [
+      "",
+      "K",
+      "M",
+      "B",
+      "T",
+      "Qa",
+      "Qi",
+      "Sx",
+      "Sp",
+      "Oc",
+      "No",
+      "Dc"
+    ];
+    if (tier < base.length) return base[tier];
+    const ones = ["", "U", "D", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No"];
+    const tens = ["", "Dc", "Vg", "Tg", "Qag", "Qig", "Sxg", "Spg", "Ocg", "Nog"];
+    const n = tier - 10;
+    const one = n % 10;
+    const ten = Math.floor(n / 10);
+    return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
+  }
+  function formatSignedNumber(value) {
+    return `+${formatNumber(value)}`;
   }
   function formatPercent(value, decimals = 2, fallback = 0) {
     return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
@@ -1995,6 +2043,382 @@
     };
   }
 
+  // src/render/effects.ts
+  var TWO_PI3 = Math.PI * 2;
+  var CLICK_BURST_COLORS = Object.freeze([
+    COLORS.rewards.coins,
+    COLORS.rewards.shards,
+    COLORS.rewards.cores,
+    COLORS.rewards.achievement,
+    COLORS.rewards.questSummary
+  ]);
+  var MAX_FLOATING_TEXTS = 72;
+  var TEXT_SPRITE_PADDING = 14;
+  var MAX_TEXT_SPRITE_CACHE = 96;
+  var REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
+  var textSpriteCache = /* @__PURE__ */ new Map();
+  function createFloatingTextState() {
+    return [];
+  }
+  function spawnFloatingText(floatingTexts2, text, x, y, color, options = {}) {
+    if (!Array.isArray(floatingTexts2)) return;
+    floatingTexts2.push({
+      text: String(text ?? ""),
+      x,
+      y,
+      startX: x,
+      startY: y,
+      color,
+      alpha: 1,
+      elapsedMs: 0,
+      type: options.type || "generic",
+      targetX: options.targetX ?? x,
+      targetY: options.targetY ?? y,
+      holdMs: options.holdMs ?? 0,
+      flyMs: options.flyMs ?? 0,
+      riseSpeed: options.riseSpeed ?? GENERIC_FLOAT_RISE_SPEED,
+      holdRiseSpeed: options.holdRiseSpeed ?? REWARD_POPUP_HOLD_RISE_SPEED,
+      lifeMs: options.lifeMs ?? GENERIC_FLOAT_LIFE_MS,
+      font: options.font || REWARD_POPUP_FONT,
+      textAlign: options.textAlign || "center",
+      scale: options.scale ?? 1,
+      minRenderSizePx: options.minRenderSizePx ?? 0,
+      stackGroupId: options.stackGroupId ?? null,
+      stackIndex: options.stackIndex ?? null
+    });
+    if (floatingTexts2.length > MAX_FLOATING_TEXTS) {
+      floatingTexts2.splice(0, floatingTexts2.length - MAX_FLOATING_TEXTS);
+    }
+  }
+  function getHudRewardTargets(canvas2) {
+    const canvasWidth = canvas2?.width ?? CANVAS_WIDTH;
+    return {
+      exp: {
+        x: TOP_HUD_EXP_COUNTER_X,
+        y: TOP_HUD_EXP_COUNTER_Y
+      },
+      coins: { x: canvasWidth - TOP_HUD_COINS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
+      shards: { x: canvasWidth - TOP_HUD_SHARDS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
+      cores: { x: canvasWidth - TOP_HUD_CORES_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y }
+    };
+  }
+  function spawnRewardPopup(floatingTexts2, canvas2, text, x, y, color, targetKey) {
+    const targets = getHudRewardTargets(canvas2);
+    const target = targets[targetKey] || targets.coins;
+    spawnFloatingText(floatingTexts2, text, x, y, color, {
+      type: "reward",
+      targetX: target.x,
+      targetY: target.y,
+      holdMs: REWARD_POPUP_HOLD_MS,
+      flyMs: REWARD_POPUP_FLY_MS,
+      holdRiseSpeed: REWARD_POPUP_HOLD_RISE_SPEED,
+      font: REWARD_POPUP_FONT,
+      textAlign: "center",
+      minRenderSizePx: REWARD_POPUP_MIN_RENDER_SIZE_PX
+    });
+  }
+  function updateFloatingTexts(floatingTexts2, deltaTime) {
+    if (!Array.isArray(floatingTexts2) || floatingTexts2.length === 0) return;
+    const deltaSeconds = deltaTime / 1e3;
+    let writeIndex = 0;
+    for (let i = 0; i < floatingTexts2.length; i += 1) {
+      const ft = floatingTexts2[i];
+      ft.elapsedMs += deltaTime;
+      if (ft.type === "reward") {
+        updateRewardPopup(ft);
+      } else {
+        ft.y -= ft.riseSpeed * deltaSeconds;
+        ft.alpha = Math.max(0, 1 - ft.elapsedMs / ft.lifeMs);
+      }
+      if (!shouldRemoveFloatingText(ft)) {
+        floatingTexts2[writeIndex] = ft;
+        writeIndex += 1;
+      }
+    }
+    floatingTexts2.length = writeIndex;
+  }
+  function renderFloatingTexts(ctx2, floatingTexts2) {
+    if (!Array.isArray(floatingTexts2) || floatingTexts2.length === 0) return;
+    ctx2.save();
+    for (let i = 0; i < floatingTexts2.length; i += 1) {
+      const ft = floatingTexts2[i];
+      if (ft.alpha <= 0) continue;
+      const sprite = getTextSprite(ctx2, ft);
+      const scale = getFloatingTextRenderScale(ft, sprite);
+      if (scale <= 0) continue;
+      ctx2.globalAlpha = ft.alpha;
+      ctx2.drawImage(
+        sprite.canvas,
+        ft.x - getSpriteAnchorX(sprite, ft.textAlign) * scale,
+        ft.y - sprite.anchorY * scale,
+        sprite.canvas.width * scale,
+        sprite.canvas.height * scale
+      );
+    }
+    ctx2.restore();
+  }
+  function getTextSprite(ctx2, ft) {
+    const key = `${ft.text}\0${ft.font}\0${ft.color}`;
+    if (ft.spriteKey === key && ft.sprite) {
+      return ft.sprite;
+    }
+    const cachedSprite = textSpriteCache.get(key);
+    if (cachedSprite) {
+      ft.spriteKey = key;
+      ft.sprite = cachedSprite;
+      return cachedSprite;
+    }
+    const sprite = createTextSprite(ctx2, ft.text, ft.font, ft.color);
+    textSpriteCache.set(key, sprite);
+    if (textSpriteCache.size > MAX_TEXT_SPRITE_CACHE) {
+      const oldestKey = textSpriteCache.keys().next().value;
+      textSpriteCache.delete(oldestKey);
+    }
+    ft.spriteKey = key;
+    ft.sprite = sprite;
+    return sprite;
+  }
+  function createTextSprite(ctx2, text, font, color) {
+    ctx2.save();
+    ctx2.font = font;
+    const metrics = ctx2.measureText(text);
+    ctx2.restore();
+    const fontSize = parseFontSizePx(font);
+    const textWidth = Math.ceil(metrics.width);
+    const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
+    const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
+    const width = Math.max(1, textWidth + TEXT_SPRITE_PADDING * 2);
+    const height = Math.max(1, ascent + descent + TEXT_SPRITE_PADDING * 2);
+    const canvas2 = createSpriteCanvas(width, height);
+    const spriteCtx = canvas2.getContext("2d");
+    const textX = TEXT_SPRITE_PADDING;
+    const textY = TEXT_SPRITE_PADDING + ascent;
+    spriteCtx.font = font;
+    spriteCtx.textAlign = "left";
+    spriteCtx.textBaseline = "alphabetic";
+    spriteCtx.lineJoin = "round";
+    spriteCtx.lineWidth = 7;
+    spriteCtx.strokeStyle = "#ffffff";
+    spriteCtx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    spriteCtx.shadowBlur = 5;
+    spriteCtx.shadowOffsetX = 2;
+    spriteCtx.shadowOffsetY = 2;
+    spriteCtx.strokeText(text, textX, textY);
+    spriteCtx.shadowColor = "transparent";
+    spriteCtx.shadowBlur = 0;
+    spriteCtx.shadowOffsetX = 0;
+    spriteCtx.shadowOffsetY = 0;
+    spriteCtx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    spriteCtx.fillText(text, textX - 1, textY);
+    spriteCtx.fillText(text, textX + 1, textY);
+    spriteCtx.fillText(text, textX, textY - 1);
+    spriteCtx.fillText(text, textX, textY + 1);
+    spriteCtx.fillStyle = color;
+    spriteCtx.fillText(text, textX, textY);
+    return {
+      canvas: canvas2,
+      textWidth,
+      anchorY: textY
+    };
+  }
+  function createSpriteCanvas(width, height) {
+    if (typeof OffscreenCanvas === "function") {
+      return new OffscreenCanvas(width, height);
+    }
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = width;
+    canvas2.height = height;
+    return canvas2;
+  }
+  function getSpriteAnchorX(sprite, textAlign) {
+    switch (textAlign) {
+      case "center":
+        return TEXT_SPRITE_PADDING + sprite.textWidth / 2;
+      case "right":
+      case "end":
+        return TEXT_SPRITE_PADDING + sprite.textWidth;
+      case "left":
+      case "start":
+      default:
+        return TEXT_SPRITE_PADDING;
+    }
+  }
+  function getFloatingTextRenderScale(ft, sprite) {
+    const requestedScale = Number.isFinite(ft.scale) ? Math.max(0, ft.scale) : 1;
+    const minRenderSizePx = Number.isFinite(ft.minRenderSizePx) ? Math.max(0, ft.minRenderSizePx) : 0;
+    if (minRenderSizePx <= 0) {
+      return requestedScale;
+    }
+    const largestSpriteDimension = Math.max(
+      sprite?.canvas?.width ?? 0,
+      sprite?.canvas?.height ?? 0,
+      1
+    );
+    return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
+  }
+  function parseFontSizePx(font) {
+    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
+    if (!match) {
+      return 16;
+    }
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : 16;
+  }
+  function updateRewardPopup(ft) {
+    const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);
+    const holdDistance = ft.holdRiseSpeed * (holdElapsed / 1e3);
+    const holdY = ft.startY - holdDistance;
+    if (ft.elapsedMs <= ft.holdMs) {
+      ft.x = ft.startX;
+      ft.y = holdY;
+      ft.alpha = 1;
+      ft.scale = 1;
+      return;
+    }
+    const flyElapsed = ft.elapsedMs - ft.holdMs;
+    const flyProgress = ft.flyMs > 0 ? Math.min(flyElapsed / ft.flyMs, 1) : 1;
+    const eased = 1 - Math.pow(1 - flyProgress, 3);
+    ft.x = ft.startX + (ft.targetX - ft.startX) * eased;
+    ft.y = holdY + (ft.targetY - holdY) * eased;
+    ft.alpha = Math.max(0, 1 - flyProgress);
+    ft.scale = Math.max(0, 1 - flyProgress);
+  }
+  function shouldRemoveFloatingText(ft) {
+    if (ft.type === "reward") {
+      return ft.elapsedMs >= ft.holdMs + ft.flyMs;
+    }
+    return ft.elapsedMs >= ft.lifeMs;
+  }
+
+  // src/features/progress/claim-effects.ts
+  var POPUP_OFFSET = Object.freeze({
+    exp: { x: -55, y: -20 },
+    coins: { x: 55, y: -20 },
+    shards: { x: -55, y: 12 },
+    cores: { x: 55, y: 12 }
+  });
+  function spawnProgressClaimRewardEffects(floatingTexts2, canvas2, textMeasureContext, currentAmounts, newAmounts, anchorPoint = null) {
+    const expGain = Math.max(0, Math.floor(newAmounts.exp) - Math.floor(currentAmounts.exp));
+    const coinGain = Math.max(0, Math.floor(newAmounts.coins) - Math.floor(currentAmounts.coins));
+    const shardGain = Math.max(0, Math.floor(newAmounts.shards) - Math.floor(currentAmounts.shards));
+    const coreGain = Math.max(0, Math.floor(newAmounts.cores) - Math.floor(currentAmounts.cores));
+    const expText = formatSignedNumber(expGain);
+    const coinText = formatSignedNumber(coinGain);
+    const shardText = formatSignedNumber(shardGain);
+    const coreText = formatSignedNumber(coreGain);
+    const rewardGroupEntries = [
+      { text: expText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.exp.x, offsetY: POPUP_OFFSET.exp.y },
+      { text: coinText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.coins.x, offsetY: POPUP_OFFSET.coins.y }
+    ];
+    if (shardGain > 0) {
+      rewardGroupEntries.push({ text: shardText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.shards.x, offsetY: POPUP_OFFSET.shards.y });
+    }
+    if (coreGain > 0) {
+      rewardGroupEntries.push({ text: coreText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.cores.x, offsetY: POPUP_OFFSET.cores.y });
+    }
+    const barLayout = getProgressBarLayout(canvas2);
+    const rawAnchor = anchorPoint ?? {
+      x: barLayout.x + barLayout.width / 2,
+      y: barLayout.y + barLayout.height / 2
+    };
+    const anchor = clampRewardAnchorToCanvas(textMeasureContext, canvas2, rawAnchor, rewardGroupEntries);
+    spawnRewardPopup(
+      floatingTexts2,
+      canvas2,
+      expText,
+      anchor.x + POPUP_OFFSET.exp.x,
+      anchor.y + POPUP_OFFSET.exp.y,
+      COLORS.rewards.expGain,
+      "exp"
+    );
+    spawnRewardPopup(
+      floatingTexts2,
+      canvas2,
+      coinText,
+      anchor.x + POPUP_OFFSET.coins.x,
+      anchor.y + POPUP_OFFSET.coins.y,
+      COLORS.rewards.coins,
+      "coins"
+    );
+    if (shardGain > 0) {
+      spawnRewardPopup(
+        floatingTexts2,
+        canvas2,
+        shardText,
+        anchor.x + POPUP_OFFSET.shards.x,
+        anchor.y + POPUP_OFFSET.shards.y,
+        COLORS.rewards.shards,
+        "shards"
+      );
+    }
+    if (coreGain > 0) {
+      spawnRewardPopup(
+        floatingTexts2,
+        canvas2,
+        coreText,
+        anchor.x + POPUP_OFFSET.cores.x,
+        anchor.y + POPUP_OFFSET.cores.y,
+        COLORS.rewards.cores,
+        "cores"
+      );
+    }
+  }
+  function clampRewardAnchorToCanvas(textMeasureContext, canvas2, point, entries) {
+    let minX = Number.NEGATIVE_INFINITY;
+    let maxX = Number.POSITIVE_INFINITY;
+    let minY = Number.NEGATIVE_INFINITY;
+    let maxY = Number.POSITIVE_INFINITY;
+    for (const entry of entries) {
+      const bounds = getCenteredPopupAnchorBounds(textMeasureContext, canvas2, entry.text, entry.font, entry.offsetX, entry.offsetY);
+      minX = Math.max(minX, bounds.minX);
+      maxX = Math.min(maxX, bounds.maxX);
+      minY = Math.max(minY, bounds.minY);
+      maxY = Math.min(maxY, bounds.maxY);
+    }
+    if (maxX < minX) {
+      minX = canvas2.width / 2;
+      maxX = canvas2.width / 2;
+    }
+    if (maxY < minY) {
+      minY = canvas2.height / 2;
+      maxY = canvas2.height / 2;
+    }
+    return {
+      x: clamp(point.x, minX, maxX),
+      y: clamp(point.y, minY, maxY)
+    };
+  }
+  function getCenteredPopupAnchorBounds(textMeasureContext, canvas2, text, font, offsetX, offsetY, margin = 8) {
+    const fontSize = parseFontSizePx2(font);
+    const textWidth = measureTextWidth(textMeasureContext, text, font);
+    const halfWidth = textWidth / 2;
+    const bottomPadding = Math.max(6, Math.round(fontSize * 0.3));
+    return {
+      minX: margin + halfWidth - offsetX,
+      maxX: canvas2.width - margin - halfWidth - offsetX,
+      minY: margin + fontSize - offsetY,
+      maxY: canvas2.height - margin - bottomPadding - offsetY
+    };
+  }
+  function measureTextWidth(textMeasureContext, text, font) {
+    textMeasureContext.save();
+    textMeasureContext.font = font;
+    const width = textMeasureContext.measureText(text).width;
+    textMeasureContext.restore();
+    return width;
+  }
+  function parseFontSizePx2(font) {
+    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
+    if (!match) {
+      return 16;
+    }
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : 16;
+  }
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
   // src/app.ts
   var tokenKey = "incrementalist.anonymousPlayerToken";
   var statusLine = requiredElement("#status-line");
@@ -2012,6 +2436,9 @@
   var snapshotCache;
   var busy = false;
   var claimResolutionInFlight = false;
+  var floatingTexts = createFloatingTextState();
+  var lastPointerPoint = null;
+  var pendingClaimPopupPoint = null;
   resizeGameCanvases();
   initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
   window.addEventListener("resize", resizeGameCanvases);
@@ -2043,6 +2470,7 @@
   }
   async function applyAndAck(result) {
     hydrateSnapshotFromCache(result);
+    const previousAmounts = result.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
     applyResult(serverState, result);
     cacheSnapshotFromResult(result);
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
@@ -2050,16 +2478,17 @@
         getStateFromSnapshot(serverState.snapshot);
       }
     }
-    applyProgressResultEffects(result);
+    applyProgressResultEffects(result, previousAmounts);
     renderDom();
     if (!isAckableCommandResult(result)) return;
     let next = await ackAppliedResult(channel, result.command_id);
     if (clearsCommandQueue(result)) channel.clearCommandQueue();
     while (next) {
       hydrateSnapshotFromCache(next);
+      const previousAmounts2 = next.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
       applyResult(serverState, next);
       cacheSnapshotFromResult(next);
-      applyProgressResultEffects(next);
+      applyProgressResultEffects(next, previousAmounts2);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
         if (serverState.snapshot) {
           getStateFromSnapshot(serverState.snapshot);
@@ -2071,12 +2500,31 @@
       if (clearsCommandQueue(applied)) channel.clearCommandQueue();
     }
   }
-  function applyProgressResultEffects(result) {
+  function snapshotAmounts() {
+    const snapshot = serverState.snapshot;
+    if (!snapshot) return null;
+    return {
+      exp: snapshot.state.exp,
+      coins: snapshot.state.coins,
+      shards: snapshot.state.shards,
+      cores: snapshot.state.cores
+    };
+  }
+  function applyProgressResultEffects(result, previousAmounts) {
     if (result.type === "progress.claim_in.result") {
       handleClaimInResult(result);
     } else if (result.type === "progress.claim_reward.result") {
       handleClaimRewardResult();
       triggerProgressBarCollectionEffect(canvas);
+      if (ctx && previousAmounts) {
+        spawnProgressClaimRewardEffects(floatingTexts, canvas, ctx, previousAmounts, {
+          exp: result.exp,
+          coins: result.coins,
+          shards: result.shards,
+          cores: result.cores
+        }, pendingClaimPopupPoint);
+      }
+      pendingClaimPopupPoint = null;
     } else if (result.type === "command.error" && result.reason === "claim_not_ready") {
       handleClaimNotReadyError(result.can_claim_in ?? null);
     }
@@ -2160,9 +2608,14 @@
     if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
     return element;
   }
-  var handleAnyInput = () => {
+  var handleAnyInput = (event) => {
+    const pointerPoint = getCanvasPointFromInputEvent(event, canvas);
+    if (pointerPoint) {
+      lastPointerPoint = pointerPoint;
+    }
     if (!channel) return;
     if (!tryClaimReward(channel)) return;
+    pendingClaimPopupPoint = lastPointerPoint;
     beginAsyncClaimResolution();
     void resolveClaimAsync();
   };
@@ -2185,8 +2638,12 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       renderProgressBar(ctx, canvas);
     }
+    updateFloatingTexts(floatingTexts, dt);
     updateWebGLEffects(dt);
     renderWebGLEffects();
+    if (ctx) {
+      renderFloatingTexts(ctx, floatingTexts);
+    }
   }
   requestAnimationFrame(gameLoop);
   async function resolveClaimAsync() {
@@ -2212,6 +2669,28 @@
     return new Promise((resolve) => {
       window.setTimeout(resolve, Math.max(0, ms));
     });
+  }
+  function getCanvasPointFromInputEvent(event, targetCanvas) {
+    const rect = targetCanvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    let clientX = null;
+    let clientY = null;
+    if (event instanceof MouseEvent || event instanceof PointerEvent) {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    } else if (event instanceof TouchEvent && event.touches.length > 0) {
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+    }
+    if (clientX === null || clientY === null) return null;
+    const scaleX = targetCanvas.width / rect.width;
+    const scaleY = targetCanvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+    return {
+      x: Math.min(Math.max(0, x), targetCanvas.width),
+      y: Math.min(Math.max(0, y), targetCanvas.height)
+    };
   }
   boot().catch((error) => {
     serverState.statusTone = "error";
