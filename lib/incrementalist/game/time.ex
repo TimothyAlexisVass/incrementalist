@@ -12,6 +12,8 @@ defmodule Incrementalist.Game.Time do
       error -> error
     end
   end
+  def from_iso8601(nil), do: {:error, :nil}
+  def from_iso8601(_), do: {:error, :invalid}
 
   def to_unix_ms(%DateTime{} = datetime) do
     DateTime.to_unix(datetime, :millisecond)
