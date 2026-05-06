@@ -10,7 +10,15 @@ import { isAckableCommandResult, type AckableCommandResult, type ServerResult } 
 import { applyResult, createServerState } from "./net/snapshots";
 import { SnapshotCache } from "./net/snapshot-cache";
 import { setButtonBusy } from "./ui/components/button";
-import { updateProjectedFill, getStateFromSnapshot, handleClaimInResult, handleClaimRewardResult } from "./features/progress/view-model";
+import {
+  updateProjectedFill,
+  getStateFromSnapshot,
+  handleClaimInResult,
+  handleClaimRewardResult,
+  handleClaimNotReadyError,
+  beginAsyncClaimResolution,
+  setPendingClaimIntent
+} from "./features/progress/view-model";
 import { handleProgressLoop, tryClaimReward } from "./features/progress/interactions";
 import { renderProgressBar } from "./features/progress/render";
 import { progressClaimIn, progressClaimReward } from "./net/commands";
@@ -35,6 +43,7 @@ const serverState = createServerState();
 let channel: GameChannel;
 let snapshotCache: SnapshotCache;
 let busy = false;
+let claimResolutionInFlight = false;
 
 // Initialize the WebGL layer
 resizeGameCanvases();
@@ -85,12 +94,7 @@ async function applyAndAck(result: ServerResult) {
     }
   }
 
-  if (result.type === "progress.claim_in.result") {
-    handleClaimInResult(result);
-  } else if (result.type === "progress.claim_reward.result") {
-    handleClaimRewardResult();
-    triggerProgressBarCollectionEffect(canvas);
-  }
+  applyProgressResultEffects(result);
 
   renderDom();
 
@@ -104,6 +108,7 @@ async function applyAndAck(result: ServerResult) {
     hydrateSnapshotFromCache(next);
     applyResult(serverState, next);
     cacheSnapshotFromResult(next);
+    applyProgressResultEffects(next);
     if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
       if (serverState.snapshot) {
         getStateFromSnapshot(serverState.snapshot);
@@ -118,8 +123,22 @@ async function applyAndAck(result: ServerResult) {
   }
 }
 
-async function runCommand(command: () => Promise<ServerResult>, loadingMessage: string | null = null) {
-  if (busy) return;
+function applyProgressResultEffects(result: ServerResult) {
+  if (result.type === "progress.claim_in.result") {
+    handleClaimInResult(result);
+  } else if (result.type === "progress.claim_reward.result") {
+    handleClaimRewardResult();
+    triggerProgressBarCollectionEffect(canvas);
+  } else if (result.type === "command.error" && result.reason === "claim_not_ready") {
+    handleClaimNotReadyError(result.can_claim_in ?? null);
+  }
+}
+
+async function runCommand(
+  command: () => Promise<ServerResult>,
+  loadingMessage: string | null = null
+): Promise<ServerResult | null> {
+  if (busy) return null;
   // This guard is UI backpressure. Save-slot boundaries also rely on it so no
   // previous-slot command can be sent while the load/switch result is pending.
   busy = true;
@@ -130,11 +149,14 @@ async function runCommand(command: () => Promise<ServerResult>, loadingMessage: 
   renderDom();
 
   try {
-    await applyAndAck(await command());
+    const result = await command();
+    await applyAndAck(result);
+    return result;
   } catch (error) {
     serverState.statusTone = "error";
     serverState.status = error instanceof Error ? error.message : "Command failed";
     renderDom();
+    return null;
   } finally {
     serverState.loadingMessage = null;
     busy = false;
@@ -212,9 +234,10 @@ function requiredElement<TElement extends Element>(selector: string) {
 }
 
 const handleAnyInput = () => {
-  if (channel && tryClaimReward(channel)) {
-    runCommand(() => progressClaimReward(channel));
-  }
+  if (!channel) return;
+  if (!tryClaimReward(channel)) return;
+  beginAsyncClaimResolution();
+  void resolveClaimAsync();
 };
 
 window.addEventListener("click", handleAnyInput);
@@ -252,6 +275,44 @@ function gameLoop(time: number) {
 }
 
 requestAnimationFrame(gameLoop);
+
+async function resolveClaimAsync() {
+  if (!channel || claimResolutionInFlight) return;
+  claimResolutionInFlight = true;
+
+  try {
+    const verify = await runCommand(() => progressClaimIn(channel));
+    const canClaimIn =
+      verify && verify.type === "progress.claim_in.result"
+        ? verify.can_claim_in
+        : 0;
+
+    if (canClaimIn > 100) {
+      await sleep(canClaimIn);
+    }
+
+    let reward = await runCommand(() => progressClaimReward(channel));
+    while (
+      reward &&
+      reward.type === "command.error" &&
+      reward.reason === "claim_not_ready" &&
+      typeof reward.can_claim_in === "number" &&
+      reward.can_claim_in > 0
+    ) {
+      await sleep(reward.can_claim_in);
+      reward = await runCommand(() => progressClaimReward(channel));
+    }
+  } finally {
+    setPendingClaimIntent(false);
+    claimResolutionInFlight = false;
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, Math.max(0, ms));
+  });
+}
 
 boot().catch((error) => {
   serverState.statusTone = "error";

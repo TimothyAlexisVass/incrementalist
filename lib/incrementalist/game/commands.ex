@@ -66,28 +66,6 @@ defmodule Incrementalist.Game.Commands do
 
         case current_unacked_command(player.id) do
           %GameCommand{command_id: ^command_id} = command ->
-            if command.command_type == "progress.claim_reward" and command.status == "processed" do
-              if command.result["type"] == "progress.claim_reward.result" do
-                slot = SaveSlots.get_slot!(player.id, command.save_slot_id)
-                state = slot.state
-
-                progress_bar = Map.get(state, "progress_bar", %{})
-                rewards_claimed = Map.get(progress_bar, "rewards_claimed", 0) + 1
-                updated_progress_bar = Map.put(progress_bar, "rewards_claimed", rewards_claimed)
-
-                new_state = state
-                            |> Map.put("progress_bar", updated_progress_bar)
-                            |> Map.put("last_claimed_at", Time.iso8601(now))
-
-                next_can_claim_at = Bar.calculate_next_can_claim_at(new_state, now)
-                new_state = Map.put(new_state, "can_claim_at", next_can_claim_at)
-
-                slot
-                |> Ecto.Changeset.change(state: new_state, last_saved_at: now)
-                |> Repo.update!()
-              end
-            end
-
             command
             |> GameCommand.changeset(%{status: "acked", acked_at: now})
             |> Repo.update!()
@@ -168,7 +146,13 @@ defmodule Incrementalist.Game.Commands do
 
         "progress.claim_in" ->
           active_slot = active_slot(player, now)
-          can_claim_in = Bar.can_claim_in(active_slot.state, now)
+          {next_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
+
+          if next_state != active_slot.state do
+            active_slot
+            |> Ecto.Changeset.change(state: next_state, last_saved_at: now)
+            |> Repo.update!()
+          end
 
           {"succeeded",
            %{
@@ -179,13 +163,15 @@ defmodule Incrementalist.Game.Commands do
 
         "progress.claim_reward" ->
           active_slot = active_slot(player, now)
+          {scheduled_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
 
-          if Bar.can_claim_in(active_slot.state, now) <= 0 do
+          if can_claim_in <= 100 do
             # Compute changes and apply state logic
-            new_state = Bar.claim_reward(active_slot.state)
+            new_state =
+              scheduled_state
+              |> Bar.claim_reward()
+              |> Bar.finalize_claim(now)
 
-            # Only save to memory and persist the state here.
-            # Timing changes handled in ACK.
             updated_slot = Ecto.Changeset.change(active_slot, state: new_state, last_saved_at: now)
             Repo.update!(updated_slot)
 
@@ -204,7 +190,8 @@ defmodule Incrementalist.Game.Commands do
                "type" => "command.error",
                "status" => "error",
                "command_id" => command.command_id,
-               "reason" => "claim_not_ready"
+               "reason" => "claim_not_ready",
+               "can_claim_in" => can_claim_in
              }, active_slot.id}
           end
 

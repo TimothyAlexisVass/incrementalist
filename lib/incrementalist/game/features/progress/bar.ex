@@ -54,41 +54,49 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   end
 
   def can_claim_in(state, now) do
+    {_state, can_claim_in} = ensure_can_claim_at(state, now)
+    can_claim_in
+  end
+
+  def ensure_can_claim_at(state, now) do
     rate = get_progress_bar_fill_rate(state, now)
     ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
 
     can_claim_at_iso = Map.get(state, "can_claim_at")
-    last_claimed_iso = Map.get(state, "last_claimed_at")
+    {state, can_claim_at_ms} =
+      case parse_iso_ms(can_claim_at_iso) do
+        {:ok, claim_at_ms} ->
+          {state, claim_at_ms}
 
-    can_claim_at_ms =
-      if can_claim_at_iso do
-        case Time.from_iso8601(can_claim_at_iso) do
-          {:ok, dt} -> Time.to_unix_ms(dt)
-          _ ->
-            last_claimed_ms =
-              case Time.from_iso8601(last_claimed_iso) do
-                {:ok, dt} -> Time.to_unix_ms(dt)
-                _ -> Time.to_unix_ms(now)
-              end
-            last_claimed_ms + ms_required
-        end
-      else
-        last_claimed_ms =
-          case Time.from_iso8601(last_claimed_iso) do
-            {:ok, dt} -> Time.to_unix_ms(dt)
-            _ -> Time.to_unix_ms(now)
-          end
-        last_claimed_ms + ms_required
+        :error ->
+          claim_at = Time.iso8601(DateTime.add(now, ms_required, :millisecond))
+          {Map.put(state, "can_claim_at", claim_at), Time.to_unix_ms(DateTime.add(now, ms_required, :millisecond))}
       end
 
     now_ms = Time.to_unix_ms(now)
-    max(0, can_claim_at_ms - now_ms)
+    {state, max(0, can_claim_at_ms - now_ms)}
   end
 
   def calculate_next_can_claim_at(state, now) do
     rate = get_progress_bar_fill_rate(state, now)
     ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
     Time.iso8601(DateTime.add(now, ms_required, :millisecond))
+  end
+
+  def claim_ready?(state, now, tolerance_ms \\ 0) do
+    {_state, can_claim_in} = ensure_can_claim_at(state, now)
+    can_claim_in <= tolerance_ms
+  end
+
+  def finalize_claim(state, now) do
+    progress_bar = Map.get(state, "progress_bar", %{})
+    rewards_claimed = Map.get(progress_bar, "rewards_claimed", 0) + 1
+    updated_progress_bar = Map.put(progress_bar, "rewards_claimed", rewards_claimed)
+
+    state
+    |> Map.put("progress_bar", updated_progress_bar)
+    |> Map.put("last_claimed_at", Time.iso8601(now))
+    |> Map.put("can_claim_at", nil)
   end
 
   def claim_reward(state, random_fn \\ &rand/0) do
@@ -144,4 +152,13 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   defp rand() do
     :rand.uniform()
   end
+
+  defp parse_iso_ms(iso) when is_binary(iso) do
+    case Time.from_iso8601(iso) do
+      {:ok, dt} -> {:ok, Time.to_unix_ms(dt)}
+      _ -> :error
+    end
+  end
+
+  defp parse_iso_ms(_), do: :error
 end

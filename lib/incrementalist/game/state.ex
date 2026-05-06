@@ -31,7 +31,7 @@ defmodule Incrementalist.Game.State do
       "idle_mode" => false,
       "first_played_at" => timestamp,
       "last_claimed_at" => timestamp,
-      "can_claim_at" => timestamp,
+      "can_claim_at" => nil,
       "saved_at" => timestamp,
       "features" => %{
         "idle_mode_purchased" => false,

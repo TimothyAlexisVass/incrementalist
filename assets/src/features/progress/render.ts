@@ -130,7 +130,7 @@ export function renderProgressBar(
   const fillRatio = fillValue / 100;
   const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
   const displayedFillValue = displayedFillRatio * 100;
-  const isFull = fillRatio >= 1;
+  const isFull = state?.state === "confirmed_collectible";
   const collectionPulse = getCollectionGlowPulse(now);
 
   if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {

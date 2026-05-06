@@ -23,6 +23,8 @@ export type GameSnapshot = {
     coins: number;
     shards: number;
     cores: number;
+    idle_mode: boolean;
+    first_played_at: string | null;
     progress_bar: {
       sisu: number;
       reward_multiplier: number;
@@ -83,7 +85,11 @@ export type ProgressClaimRewardResult = {
   cores: number;
 };
 
-export type CommandErrorReason = "unknown_command" | "slot_index_required" | "invalid_slot_index";
+export type CommandErrorReason =
+  | "unknown_command"
+  | "slot_index_required"
+  | "invalid_slot_index"
+  | "claim_not_ready";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -91,6 +97,7 @@ export type CommandErrorResult = {
   command_id: number;
   reason: CommandErrorReason;
   active_save_slot?: number;
+  can_claim_in?: number;
 };
 
 export type AckableCommandResult =

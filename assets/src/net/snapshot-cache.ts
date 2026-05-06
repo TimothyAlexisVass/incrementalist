@@ -27,7 +27,11 @@ export class SnapshotCache {
       if (!encoded) return null;
 
       const snapshot = JSON.parse(encoded) as GameSnapshot;
-      return snapshot?.type === "game.snapshot" && snapshot.active_save_slot === slotIndex ? snapshot : null;
+      if (!isUsableSnapshot(snapshot, slotIndex)) {
+        window.localStorage.removeItem(this.key(slotIndex));
+        return null;
+      }
+      return snapshot;
     } catch {
       return null;
     }
@@ -42,4 +46,14 @@ export class SnapshotCache {
   private key(slotIndex: number) {
     return `incrementalist.snapshot.${this.token}.${slotIndex}`;
   }
+}
+
+function isUsableSnapshot(snapshot: GameSnapshot, slotIndex: number) {
+  if (!snapshot || snapshot.type !== "game.snapshot") return false;
+  if (snapshot.active_save_slot !== slotIndex) return false;
+  if (!snapshot.state || typeof snapshot.state !== "object") return false;
+  if (typeof snapshot.state.level !== "number") return false;
+  if (typeof snapshot.state.idle_mode !== "boolean") return false;
+  if (!("first_played_at" in snapshot.state)) return false;
+  return true;
 }

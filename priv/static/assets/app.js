@@ -12,6 +12,12 @@
   }
 
   // src/config.ts
+  var NEW_PLAYER_BONUS_WINDOW_MS = 25e3;
+  var NEW_PLAYER_BONUS_FILL_MULTIPLIER = 2.5;
+  var NEW_PLAYER_BONUS_FILL_BONUS = 20;
+  var LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER = 7.25;
+  var BASE_IDLE_MODE_OFF_FILL_RATE = 0.8;
+  var BASE_IDLE_MODE_ON_FILL_RATE = 0.24;
   var BAR_RESET_LERP_SPEED = 7;
   var BAR_FULL_PULSE_SPEED = 0.3;
   var BAR_COLLECTION_GLOW_FADE_MULTIPLIER = 5;
@@ -432,7 +438,11 @@
         const encoded = window.localStorage.getItem(this.key(slotIndex));
         if (!encoded) return null;
         const snapshot = JSON.parse(encoded);
-        return snapshot?.type === "game.snapshot" && snapshot.active_save_slot === slotIndex ? snapshot : null;
+        if (!isUsableSnapshot(snapshot, slotIndex)) {
+          window.localStorage.removeItem(this.key(slotIndex));
+          return null;
+        }
+        return snapshot;
       } catch {
         return null;
       }
@@ -445,6 +455,15 @@
       return `incrementalist.snapshot.${this.token}.${slotIndex}`;
     }
   };
+  function isUsableSnapshot(snapshot, slotIndex) {
+    if (!snapshot || snapshot.type !== "game.snapshot") return false;
+    if (snapshot.active_save_slot !== slotIndex) return false;
+    if (!snapshot.state || typeof snapshot.state !== "object") return false;
+    if (typeof snapshot.state.level !== "number") return false;
+    if (typeof snapshot.state.idle_mode !== "boolean") return false;
+    if (!("first_played_at" in snapshot.state)) return false;
+    return true;
+  }
 
   // src/ui/components/button.ts
   function setButtonBusy(button, busy2) {
@@ -458,11 +477,13 @@
     projectedFill: 0,
     sisu: 1,
     rewardMultiplier: 1,
+    level: 1,
+    firstPlayedAtMs: 0,
     idleMode: false,
-    canClaimInMs: null
+    canClaimInMs: null,
+    nextVerifyAtMs: 0,
+    pendingClaimIntent: false
   };
-  var BASE_IDLE_MODE_OFF_FILL_RATE = 0.8;
-  var BASE_IDLE_MODE_ON_FILL_RATE = 0.24;
   function updateProjectedFill(deltaTimeMs) {
     if (currentViewModel.state !== "projecting" && currentViewModel.state !== "awaiting_server_confirmation") {
       return;
@@ -471,51 +492,143 @@
       if (currentViewModel.canClaimInMs !== null) {
         currentViewModel.canClaimInMs -= deltaTimeMs;
         if (currentViewModel.canClaimInMs <= 0) {
-          currentViewModel.canClaimInMs = 0;
-          currentViewModel.state = "confirmed_collectible";
+          currentViewModel.canClaimInMs = null;
+          currentViewModel.nextVerifyAtMs = Date.now();
+          currentViewModel.projectedFill = 100;
         }
+        return;
       }
       return;
     }
-    const rate = currentViewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE;
-    const fillAmount = rate * currentViewModel.sisu * (deltaTimeMs / 1e3);
-    currentViewModel.projectedFill += fillAmount;
-    if (currentViewModel.projectedFill >= 100) {
-      currentViewModel.projectedFill = 100;
-      currentViewModel.state = "awaiting_server_confirmation";
+    if (currentViewModel.canClaimInMs !== null) {
+      const before = currentViewModel.canClaimInMs;
+      currentViewModel.canClaimInMs = Math.max(0, before - deltaTimeMs);
+      const duration = getCycleDurationMs();
+      const completed = Math.max(0, duration - currentViewModel.canClaimInMs);
+      currentViewModel.projectedFill = Math.min(100, completed / duration * 100);
+      if (currentViewModel.canClaimInMs <= 0) {
+        currentViewModel.state = "confirmed_collectible";
+        currentViewModel.canClaimInMs = 0;
+        currentViewModel.nextVerifyAtMs = 0;
+        currentViewModel.projectedFill = 100;
+      }
     }
   }
   function getStateFromSnapshot(snapshot) {
-    currentViewModel.state = "projecting";
+    currentViewModel.state = "awaiting_server_confirmation";
     currentViewModel.projectedFill = 0;
     currentViewModel.sisu = snapshot.state.progress_bar.sisu;
     currentViewModel.rewardMultiplier = snapshot.state.progress_bar.reward_multiplier;
+    currentViewModel.level = snapshot.state.level;
+    currentViewModel.firstPlayedAtMs = parseTimestamp(snapshot.state.first_played_at, snapshot.server_time);
     currentViewModel.idleMode = snapshot.state.idle_mode;
     currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = 0;
+    currentViewModel.pendingClaimIntent = false;
   }
   function handleClaimInResult(result) {
-    if (result.can_claim_in <= 0) {
+    if (result.can_claim_in <= 100) {
       currentViewModel.state = "confirmed_collectible";
+      currentViewModel.canClaimInMs = 0;
+      currentViewModel.projectedFill = 100;
+      currentViewModel.nextVerifyAtMs = 0;
     } else {
+      const duration = getCycleDurationMsFromRate(Date.now());
+      if (currentViewModel.projectedFill <= 1e-3) {
+        const cycleDurationMs2 = Math.max(1, result.can_claim_in);
+        setCycleDurationMs(cycleDurationMs2);
+        currentViewModel.canClaimInMs = cycleDurationMs2;
+        currentViewModel.state = "projecting";
+        currentViewModel.projectedFill = 0;
+        currentViewModel.nextVerifyAtMs = 0;
+        return;
+      }
       currentViewModel.canClaimInMs = result.can_claim_in;
+      setCycleDurationMs(Math.max(duration, currentViewModel.canClaimInMs));
+      currentViewModel.state = "awaiting_server_confirmation";
+      currentViewModel.nextVerifyAtMs = Date.now() + result.can_claim_in;
+      currentViewModel.projectedFill = 100;
     }
   }
   function handleClaimRewardResult() {
-    currentViewModel.state = "projecting";
+    currentViewModel.state = "awaiting_server_confirmation";
     currentViewModel.projectedFill = 0;
     currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = 0;
+    currentViewModel.pendingClaimIntent = false;
+  }
+  function beginAsyncClaimResolution() {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 0;
+    currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = Number.MAX_SAFE_INTEGER;
+    currentViewModel.pendingClaimIntent = true;
+  }
+  function handleClaimNotReadyError(canClaimInMs = null) {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 100;
+    currentViewModel.canClaimInMs = null;
+    const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
+    currentViewModel.nextVerifyAtMs = Date.now() + delay;
   }
   function getViewModel() {
     return currentViewModel;
   }
+  function shouldSendClaimIn(nowMs) {
+    if (currentViewModel.pendingClaimIntent) return false;
+    if (currentViewModel.state !== "awaiting_server_confirmation") return false;
+    if (currentViewModel.canClaimInMs !== null) return false;
+    if (nowMs < currentViewModel.nextVerifyAtMs) return false;
+    currentViewModel.nextVerifyAtMs = nowMs + 110;
+    return true;
+  }
+  function setPendingClaimIntent(value) {
+    currentViewModel.pendingClaimIntent = value;
+  }
+  function getProgressBarFillRate(viewModel, nowMs) {
+    const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
+    const baseRate = (viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE) * sisuMultiplier;
+    if (viewModel.idleMode) {
+      return baseRate;
+    }
+    const gameAgeMs = nowMs - viewModel.firstPlayedAtMs;
+    if (gameAgeMs < NEW_PLAYER_BONUS_WINDOW_MS) {
+      return baseRate * NEW_PLAYER_BONUS_FILL_MULTIPLIER + NEW_PLAYER_BONUS_FILL_BONUS;
+    }
+    if (viewModel.level < 35) {
+      return baseRate * LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER;
+    }
+    return baseRate;
+  }
+  function parseTimestamp(value, serverTime) {
+    if (!value) return conservativeFallbackFirstPlayedAt(serverTime);
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return conservativeFallbackFirstPlayedAt(serverTime);
+    return parsed;
+  }
+  function conservativeFallbackFirstPlayedAt(serverTime) {
+    const parsedServerTime = serverTime ? Date.parse(serverTime) : Number.NaN;
+    const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : Date.now();
+    return safeNow - NEW_PLAYER_BONUS_WINDOW_MS;
+  }
+  var DEFAULT_CYCLE_DURATION_MS = 1e4;
+  var cycleDurationMs = DEFAULT_CYCLE_DURATION_MS;
+  function getCycleDurationMs() {
+    return cycleDurationMs;
+  }
+  function setCycleDurationMs(value) {
+    cycleDurationMs = Math.max(1, Math.floor(value));
+  }
+  function getCycleDurationMsFromRate(nowMs) {
+    const rate = getProgressBarFillRate(currentViewModel, nowMs);
+    if (rate <= 0) return DEFAULT_CYCLE_DURATION_MS;
+    return Math.max(1, Math.floor(100 * 1e3 / rate));
+  }
 
   // src/features/progress/interactions.ts
   function handleProgressLoop(channel2) {
-    const vm = getViewModel();
-    if (vm.state === "awaiting_server_confirmation" && vm.canClaimInMs === null) {
-      return true;
-    }
-    return false;
+    void channel2;
+    return shouldSendClaimIn(Date.now());
   }
   function tryClaimReward(channel2) {
     const vm = getViewModel();
@@ -1391,7 +1504,7 @@
     const fillRatio = fillValue / 100;
     const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
     const displayedFillValue = displayedFillRatio * 100;
-    const isFull = fillRatio >= 1;
+    const isFull = state?.state === "confirmed_collectible";
     const collectionPulse = getCollectionGlowPulse(now);
     if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {
       PROGRESS_VISUAL_STATE.fullStartedAt = now;
@@ -1898,6 +2011,7 @@
   var channel;
   var snapshotCache;
   var busy = false;
+  var claimResolutionInFlight = false;
   resizeGameCanvases();
   initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
   window.addEventListener("resize", resizeGameCanvases);
@@ -1936,12 +2050,7 @@
         getStateFromSnapshot(serverState.snapshot);
       }
     }
-    if (result.type === "progress.claim_in.result") {
-      handleClaimInResult(result);
-    } else if (result.type === "progress.claim_reward.result") {
-      handleClaimRewardResult();
-      triggerProgressBarCollectionEffect(canvas);
-    }
+    applyProgressResultEffects(result);
     renderDom();
     if (!isAckableCommandResult(result)) return;
     let next = await ackAppliedResult(channel, result.command_id);
@@ -1950,6 +2059,7 @@
       hydrateSnapshotFromCache(next);
       applyResult(serverState, next);
       cacheSnapshotFromResult(next);
+      applyProgressResultEffects(next);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
         if (serverState.snapshot) {
           getStateFromSnapshot(serverState.snapshot);
@@ -1961,8 +2071,18 @@
       if (clearsCommandQueue(applied)) channel.clearCommandQueue();
     }
   }
+  function applyProgressResultEffects(result) {
+    if (result.type === "progress.claim_in.result") {
+      handleClaimInResult(result);
+    } else if (result.type === "progress.claim_reward.result") {
+      handleClaimRewardResult();
+      triggerProgressBarCollectionEffect(canvas);
+    } else if (result.type === "command.error" && result.reason === "claim_not_ready") {
+      handleClaimNotReadyError(result.can_claim_in ?? null);
+    }
+  }
   async function runCommand(command, loadingMessage = null) {
-    if (busy) return;
+    if (busy) return null;
     busy = true;
     serverState.loadingMessage = loadingMessage;
     setButtonBusy(noopButton, true);
@@ -1970,11 +2090,14 @@
     setButtonBusy(resetButton, true);
     renderDom();
     try {
-      await applyAndAck(await command());
+      const result = await command();
+      await applyAndAck(result);
+      return result;
     } catch (error) {
       serverState.statusTone = "error";
       serverState.status = error instanceof Error ? error.message : "Command failed";
       renderDom();
+      return null;
     } finally {
       serverState.loadingMessage = null;
       busy = false;
@@ -2038,9 +2161,10 @@
     return element;
   }
   var handleAnyInput = () => {
-    if (channel && tryClaimReward(channel)) {
-      runCommand(() => progressClaimReward(channel));
-    }
+    if (!channel) return;
+    if (!tryClaimReward(channel)) return;
+    beginAsyncClaimResolution();
+    void resolveClaimAsync();
   };
   window.addEventListener("click", handleAnyInput);
   window.addEventListener("pointermove", handleAnyInput);
@@ -2065,6 +2189,30 @@
     renderWebGLEffects();
   }
   requestAnimationFrame(gameLoop);
+  async function resolveClaimAsync() {
+    if (!channel || claimResolutionInFlight) return;
+    claimResolutionInFlight = true;
+    try {
+      const verify = await runCommand(() => progressClaimIn(channel));
+      const canClaimIn = verify && verify.type === "progress.claim_in.result" ? verify.can_claim_in : 0;
+      if (canClaimIn > 100) {
+        await sleep(canClaimIn);
+      }
+      let reward = await runCommand(() => progressClaimReward(channel));
+      while (reward && reward.type === "command.error" && reward.reason === "claim_not_ready" && typeof reward.can_claim_in === "number" && reward.can_claim_in > 0) {
+        await sleep(reward.can_claim_in);
+        reward = await runCommand(() => progressClaimReward(channel));
+      }
+    } finally {
+      setPendingClaimIntent(false);
+      claimResolutionInFlight = false;
+    }
+  }
+  function sleep(ms) {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, Math.max(0, ms));
+    });
+  }
   boot().catch((error) => {
     serverState.statusTone = "error";
     serverState.status = error instanceof Error ? error.message : "Boot failed";
