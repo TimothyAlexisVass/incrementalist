@@ -67,9 +67,10 @@ export function updateProjectedFill(deltaTimeMs: number) {
     currentViewModel.projectedFill = Math.min(100, (completed / duration) * 100);
 
     if (currentViewModel.canClaimInMs <= 0) {
-      currentViewModel.state = "confirmed_collectible";
-      currentViewModel.canClaimInMs = 0;
-      currentViewModel.nextVerifyAtMs = 0;
+      // Projection reached the boundary; server still decides collectibility.
+      currentViewModel.state = "awaiting_server_confirmation";
+      currentViewModel.canClaimInMs = null;
+      currentViewModel.nextVerifyAtMs = Date.now();
       currentViewModel.projectedFill = 100;
     }
   }

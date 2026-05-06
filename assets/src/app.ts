@@ -17,7 +17,8 @@ import {
   handleClaimRewardResult,
   handleClaimNotReadyError,
   beginAsyncClaimResolution,
-  setPendingClaimIntent
+  setPendingClaimIntent,
+  hasPendingClaimIntent
 } from "./features/progress/view-model";
 import { handleProgressLoop, tryClaimReward } from "./features/progress/interactions";
 import { renderProgressBar } from "./features/progress/render";
@@ -144,6 +145,9 @@ function snapshotAmounts(): ResourceAmounts | null {
 
 function applyProgressResultEffects(result: ServerResult, previousAmounts: ResourceAmounts | null) {
   if (result.type === "progress.claim_in.result") {
+    if (hasPendingClaimIntent()) {
+      return;
+    }
     handleClaimInResult(result);
   } else if (result.type === "progress.claim_reward.result") {
     handleClaimRewardResult();

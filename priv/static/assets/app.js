@@ -517,9 +517,9 @@
       const completed = Math.max(0, duration - currentViewModel.canClaimInMs);
       currentViewModel.projectedFill = Math.min(100, completed / duration * 100);
       if (currentViewModel.canClaimInMs <= 0) {
-        currentViewModel.state = "confirmed_collectible";
-        currentViewModel.canClaimInMs = 0;
-        currentViewModel.nextVerifyAtMs = 0;
+        currentViewModel.state = "awaiting_server_confirmation";
+        currentViewModel.canClaimInMs = null;
+        currentViewModel.nextVerifyAtMs = Date.now();
         currentViewModel.projectedFill = 100;
       }
     }
@@ -594,6 +594,9 @@
   }
   function setPendingClaimIntent(value) {
     currentViewModel.pendingClaimIntent = value;
+  }
+  function hasPendingClaimIntent() {
+    return currentViewModel.pendingClaimIntent;
   }
   function getProgressBarFillRate(viewModel, nowMs) {
     const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
@@ -2512,6 +2515,9 @@
   }
   function applyProgressResultEffects(result, previousAmounts) {
     if (result.type === "progress.claim_in.result") {
+      if (hasPendingClaimIntent()) {
+        return;
+      }
       handleClaimInResult(result);
     } else if (result.type === "progress.claim_reward.result") {
       handleClaimRewardResult();
