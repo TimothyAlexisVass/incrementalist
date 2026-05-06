@@ -1,5 +1,5 @@
 import { COLORS } from "../../colors";
-import { REWARD_POPUP_FONT } from "../../config";
+import { DISPLAY_AREA_HEIGHT, DISPLAY_AREA_WIDTH, DISPLAY_AREA_X, DISPLAY_AREA_Y, REWARD_POPUP_FONT } from "../../config";
 import { formatSignedNumber } from "../../format";
 import { spawnRewardPopup } from "../../render/effects";
 import { getProgressBarLayout } from "./render";
@@ -156,12 +156,14 @@ function getCenteredPopupAnchorBounds(
   const textWidth = measureTextWidth(textMeasureContext, text, font);
   const halfWidth = textWidth / 2;
   const bottomPadding = Math.max(6, Math.round(fontSize * 0.3));
+  const displayAreaRight = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH;
+  const displayAreaBottom = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT;
 
   return {
-    minX: margin + halfWidth - offsetX,
-    maxX: canvas.width - margin - halfWidth - offsetX,
-    minY: margin + fontSize - offsetY,
-    maxY: canvas.height - margin - bottomPadding - offsetY
+    minX: DISPLAY_AREA_X + margin + halfWidth - offsetX,
+    maxX: displayAreaRight - margin - halfWidth - offsetX,
+    minY: DISPLAY_AREA_Y + margin + fontSize - offsetY,
+    maxY: displayAreaBottom - margin - bottomPadding - offsetY
   };
 }
 

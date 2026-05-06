@@ -34,6 +34,8 @@
   var TOP_HUD_HEIGHT = 50;
   var BOTTOM_HUD_HEIGHT = 50;
   var DISPLAY_AREA_X = 20;
+  var DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
+  var DISPLAY_AREA_WIDTH = 1112;
   var DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
   var TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
   var TOP_HUD_EXP_BAR_Y = 15;
@@ -2396,11 +2398,13 @@
     const textWidth = measureTextWidth(textMeasureContext, text, font);
     const halfWidth = textWidth / 2;
     const bottomPadding = Math.max(6, Math.round(fontSize * 0.3));
+    const displayAreaRight = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH;
+    const displayAreaBottom = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT;
     return {
-      minX: margin + halfWidth - offsetX,
-      maxX: canvas2.width - margin - halfWidth - offsetX,
-      minY: margin + fontSize - offsetY,
-      maxY: canvas2.height - margin - bottomPadding - offsetY
+      minX: DISPLAY_AREA_X + margin + halfWidth - offsetX,
+      maxX: displayAreaRight - margin - halfWidth - offsetX,
+      minY: DISPLAY_AREA_Y + margin + fontSize - offsetY,
+      maxY: displayAreaBottom - margin - bottomPadding - offsetY
     };
   }
   function measureTextWidth(textMeasureContext, text, font) {
@@ -2613,22 +2617,38 @@
     if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
     return element;
   }
-  var handleAnyInput = (event) => {
-    const pointerPoint = getCanvasPointFromInputEvent(event, canvas);
-    if (pointerPoint) {
-      lastPointerPoint = pointerPoint;
+  function claimRewardOnAnyInput(clickPoint = null) {
+    if (!channel) {
+      return;
     }
-    if (!channel) return;
-    if (!tryClaimReward(channel)) return;
-    pendingClaimPopupPoint = lastPointerPoint;
+    if (!tryClaimReward(channel)) {
+      return;
+    }
+    pendingClaimPopupPoint = clickPoint;
     triggerProgressBarCollectionEffect(canvas);
     beginAsyncClaimResolution();
     void resolveClaimAsync();
-  };
-  window.addEventListener("click", handleAnyInput);
-  window.addEventListener("pointermove", handleAnyInput);
-  window.addEventListener("keydown", handleAnyInput);
-  window.addEventListener("touchstart", handleAnyInput);
+  }
+  function handleClick(event) {
+    const point = getCanvasPointFromInputEvent(event, canvas);
+    lastPointerPoint = point;
+    claimRewardOnAnyInput(point);
+  }
+  function handleMouseMove(event) {
+    const point = getCanvasPointFromInputEvent(event, canvas);
+    lastPointerPoint = point;
+    claimRewardOnAnyInput(point);
+  }
+  function handleKeydown(event) {
+    claimRewardOnAnyInput(lastPointerPoint);
+    event.preventDefault();
+  }
+  document.addEventListener("click", handleClick);
+  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("keydown", handleKeydown);
+  canvas.addEventListener("mouseleave", () => {
+    lastPointerPoint = null;
+  });
   var lastTime = performance.now();
   function gameLoop(time) {
     requestAnimationFrame(gameLoop);

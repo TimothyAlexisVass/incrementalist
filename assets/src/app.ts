@@ -266,24 +266,44 @@ function requiredElement<TElement extends Element>(selector: string) {
   return element;
 }
 
-const handleAnyInput = (event: Event) => {
-  const pointerPoint = getCanvasPointFromInputEvent(event, canvas);
-  if (pointerPoint) {
-    lastPointerPoint = pointerPoint;
+function claimRewardOnAnyInput(clickPoint: { x: number; y: number } | null = null) {
+  if (!channel) {
+    return;
   }
 
-  if (!channel) return;
-  if (!tryClaimReward(channel)) return;
-  pendingClaimPopupPoint = lastPointerPoint;
+  if (!tryClaimReward(channel)) {
+    return;
+  }
+
+  pendingClaimPopupPoint = clickPoint;
   triggerProgressBarCollectionEffect(canvas);
   beginAsyncClaimResolution();
   void resolveClaimAsync();
-};
+}
 
-window.addEventListener("click", handleAnyInput);
-window.addEventListener("pointermove", handleAnyInput);
-window.addEventListener("keydown", handleAnyInput);
-window.addEventListener("touchstart", handleAnyInput);
+function handleClick(event: MouseEvent) {
+  const point = getCanvasPointFromInputEvent(event, canvas);
+  lastPointerPoint = point;
+  claimRewardOnAnyInput(point);
+}
+
+function handleMouseMove(event: MouseEvent) {
+  const point = getCanvasPointFromInputEvent(event, canvas);
+  lastPointerPoint = point;
+  claimRewardOnAnyInput(point);
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  claimRewardOnAnyInput(lastPointerPoint);
+  event.preventDefault();
+}
+
+document.addEventListener("click", handleClick);
+document.addEventListener("mousemove", handleMouseMove);
+document.addEventListener("keydown", handleKeydown);
+canvas.addEventListener("mouseleave", () => {
+  lastPointerPoint = null;
+});
 
 let lastTime = performance.now();
 
@@ -301,7 +321,7 @@ function gameLoop(time: number) {
      runCommand(() => progressClaimIn(channel));
   }
 
-  // Render the core 2D progress bar UI (fill ratio and legacy text)
+  // Render the core 2D progress bar UI (fill ratio and text)
   if (ctx && canvas) {
      ctx.clearRect(0, 0, canvas.width, canvas.height);
      ctx.fillStyle = COLORS.game.background;
@@ -311,7 +331,7 @@ function gameLoop(time: number) {
 
   updateFloatingTexts(floatingTexts, dt);
 
-  // Update and render legacy hardware-accelerated reward collection effects
+  // Update and render reward collection effects
   updateWebGLEffects(dt);
   renderWebGLEffects();
 
