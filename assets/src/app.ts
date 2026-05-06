@@ -1,4 +1,6 @@
 import { onClick } from "./core/input";
+import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./config";
+import { COLORS } from "./colors";
 import { bindSaveSlotClicks } from "./features/save-slots/interactions";
 import { renderSaveSlots } from "./features/save-slots/render";
 import { createSaveSlotsViewModel } from "./features/save-slots/view-model";
@@ -12,7 +14,7 @@ import { updateProjectedFill, getStateFromSnapshot, handleClaimInResult, handleC
 import { handleProgressLoop, tryClaimReward } from "./features/progress/interactions";
 import { renderProgressBar } from "./features/progress/render";
 import { progressClaimIn, progressClaimReward } from "./net/commands";
-import { initWebGLEffectsLayer, updateWebGLEffects, renderWebGLEffects } from "./render/webgl-effects";
+import { initWebGLEffectsLayer, resizeWebGLEffectsLayer, updateWebGLEffects, renderWebGLEffects } from "./render/webgl-effects";
 import { triggerProgressBarCollectionEffect } from "./features/progress/render";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
@@ -35,7 +37,30 @@ let snapshotCache: SnapshotCache;
 let busy = false;
 
 // Initialize the WebGL layer
+resizeGameCanvases();
 initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
+
+window.addEventListener("resize", resizeGameCanvases);
+
+function resizeGameCanvases() {
+  if (canvas.width !== CANVAS_WIDTH) {
+    canvas.width = CANVAS_WIDTH;
+  }
+
+  if (canvas.height !== CANVAS_HEIGHT) {
+    canvas.height = CANVAS_HEIGHT;
+  }
+
+  if (effectsCanvas.width !== canvas.width) {
+    effectsCanvas.width = canvas.width;
+  }
+
+  if (effectsCanvas.height !== canvas.height) {
+    effectsCanvas.height = canvas.height;
+  }
+
+  resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
+}
 
 function renderDom() {
   const snapshot = serverState.snapshot;
@@ -216,6 +241,8 @@ function gameLoop(time: number) {
   // Render the core 2D progress bar UI (fill ratio and legacy text)
   if (ctx && canvas) {
      ctx.clearRect(0, 0, canvas.width, canvas.height);
+     ctx.fillStyle = COLORS.game.background;
+     ctx.fillRect(0, 0, canvas.width, canvas.height);
      renderProgressBar(ctx, canvas);
   }
 

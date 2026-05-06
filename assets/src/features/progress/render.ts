@@ -13,12 +13,45 @@ import { drawLockedElement, lerpColor } from '../../utils';
 import {
   setGpuProgressBarGlow,
   spawnGpuProgressCollectionLaserBurst,
-  spawnGpuProgressCompletionBurst,
-  updateGpuProgressLiquidBubbles
+  spawnGpuProgressCompletionBurst
 } from '../../render/webgl-effects';
+import { getViewModel } from './view-model';
+
+type Rgb = [number, number, number];
+type LiquidBubble = {
+  baseX: number;
+  y: number;
+  radius: number;
+  speed: number;
+  phase: number;
+  alpha: number;
+  ageMs: number;
+};
+type CompletionParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  drag: number;
+  radius: number;
+  lineWidth: number;
+  colorCss: string;
+  elapsedMs: number;
+  lifeMs: number;
+};
 
 const TWO_PI = Math.PI * 2;
-const PROGRESS_VISUAL_STATE = {
+const PROGRESS_VISUAL_STATE: {
+  wasFull: boolean;
+  fullStartedAt: number;
+  lastTimestamp: number;
+  completionParticles: CompletionParticle[];
+  liquidBubbles: LiquidBubble[];
+  liquidBubbleSpawnAccumulator: number;
+  usesGpuLiquidBubbles: boolean;
+  displayedFillRatio: number;
+  collectionGlowStartedAt: number;
+} = {
   wasFull: false,
   fullStartedAt: 0,
   lastTimestamp: 0,
@@ -77,11 +110,11 @@ export function triggerProgressBarCollectionEffect(canvas = null) {
   );
 }
 
-import { getViewModel } from "./view-model";
-
-export function renderProgressBar(ctx, canvas) {
+export function renderProgressBar(
+  ctx: CanvasRenderingContext2D | null,
+  canvas: HTMLCanvasElement | null
+) {
   if (!ctx || !canvas) return;
-
   const state = getViewModel();
 
   const {
@@ -97,7 +130,7 @@ export function renderProgressBar(ctx, canvas) {
   const fillRatio = fillValue / 100;
   const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
   const displayedFillValue = displayedFillRatio * 100;
-  const isFull = state.state === "confirmed_collectible";
+  const isFull = fillRatio >= 1;
   const collectionPulse = getCollectionGlowPulse(now);
 
   if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {
@@ -117,22 +150,8 @@ export function renderProgressBar(ctx, canvas) {
 
   const fillHeight = displayedFillRatio * barHeight;
   const fillY = barY + barHeight - fillHeight;
-  PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = updateGpuProgressLiquidBubbles(deltaTime, {
-    barX,
-    barY,
-    barWidth,
-    barHeight,
-    fillY,
-    fillHeight,
-    fillRatio: displayedFillRatio
-  });
-
-  if (PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles) {
-    PROGRESS_VISUAL_STATE.liquidBubbles.length = 0;
-    PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator = 0;
-  } else {
-    updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
-  }
+  PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = false;
+  updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
 
   const pulse = isFull ? getFullPulse(now) : 1;
   const hasCollectionGlow = collectionPulse > 0;
@@ -207,15 +226,15 @@ export function renderProgressBar(ctx, canvas) {
   }
 }
 
-function rgbArrayToCss(rgb) {
+function rgbArrayToCss(rgb: Rgb) {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
-function rgbaArrayToCss(rgb, alpha) {
+function rgbaArrayToCss(rgb: Rgb, alpha: number) {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
 }
 
-function getProgressColorArray(percent) {
+function getProgressColorArray(percent: number): Rgb {
   const start = COLORS.bar.progress.fillStart;
   const mid = COLORS.bar.progress.fillMid;
   const end = COLORS.bar.progress.fillEnd;
@@ -234,16 +253,16 @@ function getProgressColorArray(percent) {
   return color;
 }
 
-function getProgressColor(percent) {
+function getProgressColor(percent: number): string {
   const color = getProgressColorArray(percent);
   return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
-function clampNumber(value, min, max) {
+function clampNumber(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-function getNowMs() {
+function getNowMs(): number {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
     return performance.now();
   }
@@ -251,7 +270,7 @@ function getNowMs() {
   return Date.now();
 }
 
-function getProgressVisualDelta(now) {
+function getProgressVisualDelta(now: number): number {
   if (!PROGRESS_VISUAL_STATE.lastTimestamp) {
     PROGRESS_VISUAL_STATE.lastTimestamp = now;
     return 16.67;
@@ -262,7 +281,7 @@ function getProgressVisualDelta(now) {
   return deltaTime;
 }
 
-function updateDisplayedProgressFill(targetFillRatio, deltaTime) {
+function updateDisplayedProgressFill(targetFillRatio: number, deltaTime: number): number {
   const target = clampNumber(targetFillRatio, 0, 1);
   const current = clampNumber(PROGRESS_VISUAL_STATE.displayedFillRatio, 0, 1);
 
@@ -282,13 +301,13 @@ function updateDisplayedProgressFill(targetFillRatio, deltaTime) {
   return PROGRESS_VISUAL_STATE.displayedFillRatio;
 }
 
-function getFullPulse(now, speed = BAR_FULL_PULSE_SPEED) {
+function getFullPulse(now: number, speed = BAR_FULL_PULSE_SPEED): number {
   const pulseSpeed = clampNumber(Number(speed) || BAR_FULL_PULSE_SPEED, 0.1, 4);
   const elapsed = Math.max(0, now - (PROGRESS_VISUAL_STATE.fullStartedAt || now));
   return 0.55 + ((Math.cos((elapsed * pulseSpeed) / 165) + 1) / 2) * 1.05;
 }
 
-function getCollectionGlowPulse(now) {
+function getCollectionGlowPulse(now: number): number {
   const startedAt = PROGRESS_VISUAL_STATE.collectionGlowStartedAt;
   if (!startedAt) {
     return 0;
@@ -303,7 +322,17 @@ function getCollectionGlowPulse(now) {
   return FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
 }
 
-function renderLiquidProgressFill(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+function renderLiquidProgressFill(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillY: number,
+  fillHeight: number,
+  fillRatio: number,
+  now: number
+) {
   if (fillHeight <= 0) return;
 
   ctx.save();
@@ -331,7 +360,17 @@ function renderLiquidProgressFill(ctx, barX, barY, barWidth, barHeight, fillY, f
   ctx.restore();
 }
 
-function traceLiquidPath(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+function traceLiquidPath(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillY: number,
+  fillHeight: number,
+  fillRatio: number,
+  now: number
+) {
   const bottomY = barY + barHeight;
   const step = 2;
 
@@ -353,7 +392,17 @@ function traceLiquidPath(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight
   ctx.closePath();
 }
 
-function getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+function getLiquidSurfaceY(
+  x: number,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillY: number,
+  fillHeight: number,
+  fillRatio: number,
+  now: number
+): number {
   const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
   if (waveHeight <= 0) {
     return clampNumber(fillY, barY, barY + barHeight);
@@ -367,12 +416,20 @@ function getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight
   return clampNumber(surfaceY, barY, barY + barHeight);
 }
 
-function getLiquidWaveHeight(fillHeight, fillRatio, barHeight) {
+function getLiquidWaveHeight(fillHeight: number, fillRatio: number, barHeight: number): number {
   const topClearance = Math.max(0, (1 - fillRatio) * barHeight * 0.55);
   return Math.min(LIQUID_SURFACE_WAVE_HEIGHT, fillHeight * 0.08, topClearance);
 }
 
-function updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, fillRatio, now) {
+function updateProgressLiquidBubbles(
+  deltaTime: number,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillRatio: number,
+  now: number
+) {
   const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
   const fillHeight = fillRatio * barHeight;
   const fillY = barY + barHeight - fillHeight;
@@ -427,7 +484,14 @@ function updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight,
   }
 }
 
-function spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio) {
+function spawnProgressLiquidBubble(
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillHeight: number,
+  fillRatio: number
+) {
   const radius = 0.42 + Math.random() * (0.62 + fillRatio * 0.32);
   const padding = 3 + radius;
   const availableWidth = Math.max(0, barWidth - padding * 2);
@@ -444,11 +508,21 @@ function spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, 
   });
 }
 
-function getLiquidBubbleX(bubble) {
+function getLiquidBubbleX(bubble: LiquidBubble): number {
   return bubble.baseX;
 }
 
-function renderLiquidBubbles(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+function renderLiquidBubbles(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillY: number,
+  fillHeight: number,
+  fillRatio: number,
+  now: number
+) {
   const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
   if (bubbles.length === 0) return;
 
@@ -487,7 +561,17 @@ function renderLiquidBubbles(ctx, barX, barY, barWidth, barHeight, fillY, fillHe
   ctx.restore();
 }
 
-function renderLiquidSurfaceHighlight(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+function renderLiquidSurfaceHighlight(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillY: number,
+  fillHeight: number,
+  fillRatio: number,
+  now: number
+) {
   const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
   const surfaceGlow = clampNumber(0.22 + fillRatio * 0.34, 0, 0.5);
   const step = 2;
@@ -517,7 +601,17 @@ function renderLiquidSurfaceHighlight(ctx, barX, barY, barWidth, barHeight, fill
   ctx.restore();
 }
 
-function renderProgressGlow(ctx, barX, barY, barWidth, barHeight, fillRatio, isFull, now, collectionPulse = 0) {
+function renderProgressGlow(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  fillRatio: number,
+  isFull: boolean,
+  now: number,
+  collectionPulse = 0
+) {
   if (fillRatio <= 0 && collectionPulse <= 0) return;
 
   const hasCollectionGlow = collectionPulse > 0;
@@ -556,7 +650,14 @@ function renderProgressGlow(ctx, barX, barY, barWidth, barHeight, fillRatio, isF
   ctx.restore();
 }
 
-function renderRisingEnergy(ctx, barX, barY, barWidth, barHeight, now) {
+function renderRisingEnergy(
+  ctx: CanvasRenderingContext2D,
+  barX: number,
+  barY: number,
+  barWidth: number,
+  barHeight: number,
+  now: number
+) {
   const innerX = barX + 4;
   const innerY = barY + 3;
   const innerWidth = barWidth - 8;
@@ -588,7 +689,7 @@ function renderRisingEnergy(ctx, barX, barY, barWidth, barHeight, now) {
   ctx.restore();
 }
 
-function spawnProgressCompletionBurst(barX, barY, barWidth, barHeight) {
+function spawnProgressCompletionBurst(barX: number, barY: number, barWidth: number, barHeight: number) {
   if (spawnGpuProgressCompletionBurst(
     barX,
     barY,
@@ -654,7 +755,7 @@ function spawnProgressCompletionBurst(barX, barY, barWidth, barHeight) {
   }
 }
 
-function updateProgressCompletionParticles(deltaTime) {
+function updateProgressCompletionParticles(deltaTime: number) {
   const particles = PROGRESS_VISUAL_STATE.completionParticles;
   if (particles.length === 0) return;
 
@@ -681,7 +782,7 @@ function updateProgressCompletionParticles(deltaTime) {
   particles.length = writeIndex;
 }
 
-function renderProgressCompletionParticles(ctx) {
+function renderProgressCompletionParticles(ctx: CanvasRenderingContext2D) {
   const particles = PROGRESS_VISUAL_STATE.completionParticles;
   if (particles.length === 0) return;
 
@@ -718,7 +819,7 @@ function renderProgressCompletionParticles(ctx) {
   ctx.restore();
 }
 
-export function getProgressBarLayout(canvas) {
+export function getProgressBarLayout(canvas: HTMLCanvasElement) {
   const baseHeight = canvas.height - 120;
   const barHeight = baseHeight * 0.72;
 
@@ -730,7 +831,7 @@ export function getProgressBarLayout(canvas) {
   };
 }
 
-export function getIdleModeToggleRect(canvas) {
+export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
   const barLayout = getProgressBarLayout(canvas);
   return {
     x: barLayout.x + barLayout.width / 2 - 30,
@@ -740,7 +841,11 @@ export function getIdleModeToggleRect(canvas) {
   };
 }
 
-export function renderIdleModeToggle(ctx, canvas, state) {
+export function renderIdleModeToggle(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  state: { idleMode: boolean; features?: { idleModePurchased?: boolean } }
+) {
   const toggleRect = getIdleModeToggleRect(canvas);
   const drawToggle = () => drawButton(ctx, toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
     active: false,

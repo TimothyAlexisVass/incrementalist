@@ -11,6 +11,147 @@
     return element;
   }
 
+  // src/config.ts
+  var BAR_RESET_LERP_SPEED = 7;
+  var BAR_FULL_PULSE_SPEED = 0.3;
+  var BAR_COLLECTION_GLOW_FADE_MULTIPLIER = 5;
+  var PROGRESS_PERCENT_FONT = "bold 16px Arial";
+  var IDLE_TOGGLE_FONT = "bold 11px Arial";
+  var CANVAS_WIDTH = 1280;
+  var CANVAS_HEIGHT = 760;
+  var TOP_HUD_HEIGHT = 50;
+  var BOTTOM_HUD_HEIGHT = 50;
+  var DISPLAY_AREA_X = 20;
+  var DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
+  var TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
+  var TOP_HUD_EXP_BAR_Y = 15;
+  var TOP_HUD_EXP_BAR_WIDTH = 300;
+  var TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH;
+  var TOP_HUD_EXP_COUNTER_X = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
+  var TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
+  var TOP_HUD_CURRENCY_ICON_SIZE = 32;
+  var TOP_HUD_CURRENCY_ICON_Y = Math.floor((TOP_HUD_HEIGHT - TOP_HUD_CURRENCY_ICON_SIZE) / 2);
+  var PROGRESS_BAR_WIDTH = 40;
+
+  // src/colors.ts
+  var COLORS = Object.freeze({
+    app: {
+      background: "#0f0f1a",
+      canvasBorder: "#333",
+      canvasShadow: "rgba(0, 0, 0, 0.5)"
+    },
+    game: {
+      background: "#1a1a2e"
+    },
+    bar: {
+      track: "#0f1b30",
+      border: "#5b6f93",
+      progress: {
+        fillStart: [255, 107, 107],
+        // #FF6B6B
+        fillMid: [255, 230, 109],
+        // #FFE66D
+        fillEnd: [78, 205, 196]
+        // #4ECDC4
+      },
+      exp: {
+        fillStart: "#934caf",
+        fillEnd: "#e753ec"
+      },
+      quest: {
+        readyStart: "#34a853",
+        readyEnd: "#7ce89a",
+        pendingStart: "#4b72c2",
+        pendingEnd: "#6ea9ff"
+      }
+    },
+    sisu: {
+      darkBlue: "#0B1F4D",
+      blue: "#1E90FF",
+      yellow: "#FFD700",
+      purple: "#9932CC",
+      decay: "#ffa1a1"
+    },
+    button: {
+      surface: {
+        active: "#2c6fb3",
+        inactive: "#2b3f60"
+      },
+      border: {
+        active: "#cfe7ff",
+        inactive: "#4d678f"
+      },
+      text: "#f5f8ff",
+      secondary: {
+        surface: "#2a3f61",
+        border: "#93b3d8",
+        text: "#dbe8ff"
+      },
+      toggle: {
+        on: "#4CAF50",
+        off: "#777"
+      }
+    },
+    hud: {
+      panel: "#16213e",
+      textPrimary: "#FFFFFF",
+      coins: "#FFD700",
+      shards: "#FF8C1A",
+      cores: "#FF4D4D",
+      whiteCoins: "#1E90FF",
+      questTokens: "#FF6B6B",
+      bonusText: "#6BC2FF"
+    },
+    rewards: {
+      achievement: "#6BC2FF",
+      expGain: "#c951f8",
+      coins: "#FFD700",
+      shards: "#FF8C1A",
+      cores: "#FF4D4D",
+      whiteCoins: "#1E90FF",
+      totalBonus: "#6BC2FF",
+      questSummary: "#FF9B6A",
+      questSummaryOverflow: "#D2DEF0",
+      questTokenGain: "#FF6B6B",
+      eventTokenGain: "#6BC2FF",
+      saveNotice: "#7CE89A"
+    },
+    coinRain: {
+      bucket: "#8B4513",
+      itemCoins: "#FFD700",
+      itemReward: "#FF00FF",
+      timerText: "#FFFFFF",
+      countdownText: "#FFFFFF"
+    },
+    overlay: {
+      backdrop: "rgba(0, 0, 0, 0.72)",
+      panel: "#111f34",
+      panelBorder: "#3a5273",
+      titleText: "#dbe8ff",
+      starsText: "#ffd966",
+      unlockedStateText: "#dbe8ff",
+      statusUnlocked: "#7fe38e",
+      statusLocked: "#ff8c8c",
+      bodyText: "#f5f8ff",
+      questTokenText: "#ffd2a8",
+      questBonusText: "#9be8a9",
+      questRowBackground: "#1a2d4a",
+      questRowBorder: "#2f4f79",
+      questRankText: "#f4ca64",
+      questProgressReadyText: "#9be8a9",
+      questProgressPendingText: "#dbe8ff",
+      optionsTitleText: "#dbe8ff",
+      optionsCheckboxCheckmark: "#dbe8ff",
+      optionsDropdownBackground: "#2b3f60",
+      optionsDropdownBorder: "#4d678f"
+    }
+  });
+  var CSS_COLOR_VARIABLES = Object.freeze({
+    "--app-bg-color": COLORS.app.background,
+    "--canvas-border-color": COLORS.app.canvasBorder,
+    "--canvas-shadow-color": COLORS.app.canvasShadow
+  });
+
   // src/features/save-slots/interactions.ts
   function bindSaveSlotClicks(container, onSelect) {
     container.addEventListener("click", (event) => {
@@ -384,146 +525,6 @@
     return false;
   }
 
-  // src/config.ts
-  var BAR_RESET_LERP_SPEED = 7;
-  var BAR_FULL_PULSE_SPEED = 0.3;
-  var BAR_COLLECTION_GLOW_FADE_MULTIPLIER = 5;
-  var PROGRESS_PERCENT_FONT = "bold 16px Arial";
-  var IDLE_TOGGLE_FONT = "bold 11px Arial";
-  var CANVAS_HEIGHT = 760;
-  var TOP_HUD_HEIGHT = 50;
-  var BOTTOM_HUD_HEIGHT = 50;
-  var DISPLAY_AREA_X = 20;
-  var DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
-  var TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
-  var TOP_HUD_EXP_BAR_Y = 15;
-  var TOP_HUD_EXP_BAR_WIDTH = 300;
-  var TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH;
-  var TOP_HUD_EXP_COUNTER_X = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
-  var TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
-  var TOP_HUD_CURRENCY_ICON_SIZE = 32;
-  var TOP_HUD_CURRENCY_ICON_Y = Math.floor((TOP_HUD_HEIGHT - TOP_HUD_CURRENCY_ICON_SIZE) / 2);
-  var PROGRESS_BAR_WIDTH = 40;
-
-  // src/colors.ts
-  var COLORS = Object.freeze({
-    app: {
-      background: "#0f0f1a",
-      canvasBorder: "#333",
-      canvasShadow: "rgba(0, 0, 0, 0.5)"
-    },
-    game: {
-      background: "#1a1a2e"
-    },
-    bar: {
-      track: "#0f1b30",
-      border: "#5b6f93",
-      progress: {
-        fillStart: [255, 107, 107],
-        // #FF6B6B
-        fillMid: [255, 230, 109],
-        // #FFE66D
-        fillEnd: [78, 205, 196]
-        // #4ECDC4
-      },
-      exp: {
-        fillStart: "#934caf",
-        fillEnd: "#e753ec"
-      },
-      quest: {
-        readyStart: "#34a853",
-        readyEnd: "#7ce89a",
-        pendingStart: "#4b72c2",
-        pendingEnd: "#6ea9ff"
-      }
-    },
-    sisu: {
-      darkBlue: "#0B1F4D",
-      blue: "#1E90FF",
-      yellow: "#FFD700",
-      purple: "#9932CC",
-      decay: "#ffa1a1"
-    },
-    button: {
-      surface: {
-        active: "#2c6fb3",
-        inactive: "#2b3f60"
-      },
-      border: {
-        active: "#cfe7ff",
-        inactive: "#4d678f"
-      },
-      text: "#f5f8ff",
-      secondary: {
-        surface: "#2a3f61",
-        border: "#93b3d8",
-        text: "#dbe8ff"
-      },
-      toggle: {
-        on: "#4CAF50",
-        off: "#777"
-      }
-    },
-    hud: {
-      panel: "#16213e",
-      textPrimary: "#FFFFFF",
-      coins: "#FFD700",
-      shards: "#FF8C1A",
-      cores: "#FF4D4D",
-      whiteCoins: "#1E90FF",
-      questTokens: "#FF6B6B",
-      bonusText: "#6BC2FF"
-    },
-    rewards: {
-      achievement: "#6BC2FF",
-      expGain: "#c951f8",
-      coins: "#FFD700",
-      shards: "#FF8C1A",
-      cores: "#FF4D4D",
-      whiteCoins: "#1E90FF",
-      totalBonus: "#6BC2FF",
-      questSummary: "#FF9B6A",
-      questSummaryOverflow: "#D2DEF0",
-      questTokenGain: "#FF6B6B",
-      eventTokenGain: "#6BC2FF",
-      saveNotice: "#7CE89A"
-    },
-    coinRain: {
-      bucket: "#8B4513",
-      itemCoins: "#FFD700",
-      itemReward: "#FF00FF",
-      timerText: "#FFFFFF",
-      countdownText: "#FFFFFF"
-    },
-    overlay: {
-      backdrop: "rgba(0, 0, 0, 0.72)",
-      panel: "#111f34",
-      panelBorder: "#3a5273",
-      titleText: "#dbe8ff",
-      starsText: "#ffd966",
-      unlockedStateText: "#dbe8ff",
-      statusUnlocked: "#7fe38e",
-      statusLocked: "#ff8c8c",
-      bodyText: "#f5f8ff",
-      questTokenText: "#ffd2a8",
-      questBonusText: "#9be8a9",
-      questRowBackground: "#1a2d4a",
-      questRowBorder: "#2f4f79",
-      questRankText: "#f4ca64",
-      questProgressReadyText: "#9be8a9",
-      questProgressPendingText: "#dbe8ff",
-      optionsTitleText: "#dbe8ff",
-      optionsCheckboxCheckmark: "#dbe8ff",
-      optionsDropdownBackground: "#2b3f60",
-      optionsDropdownBorder: "#4d678f"
-    }
-  });
-  var CSS_COLOR_VARIABLES = Object.freeze({
-    "--app-bg-color": COLORS.app.background,
-    "--canvas-border-color": COLORS.app.canvasBorder,
-    "--canvas-shadow-color": COLORS.app.canvasShadow
-  });
-
   // src/format.ts
   function toFiniteNumber(value, fallback = 0) {
     const parsed = Number(value);
@@ -567,7 +568,6 @@
     1,
     1
   ]);
-  var BUBBLE_SIZE = 0.83;
   var TWO_PI = Math.PI * 2;
   var DEFAULT_CLICK_COLORS = Object.freeze([
     COLORS.rewards.coins,
@@ -928,54 +928,6 @@
     );
     gl.drawArrays(gl.POINTS, 0, drawCount);
   }
-  function updateGpuProgressLiquidBubbles(deltaTime, options = {}) {
-    if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.bubbleProgram) {
-      return false;
-    }
-    const barX = Number(options.barX) || 0;
-    const barY = Number(options.barY) || 0;
-    const barWidth = Math.max(0, Number(options.barWidth) || 0);
-    const barHeight = Math.max(0, Number(options.barHeight) || 0);
-    const fillHeight = Math.max(0, Number(options.fillHeight) || 0);
-    const fillRatio = Math.min(Math.max(Number(options.fillRatio) || 0, 0), 1);
-    const fillY = Number(options.fillY) || barY + barHeight - fillHeight;
-    const bubbles = WEBGL_EFFECTS.liquidBubbles;
-    if (fillRatio <= 0.02 || fillHeight < 8 || barWidth < 8) {
-      bubbles.length = 0;
-      WEBGL_EFFECTS.liquidBubbleSpawnAccumulator = 0;
-      WEBGL_EFFECTS.liquidClipRect = null;
-      return true;
-    }
-    const clipInset = 3;
-    const clipY = Math.max(barY + clipInset, fillY + 1);
-    const clipBottom = barY + barHeight - clipInset;
-    WEBGL_EFFECTS.liquidClipRect = {
-      x: barX + clipInset,
-      y: clipY,
-      width: Math.max(0, barWidth - clipInset * 2),
-      height: Math.max(0, clipBottom - clipY)
-    };
-    const deltaSeconds = deltaTime / 1e3;
-    let writeIndex = 0;
-    for (let i = 0; i < bubbles.length; i += 1) {
-      const bubble = bubbles[i];
-      bubble.ageMs += deltaTime;
-      bubble.y -= bubble.speed * deltaSeconds;
-      if (bubble.y - bubble.radius <= clipY || bubble.y + bubble.radius < barY) {
-        continue;
-      }
-      bubbles[writeIndex] = bubble;
-      writeIndex += 1;
-    }
-    bubbles.length = writeIndex;
-    if (fillHeight < 20) return true;
-    WEBGL_EFFECTS.liquidBubbleSpawnAccumulator += deltaTime * (4e-3 + fillRatio * 6e-3);
-    while (WEBGL_EFFECTS.liquidBubbleSpawnAccumulator >= 1 && bubbles.length < MAX_GPU_LIQUID_BUBBLES) {
-      spawnGpuLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio);
-      WEBGL_EFFECTS.liquidBubbleSpawnAccumulator -= 1;
-    }
-    return true;
-  }
   function setGpuProgressBarGlow(options = {}) {
     if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.glowProgram) {
       return false;
@@ -1235,21 +1187,6 @@
     );
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
   }
-  function spawnGpuLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio) {
-    const radius = BUBBLE_SIZE - 0.31 + Math.random() * (0.62 + fillRatio * 0.32);
-    const padding = 3 + radius;
-    const availableWidth = Math.max(0, barWidth - padding * 2);
-    const bottomY = barY + barHeight;
-    WEBGL_EFFECTS.liquidBubbles.push({
-      x: barX + padding + Math.random() * availableWidth,
-      y: bottomY - Math.random() * Math.min(12, fillHeight * 0.22) + radius,
-      radius,
-      speed: 45 + Math.random() * 33,
-      phase: Math.random() * TWO_PI,
-      alpha: 0.82 + Math.random() * 0.16,
-      ageMs: Math.random() * 600
-    });
-  }
   function createProgram(gl, vertexSource, fragmentSource) {
     const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexSource);
     const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
@@ -1454,7 +1391,7 @@
     const fillRatio = fillValue / 100;
     const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
     const displayedFillValue = displayedFillRatio * 100;
-    const isFull = state.state === "confirmed_collectible";
+    const isFull = fillRatio >= 1;
     const collectionPulse = getCollectionGlowPulse(now);
     if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {
       PROGRESS_VISUAL_STATE.fullStartedAt = now;
@@ -1469,21 +1406,8 @@
     ctx2.fillRect(barX, barY, barWidth, barHeight);
     const fillHeight = displayedFillRatio * barHeight;
     const fillY = barY + barHeight - fillHeight;
-    PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = updateGpuProgressLiquidBubbles(deltaTime, {
-      barX,
-      barY,
-      barWidth,
-      barHeight,
-      fillY,
-      fillHeight,
-      fillRatio: displayedFillRatio
-    });
-    if (PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles) {
-      PROGRESS_VISUAL_STATE.liquidBubbles.length = 0;
-      PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator = 0;
-    } else {
-      updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
-    }
+    PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = false;
+    updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
     const pulse = isFull ? getFullPulse(now) : 1;
     const hasCollectionGlow = collectionPulse > 0;
     const collectionGlowFade = hasCollectionGlow ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1) : 0;
@@ -1974,7 +1898,24 @@
   var channel;
   var snapshotCache;
   var busy = false;
+  resizeGameCanvases();
   initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
+  window.addEventListener("resize", resizeGameCanvases);
+  function resizeGameCanvases() {
+    if (canvas.width !== CANVAS_WIDTH) {
+      canvas.width = CANVAS_WIDTH;
+    }
+    if (canvas.height !== CANVAS_HEIGHT) {
+      canvas.height = CANVAS_HEIGHT;
+    }
+    if (effectsCanvas.width !== canvas.width) {
+      effectsCanvas.width = canvas.width;
+    }
+    if (effectsCanvas.height !== canvas.height) {
+      effectsCanvas.height = canvas.height;
+    }
+    resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
+  }
   function renderDom() {
     const snapshot = serverState.snapshot;
     statusLine.textContent = serverState.loadingMessage ?? serverState.status;
@@ -2116,6 +2057,8 @@
     }
     if (ctx && canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = COLORS.game.background;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       renderProgressBar(ctx, canvas);
     }
     updateWebGLEffects(dt);

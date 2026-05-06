@@ -16,6 +16,8 @@ config :incrementalist, IncrementalistWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "2Sy4rftl8d5OTcOMQl6SFLlOMLDmWy60i4HpjFXVebZBdDCa0aWDpgPCF51r2tWq",
-  watchers: []
+  watchers: [
+    {"node", ["build.mjs", "--watch", cd: Path.expand("../assets", __DIR__)]}
+  ]
 
 config :phoenix, :stacktrace_depth, 20
