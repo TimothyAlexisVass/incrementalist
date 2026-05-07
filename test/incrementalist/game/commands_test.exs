@@ -11,14 +11,15 @@ defmodule Incrementalist.Game.CommandsTest do
   @now ~U[2026-05-04 12:00:00Z]
 
   test "anonymous sessions create four save slots and boot chooses slot zero when empty" do
-    session = Sessions.authenticate_anonymous(nil, @now)
+    player = Sessions.authenticate_player(nil, @now)
 
-    slots = SaveSlots.get_slots(session.player.id)
+    slots = SaveSlots.get_slots(player.id)
     assert Enum.map(slots, & &1.slot_index) == [0, 1, 2, 3]
 
-    boot = Sessions.boot_player(session.player.id, session.anonymous_player_token, @now)
+    boot = Sessions.boot_player(player.id, MapSet.new(), @now)
 
     refute Map.has_key?(boot, "slots")
+    assert boot["username"] == player.username
     assert boot["snapshot"]["active_save_slot"] == 0
     assert boot["snapshot"]["save_slot"]["has_data"]
     refute Map.has_key?(boot["snapshot"], "state_version")
@@ -26,13 +27,12 @@ defmodule Incrementalist.Game.CommandsTest do
   end
 
   test "boot can omit a full snapshot when the active slot is cached by the client" do
-    session = Sessions.authenticate_anonymous(nil, @now)
-    _initial_boot = Sessions.boot_player(session.player.id, session.anonymous_player_token, @now)
+    player = Sessions.authenticate_player(nil, @now)
+    _initial_boot = Sessions.boot_player(player.id, MapSet.new(), @now)
 
     cached_boot =
       Sessions.boot_player(
-        session.player.id,
-        session.anonymous_player_token,
+        player.id,
         MapSet.new([0]),
         @now
       )
@@ -45,8 +45,7 @@ defmodule Incrementalist.Game.CommandsTest do
   end
 
   test "boot selection uses last valid slot, then first populated slot, then slot zero" do
-    session = Sessions.authenticate_anonymous(nil, @now)
-    player = session.player
+    player = Sessions.authenticate_player(nil, @now)
 
     slot_1 = SaveSlots.get_slot!(player.id, 1)
     slot_2 = SaveSlots.get_slot!(player.id, 2)
@@ -225,14 +224,13 @@ defmodule Incrementalist.Game.CommandsTest do
   end
 
   test "reconnect boot includes the unacked stored result" do
-    session = Sessions.authenticate_anonymous(nil, @now)
-    player = session.player
+    player = Sessions.authenticate_player(nil, @now)
 
     result = Commands.enqueue(player.id, "game.noop", intent(0), @now)
 
     boot =
       player.id
-      |> Sessions.boot_player(session.anonymous_player_token, @now)
+      |> Sessions.boot_player(MapSet.new(), @now)
       |> Map.put("pending_result", Commands.replay_pending(player.id))
 
     assert boot["pending_result"] == result
@@ -265,9 +263,9 @@ defmodule Incrementalist.Game.CommandsTest do
   end
 
   defp create_player do
-    session = Sessions.authenticate_anonymous(nil, @now)
-    _snapshot = Sessions.boot_player(session.player.id, session.anonymous_player_token, @now)
-    Repo.get!(Player, session.player.id)
+    player = Sessions.authenticate_player(nil, @now)
+    _snapshot = Sessions.boot_player(player.id, MapSet.new(), @now)
+    Repo.get!(Player, player.id)
   end
 
   defp intent(command_id, attrs \\ %{}) do

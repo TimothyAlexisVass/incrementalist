@@ -135,7 +135,7 @@ export type ServerResult =
 
 export type BootResult = {
   type: "game.boot";
-  anonymous_player_token?: string | null;
+  username: string;
   active_save_slot: number;
   save_slot: SaveSlotSummary;
   snapshot?: GameSnapshot | null;

@@ -3,7 +3,7 @@ import type { GameSnapshot } from "./protocol";
 const slotCount = 4;
 
 export class SnapshotCache {
-  constructor(private readonly token: string | null) {}
+  constructor(private readonly username: string | null) {}
 
   cachedSlotIndexes() {
     if (!this.token) return [];
@@ -38,13 +38,13 @@ export class SnapshotCache {
   }
 
   save(snapshot: GameSnapshot) {
-    if (!this.token) return;
+    if (!this.username) return;
 
     window.localStorage.setItem(this.key(snapshot.active_save_slot), JSON.stringify(snapshot));
   }
 
   private key(slotIndex: number) {
-    return `incrementalist.snapshot.${this.token}.${slotIndex}`;
+    return `incrementalist.snapshot.${this.username}.${slotIndex}`;
   }
 }
 

@@ -227,8 +227,8 @@
   var heartbeatIntervalMs = 25e3;
   var commandQueueLimit = 10;
   var GameChannel = class {
-    constructor(token, cachedSaveSlots = []) {
-      this.token = token;
+    constructor(username, cachedSaveSlots = []) {
+      this.username = username;
       this.cachedSaveSlots = cachedSaveSlots;
       __publicField(this, "socket", null);
       __publicField(this, "ref", 0);
@@ -239,7 +239,7 @@
     }
     connect() {
       const params = new URLSearchParams({ vsn: "2.0.0" });
-      if (this.token) params.set("anonymous_player_token", this.token);
+      if (this.username) params.set("username", this.username);
       if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
       this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
@@ -431,8 +431,8 @@
   // src/net/snapshot-cache.ts
   var slotCount = 4;
   var SnapshotCache = class {
-    constructor(token) {
-      this.token = token;
+    constructor(username) {
+      this.username = username;
     }
     cachedSlotIndexes() {
       if (!this.token) return [];
@@ -460,11 +460,11 @@
       }
     }
     save(snapshot) {
-      if (!this.token) return;
+      if (!this.username) return;
       window.localStorage.setItem(this.key(snapshot.active_save_slot), JSON.stringify(snapshot));
     }
     key(slotIndex) {
-      return `incrementalist.snapshot.${this.token}.${slotIndex}`;
+      return `incrementalist.snapshot.${this.username}.${slotIndex}`;
     }
   };
   function isUsableSnapshot(snapshot, slotIndex) {
@@ -2454,7 +2454,7 @@
   }
 
   // src/app.ts
-  var tokenKey = "incrementalist.anonymousPlayerToken";
+  var usernameKey = "incrementalist.playerUsername";
   var statusLine = requiredElement("#status-line");
   var levelValue = requiredElement("#level-value");
   var slotValue = requiredElement("#slot-value");
@@ -2592,14 +2592,12 @@
     }
   }
   async function boot() {
-    const token = window.localStorage.getItem(tokenKey);
-    snapshotCache = new SnapshotCache(token);
-    channel = new GameChannel(token, snapshotCache.cachedSlotIndexes());
+    const username = window.localStorage.getItem(usernameKey);
+    snapshotCache = new SnapshotCache(username);
+    channel = new GameChannel(username, snapshotCache.cachedSlotIndexes());
     const bootResult = await channel.connect();
-    if (bootResult.anonymous_player_token) {
-      window.localStorage.setItem(tokenKey, bootResult.anonymous_player_token);
-      snapshotCache = new SnapshotCache(bootResult.anonymous_player_token);
-    }
+    window.localStorage.setItem(usernameKey, bootResult.username);
+    snapshotCache = new SnapshotCache(bootResult.username);
     serverState.snapshot = bootResult.snapshot ?? snapshotCache.load(bootResult.active_save_slot);
     if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);
     serverState.slots = [bootResult.save_slot];

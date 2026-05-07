@@ -30,7 +30,7 @@ import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./feature
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
-const tokenKey = "incrementalist.anonymousPlayerToken";
+const usernameKey = "incrementalist.playerUsername";
 const statusLine = requiredElement<HTMLElement>("#status-line");
 const levelValue = requiredElement<HTMLElement>("#level-value");
 const slotValue = requiredElement<HTMLElement>("#slot-value");
@@ -201,15 +201,13 @@ async function runCommand(
 }
 
 async function boot() {
-  const token = window.localStorage.getItem(tokenKey);
-  snapshotCache = new SnapshotCache(token);
-  channel = new GameChannel(token, snapshotCache.cachedSlotIndexes());
+  const username = window.localStorage.getItem(usernameKey);
+  snapshotCache = new SnapshotCache(username);
+  channel = new GameChannel(username, snapshotCache.cachedSlotIndexes());
   const bootResult = await channel.connect();
 
-  if (bootResult.anonymous_player_token) {
-    window.localStorage.setItem(tokenKey, bootResult.anonymous_player_token);
-    snapshotCache = new SnapshotCache(bootResult.anonymous_player_token);
-  }
+  window.localStorage.setItem(usernameKey, bootResult.username);
+  snapshotCache = new SnapshotCache(bootResult.username);
 
   serverState.snapshot = bootResult.snapshot ?? snapshotCache.load(bootResult.active_save_slot);
   if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);

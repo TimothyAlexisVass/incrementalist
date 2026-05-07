@@ -1,12 +1,12 @@
-defmodule UsernameGenerator do
+defmodule Incrementalist.Game.Helpers.Players.UsernameGenerator do
   @moduledoc """
   Readable random username generator.
 
   Examples:
-      UsernameGenerator.generate()
+      Incrementalist.Game.Helpers.Players.UsernameGenerator.generate()
       # "Zavennor"
 
-      UsernameGenerator.generate_unique(&username_exists?/1)
+      Incrementalist.Game.Helpers.Players.UsernameGenerator.generate_unique(&username_exists?/1)
       # "Movekkia"
   """
 
@@ -50,8 +50,14 @@ defmodule UsernameGenerator do
     |> capitalize()
   end
 
-  def generate_unique do
-    # while not unique in players.username generate() a username
+  def generate_unique(username_exists? \\ fn _username -> false end, generator \\ &generate/0) do
+    username = generator.()
+
+    if username_exists?.(username) do
+      generate_unique(username_exists?, generator)
+    else
+      username
+    end
   end
 
   defp part(:start) do
