@@ -145,19 +145,19 @@ assets/src/
       dropdown.ts
       modal.ts
       tooltip.ts
-      progress-bar.ts
     overlays/
   features/
     progress/
       view-model.ts
       render.ts
       interactions.ts
-    sisu/
+      sisu/
     areas/
     shop/
     quests/
     achievements/
     daily-bonus/
+    save-slots/
   theme/
     colors.ts
     fonts.ts
@@ -241,12 +241,12 @@ Deliverable: the core incremental loop works with server-authorized collectibili
 ### Phase 3: Currencies, Levels, and Rewards
 
 - Port or refine level-up reward events that need distinct presentation beyond the Phase 2 claim mutation.
+- EXP bar and level are calculated client-side, but without authority.
+- Ask server for current exp and level on client assumed level up and overwrite client state with authority from server.
 - Return changed final authoritative values from the server; do not send presentation-only reward or level-up events.
 - Render the top HUD currency and level display from authoritative snapshots and command results.
-- Render top-HUD resource counters and level-up reward presentation by deriving display behavior from authoritative values and local reversible UI state.
+- Render top-HUD resource counters and level-up reward presentation by deriving display behavior from authoritative values and local unauthorized UI state.
 - Add rule tests for deterministic reward paths.
-
-Deliverable: level, exp, coins, shards, and cores are durable server state.
 
 ### Phase 4: Canvas Menu Shell and Save Files
 
