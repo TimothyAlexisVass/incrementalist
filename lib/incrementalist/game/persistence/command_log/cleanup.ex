@@ -1,6 +1,6 @@
 defmodule Incrementalist.Game.Persistence.CommandLog.Cleanup do
   @moduledoc """
-  Hourly maintenance process for expired anonymous tokens and acknowledged commands.
+  Daily maintenance process for old acknowledged commands and inactive anonymous players.
 
   Cleanup is deliberately outside command execution so queue correctness does
   not depend on this process running on time.
@@ -9,9 +9,9 @@ defmodule Incrementalist.Game.Persistence.CommandLog.Cleanup do
   use GenServer
 
   alias Incrementalist.Game.Persistence.CommandLog
-  alias Incrementalist.Game.Sessions
+  alias Incrementalist.Game.Persistence.Player
 
-  @hour_ms 60 * 60 * 1000
+  @day_ms 24 * 60 * 60 * 1000
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -26,12 +26,12 @@ defmodule Incrementalist.Game.Persistence.CommandLog.Cleanup do
   @impl true
   def handle_info(:cleanup, state) do
     CommandLog.cleanup_acked()
-    Sessions.cleanup_expired_tokens()
+    Player.cleanup_anonymous()
     schedule_cleanup()
     {:noreply, state}
   end
 
   defp schedule_cleanup do
-    Process.send_after(self(), :cleanup, @hour_ms)
+    Process.send_after(self(), :cleanup, @day_ms)
   end
 end

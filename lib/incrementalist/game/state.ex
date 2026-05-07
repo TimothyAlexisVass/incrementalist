@@ -24,13 +24,14 @@ defmodule Incrementalist.Game.State do
       "shards" => 0,
       "cores" => 0,
       "progress_bar" => %{
-        "fill" => 0.0,
         "sisu" => 1,
         "reward_multiplier" => 1.0,
         "rewards_claimed" => 0
       },
       "idle_mode" => false,
       "first_played_at" => timestamp,
+      "last_claimed_at" => timestamp,
+      "can_claim_at" => nil,
       "saved_at" => timestamp,
       "features" => %{
         "idle_mode_purchased" => false,
@@ -71,7 +72,6 @@ defmodule Incrementalist.Game.State do
       "first_played_at" => string(state, "first_played_at", nil),
       "saved_at" => string(state, "saved_at", nil),
       "progress_bar" => %{
-        "fill" => number(progress_bar, "fill", 0.0),
         "sisu" => integer(progress_bar, "sisu", 1),
         "reward_multiplier" => number(progress_bar, "reward_multiplier", 1.0),
         "rewards_claimed" => integer(progress_bar, "rewards_claimed", 0)

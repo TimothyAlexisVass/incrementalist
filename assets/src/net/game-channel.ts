@@ -17,13 +17,13 @@ export class GameChannel {
   private readonly commandQueue = Array<boolean>(commandQueueLimit).fill(false);
 
   constructor(
-    private readonly token: string | null,
+    private readonly username: string | null,
     private readonly cachedSaveSlots: number[] = []
   ) {}
 
   connect(): Promise<BootResult> {
     const params = new URLSearchParams({ vsn: "2.0.0" });
-    if (this.token) params.set("anonymous_player_token", this.token);
+    if (this.username) params.set("username", this.username);
     if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";

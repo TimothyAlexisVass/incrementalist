@@ -1,6 +1,6 @@
 defmodule IncrementalistWeb.UserSocket do
   @moduledoc """
-  Authenticates socket connections with the server-issued anonymous token.
+  Authenticates socket connections with the server-issued username.
 
   Socket assigns hold the server-resolved player id. Channel messages therefore
   do not need, and must not accept, player ids from the browser.
@@ -14,15 +14,13 @@ defmodule IncrementalistWeb.UserSocket do
 
   @impl true
   def connect(params, socket, _connect_info) do
-    # The token identifies only the player. Active slot and command order are
+    # The username identifies only the player. Active slot and command order are
     # resolved after authentication from server-side rows.
-    token = Map.get(params, "anonymous_player_token")
-    session = Sessions.authenticate_anonymous(token)
+    player = Sessions.authenticate_player(Map.get(params, "username"))
 
     {:ok,
      socket
-     |> assign(:player_id, session.player.id)
-     |> assign(:anonymous_player_token, session.anonymous_player_token)
+     |> assign(:player_id, player.id)
      |> assign(:cached_save_slots, cached_save_slots(params))}
   end
 

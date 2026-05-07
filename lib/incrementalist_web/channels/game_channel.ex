@@ -20,11 +20,7 @@ defmodule IncrementalistWeb.GameChannel do
     # Boot may omit the snapshot when the browser already has a cached visible
     # copy for the active slot. Pending command replay still comes from storage.
     boot =
-      Sessions.boot_player(
-        socket.assigns.player_id,
-        socket.assigns.anonymous_player_token,
-        socket.assigns.cached_save_slots
-      )
+      Sessions.boot_player(socket.assigns.player_id, socket.assigns.cached_save_slots)
       |> Map.put("pending_result", Commands.replay_pending(socket.assigns.player_id))
 
     {:ok, boot, socket}

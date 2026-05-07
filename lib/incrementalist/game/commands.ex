@@ -17,6 +17,7 @@ defmodule Incrementalist.Game.Commands do
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
   alias Incrementalist.Game.{Snapshots, Time}
+  alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Repo
 
   @queue_limit 10
@@ -142,6 +143,57 @@ defmodule Incrementalist.Game.Commands do
              "server_time" => Time.iso8601(now),
              "events" => []
            }, active_slot.id}
+
+        "progress.claim_in" ->
+          active_slot = active_slot(player, now)
+          {next_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
+
+          if next_state != active_slot.state do
+            active_slot
+            |> Ecto.Changeset.change(state: next_state, last_saved_at: now)
+            |> Repo.update!()
+          end
+
+          {"succeeded",
+           %{
+             "type" => "progress.claim_in.result",
+             "command_id" => command.command_id,
+             "can_claim_in" => can_claim_in
+           }, active_slot.id}
+
+        "progress.claim_reward" ->
+          active_slot = active_slot(player, now)
+          {scheduled_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
+
+          if can_claim_in <= 100 do
+            # Compute changes and apply state logic
+            new_state =
+              scheduled_state
+              |> Bar.claim_reward()
+              |> Bar.finalize_claim(now)
+
+            updated_slot = Ecto.Changeset.change(active_slot, state: new_state, last_saved_at: now)
+            Repo.update!(updated_slot)
+
+            {"succeeded",
+             %{
+               "type" => "progress.claim_reward.result",
+               "command_id" => command.command_id,
+               "coins" => Map.get(new_state, "coins"),
+               "exp" => Map.get(new_state, "exp"),
+               "shards" => Map.get(new_state, "shards"),
+               "cores" => Map.get(new_state, "cores")
+             }, active_slot.id}
+          else
+            {"failed",
+             %{
+               "type" => "command.error",
+               "status" => "error",
+               "command_id" => command.command_id,
+               "reason" => "claim_not_ready",
+               "can_claim_in" => can_claim_in
+             }, active_slot.id}
+          end
 
         "save_slots.list" ->
           active_slot = active_slot(player, now)
