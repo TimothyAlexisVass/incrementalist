@@ -19,7 +19,7 @@ export function createServerState(): ServerState {
 // Applies whatever authoritative state the result contains, and leaves everything
 // else unchanged. This matches the protocol: narrow command results should not
 // force the server to resend a full snapshot just to update UI status.
-export function applyResult(state: ServerState, result: ServerResult) {
+export function applyResult(state: ServerState, result: ServerResult): void {
   const snapshot = snapshotFromResult(result);
 
   if (snapshot) {
@@ -59,7 +59,7 @@ function upsertSlot(slots: SaveSlotSummary[], slot: SaveSlotSummary) {
   return next.sort((a, b) => a.slot_index - b.slot_index);
 }
 
-function statusForResult(result: ServerResult) {
+function statusForResult(result: ServerResult): string {
   if (result.status === "error") return result.reason || "Command rejected";
   if (result.type === "command.queued") return "Queued";
   if (result.type === "game.noop.result") return "Synced";

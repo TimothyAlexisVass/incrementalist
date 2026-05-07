@@ -72,12 +72,14 @@ export type SaveSlotResetResult = {
 
 export type ProgressClaimInResult = {
   type: "progress.claim_in.result";
+  status: "ok";
   command_id: number;
   can_claim_in: number;
 };
 
 export type ProgressClaimRewardResult = {
   type: "progress.claim_reward.result";
+  status: "ok";
   command_id: number;
   coins: number;
   exp: number;

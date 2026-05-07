@@ -2,7 +2,6 @@ import type {
   AckableCommandResult,
   CommandErrorResult,
   CommandPushResult,
-  GameNoopResult,
   SaveSlotResetResult,
   SaveSlotsListResult,
   SaveSlotSwitchResult,
@@ -11,13 +10,7 @@ import type {
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
-// Command helpers send player intent plus the client command id owned by
-// GameChannel's small local queue. The id is transport correlation only; rules
-// still execute from server state.
-export function sendNoop(channel: GameChannel) {
-  return channel.pushCommand<CommandPushResult<GameNoopResult>>("game.noop");
-}
-
+// Save file commands
 export function listSaveSlots(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<SaveSlotsListResult>>("save_slots.list");
 }
