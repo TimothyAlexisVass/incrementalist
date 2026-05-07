@@ -1,15 +1,10 @@
-import { onClick } from "./core/input";
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./config";
 import { COLORS } from "./colors";
-import { bindSaveSlotClicks } from "./features/save-slots/interactions";
-import { renderSaveSlots } from "./features/save-slots/render";
-import { createSaveSlotsViewModel } from "./features/save-slots/view-model";
 import { GameChannel } from "./net/game-channel";
-import { ackAppliedResult, listSaveSlots, resetSaveSlot, sendNoop, switchSaveSlot } from "./net/commands";
+import { ackAppliedResult, sendNoop } from "./net/commands";
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "./net/protocol";
 import { applyResult, createServerState } from "./net/snapshots";
 import { SnapshotCache } from "./net/snapshot-cache";
-import { setButtonBusy } from "./ui/components/button";
 import {
   updateProjectedFill,
   getStateFromSnapshot,
@@ -27,22 +22,16 @@ import { initWebGLEffectsLayer, resizeWebGLEffectsLayer, updateWebGLEffects, ren
 import { triggerProgressBarCollectionEffect } from "./features/progress/render";
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "./render/effects";
 import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./features/progress/claim-effects";
+import { Store } from "./core/store";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
 const usernameKey = "incrementalist.playerUsername";
-const statusLine = requiredElement<HTMLElement>("#status-line");
-const levelValue = requiredElement<HTMLElement>("#level-value");
-const slotValue = requiredElement<HTMLElement>("#slot-value");
-const noopButton = requiredElement<HTMLButtonElement>("#noop-button");
-const saveButton = requiredElement<HTMLButtonElement>("#save-button");
-const resetButton = requiredElement<HTMLButtonElement>("#reset-button");
-const slotList = requiredElement<HTMLElement>("#slot-list");
 const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
 const effectsCanvas = requiredElement<HTMLCanvasElement>("#effects-canvas");
 const ctx = canvas.getContext("2d");
 
-const serverState = createServerState();
+const store = new Store(createServerState());
 let channel: GameChannel;
 let snapshotCache: SnapshotCache;
 let busy = false;
@@ -78,32 +67,24 @@ function resizeGameCanvases() {
 }
 
 function renderDom() {
-  const snapshot = serverState.snapshot;
-  statusLine.textContent = serverState.loadingMessage ?? serverState.status;
-  statusLine.dataset.tone = serverState.statusTone;
-  levelValue.textContent = String(snapshot?.state.level ?? 1);
-  slotValue.textContent = String((snapshot?.active_save_slot ?? 0) + 1);
-  renderSaveSlots(slotList, createSaveSlotsViewModel(snapshot, serverState.slots));
-  slotList.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
-    setButtonBusy(button, busy);
-  });
+  // HTML HUD is removed. UI is now exclusively on Canvas/WebGL.
 }
 
 async function applyAndAck(result: ServerResult) {
   hydrateSnapshotFromCache(result);
   const previousAmounts = result.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-  applyResult(serverState, result);
+  applyResult(store.state, result);
   cacheSnapshotFromResult(result);
 
   if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-    if (serverState.snapshot) {
-      getStateFromSnapshot(serverState.snapshot);
+    if (store.state.snapshot) {
+      getStateFromSnapshot(store.state.snapshot);
     }
   }
 
   applyProgressResultEffects(result, previousAmounts);
 
-  renderDom();
+  store.markDirty();
 
   if (!isAckableCommandResult(result)) return;
 
@@ -114,15 +95,15 @@ async function applyAndAck(result: ServerResult) {
   while (next) {
     hydrateSnapshotFromCache(next);
     const previousAmounts = next.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-    applyResult(serverState, next);
+    applyResult(store.state, next);
     cacheSnapshotFromResult(next);
     applyProgressResultEffects(next, previousAmounts);
     if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
-      if (serverState.snapshot) {
-        getStateFromSnapshot(serverState.snapshot);
+      if (store.state.snapshot) {
+        getStateFromSnapshot(store.state.snapshot);
       }
     }
-    renderDom();
+    store.markDirty();
     // The server releases at most one queued result per acknowledgement so the
     // client cannot accidentally skip over a command result.
     const applied = next;
@@ -132,7 +113,7 @@ async function applyAndAck(result: ServerResult) {
 }
 
 function snapshotAmounts(): ResourceAmounts | null {
-  const snapshot = serverState.snapshot;
+  const snapshot = store.state.snapshot;
   if (!snapshot) return null;
 
   return {
@@ -175,28 +156,22 @@ async function runCommand(
   // This guard is UI backpressure. Save-slot boundaries also rely on it so no
   // previous-slot command can be sent while the load/switch result is pending.
   busy = true;
-  serverState.loadingMessage = loadingMessage;
-  setButtonBusy(noopButton, true);
-  setButtonBusy(saveButton, true);
-  setButtonBusy(resetButton, true);
-  renderDom();
+  store.state.loadingMessage = loadingMessage;
+  store.markDirty();
 
   try {
     const result = await command();
     await applyAndAck(result);
     return result;
   } catch (error) {
-    serverState.statusTone = "error";
-    serverState.status = error instanceof Error ? error.message : "Command failed";
-    renderDom();
+    store.state.statusTone = "error";
+    store.state.status = error instanceof Error ? error.message : "Command failed";
+    store.markDirty();
     return null;
   } finally {
-    serverState.loadingMessage = null;
-    busy = false;
-    setButtonBusy(noopButton, false);
-    setButtonBusy(saveButton, false);
-    setButtonBusy(resetButton, false);
-    renderDom();
+    store.state.loadingMessage = null;
+    busy = channel.status !== "connected";
+    store.markDirty();
   }
 }
 
@@ -204,46 +179,52 @@ async function boot() {
   const username = window.localStorage.getItem(usernameKey);
   snapshotCache = new SnapshotCache(username);
   channel = new GameChannel(username, snapshotCache.cachedSlotIndexes());
-  const bootResult = await channel.connect();
 
-  window.localStorage.setItem(usernameKey, bootResult.username);
-  snapshotCache = new SnapshotCache(bootResult.username);
+  channel.onStatusChange = (status) => {
+    store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
+    store.state.statusTone = status === "connected" ? "ok" : (status === "disconnected" ? "error" : "");
+    busy = status !== "connected";
+    store.markDirty();
+  };
 
-  serverState.snapshot = bootResult.snapshot ?? snapshotCache.load(bootResult.active_save_slot);
-  if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);
-  serverState.slots = [bootResult.save_slot];
-  serverState.status = "Ready";
+  channel.onBootResult = async (result) => {
+    window.localStorage.setItem(usernameKey, result.username);
+    snapshotCache = new SnapshotCache(result.username);
 
-  if (serverState.snapshot) {
-    getStateFromSnapshot(serverState.snapshot);
-  }
+    store.state.snapshot = result.snapshot ?? snapshotCache.load(result.active_save_slot);
+    if (result.snapshot) snapshotCache.save(result.snapshot);
+    store.state.slots = [result.save_slot];
 
-  renderDom();
+    if (store.state.snapshot) {
+      getStateFromSnapshot(store.state.snapshot);
+    }
 
-  if (bootResult.pending_result) {
-    // The pending result belongs before any new local action; acknowledging it
-    // first keeps the server queue and the rendered snapshot on the same boundary.
-    await applyAndAck(bootResult.pending_result);
+    store.markDirty();
+
+    if (result.pending_result) {
+      // The pending result belongs before any new local action; acknowledging it
+      // first keeps the server queue and the rendered snapshot on the same boundary.
+      await applyAndAck(result.pending_result);
+    }
+  };
+
+  try {
+    await channel.connect();
+  } catch (error) {
+    store.state.statusTone = "error";
+    store.state.status = error instanceof Error ? error.message : "Boot failed";
+    store.markDirty();
   }
 }
 
-onClick("#noop-button", () => runCommand(() => sendNoop(channel)));
-onClick("#save-button", () => runCommand(() => listSaveSlots(channel)));
-onClick("#reset-button", () => {
-  if (window.confirm("Reset the active save file?")) {
-    runCommand(() => resetSaveSlot(channel), "Loading save file...");
-  }
-});
-bindSaveSlotClicks(slotList, (slotIndex) =>
-  runCommand(() => switchSaveSlot(channel, slotIndex, Boolean(snapshotCache.load(slotIndex))), "Loading save file...")
-);
+// HUD interactions removed.
 
 function hydrateSnapshotFromCache(result: ServerResult) {
   if (result.type !== "save_slot.switch.result" || result.snapshot) return;
 
   const cachedSnapshot = snapshotCache.load(result.active_save_slot);
   if (cachedSnapshot) {
-    serverState.snapshot = cachedSnapshot;
+    store.state.snapshot = cachedSnapshot;
     getStateFromSnapshot(cachedSnapshot);
   }
 }
@@ -310,6 +291,11 @@ function gameLoop(time: number) {
 
   const dt = time - lastTime;
   lastTime = time;
+
+  if (store.dirty) {
+    renderDom();
+    store.dirty = false;
+  }
 
   // Advance client-side estimation of progress bar fill
   updateProjectedFill(dt);
@@ -402,7 +388,7 @@ function getCanvasPointFromInputEvent(
 }
 
 boot().catch((error) => {
-  serverState.statusTone = "error";
-  serverState.status = error instanceof Error ? error.message : "Boot failed";
-  renderDom();
+  store.state.statusTone = "error";
+  store.state.status = error instanceof Error ? error.message : "Boot failed";
+  store.markDirty();
 });

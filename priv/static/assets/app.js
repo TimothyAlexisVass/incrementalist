@@ -3,14 +3,6 @@
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
-  // src/core/input.ts
-  function onClick(selector, callback) {
-    const element = document.querySelector(selector);
-    if (!element) throw new Error(`Missing element ${selector}`);
-    element.addEventListener("click", callback);
-    return element;
-  }
-
   // src/config.ts
   var NEW_PLAYER_BONUS_WINDOW_MS = 25e3;
   var NEW_PLAYER_BONUS_FILL_MULTIPLIER = 2.5;
@@ -170,62 +162,12 @@
     "--canvas-shadow-color": COLORS.app.canvasShadow
   });
 
-  // src/features/save-slots/interactions.ts
-  function bindSaveSlotClicks(container, onSelect) {
-    container.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const button = target.closest("[data-slot-index]");
-      if (!button) return;
-      const slotIndex = Number(button.dataset.slotIndex);
-      if (Number.isInteger(slotIndex)) onSelect(slotIndex);
-    });
-  }
-
-  // src/features/save-slots/render.ts
-  function renderSaveSlots(container, viewModel) {
-    container.replaceChildren(
-      ...viewModel.slots.map((slot) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "slot-button";
-        button.dataset.slotIndex = String(slot.slot_index);
-        button.dataset.current = String(slot.is_current || slot.slot_index === viewModel.activeSlot);
-        const title = document.createElement("span");
-        title.textContent = `File ${slot.slot_index + 1}`;
-        const level = document.createElement("strong");
-        level.textContent = slot.has_data ? `Level ${slot.level}` : "Empty";
-        const rewards = document.createElement("small");
-        rewards.textContent = `Rewards ${slot.rewards_claimed}`;
-        button.append(title, level, rewards);
-        return button;
-      })
-    );
-  }
-
-  // src/features/save-slots/view-model.ts
-  function createSaveSlotsViewModel(snapshot, slots) {
-    const activeSlot = snapshot?.active_save_slot ?? 0;
-    if (slots.length > 0) {
-      return { activeSlot, slots };
-    }
-    return {
-      activeSlot,
-      slots: [0, 1, 2, 3].map((slotIndex) => ({
-        slot_index: slotIndex,
-        file_index: slotIndex,
-        is_current: slotIndex === activeSlot,
-        has_data: slotIndex === activeSlot,
-        level: snapshot?.state.level ?? 1,
-        rewards_claimed: snapshot?.state.progress_bar.rewards_claimed ?? 0,
-        saved_at: snapshot?.save_slot.saved_at ?? null
-      }))
-    };
-  }
-
   // src/net/game-channel.ts
   var heartbeatIntervalMs = 25e3;
   var commandQueueLimit = 10;
+  var initialReconnectionDelayMs = 1e3;
+  var maxReconnectionDelayMs = 3e4;
+  var reconnectionBackoffFactor = 1.5;
   var GameChannel = class {
     constructor(username, cachedSaveSlots = []) {
       this.username = username;
@@ -236,23 +178,77 @@
       __publicField(this, "waiters", /* @__PURE__ */ new Map());
       __publicField(this, "heartbeatId", 0);
       __publicField(this, "commandQueue", Array(commandQueueLimit).fill(false));
+      __publicField(this, "_status", "disconnected");
+      __publicField(this, "reconnectionDelay", initialReconnectionDelayMs);
+      __publicField(this, "reconnectionTimeoutId", 0);
+      __publicField(this, "onStatusChange");
+      __publicField(this, "onBootResult");
+    }
+    get status() {
+      return this._status;
+    }
+    setStatus(newStatus) {
+      if (this._status === newStatus) return;
+      this._status = newStatus;
+      this.onStatusChange?.(newStatus);
     }
     connect() {
+      if (this._status === "connecting" || this._status === "reconnecting") {
+      }
+      this.setStatus(this._status === "disconnected" ? "connecting" : "reconnecting");
+      this.clearReconnectionTimeout();
       const params = new URLSearchParams({ vsn: "2.0.0" });
       if (this.username) params.set("username", this.username);
       if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
       this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
       return new Promise((resolve, reject) => {
-        if (!this.socket) return reject(new Error("Socket unavailable"));
+        if (!this.socket) {
+          this.setStatus("disconnected");
+          return reject(new Error("Socket unavailable"));
+        }
         this.socket.addEventListener("open", () => {
+          this.reconnectionDelay = initialReconnectionDelayMs;
           this.startHeartbeat();
-          this.join().then(resolve, reject);
+          this.join().then((result) => {
+            this.setStatus("connected");
+            this.onBootResult?.(result);
+            resolve(result);
+          }, (error) => {
+            this.setStatus("disconnected");
+            reject(error);
+          });
         });
         this.socket.addEventListener("message", (event) => this.handleMessage(event));
-        this.socket.addEventListener("error", () => reject(new Error("Socket error")));
-        this.socket.addEventListener("close", () => this.stopHeartbeat());
+        this.socket.addEventListener("error", () => {
+          if (this._status === "connecting") {
+            this.setStatus("disconnected");
+            reject(new Error("Socket error"));
+          }
+          this.scheduleReconnect();
+        });
+        this.socket.addEventListener("close", () => {
+          this.stopHeartbeat();
+          this.scheduleReconnect();
+        });
       });
+    }
+    scheduleReconnect() {
+      if (this._status === "disconnected" || this._status === "reconnecting") {
+        this.clearReconnectionTimeout();
+        this.setStatus("reconnecting");
+        this.reconnectionTimeoutId = window.setTimeout(() => {
+          this.connect().catch(() => {
+          });
+          this.reconnectionDelay = Math.min(this.reconnectionDelay * reconnectionBackoffFactor, maxReconnectionDelayMs);
+        }, this.reconnectionDelay);
+      }
+    }
+    clearReconnectionTimeout() {
+      if (this.reconnectionTimeoutId) {
+        window.clearTimeout(this.reconnectionTimeoutId);
+        this.reconnectionTimeoutId = 0;
+      }
     }
     push(event, payload = {}) {
       return this.send("game", event, payload);
@@ -277,6 +273,8 @@
       return ack;
     }
     close() {
+      this.setStatus("disconnected");
+      this.clearReconnectionTimeout();
       this.stopHeartbeat();
       this.socket?.close();
       this.socket = null;
@@ -347,21 +345,6 @@
   };
 
   // src/net/commands.ts
-  function sendNoop(channel2) {
-    return channel2.pushCommand("game.noop");
-  }
-  function listSaveSlots(channel2) {
-    return channel2.pushCommand("save_slots.list");
-  }
-  function switchSaveSlot(channel2, slotIndex, hasCachedSnapshot) {
-    return channel2.pushCommand("save_slot.switch", {
-      slot_index: slotIndex,
-      has_cached_snapshot: hasCachedSnapshot
-    });
-  }
-  function resetSaveSlot(channel2) {
-    return channel2.pushCommand("save_slot.reset");
-  }
   function progressClaimIn(channel2) {
     return channel2.pushCommand("progress.claim_in");
   }
@@ -475,12 +458,6 @@
     if (typeof snapshot.state.idle_mode !== "boolean") return false;
     if (!("first_played_at" in snapshot.state)) return false;
     return true;
-  }
-
-  // src/ui/components/button.ts
-  function setButtonBusy(button, busy2) {
-    button.disabled = busy2;
-    button.setAttribute("aria-busy", String(busy2));
   }
 
   // src/features/progress/view-model.ts
@@ -2453,19 +2430,23 @@
     return Math.min(Math.max(value, min), max);
   }
 
+  // src/core/store.ts
+  var Store = class {
+    constructor(state) {
+      this.state = state;
+      __publicField(this, "dirty", false);
+    }
+    markDirty() {
+      this.dirty = true;
+    }
+  };
+
   // src/app.ts
   var usernameKey = "incrementalist.playerUsername";
-  var statusLine = requiredElement("#status-line");
-  var levelValue = requiredElement("#level-value");
-  var slotValue = requiredElement("#slot-value");
-  var noopButton = requiredElement("#noop-button");
-  var saveButton = requiredElement("#save-button");
-  var resetButton = requiredElement("#reset-button");
-  var slotList = requiredElement("#slot-list");
   var canvas = requiredElement("#game-canvas");
   var effectsCanvas = requiredElement("#effects-canvas");
   var ctx = canvas.getContext("2d");
-  var serverState = createServerState();
+  var store = new Store(createServerState());
   var channel;
   var snapshotCache;
   var busy = false;
@@ -2492,50 +2473,41 @@
     resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
   }
   function renderDom() {
-    const snapshot = serverState.snapshot;
-    statusLine.textContent = serverState.loadingMessage ?? serverState.status;
-    statusLine.dataset.tone = serverState.statusTone;
-    levelValue.textContent = String(snapshot?.state.level ?? 1);
-    slotValue.textContent = String((snapshot?.active_save_slot ?? 0) + 1);
-    renderSaveSlots(slotList, createSaveSlotsViewModel(snapshot, serverState.slots));
-    slotList.querySelectorAll("button").forEach((button) => {
-      setButtonBusy(button, busy);
-    });
   }
   async function applyAndAck(result) {
     hydrateSnapshotFromCache(result);
     const previousAmounts = result.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-    applyResult(serverState, result);
+    applyResult(store.state, result);
     cacheSnapshotFromResult(result);
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-      if (serverState.snapshot) {
-        getStateFromSnapshot(serverState.snapshot);
+      if (store.state.snapshot) {
+        getStateFromSnapshot(store.state.snapshot);
       }
     }
     applyProgressResultEffects(result, previousAmounts);
-    renderDom();
+    store.markDirty();
     if (!isAckableCommandResult(result)) return;
     let next = await ackAppliedResult(channel, result.command_id);
     if (clearsCommandQueue(result)) channel.clearCommandQueue();
     while (next) {
       hydrateSnapshotFromCache(next);
       const previousAmounts2 = next.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-      applyResult(serverState, next);
+      applyResult(store.state, next);
       cacheSnapshotFromResult(next);
       applyProgressResultEffects(next, previousAmounts2);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
-        if (serverState.snapshot) {
-          getStateFromSnapshot(serverState.snapshot);
+        if (store.state.snapshot) {
+          getStateFromSnapshot(store.state.snapshot);
         }
       }
-      renderDom();
+      store.markDirty();
       const applied = next;
       next = await ackAppliedResult(channel, applied.command_id);
       if (clearsCommandQueue(applied)) channel.clearCommandQueue();
     }
   }
   function snapshotAmounts() {
-    const snapshot = serverState.snapshot;
+    const snapshot = store.state.snapshot;
     if (!snapshot) return null;
     return {
       exp: snapshot.state.exp,
@@ -2568,64 +2540,60 @@
   async function runCommand(command, loadingMessage = null) {
     if (busy) return null;
     busy = true;
-    serverState.loadingMessage = loadingMessage;
-    setButtonBusy(noopButton, true);
-    setButtonBusy(saveButton, true);
-    setButtonBusy(resetButton, true);
-    renderDom();
+    store.state.loadingMessage = loadingMessage;
+    store.markDirty();
     try {
       const result = await command();
       await applyAndAck(result);
       return result;
     } catch (error) {
-      serverState.statusTone = "error";
-      serverState.status = error instanceof Error ? error.message : "Command failed";
-      renderDom();
+      store.state.statusTone = "error";
+      store.state.status = error instanceof Error ? error.message : "Command failed";
+      store.markDirty();
       return null;
     } finally {
-      serverState.loadingMessage = null;
-      busy = false;
-      setButtonBusy(noopButton, false);
-      setButtonBusy(saveButton, false);
-      setButtonBusy(resetButton, false);
-      renderDom();
+      store.state.loadingMessage = null;
+      busy = channel.status !== "connected";
+      store.markDirty();
     }
   }
   async function boot() {
     const username = window.localStorage.getItem(usernameKey);
     snapshotCache = new SnapshotCache(username);
     channel = new GameChannel(username, snapshotCache.cachedSlotIndexes());
-    const bootResult = await channel.connect();
-    window.localStorage.setItem(usernameKey, bootResult.username);
-    snapshotCache = new SnapshotCache(bootResult.username);
-    serverState.snapshot = bootResult.snapshot ?? snapshotCache.load(bootResult.active_save_slot);
-    if (bootResult.snapshot) snapshotCache.save(bootResult.snapshot);
-    serverState.slots = [bootResult.save_slot];
-    serverState.status = "Ready";
-    if (serverState.snapshot) {
-      getStateFromSnapshot(serverState.snapshot);
-    }
-    renderDom();
-    if (bootResult.pending_result) {
-      await applyAndAck(bootResult.pending_result);
+    channel.onStatusChange = (status) => {
+      store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
+      store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
+      busy = status !== "connected";
+      store.markDirty();
+    };
+    channel.onBootResult = async (result) => {
+      window.localStorage.setItem(usernameKey, result.username);
+      snapshotCache = new SnapshotCache(result.username);
+      store.state.snapshot = result.snapshot ?? snapshotCache.load(result.active_save_slot);
+      if (result.snapshot) snapshotCache.save(result.snapshot);
+      store.state.slots = [result.save_slot];
+      if (store.state.snapshot) {
+        getStateFromSnapshot(store.state.snapshot);
+      }
+      store.markDirty();
+      if (result.pending_result) {
+        await applyAndAck(result.pending_result);
+      }
+    };
+    try {
+      await channel.connect();
+    } catch (error) {
+      store.state.statusTone = "error";
+      store.state.status = error instanceof Error ? error.message : "Boot failed";
+      store.markDirty();
     }
   }
-  onClick("#noop-button", () => runCommand(() => sendNoop(channel)));
-  onClick("#save-button", () => runCommand(() => listSaveSlots(channel)));
-  onClick("#reset-button", () => {
-    if (window.confirm("Reset the active save file?")) {
-      runCommand(() => resetSaveSlot(channel), "Loading save file...");
-    }
-  });
-  bindSaveSlotClicks(
-    slotList,
-    (slotIndex) => runCommand(() => switchSaveSlot(channel, slotIndex, Boolean(snapshotCache.load(slotIndex))), "Loading save file...")
-  );
   function hydrateSnapshotFromCache(result) {
     if (result.type !== "save_slot.switch.result" || result.snapshot) return;
     const cachedSnapshot = snapshotCache.load(result.active_save_slot);
     if (cachedSnapshot) {
-      serverState.snapshot = cachedSnapshot;
+      store.state.snapshot = cachedSnapshot;
       getStateFromSnapshot(cachedSnapshot);
     }
   }
@@ -2679,6 +2647,10 @@
     requestAnimationFrame(gameLoop);
     const dt = time - lastTime;
     lastTime = time;
+    if (store.dirty) {
+      renderDom();
+      store.dirty = false;
+    }
     updateProjectedFill(dt);
     if (channel && handleProgressLoop(channel)) {
       runCommand(() => progressClaimIn(channel));
@@ -2739,9 +2711,9 @@
     };
   }
   boot().catch((error) => {
-    serverState.statusTone = "error";
-    serverState.status = error instanceof Error ? error.message : "Boot failed";
-    renderDom();
+    store.state.statusTone = "error";
+    store.state.status = error instanceof Error ? error.message : "Boot failed";
+    store.markDirty();
   });
 })();
 //# sourceMappingURL=app.js.map
