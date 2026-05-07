@@ -1,5 +1,6 @@
 defmodule Incrementalist.Game.Features.Progress.Bar do
   alias Incrementalist.Game.Time
+  alias Incrementalist.Game.State
 
   @new_player_bonus_window_ms 25_000
   @new_player_bonus_fill_multiplier 2.5
@@ -10,10 +11,10 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   @sisu_min_multiplier 1.0
   @max_fill 100.0
 
-  def get_progress_bar_fill_rate(state, now) do
-    progress_bar = Map.get(state, "progress_bar", %{})
-    sisu = Map.get(progress_bar, "sisu", 1) |> max(@sisu_min_multiplier)
-    idle_mode = Map.get(state, "idle_mode", false)
+  def get_progress_bar_fill_rate(%State{} = state, now) do
+    progress_bar = state.progress_bar
+    sisu = (if progress_bar, do: progress_bar.sisu, else: 1) |> max(@sisu_min_multiplier)
+    idle_mode = state.idle_mode || false
 
     base_rate =
       if idle_mode do
@@ -26,7 +27,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
       base_rate
     else
       first_played_at_ms =
-        case Map.get(state, "first_played_at") do
+        case state.first_played_at do
           nil -> Time.to_unix_ms(now)
           iso_str ->
             case Time.from_iso8601(iso_str) do
@@ -38,7 +39,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
       now_ms = Time.to_unix_ms(now)
       game_age_ms = now_ms - first_played_at_ms
 
-      level = Map.get(state, "level", 1)
+      level = state.level || 1
 
       cond do
         game_age_ms < @new_player_bonus_window_ms ->
@@ -53,16 +54,16 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     end
   end
 
-  def can_claim_in(state, now) do
+  def can_claim_in(%State{} = state, now) do
     {_state, can_claim_in} = ensure_can_claim_at(state, now)
     can_claim_in
   end
 
-  def ensure_can_claim_at(state, now) do
+  def ensure_can_claim_at(%State{} = state, now) do
     rate = get_progress_bar_fill_rate(state, now)
     ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
 
-    can_claim_at_iso = Map.get(state, "can_claim_at")
+    can_claim_at_iso = state.can_claim_at
     {state, can_claim_at_ms} =
       case parse_iso_ms(can_claim_at_iso) do
         {:ok, claim_at_ms} ->
@@ -70,41 +71,42 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
         :error ->
           claim_at = Time.iso8601(DateTime.add(now, ms_required, :millisecond))
-          {Map.put(state, "can_claim_at", claim_at), Time.to_unix_ms(DateTime.add(now, ms_required, :millisecond))}
+          {%{state | can_claim_at: claim_at}, Time.to_unix_ms(DateTime.add(now, ms_required, :millisecond))}
       end
 
     now_ms = Time.to_unix_ms(now)
     {state, max(0, can_claim_at_ms - now_ms)}
   end
 
-  def calculate_next_can_claim_at(state, now) do
+  def calculate_next_can_claim_at(%State{} = state, now) do
     rate = get_progress_bar_fill_rate(state, now)
     ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
     Time.iso8601(DateTime.add(now, ms_required, :millisecond))
   end
 
-  def claim_ready?(state, now, tolerance_ms \\ 0) do
+  def claim_ready?(%State{} = state, now, tolerance_ms \\ 0) do
     {_state, can_claim_in} = ensure_can_claim_at(state, now)
     can_claim_in <= tolerance_ms
   end
 
-  def finalize_claim(state, now) do
-    progress_bar = Map.get(state, "progress_bar", %{})
-    rewards_claimed = Map.get(progress_bar, "rewards_claimed", 0) + 1
-    updated_progress_bar = Map.put(progress_bar, "rewards_claimed", rewards_claimed)
+  def finalize_claim(%State{} = state, now) do
+    progress_bar = state.progress_bar || %State.ProgressBar{}
+    rewards_claimed = (progress_bar.rewards_claimed || 0) + 1
+    updated_progress_bar = %{progress_bar | rewards_claimed: rewards_claimed}
 
-    state
-    |> Map.put("progress_bar", updated_progress_bar)
-    |> Map.put("last_claimed_at", Time.iso8601(now))
-    |> Map.put("can_claim_at", nil)
+    %{state |
+      progress_bar: updated_progress_bar,
+      last_claimed_at: Time.iso8601(now),
+      can_claim_at: nil
+    }
   end
 
-  def claim_reward(state, random_fn \\ &rand/0) do
-    progress_bar = Map.get(state, "progress_bar", %{})
-    sisu = Map.get(progress_bar, "sisu", 1) |> max(@sisu_min_multiplier)
-    level = Map.get(state, "level", 1)
-    idle_mode = Map.get(state, "idle_mode", false)
-    reward_multiplier = Map.get(progress_bar, "reward_multiplier", 1.0)
+  def claim_reward(%State{} = state, random_fn \\ &rand/0) do
+    progress_bar = state.progress_bar || %State.ProgressBar{}
+    sisu = (progress_bar.sisu || 1) |> max(@sisu_min_multiplier)
+    level = state.level || 1
+    idle_mode = state.idle_mode || false
+    reward_multiplier = progress_bar.reward_multiplier || 1.0
 
     level_pow = :math.pow(level, 0.7)
 
@@ -139,14 +141,12 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         {exp, coin, shard, core}
       end
 
-    state =
-      state
-      |> Map.put("exp", Map.get(state, "exp", 0) + exp_gain)
-      |> Map.put("coins", Map.get(state, "coins", 0) + coin_gain)
-      |> Map.put("shards", Map.get(state, "shards", 0) + shard_gain)
-      |> Map.put("cores", Map.get(state, "cores", 0) + core_gain)
-
-    state
+    %{state |
+      exp: (state.exp || 0) + exp_gain,
+      coins: (state.coins || 0) + coin_gain,
+      shards: (state.shards || 0) + shard_gain,
+      cores: (state.cores || 0) + core_gain
+    }
   end
 
   defp rand() do

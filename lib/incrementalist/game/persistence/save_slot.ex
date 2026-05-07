@@ -11,13 +11,13 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
 
   import Ecto.Changeset
 
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.Player
-
-  @slot_indexes 0..3
+  alias Incrementalist.Game.State
 
   schema "save_slots" do
     field :slot_index, :integer
-    field :state, :map
+    embeds_one :state, State, on_replace: :update
     field :last_saved_at, :utc_datetime
 
     belongs_to :player, Player
@@ -26,11 +26,22 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
   end
 
   def changeset(save_slot, attrs) do
+    attrs = normalize_state_attr(attrs)
+
     save_slot
-    |> cast(attrs, [:player_id, :slot_index, :state, :last_saved_at])
+    |> cast(attrs, [:player_id, :slot_index, :last_saved_at])
+    |> cast_embed(:state)
     |> validate_required([:player_id, :slot_index])
-    |> validate_inclusion(:slot_index, @slot_indexes)
+    |> validate_inclusion(:slot_index, Constants.valid_slot_indexes())
     |> foreign_key_constraint(:player_id)
     |> unique_constraint([:player_id, :slot_index])
   end
+
+  defp normalize_state_attr(%{state: %State{} = state_struct} = attrs),
+    do: Map.put(attrs, :state, Map.from_struct(state_struct))
+
+  defp normalize_state_attr(%{"state" => %State{} = state_struct} = attrs),
+    do: Map.put(attrs, "state", Map.from_struct(state_struct))
+
+  defp normalize_state_attr(attrs), do: attrs
 end

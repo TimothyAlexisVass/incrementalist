@@ -19,6 +19,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
 
   import Ecto.Changeset
 
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.{Player, SaveSlot}
 
   @statuses ~w(queued succeeded failed acked)
@@ -67,7 +68,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
       :queued_at
     ])
     |> validate_inclusion(:status, @statuses)
-    |> validate_number(:command_id, greater_than_or_equal_to: 0, less_than: 10)
+    |> validate_number(:command_id, greater_than_or_equal_to: 0, less_than: Constants.max_queued_commands())
     |> validate_number(:sequence, greater_than: 0)
     |> validate_number(:replay_count, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:player_id)

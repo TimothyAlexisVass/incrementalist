@@ -10,17 +10,15 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
 
   import Ecto.Query
 
-  alias Incrementalist.Game.{Snapshots, State, Time}
+  alias Incrementalist.Game.{Constants, Snapshots, State, Time}
   alias Incrementalist.Game.Persistence.{Player, SaveSlot}
   alias Incrementalist.Repo
-
-  @slot_indexes 0..3
 
   def ensure_four_slots(player_id, now \\ Time.now()) do
     # The unique index on {player_id, slot_index} makes this safe on every boot.
     # Missing rows are repaired, existing rows and their state are left untouched.
     rows =
-      Enum.map(@slot_indexes, fn slot_index ->
+      Enum.map(Constants.valid_slot_indexes(), fn slot_index ->
         %{
           player_id: player_id,
           slot_index: slot_index,
@@ -72,8 +70,8 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     # Boot must never trust a stale active pointer that targets an empty slot.
     # The visible behavior is: last valid slot, else first populated slot, else slot zero.
     selected_slot =
-      Enum.find(slots, &(&1.slot_index == player.active_save_slot and is_map(&1.state))) ||
-        Enum.find(slots, &is_map(&1.state)) ||
+      Enum.find(slots, &(&1.slot_index == player.active_save_slot and &1.state != nil)) ||
+        Enum.find(slots, &(&1.state != nil)) ||
         Enum.find(slots, &(&1.slot_index == 0))
 
     selected_slot = initialize_if_empty(selected_slot, now)
@@ -118,8 +116,12 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     |> Repo.update!()
   end
 
-  def switch_player_to_slot(%Player{} = player, slot_index, now \\ Time.now())
-      when slot_index in @slot_indexes do
+  def switch_player_to_slot(%Player{} = player, slot_index, now \\ Time.now()) do
+    # Validations should happen via commands/schemas, but we double-check here
+    unless slot_index in Constants.valid_slot_indexes() do
+      raise ArgumentError, "Invalid slot_index: #{slot_index}"
+    end
+
     current_slot = get_slot!(player.id, player.active_save_slot)
     # Switching slots is also an autosave boundary for the outgoing active file.
     # The target can be empty, but the old slot must be durable first.

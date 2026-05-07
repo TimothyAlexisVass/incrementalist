@@ -14,6 +14,7 @@ The server owns truth. The client owns projection, rendering, input, and reversi
 
 ## Forbidden Client Authority
 Client-side truth is forbidden for reward grants, claim eligibility, purchases, unlocks, level-ups, quest completion, achievement completion, daily bonus outcomes, gameplay RNG, hidden card or board outcomes, and durable save state. LocalStorage may only hold harmless preferences, anonymous identity tokens, and non-authoritative cached gameplay snapshots. It must never store command ids, queue position, reward eligibility, hidden outcomes, or anything that can authorize durable gameplay transitions.
+Legacy client-local save-file code remains only as migration reference under `legacy/`; do not extend that model into the active `assets/src/` client.
 
 ## Hidden outcomes Contract (Showing Card pick Bonus game as example)
 The client must never receive hidden outcomes. Store selected indexes as UI intent only. The server validates the picked count against server-owned session phase and calculates reveal outcomes only when the reveal command is processed. Snapshots and responses may include only information the player is allowed to know.
@@ -32,6 +33,10 @@ feature/
 
 ## Persistence Rules
 Use `save_slots` with `jsonb` game state. Players have 4 save slots. Use a `game_commands` table for idempotent command processing and auditability. During development, prefer resetting data and updating the current schema over adding backward-compatibility layers or preserving old save formats. Avoid over-normalizing gameplay state unless a stable query or integrity need justifies it.
+Keep server-owned save-state coherent with the embedded-schema pattern: persist authoritative gameplay state as `Ecto.Schema` embeds, keep nested state as nested embeds rather than ad hoc maps, and project wire/client payloads from those structs. Use maps only at serialization/projection boundaries; do not keep parallel map-shaped and struct-shaped save-state models in application code.
+
+## Constants Rule
+Do not introduce backend gameplay magic numbers inline. Shared server-owned limits, thresholds, slot counts, queue sizes, timers, and other domain constants must live in `lib/incrementalist/game/constants.ex` and be referenced from there. Frontend presentation-only constants may live in `assets/src/config.ts` or nearby feature files, but they must mirror server-owned rules rather than invent their own authoritative values.
 
 ## Client/Server Protocol Rules
 The only gameplay communication pattern is client command, server result. Client commands describe player intent, include only a client-generated integer `command_id`, and omit UI display details. The client command ids are the indexes of a 10-slot local boolean queue and must not be stored in LocalStorage. The server owns durable command sequencing, idempotent execution, active save slot, FIFO queue order, replay state, and persisted command results until ACK. Do not require active save slots, version markers, or generic payload envelopes from the client. Cache hints are allowed only to reduce snapshot payload size.
