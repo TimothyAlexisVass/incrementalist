@@ -15,16 +15,14 @@ defmodule Incrementalist.Game.Commands do
 
   import Ecto.Query
 
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
   alias Incrementalist.Game.{Snapshots, Time}
   alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Repo
 
-  @queue_limit 10
   @processed_statuses ["succeeded", "failed"]
   @pending_statuses ["queued" | @processed_statuses]
-  @slot_indexes 0..3
-  @command_id_slots 0..9
 
   def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now())
       when is_binary(command_type) do
@@ -40,7 +38,7 @@ defmodule Incrementalist.Game.Commands do
 
           nil ->
             if save_boundary_pending?(player.id) or
-                 pending_command_count(player.id) >= @queue_limit do
+                 pending_command_count(player.id) >= Constants.max_queued_commands() do
               :queue_full
             else
               command = insert_command(player.id, command_id, command_type, command_intent, now)
@@ -388,13 +386,17 @@ defmodule Incrementalist.Game.Commands do
   defp fetch_slot_index(_intent), do: {:error, "slot_index_required"}
 
   defp normalize_slot_index(slot_index)
-       when is_integer(slot_index) and slot_index in @slot_indexes do
-    {:ok, slot_index}
+       when is_integer(slot_index) do
+    if slot_index in Constants.valid_slot_indexes() do
+      {:ok, slot_index}
+    else
+      {:error, "invalid_slot_index"}
+    end
   end
 
   defp normalize_slot_index(slot_index) when is_binary(slot_index) do
     with {integer, ""} <- Integer.parse(slot_index),
-         true <- integer in @slot_indexes do
+         true <- integer in Constants.valid_slot_indexes() do
       {:ok, integer}
     else
       _ -> {:error, "invalid_slot_index"}
@@ -427,8 +429,12 @@ defmodule Incrementalist.Game.Commands do
   end
 
   defp normalize_command_id(command_id)
-       when is_integer(command_id) and command_id in @command_id_slots do
-    {:ok, command_id}
+       when is_integer(command_id) do
+    if command_id in Constants.valid_command_ids() do
+      {:ok, command_id}
+    else
+      :invalid_command_id
+    end
   end
 
   defp normalize_command_id(_command_id), do: :invalid_command_id
