@@ -70,8 +70,8 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     # Boot must never trust a stale active pointer that targets an empty slot.
     # The visible behavior is: last valid slot, else first populated slot, else slot zero.
     selected_slot =
-      Enum.find(slots, &(&1.slot_index == player.active_save_slot and is_map(&1.state))) ||
-        Enum.find(slots, &is_map(&1.state)) ||
+      Enum.find(slots, &(&1.slot_index == player.active_save_slot and &1.state != nil)) ||
+        Enum.find(slots, &(&1.state != nil)) ||
         Enum.find(slots, &(&1.slot_index == 0))
 
     selected_slot = initialize_if_empty(selected_slot, now)

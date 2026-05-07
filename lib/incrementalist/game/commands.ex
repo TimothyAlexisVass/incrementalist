@@ -16,7 +16,7 @@ defmodule Incrementalist.Game.Commands do
   import Ecto.Query
 
   alias Incrementalist.Game.Constants
-  alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
+  alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlot, SaveSlots}
   alias Incrementalist.Game.{Snapshots, Time}
   alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Repo
@@ -148,7 +148,7 @@ defmodule Incrementalist.Game.Commands do
 
           if next_state != active_slot.state do
             active_slot
-            |> Ecto.Changeset.change(state: next_state, last_saved_at: now)
+            |> SaveSlot.changeset(%{state: next_state, last_saved_at: now})
             |> Repo.update!()
           end
 
@@ -170,17 +170,19 @@ defmodule Incrementalist.Game.Commands do
               |> Bar.claim_reward()
               |> Bar.finalize_claim(now)
 
-            updated_slot = Ecto.Changeset.change(active_slot, state: new_state, last_saved_at: now)
+            updated_slot =
+              SaveSlot.changeset(active_slot, %{state: new_state, last_saved_at: now})
+
             Repo.update!(updated_slot)
 
             {"succeeded",
              %{
                "type" => "progress.claim_reward.result",
                "command_id" => command.command_id,
-               "coins" => Map.get(new_state, "coins"),
-               "exp" => Map.get(new_state, "exp"),
-               "shards" => Map.get(new_state, "shards"),
-               "cores" => Map.get(new_state, "cores")
+               "coins" => new_state.coins,
+               "exp" => new_state.exp,
+               "shards" => new_state.shards,
+               "cores" => new_state.cores
              }, active_slot.id}
           else
             {"failed",
@@ -234,7 +236,7 @@ defmodule Incrementalist.Game.Commands do
     with {:ok, slot_index} <- fetch_slot_index(command.intent) do
       # Switching is a command because the current active slot is server truth.
       # The previous slot is saved before the active pointer moves.
-      target_had_state = SaveSlots.get_slot!(player.id, slot_index).state |> is_map()
+      target_had_state = SaveSlots.get_slot!(player.id, slot_index).state != nil
       use_cached_snapshot = target_had_state and cached_snapshot_hint?(command.intent)
       target_slot = SaveSlots.switch_player_to_slot(player, slot_index, now)
       clear_commands_after_save_boundary!(player.id, command.sequence, now)

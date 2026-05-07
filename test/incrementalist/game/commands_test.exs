@@ -70,7 +70,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     selected_slot = SaveSlots.determine_active_slot(Repo.get!(Player, player.id), @now)
     assert selected_slot.slot_index == 0
-    assert is_map(selected_slot.state)
+    assert match?(%State{}, selected_slot.state)
   end
 
   test "commands are FIFO and ACK-gated" do
