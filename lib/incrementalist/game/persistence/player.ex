@@ -12,7 +12,7 @@ defmodule Incrementalist.Game.Persistence.Player do
   import Ecto.Changeset
   import Ecto.Query
 
-  @slot_indexes 0..3
+  alias Incrementalist.Game.Constants
 
   schema "players" do
     field :email, :string
@@ -27,7 +27,7 @@ defmodule Incrementalist.Game.Persistence.Player do
     player
     |> cast(attrs, [:username, :email, :active_save_slot, :last_seen_at])
     |> validate_required([:username, :active_save_slot, :last_seen_at])
-    |> validate_inclusion(:active_save_slot, @slot_indexes)
+    |> validate_inclusion(:active_save_slot, Constants.valid_slot_indexes())
     |> unique_constraint(:username)
   end
 

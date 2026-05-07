@@ -11,9 +11,8 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
 
   import Ecto.Changeset
 
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.Player
-
-  @slot_indexes 0..3
 
   schema "save_slots" do
     field :slot_index, :integer
@@ -29,7 +28,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     save_slot
     |> cast(attrs, [:player_id, :slot_index, :state, :last_saved_at])
     |> validate_required([:player_id, :slot_index])
-    |> validate_inclusion(:slot_index, @slot_indexes)
+    |> validate_inclusion(:slot_index, Constants.valid_slot_indexes())
     |> foreign_key_constraint(:player_id)
     |> unique_constraint([:player_id, :slot_index])
   end
