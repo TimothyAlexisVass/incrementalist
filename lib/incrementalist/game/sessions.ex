@@ -11,6 +11,7 @@ defmodule Incrementalist.Game.Sessions do
 
   alias Incrementalist.Game.Helpers.Players.UsernameGenerator
   alias Incrementalist.Game.Persistence.{Player, SaveSlots}
+  alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.Time
   alias Incrementalist.Repo
 
@@ -27,18 +28,7 @@ defmodule Incrementalist.Game.Sessions do
   end
 
   def boot_player(player_id, cached_save_slots \\ MapSet.new(), now \\ Time.now()) do
-    player = Repo.get!(Player, player_id)
-    active_slot = SaveSlots.determine_active_slot(player, now)
-    active_slot_index = active_slot.slot_index
-    snapshot = snapshot_unless_cached(active_slot, cached_save_slots, now)
-
-    %{
-      "type" => "game.boot",
-      "username" => player.username,
-      "active_save_slot" => active_slot_index,
-      "save_slot" => Incrementalist.Game.State.summary(active_slot, active_slot_index),
-      "snapshot" => snapshot
-    }
+    PlayerServer.boot_player(player_id, cached_save_slots, now)
   end
 
   def cleanup_anonymous_players(now \\ Time.now()) do
@@ -93,14 +83,6 @@ defmodule Incrementalist.Game.Sessions do
         else
           raise Ecto.InvalidChangesetError, action: :insert, changeset: changeset
         end
-    end
-  end
-
-  defp snapshot_unless_cached(active_slot, cached_save_slots, now) do
-    if MapSet.member?(cached_save_slots, active_slot.slot_index) do
-      nil
-    else
-      Incrementalist.Game.Snapshots.full(active_slot, active_slot.slot_index, now)
     end
   end
 

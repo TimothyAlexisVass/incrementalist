@@ -18,16 +18,17 @@ defmodule Incrementalist.Game.Commands do
   alias Incrementalist.Game.Constants
   alias Incrementalist.Game.CommandExecutor
   alias Incrementalist.Game.Persistence.{GameCommand, Player}
+  alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.Time
   alias Incrementalist.Repo
 
   @processed_statuses ["succeeded", "failed"]
   @pending_statuses ["queued" | @processed_statuses]
 
-  def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now())
-      when is_binary(command_type) do
+  def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now()) do
     with {:ok, command_id, command_intent} <- extract_command_id(intent) do
-      Repo.transaction(fn ->
+      result =
+        Repo.transaction(fn ->
         # Locking the player row gives every queue mutation the same serialization point.
         # Without this, two sockets could both see an empty queue and execute out of order.
         player = lock_player!(player_id)
@@ -52,14 +53,18 @@ defmodule Incrementalist.Game.Commands do
               end
             end
         end
-      end)
-      |> unwrap_transaction()
+        end)
+        |> unwrap_transaction()
+
+      maybe_sync_player_session(player_id, result)
+      result
     end
   end
 
   def ack(player_id, command_id, now \\ Time.now()) do
     with {:ok, command_id} <- normalize_command_id(command_id) do
-      Repo.transaction(fn ->
+      result =
+        Repo.transaction(fn ->
         player = lock_player!(player_id)
 
         case current_unacked_command(player.id) do
@@ -79,32 +84,16 @@ defmodule Incrementalist.Game.Commands do
           _not_current ->
             ack_result(command_id, nil)
         end
-      end)
-      |> unwrap_transaction()
+        end)
+        |> unwrap_transaction()
+
+      maybe_sync_player_session(player_id, result)
+      result
     end
   end
 
-  def replay_pending(player_id) do
-    Repo.transaction(fn ->
-      player = lock_player!(player_id)
-
-      case current_unacked_command(player.id) do
-        nil ->
-          nil
-
-        command ->
-          # Replay must not consult rule code or reload current save facts. The
-          # saved result is the exact response the client failed to acknowledge.
-          {1, _} =
-            Repo.update_all(
-              from(game_command in GameCommand, where: game_command.id == ^command.id),
-              inc: [replay_count: 1]
-            )
-
-          command.result
-      end
-    end)
-    |> unwrap_transaction()
+  def replay_pending(player_id, last_known_sequence \\ nil) do
+    PlayerServer.replay_pending(player_id, last_known_sequence)
   end
 
   defp process_next_queued(%Player{} = player, now) do
@@ -258,6 +247,13 @@ defmodule Incrementalist.Game.Commands do
   defp command_result(%GameCommand{status: status} = command)
        when status in @processed_statuses do
     command.result
+  end
+
+  defp maybe_sync_player_session(_player_id, result) when result in [:queue_full, :invalid_command_id],
+    do: :ok
+
+  defp maybe_sync_player_session(player_id, _result) do
+    PlayerServer.sync_from_db(player_id)
   end
 
   defp queued_result(%GameCommand{} = command) do

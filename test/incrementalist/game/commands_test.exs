@@ -5,6 +5,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
   alias Incrementalist.Game.Commands
   alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, SaveSlot, SaveSlots}
+  alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.{Sessions, State, Time}
   alias Incrementalist.Repo
 
@@ -180,6 +181,16 @@ defmodule Incrementalist.Game.CommandsTest do
 
     Commands.ack(player.id, 0, @now)
     assert Commands.replay_pending(player.id) == nil
+  end
+
+  test "the session replay buffer can replay the last completed command by sequence" do
+    player = create_player()
+
+    result = Commands.enqueue(player.id, "game.noop", intent(0), @now)
+
+    Commands.ack(player.id, 0, @now)
+
+    assert PlayerServer.replay_pending(player.id, 0) == result
   end
 
   test "command ids are limited to the ten client queue slots" do
