@@ -13,10 +13,10 @@ defmodule Incrementalist.Game.Persistence.CommandLog do
   alias Incrementalist.Game.Time
   alias Incrementalist.Repo
 
-  @acked_retention_seconds 48 * 60 * 60
+  @retention_seconds 24 * 60 * 60
 
   def cleanup_acked(now \\ Time.now()) do
-    cutoff = DateTime.add(now, -@acked_retention_seconds, :second)
+    cutoff = DateTime.add(now, -@retention_seconds, :second)
 
     # Do not delete old processed-but-unacked rows. They are still the current
     # result for a stalled or reconnecting client.

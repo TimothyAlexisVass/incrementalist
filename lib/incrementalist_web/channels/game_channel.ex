@@ -15,6 +15,8 @@ defmodule IncrementalistWeb.GameChannel do
 
   alias Incrementalist.Game.{Commands, Sessions}
 
+  alias Incrementalist.Game.Session.PlayerSupervisor
+
   @impl true
   def join("game", _params, socket) do
     # Boot may omit the snapshot when the browser already has a cached visible
@@ -24,6 +26,14 @@ defmodule IncrementalistWeb.GameChannel do
       |> Map.put("pending_result", Commands.replay_pending(socket.assigns.player_id))
 
     {:ok, boot, socket}
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    # Handle deliberate disconnect by notifying the GenServer
+    with {:ok, pid} <- PlayerSupervisor.ensure_started(socket.assigns.player_id) do
+      GenServer.cast(pid, :disconnect)
+    end
   end
 
   @impl true

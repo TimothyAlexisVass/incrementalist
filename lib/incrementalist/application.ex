@@ -9,6 +9,8 @@ defmodule Incrementalist.Application do
       Incrementalist.Repo,
       {Phoenix.PubSub, name: Incrementalist.PubSub},
       Incrementalist.Game.Persistence.CommandLog.Cleanup,
+      {Registry, keys: :unique, name: Incrementalist.Game.Session.PlayerRegistry},
+      Incrementalist.Game.Session.PlayerSupervisor,
       IncrementalistWeb.Endpoint
     ]
 
