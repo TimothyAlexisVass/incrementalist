@@ -35,6 +35,21 @@ feature/
 Use `save_slots` with `jsonb` game state. Players have 4 save slots. Use a `game_commands` table for idempotent command processing and auditability. During development, prefer resetting data and updating the current schema over adding backward-compatibility layers or preserving old save formats. Avoid over-normalizing gameplay state unless a stable query or integrity need justifies it.
 Keep server-owned save-state coherent with the embedded-schema pattern: persist authoritative gameplay state as `Ecto.Schema` embeds, keep nested state as nested embeds rather than ad hoc maps, and project wire/client payloads from those structs. Use maps only at serialization/projection boundaries; do not keep parallel map-shaped and struct-shaped save-state models in application code.
 
+## PlayerServer / DB Rules
+`Incrementalist.Game.Session.PlayerServer` is the single authority for live per-player command flow. Do not move hot-path command sequencing back into DB locks or transactional queue mutation.
+
+Execution and queue rules:
+- Accept, dedupe, queue, execute, replay, and ACK-gating for live commands inside `PlayerServer`.
+- Keep FIFO order in `PlayerServer` in-memory state.
+- Never re-execute a completed command because of reconnect or missing ACK; replay the stored result instead.
+- Preserve save-boundary blocking behavior (`save_slot.switch`, `save_slot.reset`) in the `PlayerServer` flow.
+
+Persistence boundary rules:
+- Treat `save_slots` as critical durable state and persist synchronously at required boundaries (disconnect, idle timeout shutdown, slot switch/reset, process termination).
+- Treat `game_commands` as command log/audit persistence that follows execution; it must not be the coordination primitive for live ordering.
+- Do not introduce `FOR UPDATE`/row-lock serialized gameplay command execution paths.
+- Keep DB writes aligned with server truth: save-state durability is authoritative; command rows support replay/audit semantics.
+
 ## Constants Rule
 Do not introduce backend gameplay magic numbers inline. Shared server-owned limits, thresholds, slot counts, queue sizes, timers, and other domain constants must live in `lib/incrementalist/game/constants.ex` and be referenced from there. Frontend presentation-only constants may live in `assets/src/config.ts` or nearby feature files, but they must mirror server-owned rules rather than invent their own authoritative values.
 

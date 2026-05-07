@@ -90,7 +90,7 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(second, "queue_position")
     refute Map.has_key?(second, "requires_ack")
     assert third["type"] == "command.queued"
-    assert command_statuses(player.id) == ["succeeded", "queued", "queued"]
+    assert command_statuses(player.id) == ["succeeded"]
 
     ack = Commands.ack(player.id, 0, @now)
     assert ack["command_id"] == 0
@@ -99,7 +99,7 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(ack, "requires_ack")
     assert ack["released_result"]["type"] == "save_slots.list.result"
     assert ack["released_result"]["command_id"] == 1
-    assert command_statuses(player.id) == ["acked", "succeeded", "queued"]
+    assert command_statuses(player.id) == ["acked", "succeeded"]
 
     ack = Commands.ack(player.id, 1, @now)
     assert ack["released_result"]["type"] == "save_slot.switch.result"
@@ -118,7 +118,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert ignored["command_id"] == 1
     assert ignored["released_result"] == nil
-    assert command_statuses(player.id) == ["succeeded", "queued"]
+    assert command_statuses(player.id) == ["succeeded"]
 
     released = Commands.ack(player.id, 0, @now)
 
@@ -206,10 +206,10 @@ defmodule Incrementalist.Game.CommandsTest do
     rejected = Commands.enqueue(player.id, "game.noop", intent(10), @now)
 
     assert rejected == :invalid_command_id
-    assert Repo.aggregate(GameCommand, :count) == 10
+    assert Repo.aggregate(GameCommand, :count) == 1
   end
 
-  test "save slot boundaries block and clear queued follow-up commands" do
+  test "save slot boundaries block follow-up commands until acknowledged" do
     player = create_player()
 
     Commands.enqueue(player.id, "game.noop", intent(0), @now)
@@ -220,18 +220,16 @@ defmodule Incrementalist.Game.CommandsTest do
     assert switch["type"] == "command.queued"
     assert Commands.enqueue(player.id, "game.noop", intent(2), @now) == :queue_full
 
-    insert_queued_command(player.id, 2, 3, "game.noop")
-
     ack = Commands.ack(player.id, 0, @now)
 
     assert ack["released_result"]["type"] == "save_slot.switch.result"
     assert ack["released_result"]["command_id"] == 1
-    assert command_statuses(player.id) == ["acked", "succeeded", "acked"]
+    assert command_statuses(player.id) == ["acked", "succeeded"]
 
     ack = Commands.ack(player.id, 1, @now)
 
     assert ack["released_result"] == nil
-    assert command_statuses(player.id) == ["acked", "acked", "acked"]
+    assert command_statuses(player.id) == ["acked", "acked"]
   end
 
   test "reconnect boot includes the unacked stored result" do
@@ -281,20 +279,6 @@ defmodule Incrementalist.Game.CommandsTest do
 
   defp intent(command_id, attrs \\ %{}) do
     Map.put(attrs, "command_id", command_id)
-  end
-
-  defp insert_queued_command(player_id, command_id, sequence, command_type) do
-    %GameCommand{}
-    |> GameCommand.changeset(%{
-      player_id: player_id,
-      command_id: command_id,
-      sequence: sequence,
-      command_type: command_type,
-      intent: %{},
-      status: "queued",
-      queued_at: @now
-    })
-    |> Repo.insert!()
   end
 
   defp command_statuses(player_id) do
