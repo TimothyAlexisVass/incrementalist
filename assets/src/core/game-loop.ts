@@ -1,13 +1,16 @@
-export type FrameCallback = (time: number) => void;
+export type FrameCallback = (dt: number) => void;
 
 export class GameLoop {
   private frame = 0;
+  private lastTime = 0;
 
   constructor(private readonly callback: FrameCallback) {}
 
   start() {
     const tick = (time: number) => {
-      this.callback(time);
+      const dt = this.lastTime ? time - this.lastTime : 0;
+      this.lastTime = time;
+      this.callback(dt);
       this.frame = window.requestAnimationFrame(tick);
     };
 
@@ -16,5 +19,6 @@ export class GameLoop {
 
   stop() {
     if (this.frame) window.cancelAnimationFrame(this.frame);
+    this.lastTime = 0;
   }
 }

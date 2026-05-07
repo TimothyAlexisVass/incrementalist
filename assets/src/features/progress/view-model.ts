@@ -1,4 +1,4 @@
-import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult } from "../../net/protocol";
+import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult, ServerResult } from "../../net/protocol";
 import {
   BASE_IDLE_MODE_OFF_FILL_RATE,
   BASE_IDLE_MODE_ON_FILL_RATE,
@@ -7,6 +7,7 @@ import {
   NEW_PLAYER_BONUS_FILL_MULTIPLIER,
   NEW_PLAYER_BONUS_WINDOW_MS
 } from "../../config";
+import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./claim-effects";
 
 export type ProgressState = "projecting" | "awaiting_server_confirmation" | "confirmed_collectible";
 
@@ -144,6 +145,48 @@ export function handleClaimNotReadyError(canClaimInMs: number | null = null) {
   currentViewModel.canClaimInMs = null;
   const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
   currentViewModel.nextVerifyAtMs = Date.now() + delay;
+}
+
+export type EffectContext = {
+  floatingTexts: unknown[];
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  popupPoint: { x: number; y: number } | null;
+};
+
+/**
+ * Dispatches a server result to the appropriate progress view-model handler and
+ * spawns reward effects when applicable.
+ */
+export function applyProgressResult(
+  result: ServerResult,
+  previousAmounts: ResourceAmounts | null,
+  effects: EffectContext | null
+) {
+  if (result.type === "progress.claim_in.result") {
+    if (currentViewModel.pendingClaimIntent) return;
+    handleClaimInResult(result);
+    return;
+  }
+
+  if (result.type === "progress.claim_reward.result") {
+    handleClaimRewardResult();
+
+    if (effects && previousAmounts) {
+      spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, effects.ctx, previousAmounts, {
+        exp: result.exp,
+        coins: result.coins,
+        shards: result.shards,
+        cores: result.cores
+      }, effects.popupPoint);
+    }
+
+    return;
+  }
+
+  if (result.type === "command.error" && result.reason === "claim_not_ready") {
+    handleClaimNotReadyError(result.can_claim_in ?? null);
+  }
 }
 
 export function getViewModel(): ProgressViewModel {

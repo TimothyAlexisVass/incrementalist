@@ -5,7 +5,6 @@ export type ServerState = {
   slots: SaveSlotSummary[];
   status: string;
   statusTone: "ok" | "error" | "";
-  loadingMessage: string | null;
 };
 
 export function createServerState(): ServerState {
@@ -13,8 +12,7 @@ export function createServerState(): ServerState {
     snapshot: null,
     slots: [],
     status: "Connecting...",
-    statusTone: "",
-    loadingMessage: null
+    statusTone: ""
   };
 }
 

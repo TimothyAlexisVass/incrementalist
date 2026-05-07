@@ -162,533 +162,6 @@
     "--canvas-shadow-color": COLORS.app.canvasShadow
   });
 
-  // src/net/game-channel.ts
-  var heartbeatIntervalMs = 25e3;
-  var commandQueueLimit = 10;
-  var initialReconnectionDelayMs = 1e3;
-  var maxReconnectionDelayMs = 3e4;
-  var reconnectionBackoffFactor = 1.5;
-  var GameChannel = class {
-    constructor(username, cachedSaveSlots = []) {
-      this.username = username;
-      this.cachedSaveSlots = cachedSaveSlots;
-      __publicField(this, "socket", null);
-      __publicField(this, "ref", 0);
-      __publicField(this, "joinRef", null);
-      __publicField(this, "waiters", /* @__PURE__ */ new Map());
-      __publicField(this, "heartbeatId", 0);
-      __publicField(this, "commandQueue", Array(commandQueueLimit).fill(false));
-      __publicField(this, "_status", "disconnected");
-      __publicField(this, "reconnectionDelay", initialReconnectionDelayMs);
-      __publicField(this, "reconnectionTimeoutId", 0);
-      __publicField(this, "onStatusChange");
-      __publicField(this, "onBootResult");
-    }
-    get status() {
-      return this._status;
-    }
-    setStatus(newStatus) {
-      if (this._status === newStatus) return;
-      this._status = newStatus;
-      this.onStatusChange?.(newStatus);
-    }
-    connect() {
-      if (this._status === "connecting" || this._status === "reconnecting") {
-      }
-      this.setStatus(this._status === "disconnected" ? "connecting" : "reconnecting");
-      this.clearReconnectionTimeout();
-      const params = new URLSearchParams({ vsn: "2.0.0" });
-      if (this.username) params.set("username", this.username);
-      if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
-      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-      this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
-      return new Promise((resolve, reject) => {
-        if (!this.socket) {
-          this.setStatus("disconnected");
-          return reject(new Error("Socket unavailable"));
-        }
-        this.socket.addEventListener("open", () => {
-          this.reconnectionDelay = initialReconnectionDelayMs;
-          this.startHeartbeat();
-          this.join().then((result) => {
-            this.setStatus("connected");
-            this.onBootResult?.(result);
-            resolve(result);
-          }, (error) => {
-            this.setStatus("disconnected");
-            reject(error);
-          });
-        });
-        this.socket.addEventListener("message", (event) => this.handleMessage(event));
-        this.socket.addEventListener("error", () => {
-          if (this._status === "connecting") {
-            this.setStatus("disconnected");
-            reject(new Error("Socket error"));
-          }
-          this.scheduleReconnect();
-        });
-        this.socket.addEventListener("close", () => {
-          this.stopHeartbeat();
-          this.scheduleReconnect();
-        });
-      });
-    }
-    scheduleReconnect() {
-      if (this._status === "disconnected" || this._status === "reconnecting") {
-        this.clearReconnectionTimeout();
-        this.setStatus("reconnecting");
-        this.reconnectionTimeoutId = window.setTimeout(() => {
-          this.connect().catch(() => {
-          });
-          this.reconnectionDelay = Math.min(this.reconnectionDelay * reconnectionBackoffFactor, maxReconnectionDelayMs);
-        }, this.reconnectionDelay);
-      }
-    }
-    clearReconnectionTimeout() {
-      if (this.reconnectionTimeoutId) {
-        window.clearTimeout(this.reconnectionTimeoutId);
-        this.reconnectionTimeoutId = 0;
-      }
-    }
-    push(event, payload = {}) {
-      return this.send("game", event, payload);
-    }
-    pushCommand(event, payload = {}) {
-      const commandId = this.reserveCommandId();
-      return this.send("game", event, { ...payload, command_id: commandId }).then(
-        (response) => {
-          this.trackCommandResult(response);
-          return response;
-        },
-        (error) => {
-          this.forgetCommand(commandId);
-          throw error;
-        }
-      );
-    }
-    async ackCommand(commandId) {
-      const ack = await this.send("game", "command.ack", commandId);
-      this.forgetCommand(commandId);
-      if (ack.released_result) this.trackCommandResult(ack.released_result);
-      return ack;
-    }
-    close() {
-      this.setStatus("disconnected");
-      this.clearReconnectionTimeout();
-      this.stopHeartbeat();
-      this.socket?.close();
-      this.socket = null;
-    }
-    join() {
-      this.joinRef = this.nextRef();
-      return this.send("game", "phx_join", {}, this.joinRef);
-    }
-    send(topic, event, payload, joinRef = this.joinRef) {
-      const ref = this.nextRef();
-      const message = [joinRef, ref, topic, event, payload];
-      return new Promise((resolve, reject) => {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-          reject(new Error("Channel is not connected"));
-          return;
-        }
-        this.waiters.set(ref, { resolve, reject });
-        this.socket.send(JSON.stringify(message));
-      });
-    }
-    handleMessage(event) {
-      const message = JSON.parse(event.data);
-      const [_joinRef, ref, _topic, eventName, payload] = message;
-      if (eventName !== "phx_reply" || !ref) return;
-      const waiter = this.waiters.get(ref);
-      if (!waiter) return;
-      this.waiters.delete(ref);
-      const reply = payload;
-      if (reply.status === "ok") {
-        waiter.resolve(reply.response);
-      } else {
-        waiter.reject(new Error("Channel command failed"));
-      }
-    }
-    nextRef() {
-      this.ref += 1;
-      return String(this.ref);
-    }
-    reserveCommandId() {
-      const commandId = this.commandQueue.findIndex((waitingForResult) => waitingForResult === false);
-      if (commandId < 0) throw new Error("Command queue is full");
-      this.commandQueue[commandId] = true;
-      return commandId;
-    }
-    trackCommandResult(result) {
-      if (!("command_id" in result)) return;
-      if (result.command_id < 0 || result.command_id >= commandQueueLimit) return;
-      this.commandQueue[result.command_id] = result.type === "command.queued";
-    }
-    forgetCommand(commandId) {
-      if (commandId < 0 || commandId >= commandQueueLimit) return;
-      this.commandQueue[commandId] = false;
-    }
-    clearCommandQueue() {
-      this.commandQueue.fill(false);
-    }
-    startHeartbeat() {
-      this.stopHeartbeat();
-      this.heartbeatId = window.setInterval(() => {
-        this.send("phoenix", "heartbeat", {}).catch(() => {
-        });
-      }, heartbeatIntervalMs);
-    }
-    stopHeartbeat() {
-      if (this.heartbeatId) window.clearInterval(this.heartbeatId);
-      this.heartbeatId = 0;
-    }
-  };
-
-  // src/net/commands.ts
-  function progressClaimIn(channel2) {
-    return channel2.pushCommand("progress.claim_in");
-  }
-  function progressClaimReward(channel2) {
-    return channel2.pushCommand("progress.claim_reward");
-  }
-  async function ackAppliedResult(channel2, commandId) {
-    const ack = await channel2.ackCommand(commandId);
-    return ack.released_result;
-  }
-
-  // src/net/protocol.ts
-  function isAckableCommandResult(result) {
-    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "command.error";
-  }
-
-  // src/net/snapshots.ts
-  function createServerState() {
-    return {
-      snapshot: null,
-      slots: [],
-      status: "Connecting...",
-      statusTone: "",
-      loadingMessage: null
-    };
-  }
-  function applyResult(state, result) {
-    const snapshot = snapshotFromResult(result);
-    if (snapshot) {
-      state.snapshot = snapshot;
-    }
-    if ("slots" in result) {
-      state.slots = result.slots;
-    } else if (snapshot) {
-      state.slots = upsertSlot(state.slots, snapshot.save_slot);
-    }
-    if (result.type === "progress.claim_reward.result" && state.snapshot) {
-      state.snapshot.state.coins = result.coins;
-      state.snapshot.state.exp = result.exp;
-      state.snapshot.state.shards = result.shards;
-      state.snapshot.state.cores = result.cores;
-    }
-    state.statusTone = result.status === "error" ? "error" : "ok";
-    state.status = statusForResult(result);
-  }
-  function snapshotFromResult(result) {
-    if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-      return result.snapshot ?? null;
-    }
-    return null;
-  }
-  function upsertSlot(slots, slot) {
-    const next = slots.filter((candidate) => candidate.slot_index !== slot.slot_index);
-    next.push(slot);
-    return next.sort((a, b) => a.slot_index - b.slot_index);
-  }
-  function statusForResult(result) {
-    if (result.status === "error") return result.reason || "Command rejected";
-    if (result.type === "command.queued") return "Queued";
-    if (result.type === "game.noop.result") return "Synced";
-    if (result.type === "save_slots.list.result") return "Save files";
-    if (result.type === "save_slot.switch.result") return "Save file loaded";
-    if (result.type === "save_slot.reset.result") return "Save file reset";
-    return "Ready";
-  }
-
-  // src/net/snapshot-cache.ts
-  var slotCount = 4;
-  var SnapshotCache = class {
-    constructor(username) {
-      this.username = username;
-    }
-    cachedSlotIndexes() {
-      if (!this.token) return [];
-      const indexes = [];
-      for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-        if (this.load(slotIndex)) {
-          indexes.push(slotIndex);
-        }
-      }
-      return indexes;
-    }
-    load(slotIndex) {
-      if (!this.token) return null;
-      try {
-        const encoded = window.localStorage.getItem(this.key(slotIndex));
-        if (!encoded) return null;
-        const snapshot = JSON.parse(encoded);
-        if (!isUsableSnapshot(snapshot, slotIndex)) {
-          window.localStorage.removeItem(this.key(slotIndex));
-          return null;
-        }
-        return snapshot;
-      } catch {
-        return null;
-      }
-    }
-    save(snapshot) {
-      if (!this.username) return;
-      window.localStorage.setItem(this.key(snapshot.active_save_slot), JSON.stringify(snapshot));
-    }
-    key(slotIndex) {
-      return `incrementalist.snapshot.${this.username}.${slotIndex}`;
-    }
-  };
-  function isUsableSnapshot(snapshot, slotIndex) {
-    if (!snapshot || snapshot.type !== "game.snapshot") return false;
-    if (snapshot.active_save_slot !== slotIndex) return false;
-    if (!snapshot.state || typeof snapshot.state !== "object") return false;
-    if (typeof snapshot.state.level !== "number") return false;
-    if (typeof snapshot.state.idle_mode !== "boolean") return false;
-    if (!("first_played_at" in snapshot.state)) return false;
-    return true;
-  }
-
-  // src/features/progress/view-model.ts
-  var currentViewModel = {
-    state: "projecting",
-    projectedFill: 0,
-    sisu: 1,
-    rewardMultiplier: 1,
-    level: 1,
-    firstPlayedAtMs: 0,
-    idleMode: false,
-    canClaimInMs: null,
-    nextVerifyAtMs: 0,
-    pendingClaimIntent: false
-  };
-  function updateProjectedFill(deltaTimeMs) {
-    if (currentViewModel.state !== "projecting" && currentViewModel.state !== "awaiting_server_confirmation") {
-      return;
-    }
-    if (currentViewModel.state === "awaiting_server_confirmation") {
-      if (currentViewModel.canClaimInMs !== null) {
-        currentViewModel.canClaimInMs -= deltaTimeMs;
-        if (currentViewModel.canClaimInMs <= 0) {
-          currentViewModel.canClaimInMs = null;
-          currentViewModel.nextVerifyAtMs = Date.now();
-          currentViewModel.projectedFill = 100;
-        }
-        return;
-      }
-      return;
-    }
-    if (currentViewModel.canClaimInMs !== null) {
-      const before = currentViewModel.canClaimInMs;
-      currentViewModel.canClaimInMs = Math.max(0, before - deltaTimeMs);
-      const duration = getCycleDurationMs();
-      const completed = Math.max(0, duration - currentViewModel.canClaimInMs);
-      currentViewModel.projectedFill = Math.min(100, completed / duration * 100);
-      if (currentViewModel.canClaimInMs <= 0) {
-        currentViewModel.state = "confirmed_collectible";
-        currentViewModel.canClaimInMs = 0;
-        currentViewModel.nextVerifyAtMs = 0;
-        currentViewModel.projectedFill = 100;
-      }
-    }
-  }
-  function getStateFromSnapshot(snapshot) {
-    currentViewModel.state = "awaiting_server_confirmation";
-    currentViewModel.projectedFill = 0;
-    currentViewModel.sisu = snapshot.state.progress_bar.sisu;
-    currentViewModel.rewardMultiplier = snapshot.state.progress_bar.reward_multiplier;
-    currentViewModel.level = snapshot.state.level;
-    currentViewModel.firstPlayedAtMs = parseTimestamp(snapshot.state.first_played_at, snapshot.server_time);
-    currentViewModel.idleMode = snapshot.state.idle_mode;
-    currentViewModel.canClaimInMs = null;
-    currentViewModel.nextVerifyAtMs = 0;
-    currentViewModel.pendingClaimIntent = false;
-  }
-  function handleClaimInResult(result) {
-    if (result.can_claim_in <= 100) {
-      currentViewModel.state = "confirmed_collectible";
-      currentViewModel.canClaimInMs = 0;
-      currentViewModel.projectedFill = 100;
-      currentViewModel.nextVerifyAtMs = 0;
-    } else {
-      const duration = getCycleDurationMsFromRate(Date.now());
-      if (currentViewModel.projectedFill <= 1e-3) {
-        const cycleDurationMs2 = Math.max(1, result.can_claim_in);
-        setCycleDurationMs(cycleDurationMs2);
-        currentViewModel.canClaimInMs = cycleDurationMs2;
-        currentViewModel.state = "projecting";
-        currentViewModel.projectedFill = 0;
-        currentViewModel.nextVerifyAtMs = 0;
-        return;
-      }
-      currentViewModel.canClaimInMs = result.can_claim_in;
-      setCycleDurationMs(Math.max(duration, currentViewModel.canClaimInMs));
-      currentViewModel.state = "awaiting_server_confirmation";
-      currentViewModel.nextVerifyAtMs = Date.now() + result.can_claim_in;
-      currentViewModel.projectedFill = 100;
-    }
-  }
-  function handleClaimRewardResult() {
-    currentViewModel.state = "awaiting_server_confirmation";
-    currentViewModel.projectedFill = 0;
-    currentViewModel.canClaimInMs = null;
-    currentViewModel.nextVerifyAtMs = 0;
-    currentViewModel.pendingClaimIntent = false;
-  }
-  function beginAsyncClaimResolution() {
-    currentViewModel.state = "awaiting_server_confirmation";
-    currentViewModel.projectedFill = 0;
-    currentViewModel.canClaimInMs = null;
-    currentViewModel.nextVerifyAtMs = Number.MAX_SAFE_INTEGER;
-    currentViewModel.pendingClaimIntent = true;
-  }
-  function handleClaimNotReadyError(canClaimInMs = null) {
-    currentViewModel.state = "awaiting_server_confirmation";
-    currentViewModel.projectedFill = 0;
-    currentViewModel.canClaimInMs = null;
-    const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
-    currentViewModel.nextVerifyAtMs = Date.now() + delay;
-  }
-  function getViewModel() {
-    return currentViewModel;
-  }
-  function shouldSendClaimIn(nowMs) {
-    if (currentViewModel.pendingClaimIntent) return false;
-    if (currentViewModel.state !== "awaiting_server_confirmation") return false;
-    if (currentViewModel.canClaimInMs !== null) return false;
-    if (nowMs < currentViewModel.nextVerifyAtMs) return false;
-    currentViewModel.nextVerifyAtMs = nowMs + 110;
-    return true;
-  }
-  function setPendingClaimIntent(value) {
-    currentViewModel.pendingClaimIntent = value;
-  }
-  function hasPendingClaimIntent() {
-    return currentViewModel.pendingClaimIntent;
-  }
-  function getProgressBarFillRate(viewModel, nowMs) {
-    const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
-    const baseRate = (viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE) * sisuMultiplier;
-    if (viewModel.idleMode) {
-      return baseRate;
-    }
-    const gameAgeMs = nowMs - viewModel.firstPlayedAtMs;
-    if (gameAgeMs < NEW_PLAYER_BONUS_WINDOW_MS) {
-      return baseRate * NEW_PLAYER_BONUS_FILL_MULTIPLIER + NEW_PLAYER_BONUS_FILL_BONUS;
-    }
-    if (viewModel.level < 35) {
-      return baseRate * LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER;
-    }
-    return baseRate;
-  }
-  function parseTimestamp(value, serverTime) {
-    if (!value) return conservativeFallbackFirstPlayedAt(serverTime);
-    const parsed = Date.parse(value);
-    if (!Number.isFinite(parsed)) return conservativeFallbackFirstPlayedAt(serverTime);
-    return parsed;
-  }
-  function conservativeFallbackFirstPlayedAt(serverTime) {
-    const parsedServerTime = serverTime ? Date.parse(serverTime) : Number.NaN;
-    const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : Date.now();
-    return safeNow - NEW_PLAYER_BONUS_WINDOW_MS;
-  }
-  var DEFAULT_CYCLE_DURATION_MS = 1e4;
-  var cycleDurationMs = DEFAULT_CYCLE_DURATION_MS;
-  function getCycleDurationMs() {
-    return cycleDurationMs;
-  }
-  function setCycleDurationMs(value) {
-    cycleDurationMs = Math.max(1, Math.floor(value));
-  }
-  function getCycleDurationMsFromRate(nowMs) {
-    const rate = getProgressBarFillRate(currentViewModel, nowMs);
-    if (rate <= 0) return DEFAULT_CYCLE_DURATION_MS;
-    return Math.max(1, Math.floor(100 * 1e3 / rate));
-  }
-
-  // src/features/progress/interactions.ts
-  function handleProgressLoop(channel2) {
-    void channel2;
-    return shouldSendClaimIn(Date.now());
-  }
-  function tryClaimReward(channel2) {
-    const vm = getViewModel();
-    if (vm.state === "confirmed_collectible") {
-      return true;
-    }
-    return false;
-  }
-
-  // src/format.ts
-  function toFiniteNumber(value, fallback = 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-  function formatNumber(value, fallback = 0) {
-    const number = toFiniteNumber(value, fallback);
-    const sign = number < 0 ? "-" : "";
-    const absolute = Math.abs(number);
-    if (absolute < 1e3) {
-      return `${sign}${Math.floor(absolute)}`;
-    }
-    const tier = Math.floor(Math.log10(absolute) / 3);
-    const suffix = getSuffix(tier);
-    const scaled = absolute / 10 ** (tier * 3);
-    return `${sign}${Math.round(scaled * 1e3) / 1e3}${suffix}`;
-  }
-  function getSuffix(tier) {
-    const base = [
-      "",
-      "K",
-      "M",
-      "B",
-      "T",
-      "Qa",
-      "Qi",
-      "Sx",
-      "Sp",
-      "Oc",
-      "No",
-      "Dc"
-    ];
-    if (tier < base.length) return base[tier];
-    const ones = ["", "U", "D", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No"];
-    const tens = ["", "Dc", "Vg", "Tg", "Qag", "Qig", "Sxg", "Spg", "Ocg", "Nog"];
-    const n = tier - 10;
-    const one = n % 10;
-    const ten = Math.floor(n / 10);
-    return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
-  }
-  function formatSignedNumber(value) {
-    return `+${formatNumber(value)}`;
-  }
-  function formatPercent(value, decimals = 2, fallback = 0) {
-    return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
-  }
-
-  // src/utils.ts
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-  function lerpColor(c1, c2, t) {
-    return [
-      Math.floor(lerp(c1[0], c2[0], t)),
-      Math.floor(lerp(c1[1], c2[1], t)),
-      Math.floor(lerp(c1[2], c2[2], t))
-    ];
-  }
-
   // src/render/webgl-effects.ts
   var MAX_GPU_PARTICLES = 4096;
   var MAX_GPU_LIQUID_BUBBLES = 96;
@@ -1494,8 +967,611 @@
     return Math.min(Math.max(Number(value) || 0, 0), 1);
   }
 
-  // src/features/progress/render.ts
+  // src/net/game-channel.ts
+  var heartbeatIntervalMs = 25e3;
+  var commandQueueLimit = 10;
+  var initialReconnectionDelayMs = 1e3;
+  var maxReconnectionDelayMs = 3e4;
+  var reconnectionBackoffFactor = 1.5;
+  var GameChannel = class {
+    constructor(username, cachedSaveSlots = []) {
+      this.username = username;
+      this.cachedSaveSlots = cachedSaveSlots;
+      __publicField(this, "socket", null);
+      __publicField(this, "ref", 0);
+      __publicField(this, "joinRef", null);
+      __publicField(this, "waiters", /* @__PURE__ */ new Map());
+      __publicField(this, "heartbeatId", 0);
+      __publicField(this, "commandQueue", Array(commandQueueLimit).fill(false));
+      __publicField(this, "_status", "disconnected");
+      __publicField(this, "reconnectionDelay", initialReconnectionDelayMs);
+      __publicField(this, "reconnectionTimeoutId", 0);
+      __publicField(this, "onStatusChange");
+      __publicField(this, "onBootResult");
+    }
+    get status() {
+      return this._status;
+    }
+    setStatus(newStatus) {
+      if (this._status === newStatus) return;
+      this._status = newStatus;
+      this.onStatusChange?.(newStatus);
+    }
+    connect() {
+      if (this._status === "connecting" || this._status === "reconnecting") {
+      }
+      this.setStatus(this._status === "disconnected" ? "connecting" : "reconnecting");
+      this.clearReconnectionTimeout();
+      const params = new URLSearchParams({ vsn: "2.0.0" });
+      if (this.username) params.set("username", this.username);
+      if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
+      const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+      this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
+      return new Promise((resolve, reject) => {
+        if (!this.socket) {
+          this.setStatus("disconnected");
+          return reject(new Error("Socket unavailable"));
+        }
+        this.socket.addEventListener("open", () => {
+          this.reconnectionDelay = initialReconnectionDelayMs;
+          this.startHeartbeat();
+          this.join().then((result) => {
+            this.setStatus("connected");
+            this.onBootResult?.(result);
+            resolve(result);
+          }, (error) => {
+            this.setStatus("disconnected");
+            reject(error);
+          });
+        });
+        this.socket.addEventListener("message", (event) => this.handleMessage(event));
+        this.socket.addEventListener("error", () => {
+          if (this._status === "connecting") {
+            this.setStatus("disconnected");
+            reject(new Error("Socket error"));
+          }
+          this.scheduleReconnect();
+        });
+        this.socket.addEventListener("close", () => {
+          this.stopHeartbeat();
+          this.scheduleReconnect();
+        });
+      });
+    }
+    scheduleReconnect() {
+      if (this._status === "disconnected" || this._status === "reconnecting") {
+        this.clearReconnectionTimeout();
+        this.setStatus("reconnecting");
+        this.reconnectionTimeoutId = window.setTimeout(() => {
+          this.connect().catch(() => {
+          });
+          this.reconnectionDelay = Math.min(this.reconnectionDelay * reconnectionBackoffFactor, maxReconnectionDelayMs);
+        }, this.reconnectionDelay);
+      }
+    }
+    clearReconnectionTimeout() {
+      if (this.reconnectionTimeoutId) {
+        window.clearTimeout(this.reconnectionTimeoutId);
+        this.reconnectionTimeoutId = 0;
+      }
+    }
+    push(event, payload = {}) {
+      return this.send("game", event, payload);
+    }
+    pushCommand(event, payload = {}) {
+      const commandId = this.reserveCommandId();
+      return this.send("game", event, { ...payload, command_id: commandId }).then(
+        (response) => {
+          this.trackCommandResult(response);
+          return response;
+        },
+        (error) => {
+          this.forgetCommand(commandId);
+          throw error;
+        }
+      );
+    }
+    async ackCommand(commandId) {
+      const ack = await this.send("game", "command.ack", commandId);
+      this.forgetCommand(commandId);
+      if (ack.released_result) this.trackCommandResult(ack.released_result);
+      return ack;
+    }
+    close() {
+      this.setStatus("disconnected");
+      this.clearReconnectionTimeout();
+      this.stopHeartbeat();
+      this.socket?.close();
+      this.socket = null;
+    }
+    join() {
+      this.joinRef = this.nextRef();
+      return this.send("game", "phx_join", {}, this.joinRef);
+    }
+    send(topic, event, payload, joinRef = this.joinRef) {
+      const ref = this.nextRef();
+      const message = [joinRef, ref, topic, event, payload];
+      return new Promise((resolve, reject) => {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          reject(new Error("Channel is not connected"));
+          return;
+        }
+        this.waiters.set(ref, { resolve, reject });
+        this.socket.send(JSON.stringify(message));
+      });
+    }
+    handleMessage(event) {
+      const message = JSON.parse(event.data);
+      const [_joinRef, ref, _topic, eventName, payload] = message;
+      if (eventName !== "phx_reply" || !ref) return;
+      const waiter = this.waiters.get(ref);
+      if (!waiter) return;
+      this.waiters.delete(ref);
+      const reply = payload;
+      if (reply.status === "ok") {
+        waiter.resolve(reply.response);
+      } else {
+        waiter.reject(new Error("Channel command failed"));
+      }
+    }
+    nextRef() {
+      this.ref += 1;
+      return String(this.ref);
+    }
+    reserveCommandId() {
+      const commandId = this.commandQueue.findIndex((waitingForResult) => waitingForResult === false);
+      if (commandId < 0) throw new Error("Command queue is full");
+      this.commandQueue[commandId] = true;
+      return commandId;
+    }
+    trackCommandResult(result) {
+      if (!("command_id" in result)) return;
+      if (result.command_id < 0 || result.command_id >= commandQueueLimit) return;
+      this.commandQueue[result.command_id] = result.type === "command.queued";
+    }
+    forgetCommand(commandId) {
+      if (commandId < 0 || commandId >= commandQueueLimit) return;
+      this.commandQueue[commandId] = false;
+    }
+    clearCommandQueue() {
+      this.commandQueue.fill(false);
+    }
+    startHeartbeat() {
+      this.stopHeartbeat();
+      this.heartbeatId = window.setInterval(() => {
+        this.send("phoenix", "heartbeat", {}).catch(() => {
+        });
+      }, heartbeatIntervalMs);
+    }
+    stopHeartbeat() {
+      if (this.heartbeatId) window.clearInterval(this.heartbeatId);
+      this.heartbeatId = 0;
+    }
+  };
+
+  // src/net/commands.ts
+  function progressClaimIn(channel) {
+    return channel.pushCommand("progress.claim_in");
+  }
+  function progressClaimReward(channel) {
+    return channel.pushCommand("progress.claim_reward");
+  }
+  async function ackAppliedResult(channel, commandId) {
+    const ack = await channel.ackCommand(commandId);
+    return ack.released_result;
+  }
+
+  // src/net/protocol.ts
+  function isAckableCommandResult(result) {
+    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "command.error";
+  }
+
+  // src/net/snapshots.ts
+  function createServerState() {
+    return {
+      snapshot: null,
+      slots: [],
+      status: "Connecting...",
+      statusTone: ""
+    };
+  }
+  function applyResult(state, result) {
+    const snapshot = snapshotFromResult(result);
+    if (snapshot) {
+      state.snapshot = snapshot;
+    }
+    if ("slots" in result) {
+      state.slots = result.slots;
+    } else if (snapshot) {
+      state.slots = upsertSlot(state.slots, snapshot.save_slot);
+    }
+    if (result.type === "progress.claim_reward.result" && state.snapshot) {
+      state.snapshot.state.coins = result.coins;
+      state.snapshot.state.exp = result.exp;
+      state.snapshot.state.shards = result.shards;
+      state.snapshot.state.cores = result.cores;
+    }
+    state.statusTone = result.status === "error" ? "error" : "ok";
+    state.status = statusForResult(result);
+  }
+  function snapshotFromResult(result) {
+    if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+      return result.snapshot ?? null;
+    }
+    return null;
+  }
+  function upsertSlot(slots, slot) {
+    const next = slots.filter((candidate) => candidate.slot_index !== slot.slot_index);
+    next.push(slot);
+    return next.sort((a, b) => a.slot_index - b.slot_index);
+  }
+  function statusForResult(result) {
+    if (result.status === "error") return result.reason || "Command rejected";
+    if (result.type === "command.queued") return "Queued";
+    if (result.type === "game.noop.result") return "Synced";
+    if (result.type === "save_slots.list.result") return "Save files";
+    if (result.type === "save_slot.switch.result") return "Save file loaded";
+    if (result.type === "save_slot.reset.result") return "Save file reset";
+    return "Ready";
+  }
+
+  // src/net/snapshot-cache.ts
+  var slotCount = 4;
+  var SnapshotCache = class {
+    constructor(username) {
+      this.username = username;
+    }
+    cachedSlotIndexes() {
+      if (!this.token) return [];
+      const indexes = [];
+      for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
+        if (this.load(slotIndex)) {
+          indexes.push(slotIndex);
+        }
+      }
+      return indexes;
+    }
+    load(slotIndex) {
+      if (!this.token) return null;
+      try {
+        const encoded = window.localStorage.getItem(this.key(slotIndex));
+        if (!encoded) return null;
+        const snapshot = JSON.parse(encoded);
+        if (!isUsableSnapshot(snapshot, slotIndex)) {
+          window.localStorage.removeItem(this.key(slotIndex));
+          return null;
+        }
+        return snapshot;
+      } catch {
+        return null;
+      }
+    }
+    save(snapshot) {
+      if (!this.username) return;
+      window.localStorage.setItem(this.key(snapshot.active_save_slot), JSON.stringify(snapshot));
+    }
+    key(slotIndex) {
+      return `incrementalist.snapshot.${this.username}.${slotIndex}`;
+    }
+  };
+  function isUsableSnapshot(snapshot, slotIndex) {
+    if (!snapshot || snapshot.type !== "game.snapshot") return false;
+    if (snapshot.active_save_slot !== slotIndex) return false;
+    if (!snapshot.state || typeof snapshot.state !== "object") return false;
+    if (typeof snapshot.state.level !== "number") return false;
+    if (typeof snapshot.state.idle_mode !== "boolean") return false;
+    if (!("first_played_at" in snapshot.state)) return false;
+    return true;
+  }
+
+  // src/format.ts
+  function toFiniteNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  function formatNumber(value, fallback = 0) {
+    const number = toFiniteNumber(value, fallback);
+    const sign = number < 0 ? "-" : "";
+    const absolute = Math.abs(number);
+    if (absolute < 1e3) {
+      return `${sign}${Math.floor(absolute)}`;
+    }
+    const tier = Math.floor(Math.log10(absolute) / 3);
+    const suffix = getSuffix(tier);
+    const scaled = absolute / 10 ** (tier * 3);
+    return `${sign}${Math.round(scaled * 1e3) / 1e3}${suffix}`;
+  }
+  function getSuffix(tier) {
+    const base = [
+      "",
+      "K",
+      "M",
+      "B",
+      "T",
+      "Qa",
+      "Qi",
+      "Sx",
+      "Sp",
+      "Oc",
+      "No",
+      "Dc"
+    ];
+    if (tier < base.length) return base[tier];
+    const ones = ["", "U", "D", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No"];
+    const tens = ["", "Dc", "Vg", "Tg", "Qag", "Qig", "Sxg", "Spg", "Ocg", "Nog"];
+    const n = tier - 10;
+    const one = n % 10;
+    const ten = Math.floor(n / 10);
+    return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
+  }
+  function formatSignedNumber(value) {
+    return `+${formatNumber(value)}`;
+  }
+  function formatPercent(value, decimals = 2, fallback = 0) {
+    return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
+  }
+
+  // src/render/effects.ts
   var TWO_PI2 = Math.PI * 2;
+  var CLICK_BURST_COLORS = Object.freeze([
+    COLORS.rewards.coins,
+    COLORS.rewards.shards,
+    COLORS.rewards.cores,
+    COLORS.rewards.achievement,
+    COLORS.rewards.questSummary
+  ]);
+  var MAX_FLOATING_TEXTS = 72;
+  var TEXT_SPRITE_PADDING = 14;
+  var MAX_TEXT_SPRITE_CACHE = 96;
+  var REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
+  var textSpriteCache = /* @__PURE__ */ new Map();
+  function createFloatingTextState() {
+    return [];
+  }
+  function spawnFloatingText(floatingTexts, text, x, y, color, options = {}) {
+    if (!Array.isArray(floatingTexts)) return;
+    floatingTexts.push({
+      text: String(text ?? ""),
+      x,
+      y,
+      startX: x,
+      startY: y,
+      color,
+      alpha: 1,
+      elapsedMs: 0,
+      type: options.type || "generic",
+      targetX: options.targetX ?? x,
+      targetY: options.targetY ?? y,
+      holdMs: options.holdMs ?? 0,
+      flyMs: options.flyMs ?? 0,
+      riseSpeed: options.riseSpeed ?? GENERIC_FLOAT_RISE_SPEED,
+      holdRiseSpeed: options.holdRiseSpeed ?? REWARD_POPUP_HOLD_RISE_SPEED,
+      lifeMs: options.lifeMs ?? GENERIC_FLOAT_LIFE_MS,
+      font: options.font || REWARD_POPUP_FONT,
+      textAlign: options.textAlign || "center",
+      scale: options.scale ?? 1,
+      minRenderSizePx: options.minRenderSizePx ?? 0,
+      stackGroupId: options.stackGroupId ?? null,
+      stackIndex: options.stackIndex ?? null
+    });
+    if (floatingTexts.length > MAX_FLOATING_TEXTS) {
+      floatingTexts.splice(0, floatingTexts.length - MAX_FLOATING_TEXTS);
+    }
+  }
+  function getHudRewardTargets(canvas2) {
+    const canvasWidth = canvas2?.width ?? CANVAS_WIDTH;
+    return {
+      exp: {
+        x: TOP_HUD_EXP_COUNTER_X,
+        y: TOP_HUD_EXP_COUNTER_Y
+      },
+      coins: { x: canvasWidth - TOP_HUD_COINS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
+      shards: { x: canvasWidth - TOP_HUD_SHARDS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
+      cores: { x: canvasWidth - TOP_HUD_CORES_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y }
+    };
+  }
+  function spawnRewardPopup(floatingTexts, canvas2, text, x, y, color, targetKey) {
+    const targets = getHudRewardTargets(canvas2);
+    const target = targets[targetKey] || targets.coins;
+    spawnFloatingText(floatingTexts, text, x, y, color, {
+      type: "reward",
+      targetX: target.x,
+      targetY: target.y,
+      holdMs: REWARD_POPUP_HOLD_MS,
+      flyMs: REWARD_POPUP_FLY_MS,
+      holdRiseSpeed: REWARD_POPUP_HOLD_RISE_SPEED,
+      font: REWARD_POPUP_FONT,
+      textAlign: "center",
+      minRenderSizePx: REWARD_POPUP_MIN_RENDER_SIZE_PX
+    });
+  }
+  function updateFloatingTexts(floatingTexts, deltaTime) {
+    if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
+    const deltaSeconds = deltaTime / 1e3;
+    let writeIndex = 0;
+    for (let i = 0; i < floatingTexts.length; i += 1) {
+      const ft = floatingTexts[i];
+      ft.elapsedMs += deltaTime;
+      if (ft.type === "reward") {
+        updateRewardPopup(ft);
+      } else {
+        ft.y -= ft.riseSpeed * deltaSeconds;
+        ft.alpha = Math.max(0, 1 - ft.elapsedMs / ft.lifeMs);
+      }
+      if (!shouldRemoveFloatingText(ft)) {
+        floatingTexts[writeIndex] = ft;
+        writeIndex += 1;
+      }
+    }
+    floatingTexts.length = writeIndex;
+  }
+  function renderFloatingTexts(ctx2, floatingTexts) {
+    if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
+    ctx2.save();
+    for (let i = 0; i < floatingTexts.length; i += 1) {
+      const ft = floatingTexts[i];
+      if (ft.alpha <= 0) continue;
+      const sprite = getTextSprite(ctx2, ft);
+      const scale = getFloatingTextRenderScale(ft, sprite);
+      if (scale <= 0) continue;
+      ctx2.globalAlpha = ft.alpha;
+      ctx2.drawImage(
+        sprite.canvas,
+        ft.x - getSpriteAnchorX(sprite, ft.textAlign) * scale,
+        ft.y - sprite.anchorY * scale,
+        sprite.canvas.width * scale,
+        sprite.canvas.height * scale
+      );
+    }
+    ctx2.restore();
+  }
+  function getTextSprite(ctx2, ft) {
+    const key = `${ft.text}\0${ft.font}\0${ft.color}`;
+    if (ft.spriteKey === key && ft.sprite) {
+      return ft.sprite;
+    }
+    const cachedSprite = textSpriteCache.get(key);
+    if (cachedSprite) {
+      ft.spriteKey = key;
+      ft.sprite = cachedSprite;
+      return cachedSprite;
+    }
+    const sprite = createTextSprite(ctx2, ft.text, ft.font, ft.color);
+    textSpriteCache.set(key, sprite);
+    if (textSpriteCache.size > MAX_TEXT_SPRITE_CACHE) {
+      const oldestKey = textSpriteCache.keys().next().value;
+      textSpriteCache.delete(oldestKey);
+    }
+    ft.spriteKey = key;
+    ft.sprite = sprite;
+    return sprite;
+  }
+  function createTextSprite(ctx2, text, font, color) {
+    ctx2.save();
+    ctx2.font = font;
+    const metrics = ctx2.measureText(text);
+    ctx2.restore();
+    const fontSize = parseFontSizePx(font);
+    const textWidth = Math.ceil(metrics.width);
+    const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
+    const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
+    const width = Math.max(1, textWidth + TEXT_SPRITE_PADDING * 2);
+    const height = Math.max(1, ascent + descent + TEXT_SPRITE_PADDING * 2);
+    const canvas2 = createSpriteCanvas(width, height);
+    const spriteCtx = canvas2.getContext("2d");
+    const textX = TEXT_SPRITE_PADDING;
+    const textY = TEXT_SPRITE_PADDING + ascent;
+    spriteCtx.font = font;
+    spriteCtx.textAlign = "left";
+    spriteCtx.textBaseline = "alphabetic";
+    spriteCtx.lineJoin = "round";
+    spriteCtx.lineWidth = 7;
+    spriteCtx.strokeStyle = "#ffffff";
+    spriteCtx.shadowColor = "rgba(0, 0, 0, 0.6)";
+    spriteCtx.shadowBlur = 5;
+    spriteCtx.shadowOffsetX = 2;
+    spriteCtx.shadowOffsetY = 2;
+    spriteCtx.strokeText(text, textX, textY);
+    spriteCtx.shadowColor = "transparent";
+    spriteCtx.shadowBlur = 0;
+    spriteCtx.shadowOffsetX = 0;
+    spriteCtx.shadowOffsetY = 0;
+    spriteCtx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    spriteCtx.fillText(text, textX - 1, textY);
+    spriteCtx.fillText(text, textX + 1, textY);
+    spriteCtx.fillText(text, textX, textY - 1);
+    spriteCtx.fillText(text, textX, textY + 1);
+    spriteCtx.fillStyle = color;
+    spriteCtx.fillText(text, textX, textY);
+    return {
+      canvas: canvas2,
+      textWidth,
+      anchorY: textY
+    };
+  }
+  function createSpriteCanvas(width, height) {
+    if (typeof OffscreenCanvas === "function") {
+      return new OffscreenCanvas(width, height);
+    }
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = width;
+    canvas2.height = height;
+    return canvas2;
+  }
+  function getSpriteAnchorX(sprite, textAlign) {
+    switch (textAlign) {
+      case "center":
+        return TEXT_SPRITE_PADDING + sprite.textWidth / 2;
+      case "right":
+      case "end":
+        return TEXT_SPRITE_PADDING + sprite.textWidth;
+      case "left":
+      case "start":
+      default:
+        return TEXT_SPRITE_PADDING;
+    }
+  }
+  function getFloatingTextRenderScale(ft, sprite) {
+    const requestedScale = Number.isFinite(ft.scale) ? Math.max(0, ft.scale) : 1;
+    const minRenderSizePx = Number.isFinite(ft.minRenderSizePx) ? Math.max(0, ft.minRenderSizePx) : 0;
+    if (minRenderSizePx <= 0) {
+      return requestedScale;
+    }
+    const largestSpriteDimension = Math.max(
+      sprite?.canvas?.width ?? 0,
+      sprite?.canvas?.height ?? 0,
+      1
+    );
+    return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
+  }
+  function parseFontSizePx(font) {
+    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
+    if (!match) {
+      return 16;
+    }
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : 16;
+  }
+  function updateRewardPopup(ft) {
+    const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);
+    const holdDistance = ft.holdRiseSpeed * (holdElapsed / 1e3);
+    const holdY = ft.startY - holdDistance;
+    if (ft.elapsedMs <= ft.holdMs) {
+      ft.x = ft.startX;
+      ft.y = holdY;
+      ft.alpha = 1;
+      ft.scale = 1;
+      return;
+    }
+    const flyElapsed = ft.elapsedMs - ft.holdMs;
+    const flyProgress = ft.flyMs > 0 ? Math.min(flyElapsed / ft.flyMs, 1) : 1;
+    const eased = 1 - Math.pow(1 - flyProgress, 3);
+    ft.x = ft.startX + (ft.targetX - ft.startX) * eased;
+    ft.y = holdY + (ft.targetY - holdY) * eased;
+    ft.alpha = Math.max(0, 1 - flyProgress);
+    ft.scale = Math.max(0, 1 - flyProgress);
+  }
+  function shouldRemoveFloatingText(ft) {
+    if (ft.type === "reward") {
+      return ft.elapsedMs >= ft.holdMs + ft.flyMs;
+    }
+    return ft.elapsedMs >= ft.lifeMs;
+  }
+
+  // src/utils.ts
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+  function lerpColor(c1, c2, t) {
+    return [
+      Math.floor(lerp(c1[0], c2[0], t)),
+      Math.floor(lerp(c1[1], c2[1], t)),
+      Math.floor(lerp(c1[2], c2[2], t))
+    ];
+  }
+
+  // src/features/progress/render.ts
+  var TWO_PI3 = Math.PI * 2;
   var PROGRESS_VISUAL_STATE = {
     wasFull: false,
     fullStartedAt: 0,
@@ -1753,8 +1829,8 @@
       return clampNumber(fillY, barY, barY + barHeight);
     }
     const xRatio = (x - barX) / Math.max(1, barWidth);
-    const primaryWave = Math.sin(xRatio * TWO_PI2 * 0.7 + now * 32e-4);
-    const secondaryWave = Math.sin(xRatio * TWO_PI2 * 1.35 - now * 24e-4);
+    const primaryWave = Math.sin(xRatio * TWO_PI3 * 0.7 + now * 32e-4);
+    const secondaryWave = Math.sin(xRatio * TWO_PI3 * 1.35 - now * 24e-4);
     const surfaceY = fillY + primaryWave * waveHeight + secondaryWave * waveHeight * 0.22;
     return clampNumber(surfaceY, barY, barY + barHeight);
   }
@@ -1813,7 +1889,7 @@
       y: bottomY - Math.random() * Math.min(12, fillHeight * 0.22) + radius,
       radius,
       speed: 42 + Math.random() * 30,
-      phase: Math.random() * TWO_PI2,
+      phase: Math.random() * TWO_PI3,
       alpha: 0.28 + Math.random() * 0.3,
       ageMs: Math.random() * 600
     });
@@ -1841,12 +1917,12 @@
       ctx2.lineWidth = 0.55;
       ctx2.shadowBlur = 0;
       ctx2.beginPath();
-      ctx2.arc(x, bubble.y, bubble.radius, 0, TWO_PI2);
+      ctx2.arc(x, bubble.y, bubble.radius, 0, TWO_PI3);
       ctx2.fill();
       ctx2.stroke();
       ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], alpha * 0.85);
       ctx2.beginPath();
-      ctx2.arc(x - bubble.radius * 0.32, bubble.y - bubble.radius * 0.35, Math.max(0.18, bubble.radius * 0.18), 0, TWO_PI2);
+      ctx2.arc(x - bubble.radius * 0.32, bubble.y - bubble.radius * 0.35, Math.max(0.18, bubble.radius * 0.18), 0, TWO_PI3);
       ctx2.fill();
     }
     ctx2.restore();
@@ -2036,7 +2112,7 @@
       );
       ctx2.stroke();
       ctx2.beginPath();
-      ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI2);
+      ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI3);
       ctx2.fill();
     }
     ctx2.restore();
@@ -2052,253 +2128,6 @@
     };
   }
 
-  // src/render/effects.ts
-  var TWO_PI3 = Math.PI * 2;
-  var CLICK_BURST_COLORS = Object.freeze([
-    COLORS.rewards.coins,
-    COLORS.rewards.shards,
-    COLORS.rewards.cores,
-    COLORS.rewards.achievement,
-    COLORS.rewards.questSummary
-  ]);
-  var MAX_FLOATING_TEXTS = 72;
-  var TEXT_SPRITE_PADDING = 14;
-  var MAX_TEXT_SPRITE_CACHE = 96;
-  var REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
-  var textSpriteCache = /* @__PURE__ */ new Map();
-  function createFloatingTextState() {
-    return [];
-  }
-  function spawnFloatingText(floatingTexts2, text, x, y, color, options = {}) {
-    if (!Array.isArray(floatingTexts2)) return;
-    floatingTexts2.push({
-      text: String(text ?? ""),
-      x,
-      y,
-      startX: x,
-      startY: y,
-      color,
-      alpha: 1,
-      elapsedMs: 0,
-      type: options.type || "generic",
-      targetX: options.targetX ?? x,
-      targetY: options.targetY ?? y,
-      holdMs: options.holdMs ?? 0,
-      flyMs: options.flyMs ?? 0,
-      riseSpeed: options.riseSpeed ?? GENERIC_FLOAT_RISE_SPEED,
-      holdRiseSpeed: options.holdRiseSpeed ?? REWARD_POPUP_HOLD_RISE_SPEED,
-      lifeMs: options.lifeMs ?? GENERIC_FLOAT_LIFE_MS,
-      font: options.font || REWARD_POPUP_FONT,
-      textAlign: options.textAlign || "center",
-      scale: options.scale ?? 1,
-      minRenderSizePx: options.minRenderSizePx ?? 0,
-      stackGroupId: options.stackGroupId ?? null,
-      stackIndex: options.stackIndex ?? null
-    });
-    if (floatingTexts2.length > MAX_FLOATING_TEXTS) {
-      floatingTexts2.splice(0, floatingTexts2.length - MAX_FLOATING_TEXTS);
-    }
-  }
-  function getHudRewardTargets(canvas2) {
-    const canvasWidth = canvas2?.width ?? CANVAS_WIDTH;
-    return {
-      exp: {
-        x: TOP_HUD_EXP_COUNTER_X,
-        y: TOP_HUD_EXP_COUNTER_Y
-      },
-      coins: { x: canvasWidth - TOP_HUD_COINS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
-      shards: { x: canvasWidth - TOP_HUD_SHARDS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
-      cores: { x: canvasWidth - TOP_HUD_CORES_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y }
-    };
-  }
-  function spawnRewardPopup(floatingTexts2, canvas2, text, x, y, color, targetKey) {
-    const targets = getHudRewardTargets(canvas2);
-    const target = targets[targetKey] || targets.coins;
-    spawnFloatingText(floatingTexts2, text, x, y, color, {
-      type: "reward",
-      targetX: target.x,
-      targetY: target.y,
-      holdMs: REWARD_POPUP_HOLD_MS,
-      flyMs: REWARD_POPUP_FLY_MS,
-      holdRiseSpeed: REWARD_POPUP_HOLD_RISE_SPEED,
-      font: REWARD_POPUP_FONT,
-      textAlign: "center",
-      minRenderSizePx: REWARD_POPUP_MIN_RENDER_SIZE_PX
-    });
-  }
-  function updateFloatingTexts(floatingTexts2, deltaTime) {
-    if (!Array.isArray(floatingTexts2) || floatingTexts2.length === 0) return;
-    const deltaSeconds = deltaTime / 1e3;
-    let writeIndex = 0;
-    for (let i = 0; i < floatingTexts2.length; i += 1) {
-      const ft = floatingTexts2[i];
-      ft.elapsedMs += deltaTime;
-      if (ft.type === "reward") {
-        updateRewardPopup(ft);
-      } else {
-        ft.y -= ft.riseSpeed * deltaSeconds;
-        ft.alpha = Math.max(0, 1 - ft.elapsedMs / ft.lifeMs);
-      }
-      if (!shouldRemoveFloatingText(ft)) {
-        floatingTexts2[writeIndex] = ft;
-        writeIndex += 1;
-      }
-    }
-    floatingTexts2.length = writeIndex;
-  }
-  function renderFloatingTexts(ctx2, floatingTexts2) {
-    if (!Array.isArray(floatingTexts2) || floatingTexts2.length === 0) return;
-    ctx2.save();
-    for (let i = 0; i < floatingTexts2.length; i += 1) {
-      const ft = floatingTexts2[i];
-      if (ft.alpha <= 0) continue;
-      const sprite = getTextSprite(ctx2, ft);
-      const scale = getFloatingTextRenderScale(ft, sprite);
-      if (scale <= 0) continue;
-      ctx2.globalAlpha = ft.alpha;
-      ctx2.drawImage(
-        sprite.canvas,
-        ft.x - getSpriteAnchorX(sprite, ft.textAlign) * scale,
-        ft.y - sprite.anchorY * scale,
-        sprite.canvas.width * scale,
-        sprite.canvas.height * scale
-      );
-    }
-    ctx2.restore();
-  }
-  function getTextSprite(ctx2, ft) {
-    const key = `${ft.text}\0${ft.font}\0${ft.color}`;
-    if (ft.spriteKey === key && ft.sprite) {
-      return ft.sprite;
-    }
-    const cachedSprite = textSpriteCache.get(key);
-    if (cachedSprite) {
-      ft.spriteKey = key;
-      ft.sprite = cachedSprite;
-      return cachedSprite;
-    }
-    const sprite = createTextSprite(ctx2, ft.text, ft.font, ft.color);
-    textSpriteCache.set(key, sprite);
-    if (textSpriteCache.size > MAX_TEXT_SPRITE_CACHE) {
-      const oldestKey = textSpriteCache.keys().next().value;
-      textSpriteCache.delete(oldestKey);
-    }
-    ft.spriteKey = key;
-    ft.sprite = sprite;
-    return sprite;
-  }
-  function createTextSprite(ctx2, text, font, color) {
-    ctx2.save();
-    ctx2.font = font;
-    const metrics = ctx2.measureText(text);
-    ctx2.restore();
-    const fontSize = parseFontSizePx(font);
-    const textWidth = Math.ceil(metrics.width);
-    const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
-    const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
-    const width = Math.max(1, textWidth + TEXT_SPRITE_PADDING * 2);
-    const height = Math.max(1, ascent + descent + TEXT_SPRITE_PADDING * 2);
-    const canvas2 = createSpriteCanvas(width, height);
-    const spriteCtx = canvas2.getContext("2d");
-    const textX = TEXT_SPRITE_PADDING;
-    const textY = TEXT_SPRITE_PADDING + ascent;
-    spriteCtx.font = font;
-    spriteCtx.textAlign = "left";
-    spriteCtx.textBaseline = "alphabetic";
-    spriteCtx.lineJoin = "round";
-    spriteCtx.lineWidth = 7;
-    spriteCtx.strokeStyle = "#ffffff";
-    spriteCtx.shadowColor = "rgba(0, 0, 0, 0.6)";
-    spriteCtx.shadowBlur = 5;
-    spriteCtx.shadowOffsetX = 2;
-    spriteCtx.shadowOffsetY = 2;
-    spriteCtx.strokeText(text, textX, textY);
-    spriteCtx.shadowColor = "transparent";
-    spriteCtx.shadowBlur = 0;
-    spriteCtx.shadowOffsetX = 0;
-    spriteCtx.shadowOffsetY = 0;
-    spriteCtx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    spriteCtx.fillText(text, textX - 1, textY);
-    spriteCtx.fillText(text, textX + 1, textY);
-    spriteCtx.fillText(text, textX, textY - 1);
-    spriteCtx.fillText(text, textX, textY + 1);
-    spriteCtx.fillStyle = color;
-    spriteCtx.fillText(text, textX, textY);
-    return {
-      canvas: canvas2,
-      textWidth,
-      anchorY: textY
-    };
-  }
-  function createSpriteCanvas(width, height) {
-    if (typeof OffscreenCanvas === "function") {
-      return new OffscreenCanvas(width, height);
-    }
-    const canvas2 = document.createElement("canvas");
-    canvas2.width = width;
-    canvas2.height = height;
-    return canvas2;
-  }
-  function getSpriteAnchorX(sprite, textAlign) {
-    switch (textAlign) {
-      case "center":
-        return TEXT_SPRITE_PADDING + sprite.textWidth / 2;
-      case "right":
-      case "end":
-        return TEXT_SPRITE_PADDING + sprite.textWidth;
-      case "left":
-      case "start":
-      default:
-        return TEXT_SPRITE_PADDING;
-    }
-  }
-  function getFloatingTextRenderScale(ft, sprite) {
-    const requestedScale = Number.isFinite(ft.scale) ? Math.max(0, ft.scale) : 1;
-    const minRenderSizePx = Number.isFinite(ft.minRenderSizePx) ? Math.max(0, ft.minRenderSizePx) : 0;
-    if (minRenderSizePx <= 0) {
-      return requestedScale;
-    }
-    const largestSpriteDimension = Math.max(
-      sprite?.canvas?.width ?? 0,
-      sprite?.canvas?.height ?? 0,
-      1
-    );
-    return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
-  }
-  function parseFontSizePx(font) {
-    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
-    if (!match) {
-      return 16;
-    }
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? parsed : 16;
-  }
-  function updateRewardPopup(ft) {
-    const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);
-    const holdDistance = ft.holdRiseSpeed * (holdElapsed / 1e3);
-    const holdY = ft.startY - holdDistance;
-    if (ft.elapsedMs <= ft.holdMs) {
-      ft.x = ft.startX;
-      ft.y = holdY;
-      ft.alpha = 1;
-      ft.scale = 1;
-      return;
-    }
-    const flyElapsed = ft.elapsedMs - ft.holdMs;
-    const flyProgress = ft.flyMs > 0 ? Math.min(flyElapsed / ft.flyMs, 1) : 1;
-    const eased = 1 - Math.pow(1 - flyProgress, 3);
-    ft.x = ft.startX + (ft.targetX - ft.startX) * eased;
-    ft.y = holdY + (ft.targetY - holdY) * eased;
-    ft.alpha = Math.max(0, 1 - flyProgress);
-    ft.scale = Math.max(0, 1 - flyProgress);
-  }
-  function shouldRemoveFloatingText(ft) {
-    if (ft.type === "reward") {
-      return ft.elapsedMs >= ft.holdMs + ft.flyMs;
-    }
-    return ft.elapsedMs >= ft.lifeMs;
-  }
-
   // src/features/progress/claim-effects.ts
   var POPUP_OFFSET = Object.freeze({
     exp: { x: -55, y: -20 },
@@ -2306,7 +2135,7 @@
     shards: { x: -55, y: 12 },
     cores: { x: 55, y: 12 }
   });
-  function spawnProgressClaimRewardEffects(floatingTexts2, canvas2, textMeasureContext, currentAmounts, newAmounts, anchorPoint = null) {
+  function spawnProgressClaimRewardEffects(floatingTexts, canvas2, textMeasureContext, currentAmounts, newAmounts, anchorPoint = null) {
     const expGain = Math.max(0, Math.floor(newAmounts.exp) - Math.floor(currentAmounts.exp));
     const coinGain = Math.max(0, Math.floor(newAmounts.coins) - Math.floor(currentAmounts.coins));
     const shardGain = Math.max(0, Math.floor(newAmounts.shards) - Math.floor(currentAmounts.shards));
@@ -2332,7 +2161,7 @@
     };
     const anchor = clampRewardAnchorToCanvas(textMeasureContext, canvas2, rawAnchor, rewardGroupEntries);
     spawnRewardPopup(
-      floatingTexts2,
+      floatingTexts,
       canvas2,
       expText,
       anchor.x + POPUP_OFFSET.exp.x,
@@ -2341,7 +2170,7 @@
       "exp"
     );
     spawnRewardPopup(
-      floatingTexts2,
+      floatingTexts,
       canvas2,
       coinText,
       anchor.x + POPUP_OFFSET.coins.x,
@@ -2351,7 +2180,7 @@
     );
     if (shardGain > 0) {
       spawnRewardPopup(
-        floatingTexts2,
+        floatingTexts,
         canvas2,
         shardText,
         anchor.x + POPUP_OFFSET.shards.x,
@@ -2362,7 +2191,7 @@
     }
     if (coreGain > 0) {
       spawnRewardPopup(
-        floatingTexts2,
+        floatingTexts,
         canvas2,
         coreText,
         anchor.x + POPUP_OFFSET.cores.x,
@@ -2430,247 +2259,211 @@
     return Math.min(Math.max(value, min), max);
   }
 
-  // src/core/store.ts
-  var Store = class {
-    constructor(state) {
-      this.state = state;
-      __publicField(this, "dirty", false);
-    }
-    markDirty() {
-      this.dirty = true;
-    }
+  // src/features/progress/view-model.ts
+  var currentViewModel = {
+    state: "projecting",
+    projectedFill: 0,
+    sisu: 1,
+    rewardMultiplier: 1,
+    level: 1,
+    firstPlayedAtMs: 0,
+    idleMode: false,
+    canClaimInMs: null,
+    nextVerifyAtMs: 0,
+    pendingClaimIntent: false
   };
-
-  // src/app.ts
-  var usernameKey = "incrementalist.playerUsername";
-  var canvas = requiredElement("#game-canvas");
-  var effectsCanvas = requiredElement("#effects-canvas");
-  var ctx = canvas.getContext("2d");
-  var store = new Store(createServerState());
-  var channel;
-  var snapshotCache;
-  var busy = false;
-  var claimResolutionInFlight = false;
-  var floatingTexts = createFloatingTextState();
-  var lastPointerPoint = null;
-  var pendingClaimPopupPoint = null;
-  resizeGameCanvases();
-  initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
-  window.addEventListener("resize", resizeGameCanvases);
-  function resizeGameCanvases() {
-    if (canvas.width !== CANVAS_WIDTH) {
-      canvas.width = CANVAS_WIDTH;
+  function updateProjectedFill(deltaTimeMs) {
+    if (currentViewModel.state !== "projecting" && currentViewModel.state !== "awaiting_server_confirmation") {
+      return;
     }
-    if (canvas.height !== CANVAS_HEIGHT) {
-      canvas.height = CANVAS_HEIGHT;
-    }
-    if (effectsCanvas.width !== canvas.width) {
-      effectsCanvas.width = canvas.width;
-    }
-    if (effectsCanvas.height !== canvas.height) {
-      effectsCanvas.height = canvas.height;
-    }
-    resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
-  }
-  function renderDom() {
-  }
-  async function applyAndAck(result) {
-    hydrateSnapshotFromCache(result);
-    const previousAmounts = result.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-    applyResult(store.state, result);
-    cacheSnapshotFromResult(result);
-    if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-      if (store.state.snapshot) {
-        getStateFromSnapshot(store.state.snapshot);
-      }
-    }
-    applyProgressResultEffects(result, previousAmounts);
-    store.markDirty();
-    if (!isAckableCommandResult(result)) return;
-    let next = await ackAppliedResult(channel, result.command_id);
-    if (clearsCommandQueue(result)) channel.clearCommandQueue();
-    while (next) {
-      hydrateSnapshotFromCache(next);
-      const previousAmounts2 = next.type === "progress.claim_reward.result" ? snapshotAmounts() : null;
-      applyResult(store.state, next);
-      cacheSnapshotFromResult(next);
-      applyProgressResultEffects(next, previousAmounts2);
-      if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
-        if (store.state.snapshot) {
-          getStateFromSnapshot(store.state.snapshot);
+    if (currentViewModel.state === "awaiting_server_confirmation") {
+      if (currentViewModel.canClaimInMs !== null) {
+        currentViewModel.canClaimInMs -= deltaTimeMs;
+        if (currentViewModel.canClaimInMs <= 0) {
+          currentViewModel.canClaimInMs = null;
+          currentViewModel.nextVerifyAtMs = Date.now();
+          currentViewModel.projectedFill = 100;
         }
-      }
-      store.markDirty();
-      const applied = next;
-      next = await ackAppliedResult(channel, applied.command_id);
-      if (clearsCommandQueue(applied)) channel.clearCommandQueue();
-    }
-  }
-  function snapshotAmounts() {
-    const snapshot = store.state.snapshot;
-    if (!snapshot) return null;
-    return {
-      exp: snapshot.state.exp,
-      coins: snapshot.state.coins,
-      shards: snapshot.state.shards,
-      cores: snapshot.state.cores
-    };
-  }
-  function applyProgressResultEffects(result, previousAmounts) {
-    if (result.type === "progress.claim_in.result") {
-      if (hasPendingClaimIntent()) {
         return;
       }
+      return;
+    }
+    if (currentViewModel.canClaimInMs !== null) {
+      const before = currentViewModel.canClaimInMs;
+      currentViewModel.canClaimInMs = Math.max(0, before - deltaTimeMs);
+      const duration = getCycleDurationMs();
+      const completed = Math.max(0, duration - currentViewModel.canClaimInMs);
+      currentViewModel.projectedFill = Math.min(100, completed / duration * 100);
+      if (currentViewModel.canClaimInMs <= 0) {
+        currentViewModel.state = "confirmed_collectible";
+        currentViewModel.canClaimInMs = 0;
+        currentViewModel.nextVerifyAtMs = 0;
+        currentViewModel.projectedFill = 100;
+      }
+    }
+  }
+  function getStateFromSnapshot(snapshot) {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 0;
+    currentViewModel.sisu = snapshot.state.progress_bar.sisu;
+    currentViewModel.rewardMultiplier = snapshot.state.progress_bar.reward_multiplier;
+    currentViewModel.level = snapshot.state.level;
+    currentViewModel.firstPlayedAtMs = parseTimestamp(snapshot.state.first_played_at, snapshot.server_time);
+    currentViewModel.idleMode = snapshot.state.idle_mode;
+    currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = 0;
+    currentViewModel.pendingClaimIntent = false;
+  }
+  function handleClaimInResult(result) {
+    if (result.can_claim_in <= 100) {
+      currentViewModel.state = "confirmed_collectible";
+      currentViewModel.canClaimInMs = 0;
+      currentViewModel.projectedFill = 100;
+      currentViewModel.nextVerifyAtMs = 0;
+    } else {
+      const duration = getCycleDurationMsFromRate(Date.now());
+      if (currentViewModel.projectedFill <= 1e-3) {
+        const cycleDurationMs2 = Math.max(1, result.can_claim_in);
+        setCycleDurationMs(cycleDurationMs2);
+        currentViewModel.canClaimInMs = cycleDurationMs2;
+        currentViewModel.state = "projecting";
+        currentViewModel.projectedFill = 0;
+        currentViewModel.nextVerifyAtMs = 0;
+        return;
+      }
+      currentViewModel.canClaimInMs = result.can_claim_in;
+      setCycleDurationMs(Math.max(duration, currentViewModel.canClaimInMs));
+      currentViewModel.state = "awaiting_server_confirmation";
+      currentViewModel.nextVerifyAtMs = Date.now() + result.can_claim_in;
+      currentViewModel.projectedFill = 100;
+    }
+  }
+  function handleClaimRewardResult() {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 0;
+    currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = 0;
+    currentViewModel.pendingClaimIntent = false;
+  }
+  function beginAsyncClaimResolution() {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 0;
+    currentViewModel.canClaimInMs = null;
+    currentViewModel.nextVerifyAtMs = Number.MAX_SAFE_INTEGER;
+    currentViewModel.pendingClaimIntent = true;
+  }
+  function handleClaimNotReadyError(canClaimInMs = null) {
+    currentViewModel.state = "awaiting_server_confirmation";
+    currentViewModel.projectedFill = 0;
+    currentViewModel.canClaimInMs = null;
+    const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
+    currentViewModel.nextVerifyAtMs = Date.now() + delay;
+  }
+  function applyProgressResult(result, previousAmounts, effects) {
+    if (result.type === "progress.claim_in.result") {
+      if (currentViewModel.pendingClaimIntent) return;
       handleClaimInResult(result);
-    } else if (result.type === "progress.claim_reward.result") {
+      return;
+    }
+    if (result.type === "progress.claim_reward.result") {
       handleClaimRewardResult();
-      if (ctx && previousAmounts) {
-        spawnProgressClaimRewardEffects(floatingTexts, canvas, ctx, previousAmounts, {
+      if (effects && previousAmounts) {
+        spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, effects.ctx, previousAmounts, {
           exp: result.exp,
           coins: result.coins,
           shards: result.shards,
           cores: result.cores
-        }, pendingClaimPopupPoint);
+        }, effects.popupPoint);
       }
-      pendingClaimPopupPoint = null;
-    } else if (result.type === "command.error" && result.reason === "claim_not_ready") {
+      return;
+    }
+    if (result.type === "command.error" && result.reason === "claim_not_ready") {
       handleClaimNotReadyError(result.can_claim_in ?? null);
     }
   }
-  async function runCommand(command, loadingMessage = null) {
-    if (busy) return null;
-    busy = true;
-    store.state.loadingMessage = loadingMessage;
-    store.markDirty();
-    try {
-      const result = await command();
-      await applyAndAck(result);
-      return result;
-    } catch (error) {
-      store.state.statusTone = "error";
-      store.state.status = error instanceof Error ? error.message : "Command failed";
-      store.markDirty();
-      return null;
-    } finally {
-      store.state.loadingMessage = null;
-      busy = channel.status !== "connected";
-      store.markDirty();
-    }
+  function getViewModel() {
+    return currentViewModel;
   }
-  async function boot() {
-    const username = window.localStorage.getItem(usernameKey);
-    snapshotCache = new SnapshotCache(username);
-    channel = new GameChannel(username, snapshotCache.cachedSlotIndexes());
-    channel.onStatusChange = (status) => {
-      store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
-      store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
-      busy = status !== "connected";
-      store.markDirty();
-    };
-    channel.onBootResult = async (result) => {
-      window.localStorage.setItem(usernameKey, result.username);
-      snapshotCache = new SnapshotCache(result.username);
-      store.state.snapshot = result.snapshot ?? snapshotCache.load(result.active_save_slot);
-      if (result.snapshot) snapshotCache.save(result.snapshot);
-      store.state.slots = [result.save_slot];
-      if (store.state.snapshot) {
-        getStateFromSnapshot(store.state.snapshot);
-      }
-      store.markDirty();
-      if (result.pending_result) {
-        await applyAndAck(result.pending_result);
-      }
-    };
-    try {
-      await channel.connect();
-    } catch (error) {
-      store.state.statusTone = "error";
-      store.state.status = error instanceof Error ? error.message : "Boot failed";
-      store.markDirty();
-    }
+  function shouldSendClaimIn(nowMs) {
+    if (currentViewModel.pendingClaimIntent) return false;
+    if (currentViewModel.state !== "awaiting_server_confirmation") return false;
+    if (currentViewModel.canClaimInMs !== null) return false;
+    if (nowMs < currentViewModel.nextVerifyAtMs) return false;
+    currentViewModel.nextVerifyAtMs = nowMs + 110;
+    return true;
   }
-  function hydrateSnapshotFromCache(result) {
-    if (result.type !== "save_slot.switch.result" || result.snapshot) return;
-    const cachedSnapshot = snapshotCache.load(result.active_save_slot);
-    if (cachedSnapshot) {
-      store.state.snapshot = cachedSnapshot;
-      getStateFromSnapshot(cachedSnapshot);
-    }
+  function setPendingClaimIntent(value) {
+    currentViewModel.pendingClaimIntent = value;
   }
-  function cacheSnapshotFromResult(result) {
-    if ("snapshot" in result && result.snapshot) {
-      snapshotCache.save(result.snapshot);
+  function getProgressBarFillRate(viewModel, nowMs) {
+    const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
+    const baseRate = (viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE) * sisuMultiplier;
+    if (viewModel.idleMode) {
+      return baseRate;
     }
-  }
-  function clearsCommandQueue(result) {
-    return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
-  }
-  function requiredElement(selector) {
-    const element = document.querySelector(selector);
-    if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
-    return element;
-  }
-  function claimRewardOnAnyInput(clickPoint = null) {
-    if (!channel) {
-      return;
+    const gameAgeMs = nowMs - viewModel.firstPlayedAtMs;
+    if (gameAgeMs < NEW_PLAYER_BONUS_WINDOW_MS) {
+      return baseRate * NEW_PLAYER_BONUS_FILL_MULTIPLIER + NEW_PLAYER_BONUS_FILL_BONUS;
     }
-    if (!tryClaimReward(channel)) {
-      return;
+    if (viewModel.level < 35) {
+      return baseRate * LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER;
     }
+    return baseRate;
+  }
+  function parseTimestamp(value, serverTime) {
+    if (!value) return conservativeFallbackFirstPlayedAt(serverTime);
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) return conservativeFallbackFirstPlayedAt(serverTime);
+    return parsed;
+  }
+  function conservativeFallbackFirstPlayedAt(serverTime) {
+    const parsedServerTime = serverTime ? Date.parse(serverTime) : Number.NaN;
+    const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : Date.now();
+    return safeNow - NEW_PLAYER_BONUS_WINDOW_MS;
+  }
+  var DEFAULT_CYCLE_DURATION_MS = 1e4;
+  var cycleDurationMs = DEFAULT_CYCLE_DURATION_MS;
+  function getCycleDurationMs() {
+    return cycleDurationMs;
+  }
+  function setCycleDurationMs(value) {
+    cycleDurationMs = Math.max(1, Math.floor(value));
+  }
+  function getCycleDurationMsFromRate(nowMs) {
+    const rate = getProgressBarFillRate(currentViewModel, nowMs);
+    if (rate <= 0) return DEFAULT_CYCLE_DURATION_MS;
+    return Math.max(1, Math.floor(100 * 1e3 / rate));
+  }
+
+  // src/features/progress/interactions.ts
+  var claimResolutionInFlight = false;
+  var pendingClaimPopupPoint = null;
+  function getPendingClaimPopupPoint() {
+    return pendingClaimPopupPoint;
+  }
+  function clearPendingClaimPopupPoint() {
+    pendingClaimPopupPoint = null;
+  }
+  function handleProgressLoop(channel) {
+    void channel;
+    return shouldSendClaimIn(Date.now());
+  }
+  function tryClaimReward(channel) {
+    const vm = getViewModel();
+    if (vm.state === "confirmed_collectible") {
+      return true;
+    }
+    return false;
+  }
+  function claimRewardOnAnyInput(channel, canvas2, clickPoint, runCommand) {
+    if (!tryClaimReward(channel)) return;
     pendingClaimPopupPoint = clickPoint;
-    triggerProgressBarCollectionEffect(canvas);
+    triggerProgressBarCollectionEffect(canvas2);
     beginAsyncClaimResolution();
-    void resolveClaimAsync();
+    void resolveClaimAsync(channel, runCommand);
   }
-  function handleClick(event) {
-    const point = getCanvasPointFromInputEvent(event, canvas);
-    lastPointerPoint = point;
-    claimRewardOnAnyInput(point);
-  }
-  function handleMouseMove(event) {
-    const point = getCanvasPointFromInputEvent(event, canvas);
-    lastPointerPoint = point;
-    claimRewardOnAnyInput(point);
-  }
-  function handleKeydown(event) {
-    claimRewardOnAnyInput(lastPointerPoint);
-    event.preventDefault();
-  }
-  document.addEventListener("click", handleClick);
-  document.addEventListener("mousemove", handleMouseMove);
-  document.addEventListener("keydown", handleKeydown);
-  canvas.addEventListener("mouseleave", () => {
-    lastPointerPoint = null;
-  });
-  var lastTime = performance.now();
-  function gameLoop(time) {
-    requestAnimationFrame(gameLoop);
-    const dt = time - lastTime;
-    lastTime = time;
-    if (store.dirty) {
-      renderDom();
-      store.dirty = false;
-    }
-    updateProjectedFill(dt);
-    if (channel && handleProgressLoop(channel)) {
-      runCommand(() => progressClaimIn(channel));
-    }
-    if (ctx && canvas) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = COLORS.game.background;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      renderProgressBar(ctx, canvas);
-    }
-    updateFloatingTexts(floatingTexts, dt);
-    updateWebGLEffects(dt);
-    renderWebGLEffects();
-    if (ctx) {
-      renderFloatingTexts(ctx, floatingTexts);
-    }
-  }
-  requestAnimationFrame(gameLoop);
-  async function resolveClaimAsync() {
-    if (!channel || claimResolutionInFlight) return;
+  async function resolveClaimAsync(channel, runCommand) {
+    if (claimResolutionInFlight) return;
     claimResolutionInFlight = true;
     try {
       let reward = await runCommand(() => progressClaimReward(channel));
@@ -2687,6 +2480,234 @@
     return new Promise((resolve) => {
       window.setTimeout(resolve, Math.max(0, ms));
     });
+  }
+
+  // src/core/store.ts
+  var Store = class {
+    constructor(state) {
+      this.state = state;
+      __publicField(this, "dirty", false);
+    }
+    markDirty() {
+      this.dirty = true;
+    }
+  };
+
+  // src/core/game-loop.ts
+  var GameLoop = class {
+    constructor(callback) {
+      this.callback = callback;
+      __publicField(this, "frame", 0);
+      __publicField(this, "lastTime", 0);
+    }
+    start() {
+      const tick = (time) => {
+        const dt = this.lastTime ? time - this.lastTime : 0;
+        this.lastTime = time;
+        this.callback(dt);
+        this.frame = window.requestAnimationFrame(tick);
+      };
+      this.frame = window.requestAnimationFrame(tick);
+    }
+    stop() {
+      if (this.frame) window.cancelAnimationFrame(this.frame);
+      this.lastTime = 0;
+    }
+  };
+
+  // src/core/game-client.ts
+  var usernameKey = "incrementalist.playerUsername";
+  var GameClient = class {
+    constructor(canvas2, ctx2) {
+      this.canvas = canvas2;
+      this.ctx = ctx2;
+      __publicField(this, "store");
+      __publicField(this, "channel", null);
+      __publicField(this, "snapshotCache", null);
+      __publicField(this, "floatingTexts", createFloatingTextState());
+      __publicField(this, "lastPointerPoint", null);
+      __publicField(this, "gameLoop");
+      // Bound event handlers for add/removeEventListener symmetry.
+      __publicField(this, "onClickBound", (e) => this.onClick(e));
+      __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
+      __publicField(this, "onKeydownBound", (e) => this.onKeydown(e));
+      __publicField(this, "onMouseLeaveBound", () => {
+        this.lastPointerPoint = null;
+      });
+      this.store = new Store(createServerState());
+      this.gameLoop = new GameLoop((dt) => this.tick(dt));
+    }
+    async boot() {
+      const username = window.localStorage.getItem(usernameKey);
+      this.snapshotCache = new SnapshotCache(username);
+      this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
+      this.channel.onStatusChange = (status) => {
+        this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
+        this.store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
+        this.store.markDirty();
+      };
+      this.channel.onBootResult = async (result) => {
+        window.localStorage.setItem(usernameKey, result.username);
+        this.snapshotCache = new SnapshotCache(result.username);
+        this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
+        if (result.snapshot) this.snapshotCache.save(result.snapshot);
+        this.store.state.slots = [result.save_slot];
+        if (this.store.state.snapshot) {
+          getStateFromSnapshot(this.store.state.snapshot);
+        }
+        this.store.markDirty();
+        if (result.pending_result) {
+          await this.applyAndAck(result.pending_result);
+        }
+      };
+      try {
+        await this.channel.connect();
+      } catch (error) {
+        this.store.state.statusTone = "error";
+        this.store.state.status = error instanceof Error ? error.message : "Boot failed";
+        this.store.markDirty();
+      }
+    }
+    start() {
+      document.addEventListener("click", this.onClickBound);
+      document.addEventListener("mousemove", this.onMouseMoveBound);
+      document.addEventListener("keydown", this.onKeydownBound);
+      this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
+      this.gameLoop.start();
+    }
+    stop() {
+      this.gameLoop.stop();
+      document.removeEventListener("click", this.onClickBound);
+      document.removeEventListener("mousemove", this.onMouseMoveBound);
+      document.removeEventListener("keydown", this.onKeydownBound);
+      this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
+    }
+    // ---------------------------------------------------------------------------
+    // Command execution
+    // ---------------------------------------------------------------------------
+    async runCommand(command) {
+      try {
+        const result = await command();
+        await this.applyAndAck(result);
+        return result;
+      } catch (error) {
+        this.store.state.statusTone = "error";
+        this.store.state.status = error instanceof Error ? error.message : "Command failed";
+        this.store.markDirty();
+        return null;
+      }
+    }
+    async applyAndAck(result) {
+      this.hydrateSnapshotFromCache(result);
+      const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+      applyResult(this.store.state, result);
+      this.cacheSnapshotFromResult(result);
+      if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+        if (this.store.state.snapshot) {
+          getStateFromSnapshot(this.store.state.snapshot);
+        }
+      }
+      this.applyProgressEffects(result, previousAmounts);
+      this.store.markDirty();
+      if (!isAckableCommandResult(result)) return;
+      let next = await ackAppliedResult(this.channel, result.command_id);
+      if (clearsCommandQueue(result)) this.channel.clearCommandQueue();
+      while (next) {
+        this.hydrateSnapshotFromCache(next);
+        const previousAmounts2 = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+        applyResult(this.store.state, next);
+        this.cacheSnapshotFromResult(next);
+        this.applyProgressEffects(next, previousAmounts2);
+        if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
+          if (this.store.state.snapshot) {
+            getStateFromSnapshot(this.store.state.snapshot);
+          }
+        }
+        this.store.markDirty();
+        const applied = next;
+        next = await ackAppliedResult(this.channel, applied.command_id);
+        if (clearsCommandQueue(applied)) this.channel.clearCommandQueue();
+      }
+    }
+    // ---------------------------------------------------------------------------
+    // Snapshot helpers
+    // ---------------------------------------------------------------------------
+    snapshotAmounts() {
+      const snapshot = this.store.state.snapshot;
+      if (!snapshot) return null;
+      return {
+        exp: snapshot.state.exp,
+        coins: snapshot.state.coins,
+        shards: snapshot.state.shards,
+        cores: snapshot.state.cores
+      };
+    }
+    hydrateSnapshotFromCache(result) {
+      if (result.type !== "save_slot.switch.result" || result.snapshot) return;
+      const cachedSnapshot = this.snapshotCache.load(result.active_save_slot);
+      if (cachedSnapshot) {
+        this.store.state.snapshot = cachedSnapshot;
+        getStateFromSnapshot(cachedSnapshot);
+      }
+    }
+    cacheSnapshotFromResult(result) {
+      if ("snapshot" in result && result.snapshot) {
+        this.snapshotCache.save(result.snapshot);
+      }
+    }
+    applyProgressEffects(result, previousAmounts) {
+      applyProgressResult(result, previousAmounts, {
+        floatingTexts: this.floatingTexts,
+        canvas: this.canvas,
+        ctx: this.ctx,
+        popupPoint: getPendingClaimPopupPoint()
+      });
+      clearPendingClaimPopupPoint();
+    }
+    // ---------------------------------------------------------------------------
+    // Input handlers
+    // ---------------------------------------------------------------------------
+    onClick(event) {
+      const point = getCanvasPointFromInputEvent(event, this.canvas);
+      this.lastPointerPoint = point;
+      if (this.channel) {
+        claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
+      }
+    }
+    onMouseMove(event) {
+      const point = getCanvasPointFromInputEvent(event, this.canvas);
+      this.lastPointerPoint = point;
+      if (this.channel) {
+        claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
+      }
+    }
+    onKeydown(event) {
+      if (this.channel) {
+        claimRewardOnAnyInput(this.channel, this.canvas, this.lastPointerPoint, (cmd) => this.runCommand(cmd));
+      }
+      event.preventDefault();
+    }
+    // ---------------------------------------------------------------------------
+    // Game loop
+    // ---------------------------------------------------------------------------
+    tick(dt) {
+      updateProjectedFill(dt);
+      if (this.channel && handleProgressLoop(this.channel)) {
+        const channel = this.channel;
+        this.runCommand(() => progressClaimIn(channel));
+      }
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.fillStyle = COLORS.game.background;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      renderProgressBar(this.ctx, this.canvas);
+      updateFloatingTexts(this.floatingTexts, dt);
+      updateWebGLEffects(dt);
+      renderWebGLEffects();
+      renderFloatingTexts(this.ctx, this.floatingTexts);
+    }
+  };
+  function clearsCommandQueue(result) {
+    return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
   }
   function getCanvasPointFromInputEvent(event, targetCanvas) {
     const rect = targetCanvas.getBoundingClientRect();
@@ -2710,10 +2731,30 @@
       y: Math.min(Math.max(0, y), targetCanvas.height)
     };
   }
-  boot().catch((error) => {
-    store.state.statusTone = "error";
-    store.state.status = error instanceof Error ? error.message : "Boot failed";
-    store.markDirty();
+
+  // src/app.ts
+  var canvas = requiredElement("#game-canvas");
+  var effectsCanvas = requiredElement("#effects-canvas");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Game shell is missing required 2d context");
+  resizeGameCanvases();
+  initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
+  window.addEventListener("resize", resizeGameCanvases);
+  var app = new GameClient(canvas, ctx);
+  app.start();
+  app.boot().catch(() => {
   });
+  function resizeGameCanvases() {
+    if (canvas.width !== CANVAS_WIDTH) canvas.width = CANVAS_WIDTH;
+    if (canvas.height !== CANVAS_HEIGHT) canvas.height = CANVAS_HEIGHT;
+    if (effectsCanvas.width !== canvas.width) effectsCanvas.width = canvas.width;
+    if (effectsCanvas.height !== canvas.height) effectsCanvas.height = canvas.height;
+    resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
+  }
+  function requiredElement(selector) {
+    const element = document.querySelector(selector);
+    if (!element) throw new Error(`Game shell is missing required element: ${selector}`);
+    return element;
+  }
 })();
 //# sourceMappingURL=app.js.map
