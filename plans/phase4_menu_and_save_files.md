@@ -8,14 +8,15 @@ To handle the complexity of overlapping UI elements and input priority, we will 
 
 ### 1. UIManager (`assets/src/ui/ui-manager.ts`)
 The central coordinator for all Canvas UI.
-- **Priority Stack**: `ModalManager` (Top) > `OverlayManager` (Middle) > Game World (Bottom).
-- **Input Routing**: Intercepts `click`, `mousemove`, and `keydown` events. If a higher layer consumes the event, it does not propagate to lower layers.
+- **Priority Stack**: `ModalManager` (Top) > `OverlayManager` (Middle) > Global Hotkeys / Game World (Bottom).
+- **Input Routing (Implicit Consumption)**: Intercepts `click`, `mousemove`, and `keydown` events. Passes them top-down. If a higher layer (like a Modal or focused Overlay) sets `input.consumed = true`, it blocks hotkeys and lower layers.
+- **Critical Exception**: The "progress-bar-reward-collection-on-any-action" logic fires on *any* activity, regardless of whether a UI element consumed the input.
 - **Rendering**: Orchestrates the draw order to ensure modals always appear above overlays.
 
 ### 2. ModalManager (`assets/src/ui/components/modal-manager/`)
 Handles high-priority, blocking UI elements.
-- **Confirmation Modals**: Used for "Reset Slot" confirmation.
-- **Loading Modal**: A non-dismissible modal that blocks input during "Switch" or "Reset" commands to prevent state contamination.
+- **Confirmation Modals**: Used for "Reset Slot" confirmation. Requires holding the confirm button for 3 seconds to execute.
+- **Loading Modal**: A non-dismissible modal that displays a loading animation and blocks input during "Switch" or "Reset" commands to prevent state contamination.
 - **Backdrop**: Renders the global dimmed backdrop when any modal is active.
 
 ### 3. OverlayManager (`assets/src/ui/components/overlay-manager/`)
@@ -28,7 +29,8 @@ Handles the main menu.
 
 ### TabMenu (`assets/src/ui/components/tab-menu/`)
 A flexible component for switching between feature views.
-- **Orientation**: Supports horizontal (top/bottom) and vertical (left/right) tab placement.
+- **Layout Options**: `layout` (`'horizontal' | 'vertical'`) and `position` (`'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'`).
+- **Tab Sizing**: Calculates the width of the widest tab's text and applies that uniform width to all tabs. If this uniform sizing would cause the tabs to overflow the parent container, it falls back to dynamic width per tab with consistent left-right padding.
 - **Responsibility**: Manages a row/column of tab buttons and a designated content box.
 - **Nesting**: Supports nested instances (e.g., Quests -> Main/Daily).
 
