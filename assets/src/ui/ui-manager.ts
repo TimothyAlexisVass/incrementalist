@@ -1,5 +1,5 @@
-import { ModalManager } from './components/modal-manager';
-import { OverlayManager } from './components/overlay-manager';
+import { ModalManager } from './modal-manager';
+import { OverlayManager } from './overlay-manager';
 import { InputState } from './input';
 
 export class UIManager {

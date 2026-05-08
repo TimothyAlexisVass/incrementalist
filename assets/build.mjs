@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const watchMode = process.argv.includes("--watch");
 const outdir = path.resolve(dirname, "../priv/static/assets");
-const themeCss = path.resolve(dirname, "src/theme/app.css");
+const themeCss = path.resolve(dirname, "src/app.css");
 
 async function copyThemeCss() {
   await copyFile(themeCss, path.join(outdir, "app.css"));

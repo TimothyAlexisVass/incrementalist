@@ -1,5 +1,5 @@
-import { COLORS } from '../../../colors';
-import { InputState } from '../../input';
+import { COLORS } from '../colors';
+import { InputState } from './input';
 
 export interface Modal {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState): void;

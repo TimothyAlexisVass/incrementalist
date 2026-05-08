@@ -1,4 +1,4 @@
-import { InputState } from '../../input';
+import { InputState } from './input';
 
 export interface Overlay {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onClose: () => void): void;

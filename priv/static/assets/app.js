@@ -3199,7 +3199,7 @@
     }
   };
 
-  // src/ui/components/modal-manager/index.ts
+  // src/ui/modal-manager.ts
   var ModalManager = class {
     constructor() {
       __publicField(this, "activeModal", null);
@@ -3226,7 +3226,7 @@
     }
   };
 
-  // src/ui/components/overlay-manager/index.ts
+  // src/ui/overlay-manager.ts
   var OverlayManager = class {
     constructor() {
       __publicField(this, "activeOverlay", null);

@@ -1,4 +1,4 @@
-import { Overlay } from '../components/overlay-manager';
+import { Overlay } from '../overlay-manager';
 import { COLORS } from '../../colors';
 import { InputState, pointInRect } from '../input';
 import {
