@@ -18,6 +18,9 @@
   var REWARD_POPUP_HOLD_RISE_SPEED = 12;
   var GENERIC_FLOAT_LIFE_MS = 2500;
   var GENERIC_FLOAT_RISE_SPEED = 16;
+  var TOP_HUD_LEVEL_FONT = "bold 24px Arial";
+  var TOP_HUD_EXP_FONT = "14px Arial";
+  var TOP_HUD_COINS_FONT = "18px Arial";
   var REWARD_POPUP_FONT = "25px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
@@ -32,11 +35,15 @@
   var TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
   var TOP_HUD_EXP_BAR_Y = 15;
   var TOP_HUD_EXP_BAR_WIDTH = 300;
+  var TOP_HUD_EXP_BAR_HEIGHT = 20;
   var TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH;
   var TOP_HUD_EXP_COUNTER_X = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
   var TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
   var TOP_HUD_CURRENCY_ICON_SIZE = 32;
   var TOP_HUD_CURRENCY_ICON_Y = Math.floor((TOP_HUD_HEIGHT - TOP_HUD_CURRENCY_ICON_SIZE) / 2);
+  var TOP_HUD_COINS_ICON_RIGHT = 450;
+  var TOP_HUD_SHARDS_ICON_RIGHT = 300;
+  var TOP_HUD_CORES_ICON_RIGHT = 150;
   var TOP_HUD_COIN_COUNTER_Y = 30;
   var TOP_HUD_COINS_COUNTER_RIGHT = 350;
   var TOP_HUD_SHARDS_COUNTER_RIGHT = 180;
@@ -1175,24 +1182,29 @@
       statusTone: ""
     };
   }
-  function applyResult(state, result) {
+  function applyResult(state2, result) {
     const snapshot = snapshotFromResult(result);
     if (snapshot) {
-      state.snapshot = snapshot;
+      state2.snapshot = snapshot;
     }
     if ("slots" in result) {
-      state.slots = result.slots;
+      state2.slots = result.slots;
     } else if (snapshot) {
-      state.slots = upsertSlot(state.slots, snapshot.save_slot);
+      state2.slots = upsertSlot(state2.slots, snapshot.save_slot);
     }
-    if (result.type === "progress.claim_reward.result" && state.snapshot) {
-      state.snapshot.state.coins = result.coins;
-      state.snapshot.state.exp = result.exp;
-      state.snapshot.state.shards = result.shards;
-      state.snapshot.state.cores = result.cores;
+    if (result.type === "progress.claim_reward.result") {
+      applyAuthoritativeData(state2, result);
     }
-    state.statusTone = result.status === "error" ? "error" : "ok";
-    state.status = statusForResult(result);
+    state2.statusTone = result.status === "error" ? "error" : "ok";
+    state2.status = statusForResult(result);
+  }
+  function applyAuthoritativeData(state2, data) {
+    if (!state2.snapshot) return;
+    if (data.coins !== void 0) state2.snapshot.state.coins = data.coins;
+    if (data.exp !== void 0) state2.snapshot.state.exp = data.exp;
+    if (data.level !== void 0) state2.snapshot.state.level = data.level;
+    if (data.shards !== void 0) state2.snapshot.state.shards = data.shards;
+    if (data.cores !== void 0) state2.snapshot.state.cores = data.cores;
   }
   function snapshotFromResult(result) {
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
@@ -1304,6 +1316,15 @@
     const ten = Math.floor(n / 10);
     return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
   }
+  function formatInteger(value, fallback = 0) {
+    return Math.floor(toFiniteNumber(value, fallback)).toString();
+  }
+  function formatShortLevel(value, fallback = 1) {
+    return `Lv.${formatInteger(Math.max(1, toFiniteNumber(value, fallback)))}`;
+  }
+  function formatNumberRatio(current, maximum) {
+    return `${formatNumber(current)} / ${formatNumber(maximum)}`;
+  }
   function formatSignedNumber(value) {
     return `+${formatNumber(value)}`;
   }
@@ -1340,8 +1361,586 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  // src/render/effects.ts
+  // src/features/progress/render.ts
   var TWO_PI2 = Math.PI * 2;
+  var PROGRESS_VISUAL_STATE = {
+    wasFull: false,
+    fullStartedAt: 0,
+    lastTimestamp: 0,
+    completionParticles: [],
+    liquidBubbles: [],
+    liquidBubbleSpawnAccumulator: 0,
+    usesGpuLiquidBubbles: false,
+    displayedFillRatio: 0,
+    collectionGlowStartedAt: 0
+  };
+  var FULL_PULSE_MAX = 1.6;
+  var COLLECTION_GLOW_FADE_MS = Math.PI * 165 / (BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER);
+  var MAX_PROGRESS_COMPLETION_PARTICLES = 512;
+  var MAX_PROGRESS_LIQUID_BUBBLES = 58;
+  var LIQUID_SURFACE_WAVE_HEIGHT = 2.2;
+  var COMPLETION_BURST_COLORS = Object.freeze([
+    COLORS.bar.progress.fillStart,
+    COLORS.bar.progress.fillMid,
+    COLORS.bar.progress.fillEnd,
+    [255, 255, 255],
+    [142, 246, 255]
+  ]);
+  var COLLECTION_LASER_BURST_COLORS = Object.freeze([
+    COLORS.bar.progress.fillEnd,
+    [255, 255, 255],
+    COLORS.bar.progress.fillMid,
+    [142, 246, 255],
+    COLORS.bar.progress.fillStart
+  ]);
+  function triggerProgressBarCollectionEffect(canvas2 = null) {
+    PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
+    PROGRESS_VISUAL_STATE.collectionGlowStartedAt = getNowMs();
+    if (!canvas2) {
+      return;
+    }
+    const {
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight
+    } = getProgressBarLayout(canvas2);
+    spawnGpuProgressCollectionLaserBurst(
+      barX,
+      barY,
+      barWidth,
+      barHeight,
+      COLLECTION_LASER_BURST_COLORS
+    );
+  }
+  function renderProgressBar(ctx2, canvas2) {
+    if (!ctx2 || !canvas2) return;
+    const state2 = getViewModel();
+    const {
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight
+    } = getProgressBarLayout(canvas2);
+    const now = getNowMs();
+    const deltaTime = getProgressVisualDelta(now);
+    const fillValue = clampNumber(Number(state2?.projectedFill) || 0, 0, 100);
+    const fillRatio = fillValue / 100;
+    const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
+    const displayedFillValue = displayedFillRatio * 100;
+    const isFull = state2?.state === "confirmed_collectible";
+    const collectionPulse = getCollectionGlowPulse(now);
+    if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {
+      PROGRESS_VISUAL_STATE.fullStartedAt = now;
+      spawnProgressCompletionBurst(barX, barY, barWidth, barHeight);
+    }
+    if (!isFull) {
+      PROGRESS_VISUAL_STATE.fullStartedAt = 0;
+    }
+    PROGRESS_VISUAL_STATE.wasFull = isFull;
+    updateProgressCompletionParticles(deltaTime);
+    ctx2.fillStyle = COLORS.bar.track;
+    ctx2.fillRect(barX, barY, barWidth, barHeight);
+    const fillHeight = displayedFillRatio * barHeight;
+    const fillY = barY + barHeight - fillHeight;
+    PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = false;
+    updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
+    const pulse = isFull ? getFullPulse(now) : 1;
+    const hasCollectionGlow = collectionPulse > 0;
+    const collectionGlowFade = hasCollectionGlow ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1) : 0;
+    const glowColor = hasCollectionGlow ? COLORS.bar.progress.fillEnd : getProgressColorArray(displayedFillRatio * 100);
+    const gpuGlowFillY = hasCollectionGlow ? barY : fillY;
+    const gpuGlowFillHeight = hasCollectionGlow ? barHeight : fillHeight;
+    const gpuFillCharge = Math.pow(displayedFillRatio, 0.85);
+    const gpuBaseIntensity = isFull ? 0.34 + pulse * 0.14 : gpuFillCharge * 0.08 + displayedFillRatio * 0.1;
+    const gpuCollectionIntensity = hasCollectionGlow ? collectionGlowFade * 0.34 + collectionPulse * 0.14 : 0;
+    const gpuBaseRadius = isFull ? 26 + pulse * 6 : 14 + displayedFillRatio * 10;
+    const gpuCollectionRadius = hasCollectionGlow ? 26 + FULL_PULSE_MAX * 6 : 0;
+    setGpuProgressBarGlow({
+      active: hasCollectionGlow ? collectionGlowFade > 0 : displayedFillRatio > 0,
+      x: barX,
+      y: gpuGlowFillY,
+      width: barWidth,
+      height: gpuGlowFillHeight,
+      color: glowColor,
+      radius: Math.max(gpuBaseRadius, gpuCollectionRadius),
+      intensity: hasCollectionGlow ? gpuCollectionIntensity : gpuBaseIntensity
+    });
+    renderLiquidProgressFill(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, displayedFillRatio, now);
+    renderProgressGlow(ctx2, barX, barY, barWidth, barHeight, displayedFillRatio, isFull, now, collectionPulse);
+    if (isFull) {
+      renderRisingEnergy(ctx2, barX, barY, barWidth, barHeight, now);
+    }
+    ctx2.save();
+    if (isFull) {
+      const pulse2 = getFullPulse(now);
+      ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22 * pulse2);
+      ctx2.shadowBlur = 2 + 2 * pulse2;
+    }
+    ctx2.strokeStyle = COLORS.bar.border;
+    ctx2.lineWidth = 2;
+    ctx2.strokeRect(barX, barY, barWidth, barHeight);
+    ctx2.restore();
+    renderProgressCompletionParticles(ctx2);
+    const progressPercent = Math.floor(displayedFillValue);
+    ctx2.save();
+    ctx2.fillStyle = getProgressColor(progressPercent);
+    ctx2.font = PROGRESS_PERCENT_FONT;
+    ctx2.textAlign = "center";
+    ctx2.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 8);
+    ctx2.restore();
+    if (isFull) {
+      const pulse2 = getFullPulse(now);
+      ctx2.save();
+      ctx2.font = IDLE_TOGGLE_FONT;
+      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], 0.78 + 0.22 * pulse2);
+      ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22);
+      ctx2.shadowBlur = 2;
+      ctx2.textAlign = "center";
+      ctx2.fillText("ACT!", barX + barWidth / 2, barY + barHeight + 16);
+      ctx2.restore();
+    }
+  }
+  function getProgressColorArray(percent) {
+    const start = COLORS.bar.progress.fillStart;
+    const mid = COLORS.bar.progress.fillMid;
+    const end = COLORS.bar.progress.fillEnd;
+    const clampedPercent = clampNumber(percent, 0, 100);
+    let color;
+    if (clampedPercent < 50) {
+      const t = clampedPercent / 50;
+      color = lerpColor(start, mid, t);
+    } else {
+      const t = (clampedPercent - 50) / 50;
+      color = lerpColor(mid, end, t);
+    }
+    return color;
+  }
+  function getProgressColor(percent) {
+    const color = getProgressColorArray(percent);
+    return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+  }
+  function getNowMs() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }
+  function getProgressVisualDelta(now) {
+    if (!PROGRESS_VISUAL_STATE.lastTimestamp) {
+      PROGRESS_VISUAL_STATE.lastTimestamp = now;
+      return 16.67;
+    }
+    const deltaTime = clampNumber(now - PROGRESS_VISUAL_STATE.lastTimestamp, 0, 80);
+    PROGRESS_VISUAL_STATE.lastTimestamp = now;
+    return deltaTime;
+  }
+  function updateDisplayedProgressFill(targetFillRatio, deltaTime) {
+    const target = clampNumber(targetFillRatio, 0, 1);
+    const current = clampNumber(PROGRESS_VISUAL_STATE.displayedFillRatio, 0, 1);
+    if (target >= current) {
+      PROGRESS_VISUAL_STATE.displayedFillRatio = target;
+      return target;
+    }
+    const deltaSeconds = Math.max(0, deltaTime) / 1e3;
+    const lerpAmount = 1 - Math.exp(-BAR_RESET_LERP_SPEED * deltaSeconds);
+    const next = current + (target - current) * lerpAmount;
+    PROGRESS_VISUAL_STATE.displayedFillRatio = Math.abs(next - target) < 1e-3 ? target : next;
+    return PROGRESS_VISUAL_STATE.displayedFillRatio;
+  }
+  function getFullPulse(now, speed = BAR_FULL_PULSE_SPEED) {
+    const pulseSpeed = clampNumber(Number(speed) || BAR_FULL_PULSE_SPEED, 0.1, 4);
+    const elapsed = Math.max(0, now - (PROGRESS_VISUAL_STATE.fullStartedAt || now));
+    return 0.55 + (Math.cos(elapsed * pulseSpeed / 165) + 1) / 2 * 1.05;
+  }
+  function getCollectionGlowPulse(now) {
+    const startedAt = PROGRESS_VISUAL_STATE.collectionGlowStartedAt;
+    if (!startedAt) {
+      return 0;
+    }
+    const progress = clampNumber((now - startedAt) / COLLECTION_GLOW_FADE_MS, 0, 1);
+    if (progress >= 1) {
+      PROGRESS_VISUAL_STATE.collectionGlowStartedAt = 0;
+      return 0;
+    }
+    return FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
+  }
+  function renderLiquidProgressFill(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+    if (fillHeight <= 0) return;
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.rect(barX, barY, barWidth, barHeight);
+    ctx2.clip();
+    ctx2.save();
+    traceLiquidPath(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+    ctx2.clip();
+    const progressGradient = ctx2.createLinearGradient(0, barY, 0, barY + barHeight);
+    progressGradient.addColorStop(0, rgbArrayToCss(COLORS.bar.progress.fillEnd));
+    progressGradient.addColorStop(0.5, rgbArrayToCss(COLORS.bar.progress.fillMid));
+    progressGradient.addColorStop(1, rgbArrayToCss(COLORS.bar.progress.fillStart));
+    ctx2.fillStyle = progressGradient;
+    ctx2.fillRect(barX, barY, barWidth, barHeight);
+    if (!PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles) {
+      renderLiquidBubbles2(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+    }
+    ctx2.restore();
+    renderLiquidSurfaceHighlight(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+    ctx2.restore();
+  }
+  function traceLiquidPath(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+    const bottomY = barY + barHeight;
+    const step = 2;
+    ctx2.beginPath();
+    ctx2.moveTo(barX, bottomY);
+    ctx2.lineTo(barX + barWidth, bottomY);
+    for (let x = barX + barWidth; x >= barX; x -= step) {
+      ctx2.lineTo(
+        x,
+        getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now)
+      );
+    }
+    ctx2.lineTo(
+      barX,
+      getLiquidSurfaceY(barX, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now)
+    );
+    ctx2.closePath();
+  }
+  function getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+    const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
+    if (waveHeight <= 0) {
+      return clampNumber(fillY, barY, barY + barHeight);
+    }
+    const xRatio = (x - barX) / Math.max(1, barWidth);
+    const primaryWave = Math.sin(xRatio * TWO_PI2 * 0.7 + now * 32e-4);
+    const secondaryWave = Math.sin(xRatio * TWO_PI2 * 1.35 - now * 24e-4);
+    const surfaceY = fillY + primaryWave * waveHeight + secondaryWave * waveHeight * 0.22;
+    return clampNumber(surfaceY, barY, barY + barHeight);
+  }
+  function getLiquidWaveHeight(fillHeight, fillRatio, barHeight) {
+    const topClearance = Math.max(0, (1 - fillRatio) * barHeight * 0.55);
+    return Math.min(LIQUID_SURFACE_WAVE_HEIGHT, fillHeight * 0.08, topClearance);
+  }
+  function updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, fillRatio, now) {
+    const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
+    const fillHeight = fillRatio * barHeight;
+    const fillY = barY + barHeight - fillHeight;
+    if (fillRatio <= 0.02 || fillHeight < 8) {
+      bubbles.length = 0;
+      PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator = 0;
+      return;
+    }
+    const deltaSeconds = deltaTime / 1e3;
+    let writeIndex = 0;
+    for (let i = 0; i < bubbles.length; i += 1) {
+      const bubble = bubbles[i];
+      bubble.ageMs += deltaTime;
+      bubble.y -= bubble.speed * deltaSeconds;
+      const bubbleX = getLiquidBubbleX(bubble);
+      const surfaceY = getLiquidSurfaceY(
+        bubbleX,
+        barX,
+        barY,
+        barWidth,
+        barHeight,
+        fillY,
+        fillHeight,
+        fillRatio,
+        now
+      );
+      if (bubble.y - bubble.radius <= surfaceY || bubble.y + bubble.radius < barY) {
+        continue;
+      }
+      bubbles[writeIndex] = bubble;
+      writeIndex += 1;
+    }
+    bubbles.length = writeIndex;
+    if (fillHeight < 20) return;
+    PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator += deltaTime * (3e-3 + fillRatio * 44e-4);
+    while (PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator >= 1 && bubbles.length < MAX_PROGRESS_LIQUID_BUBBLES) {
+      spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio);
+      PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator -= 1;
+    }
+  }
+  function spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio) {
+    const radius = 0.42 + Math.random() * (0.62 + fillRatio * 0.32);
+    const padding = 3 + radius;
+    const availableWidth = Math.max(0, barWidth - padding * 2);
+    const bottomY = barY + barHeight;
+    PROGRESS_VISUAL_STATE.liquidBubbles.push({
+      baseX: barX + padding + Math.random() * availableWidth,
+      y: bottomY - Math.random() * Math.min(12, fillHeight * 0.22) + radius,
+      radius,
+      speed: 42 + Math.random() * 30,
+      phase: Math.random() * TWO_PI2,
+      alpha: 0.28 + Math.random() * 0.3,
+      ageMs: Math.random() * 600
+    });
+  }
+  function getLiquidBubbleX(bubble) {
+    return bubble.baseX;
+  }
+  function renderLiquidBubbles2(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+    const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
+    if (bubbles.length === 0) return;
+    const bottomY = barY + barHeight;
+    ctx2.save();
+    ctx2.globalCompositeOperation = "lighter";
+    for (let i = 0; i < bubbles.length; i += 1) {
+      const bubble = bubbles[i];
+      const x = getLiquidBubbleX(bubble);
+      const surfaceY = getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+      const surfaceFade = clampNumber((bubble.y - surfaceY) / Math.max(1, bubble.radius * 7), 0, 1);
+      const bottomFade = clampNumber((bottomY - bubble.y + bubble.radius * 2) / Math.max(1, bubble.radius * 8), 0, 1);
+      const wobblePulse = 0.82 + Math.sin(bubble.ageMs / 1e3 * 2.2 + bubble.phase) * 0.08;
+      const alpha = bubble.alpha * Math.min(surfaceFade, bottomFade) * wobblePulse;
+      if (alpha <= 0.01) continue;
+      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], alpha * 0.12);
+      ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], alpha);
+      ctx2.lineWidth = 0.55;
+      ctx2.shadowBlur = 0;
+      ctx2.beginPath();
+      ctx2.arc(x, bubble.y, bubble.radius, 0, TWO_PI2);
+      ctx2.fill();
+      ctx2.stroke();
+      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], alpha * 0.85);
+      ctx2.beginPath();
+      ctx2.arc(x - bubble.radius * 0.32, bubble.y - bubble.radius * 0.35, Math.max(0.18, bubble.radius * 0.18), 0, TWO_PI2);
+      ctx2.fill();
+    }
+    ctx2.restore();
+  }
+  function renderLiquidSurfaceHighlight(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
+    const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
+    const surfaceGlow = clampNumber(0.22 + fillRatio * 0.34, 0, 0.5);
+    const step = 2;
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.rect(barX, barY, barWidth, barHeight);
+    ctx2.clip();
+    ctx2.globalCompositeOperation = "lighter";
+    ctx2.lineCap = "round";
+    ctx2.beginPath();
+    for (let x = barX; x <= barX + barWidth; x += step) {
+      const y = getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+      if (x === barX) {
+        ctx2.moveTo(x, y);
+      } else {
+        ctx2.lineTo(x, y);
+      }
+    }
+    ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], surfaceGlow);
+    ctx2.lineWidth = 1.5;
+    ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.18);
+    ctx2.shadowBlur = 1 + waveHeight * 0.4;
+    ctx2.stroke();
+    ctx2.restore();
+  }
+  function renderProgressGlow(ctx2, barX, barY, barWidth, barHeight, fillRatio, isFull, now, collectionPulse = 0) {
+    if (fillRatio <= 0 && collectionPulse <= 0) return;
+    const hasCollectionGlow = collectionPulse > 0;
+    const collectionFade = hasCollectionGlow ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1) : 0;
+    const glowColor = collectionPulse > 0 ? COLORS.bar.progress.fillEnd : getProgressColorArray(fillRatio * 100);
+    const charge = Math.pow(fillRatio, 0.85);
+    const pulse = isFull ? getFullPulse(now) : 1;
+    const baseGlowPower = charge * pulse;
+    const glowPower = hasCollectionGlow ? collectionPulse : baseGlowPower;
+    const strokeBaseFade = hasCollectionGlow ? collectionFade : charge;
+    const shadowAlpha = 0.8 * glowPower;
+    const strokeAlpha = 0.12 * strokeBaseFade + 0.5 * glowPower;
+    if (shadowAlpha <= 1e-3 && strokeAlpha <= 1e-3) return;
+    ctx2.save();
+    ctx2.globalCompositeOperation = "lighter";
+    ctx2.shadowColor = rgbaArrayToCss(glowColor, shadowAlpha);
+    ctx2.shadowBlur = 10 + 46 * glowPower;
+    ctx2.strokeStyle = rgbaArrayToCss(glowColor, strokeAlpha);
+    ctx2.lineWidth = 1 + 6 * glowPower;
+    ctx2.strokeRect(barX + 0.5, barY + 0.5, barWidth - 1, barHeight - 1);
+    if (isFull) {
+      ctx2.shadowColor = rgbaArrayToCss([255, 255, 255], 0.5 * pulse);
+      ctx2.shadowBlur = 38 + 36 * pulse;
+      ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], 0.16 + 0.32 * pulse);
+      ctx2.lineWidth = 2 + 3 * pulse;
+      ctx2.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    }
+    ctx2.restore();
+  }
+  function renderRisingEnergy(ctx2, barX, barY, barWidth, barHeight, now) {
+    const innerX = barX + 4;
+    const innerY = barY + 3;
+    const innerWidth = barWidth - 8;
+    const innerHeight = barHeight - 6;
+    const pulse = getFullPulse(now);
+    if (innerWidth <= 0 || innerHeight <= 0) return;
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.rect(innerX, innerY, innerWidth, innerHeight);
+    ctx2.clip();
+    ctx2.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 3; i += 1) {
+      const phase = (now * 22e-5 + i / 3) % 1;
+      const y = innerY + innerHeight - phase * innerHeight;
+      const alpha = Math.sin(phase * Math.PI) * 0.2 * pulse;
+      const bandGradient = ctx2.createLinearGradient(innerX, y, innerX + innerWidth, y);
+      bandGradient.addColorStop(0, rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0));
+      bandGradient.addColorStop(0.5, rgbaArrayToCss([255, 255, 255], alpha));
+      bandGradient.addColorStop(1, rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0));
+      ctx2.fillStyle = bandGradient;
+      ctx2.fillRect(innerX, y, innerWidth, 2);
+    }
+    ctx2.restore();
+  }
+  function spawnProgressCompletionBurst(barX, barY, barWidth, barHeight) {
+    if (spawnGpuProgressCompletionBurst(
+      barX,
+      barY,
+      barWidth,
+      barHeight,
+      COMPLETION_BURST_COLORS,
+      { countMultiplier: 1.5, gravity: 100 }
+    )) {
+      return;
+    }
+    const centerX = barX + barWidth / 2;
+    const centerY = barY + barHeight / 2;
+    for (let i = 0; i < 81; i += 1) {
+      const originX = barX + Math.random() * barWidth;
+      const originY = barY + Math.random() * barHeight;
+      const outwardAngle = Math.atan2(originY - centerY, originX - centerX);
+      const angle = outwardAngle + (Math.random() - 0.5) * 0.95;
+      const speed = 90 + Math.random() * 250;
+      const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
+      const colorCss = rgbArrayToCss(color);
+      PROGRESS_VISUAL_STATE.completionParticles.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        drag: 0.94 + Math.random() * 0.03,
+        radius: 1.4 + Math.random() * 3.2,
+        lineWidth: 1.1 + Math.random() * 1.5,
+        colorCss,
+        elapsedMs: 0,
+        lifeMs: 560 + Math.random() * 520
+      });
+    }
+    for (let i = 0; i < 27; i += 1) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+      const speed = 150 + Math.random() * 260;
+      const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
+      const colorCss = rgbArrayToCss(color);
+      PROGRESS_VISUAL_STATE.completionParticles.push({
+        x: barX + Math.random() * barWidth,
+        y: barY + Math.random() * 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        drag: 0.93 + Math.random() * 0.03,
+        radius: 1.2 + Math.random() * 2.4,
+        lineWidth: 1 + Math.random() * 1.3,
+        colorCss,
+        elapsedMs: 0,
+        lifeMs: 520 + Math.random() * 480
+      });
+    }
+    if (PROGRESS_VISUAL_STATE.completionParticles.length > MAX_PROGRESS_COMPLETION_PARTICLES) {
+      PROGRESS_VISUAL_STATE.completionParticles.splice(
+        0,
+        PROGRESS_VISUAL_STATE.completionParticles.length - MAX_PROGRESS_COMPLETION_PARTICLES
+      );
+    }
+  }
+  function updateProgressCompletionParticles(deltaTime) {
+    const particles = PROGRESS_VISUAL_STATE.completionParticles;
+    if (particles.length === 0) return;
+    const deltaSeconds = deltaTime / 1e3;
+    let writeIndex = 0;
+    for (let i = 0; i < particles.length; i += 1) {
+      const particle = particles[i];
+      particle.elapsedMs += deltaTime;
+      if (particle.elapsedMs >= particle.lifeMs) {
+        continue;
+      }
+      const drag = Math.pow(particle.drag, deltaTime / 16.67);
+      particle.vx *= drag;
+      particle.vy *= drag;
+      particle.x += particle.vx * deltaSeconds;
+      particle.y += particle.vy * deltaSeconds;
+      particles[writeIndex] = particle;
+      writeIndex += 1;
+    }
+    particles.length = writeIndex;
+  }
+  function renderProgressCompletionParticles(ctx2) {
+    const particles = PROGRESS_VISUAL_STATE.completionParticles;
+    if (particles.length === 0) return;
+    ctx2.save();
+    ctx2.globalCompositeOperation = "lighter";
+    ctx2.lineCap = "round";
+    for (let i = 0; i < particles.length; i += 1) {
+      const particle = particles[i];
+      const lifeProgress = particle.elapsedMs / particle.lifeMs;
+      const alpha = Math.pow(Math.max(0, 1 - lifeProgress), 1.45);
+      const tailScale = 0.018 + (1 - lifeProgress) * 0.034;
+      ctx2.globalAlpha = alpha;
+      ctx2.strokeStyle = particle.colorCss;
+      ctx2.fillStyle = particle.colorCss;
+      ctx2.shadowColor = particle.colorCss;
+      ctx2.shadowBlur = 14 * alpha;
+      ctx2.lineWidth = particle.lineWidth;
+      ctx2.beginPath();
+      ctx2.moveTo(particle.x, particle.y);
+      ctx2.lineTo(
+        particle.x - particle.vx * tailScale,
+        particle.y - particle.vy * tailScale
+      );
+      ctx2.stroke();
+      ctx2.beginPath();
+      ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI2);
+      ctx2.fill();
+    }
+    ctx2.restore();
+  }
+  function getProgressBarLayout(canvas2) {
+    const baseHeight = canvas2.height - 120;
+    const barHeight = baseHeight * 0.72;
+    return {
+      x: canvas2.width - 92,
+      y: 90,
+      width: PROGRESS_BAR_WIDTH,
+      height: barHeight
+    };
+  }
+
+  // src/features/hud/progression.ts
+  function getRequiredExp(level) {
+    return level * level * 10 + 10;
+  }
+  function getLevelUpRewards(newLevel) {
+    let shards = newLevel;
+    let cores = 0;
+    if (newLevel % 1e3 === 0) {
+      cores = newLevel;
+    } else if (newLevel % 100 === 0) {
+      shards *= 10;
+    }
+    return {
+      coins: 200 * newLevel,
+      shards,
+      cores
+    };
+  }
+  function computeLevelUps(startLevel, endLevel) {
+    const levelUps = [];
+    for (let level = startLevel + 1; level <= endLevel; level++) {
+      levelUps.push({
+        level,
+        rewards: getLevelUpRewards(level)
+      });
+    }
+    return levelUps;
+  }
+
+  // src/render/effects.ts
+  var TWO_PI3 = Math.PI * 2;
   var CLICK_BURST_COLORS = Object.freeze([
     COLORS.rewards.coins,
     COLORS.rewards.shards,
@@ -1579,556 +2178,8 @@
     return ft.elapsedMs >= ft.lifeMs;
   }
 
-  // src/features/progress/render.ts
-  var TWO_PI3 = Math.PI * 2;
-  var PROGRESS_VISUAL_STATE = {
-    wasFull: false,
-    fullStartedAt: 0,
-    lastTimestamp: 0,
-    completionParticles: [],
-    liquidBubbles: [],
-    liquidBubbleSpawnAccumulator: 0,
-    usesGpuLiquidBubbles: false,
-    displayedFillRatio: 0,
-    collectionGlowStartedAt: 0
-  };
-  var FULL_PULSE_MAX = 1.6;
-  var COLLECTION_GLOW_FADE_MS = Math.PI * 165 / (BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER);
-  var MAX_PROGRESS_COMPLETION_PARTICLES = 512;
-  var MAX_PROGRESS_LIQUID_BUBBLES = 58;
-  var LIQUID_SURFACE_WAVE_HEIGHT = 2.2;
-  var COMPLETION_BURST_COLORS = Object.freeze([
-    COLORS.bar.progress.fillStart,
-    COLORS.bar.progress.fillMid,
-    COLORS.bar.progress.fillEnd,
-    [255, 255, 255],
-    [142, 246, 255]
-  ]);
-  var COLLECTION_LASER_BURST_COLORS = Object.freeze([
-    COLORS.bar.progress.fillEnd,
-    [255, 255, 255],
-    COLORS.bar.progress.fillMid,
-    [142, 246, 255],
-    COLORS.bar.progress.fillStart
-  ]);
-  function triggerProgressBarCollectionEffect(canvas2 = null) {
-    PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
-    PROGRESS_VISUAL_STATE.collectionGlowStartedAt = getNowMs();
-    if (!canvas2) {
-      return;
-    }
-    const {
-      x: barX,
-      y: barY,
-      width: barWidth,
-      height: barHeight
-    } = getProgressBarLayout(canvas2);
-    spawnGpuProgressCollectionLaserBurst(
-      barX,
-      barY,
-      barWidth,
-      barHeight,
-      COLLECTION_LASER_BURST_COLORS
-    );
-  }
-  function renderProgressBar(ctx2, canvas2) {
-    if (!ctx2 || !canvas2) return;
-    const state = getViewModel();
-    const {
-      x: barX,
-      y: barY,
-      width: barWidth,
-      height: barHeight
-    } = getProgressBarLayout(canvas2);
-    const now = getNowMs();
-    const deltaTime = getProgressVisualDelta(now);
-    const fillValue = clampNumber(Number(state?.projectedFill) || 0, 0, 100);
-    const fillRatio = fillValue / 100;
-    const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
-    const displayedFillValue = displayedFillRatio * 100;
-    const isFull = state?.state === "confirmed_collectible";
-    const collectionPulse = getCollectionGlowPulse(now);
-    if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {
-      PROGRESS_VISUAL_STATE.fullStartedAt = now;
-      spawnProgressCompletionBurst(barX, barY, barWidth, barHeight);
-    }
-    if (!isFull) {
-      PROGRESS_VISUAL_STATE.fullStartedAt = 0;
-    }
-    PROGRESS_VISUAL_STATE.wasFull = isFull;
-    updateProgressCompletionParticles(deltaTime);
-    ctx2.fillStyle = COLORS.bar.track;
-    ctx2.fillRect(barX, barY, barWidth, barHeight);
-    const fillHeight = displayedFillRatio * barHeight;
-    const fillY = barY + barHeight - fillHeight;
-    PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = false;
-    updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
-    const pulse = isFull ? getFullPulse(now) : 1;
-    const hasCollectionGlow = collectionPulse > 0;
-    const collectionGlowFade = hasCollectionGlow ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1) : 0;
-    const glowColor = hasCollectionGlow ? COLORS.bar.progress.fillEnd : getProgressColorArray(displayedFillRatio * 100);
-    const gpuGlowFillY = hasCollectionGlow ? barY : fillY;
-    const gpuGlowFillHeight = hasCollectionGlow ? barHeight : fillHeight;
-    const gpuFillCharge = Math.pow(displayedFillRatio, 0.85);
-    const gpuBaseIntensity = isFull ? 0.34 + pulse * 0.14 : gpuFillCharge * 0.08 + displayedFillRatio * 0.1;
-    const gpuCollectionIntensity = hasCollectionGlow ? collectionGlowFade * 0.34 + collectionPulse * 0.14 : 0;
-    const gpuBaseRadius = isFull ? 26 + pulse * 6 : 14 + displayedFillRatio * 10;
-    const gpuCollectionRadius = hasCollectionGlow ? 26 + FULL_PULSE_MAX * 6 : 0;
-    setGpuProgressBarGlow({
-      active: hasCollectionGlow ? collectionGlowFade > 0 : displayedFillRatio > 0,
-      x: barX,
-      y: gpuGlowFillY,
-      width: barWidth,
-      height: gpuGlowFillHeight,
-      color: glowColor,
-      radius: Math.max(gpuBaseRadius, gpuCollectionRadius),
-      intensity: hasCollectionGlow ? gpuCollectionIntensity : gpuBaseIntensity
-    });
-    renderLiquidProgressFill(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, displayedFillRatio, now);
-    renderProgressGlow(ctx2, barX, barY, barWidth, barHeight, displayedFillRatio, isFull, now, collectionPulse);
-    if (isFull) {
-      renderRisingEnergy(ctx2, barX, barY, barWidth, barHeight, now);
-    }
-    ctx2.save();
-    if (isFull) {
-      const pulse2 = getFullPulse(now);
-      ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22 * pulse2);
-      ctx2.shadowBlur = 2 + 2 * pulse2;
-    }
-    ctx2.strokeStyle = COLORS.bar.border;
-    ctx2.lineWidth = 2;
-    ctx2.strokeRect(barX, barY, barWidth, barHeight);
-    ctx2.restore();
-    renderProgressCompletionParticles(ctx2);
-    const progressPercent = Math.floor(displayedFillValue);
-    ctx2.save();
-    ctx2.fillStyle = getProgressColor(progressPercent);
-    ctx2.font = PROGRESS_PERCENT_FONT;
-    ctx2.textAlign = "center";
-    ctx2.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 8);
-    ctx2.restore();
-    if (isFull) {
-      const pulse2 = getFullPulse(now);
-      ctx2.save();
-      ctx2.font = IDLE_TOGGLE_FONT;
-      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], 0.78 + 0.22 * pulse2);
-      ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22);
-      ctx2.shadowBlur = 2;
-      ctx2.textAlign = "center";
-      ctx2.fillText("ACT!", barX + barWidth / 2, barY + barHeight + 16);
-      ctx2.restore();
-    }
-  }
-  function getProgressColorArray(percent) {
-    const start = COLORS.bar.progress.fillStart;
-    const mid = COLORS.bar.progress.fillMid;
-    const end = COLORS.bar.progress.fillEnd;
-    const clampedPercent = clampNumber(percent, 0, 100);
-    let color;
-    if (clampedPercent < 50) {
-      const t = clampedPercent / 50;
-      color = lerpColor(start, mid, t);
-    } else {
-      const t = (clampedPercent - 50) / 50;
-      color = lerpColor(mid, end, t);
-    }
-    return color;
-  }
-  function getProgressColor(percent) {
-    const color = getProgressColorArray(percent);
-    return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-  }
-  function getNowMs() {
-    if (typeof performance !== "undefined" && typeof performance.now === "function") {
-      return performance.now();
-    }
-    return Date.now();
-  }
-  function getProgressVisualDelta(now) {
-    if (!PROGRESS_VISUAL_STATE.lastTimestamp) {
-      PROGRESS_VISUAL_STATE.lastTimestamp = now;
-      return 16.67;
-    }
-    const deltaTime = clampNumber(now - PROGRESS_VISUAL_STATE.lastTimestamp, 0, 80);
-    PROGRESS_VISUAL_STATE.lastTimestamp = now;
-    return deltaTime;
-  }
-  function updateDisplayedProgressFill(targetFillRatio, deltaTime) {
-    const target = clampNumber(targetFillRatio, 0, 1);
-    const current = clampNumber(PROGRESS_VISUAL_STATE.displayedFillRatio, 0, 1);
-    if (target >= current) {
-      PROGRESS_VISUAL_STATE.displayedFillRatio = target;
-      return target;
-    }
-    const deltaSeconds = Math.max(0, deltaTime) / 1e3;
-    const lerpAmount = 1 - Math.exp(-BAR_RESET_LERP_SPEED * deltaSeconds);
-    const next = current + (target - current) * lerpAmount;
-    PROGRESS_VISUAL_STATE.displayedFillRatio = Math.abs(next - target) < 1e-3 ? target : next;
-    return PROGRESS_VISUAL_STATE.displayedFillRatio;
-  }
-  function getFullPulse(now, speed = BAR_FULL_PULSE_SPEED) {
-    const pulseSpeed = clampNumber(Number(speed) || BAR_FULL_PULSE_SPEED, 0.1, 4);
-    const elapsed = Math.max(0, now - (PROGRESS_VISUAL_STATE.fullStartedAt || now));
-    return 0.55 + (Math.cos(elapsed * pulseSpeed / 165) + 1) / 2 * 1.05;
-  }
-  function getCollectionGlowPulse(now) {
-    const startedAt = PROGRESS_VISUAL_STATE.collectionGlowStartedAt;
-    if (!startedAt) {
-      return 0;
-    }
-    const progress = clampNumber((now - startedAt) / COLLECTION_GLOW_FADE_MS, 0, 1);
-    if (progress >= 1) {
-      PROGRESS_VISUAL_STATE.collectionGlowStartedAt = 0;
-      return 0;
-    }
-    return FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
-  }
-  function renderLiquidProgressFill(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
-    if (fillHeight <= 0) return;
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.rect(barX, barY, barWidth, barHeight);
-    ctx2.clip();
-    ctx2.save();
-    traceLiquidPath(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-    ctx2.clip();
-    const progressGradient = ctx2.createLinearGradient(0, barY, 0, barY + barHeight);
-    progressGradient.addColorStop(0, rgbArrayToCss(COLORS.bar.progress.fillEnd));
-    progressGradient.addColorStop(0.5, rgbArrayToCss(COLORS.bar.progress.fillMid));
-    progressGradient.addColorStop(1, rgbArrayToCss(COLORS.bar.progress.fillStart));
-    ctx2.fillStyle = progressGradient;
-    ctx2.fillRect(barX, barY, barWidth, barHeight);
-    if (!PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles) {
-      renderLiquidBubbles2(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-    }
-    ctx2.restore();
-    renderLiquidSurfaceHighlight(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-    ctx2.restore();
-  }
-  function traceLiquidPath(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
-    const bottomY = barY + barHeight;
-    const step = 2;
-    ctx2.beginPath();
-    ctx2.moveTo(barX, bottomY);
-    ctx2.lineTo(barX + barWidth, bottomY);
-    for (let x = barX + barWidth; x >= barX; x -= step) {
-      ctx2.lineTo(
-        x,
-        getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now)
-      );
-    }
-    ctx2.lineTo(
-      barX,
-      getLiquidSurfaceY(barX, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now)
-    );
-    ctx2.closePath();
-  }
-  function getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
-    const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
-    if (waveHeight <= 0) {
-      return clampNumber(fillY, barY, barY + barHeight);
-    }
-    const xRatio = (x - barX) / Math.max(1, barWidth);
-    const primaryWave = Math.sin(xRatio * TWO_PI3 * 0.7 + now * 32e-4);
-    const secondaryWave = Math.sin(xRatio * TWO_PI3 * 1.35 - now * 24e-4);
-    const surfaceY = fillY + primaryWave * waveHeight + secondaryWave * waveHeight * 0.22;
-    return clampNumber(surfaceY, barY, barY + barHeight);
-  }
-  function getLiquidWaveHeight(fillHeight, fillRatio, barHeight) {
-    const topClearance = Math.max(0, (1 - fillRatio) * barHeight * 0.55);
-    return Math.min(LIQUID_SURFACE_WAVE_HEIGHT, fillHeight * 0.08, topClearance);
-  }
-  function updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, fillRatio, now) {
-    const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
-    const fillHeight = fillRatio * barHeight;
-    const fillY = barY + barHeight - fillHeight;
-    if (fillRatio <= 0.02 || fillHeight < 8) {
-      bubbles.length = 0;
-      PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator = 0;
-      return;
-    }
-    const deltaSeconds = deltaTime / 1e3;
-    let writeIndex = 0;
-    for (let i = 0; i < bubbles.length; i += 1) {
-      const bubble = bubbles[i];
-      bubble.ageMs += deltaTime;
-      bubble.y -= bubble.speed * deltaSeconds;
-      const bubbleX = getLiquidBubbleX(bubble);
-      const surfaceY = getLiquidSurfaceY(
-        bubbleX,
-        barX,
-        barY,
-        barWidth,
-        barHeight,
-        fillY,
-        fillHeight,
-        fillRatio,
-        now
-      );
-      if (bubble.y - bubble.radius <= surfaceY || bubble.y + bubble.radius < barY) {
-        continue;
-      }
-      bubbles[writeIndex] = bubble;
-      writeIndex += 1;
-    }
-    bubbles.length = writeIndex;
-    if (fillHeight < 20) return;
-    PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator += deltaTime * (3e-3 + fillRatio * 44e-4);
-    while (PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator >= 1 && bubbles.length < MAX_PROGRESS_LIQUID_BUBBLES) {
-      spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio);
-      PROGRESS_VISUAL_STATE.liquidBubbleSpawnAccumulator -= 1;
-    }
-  }
-  function spawnProgressLiquidBubble(barX, barY, barWidth, barHeight, fillHeight, fillRatio) {
-    const radius = 0.42 + Math.random() * (0.62 + fillRatio * 0.32);
-    const padding = 3 + radius;
-    const availableWidth = Math.max(0, barWidth - padding * 2);
-    const bottomY = barY + barHeight;
-    PROGRESS_VISUAL_STATE.liquidBubbles.push({
-      baseX: barX + padding + Math.random() * availableWidth,
-      y: bottomY - Math.random() * Math.min(12, fillHeight * 0.22) + radius,
-      radius,
-      speed: 42 + Math.random() * 30,
-      phase: Math.random() * TWO_PI3,
-      alpha: 0.28 + Math.random() * 0.3,
-      ageMs: Math.random() * 600
-    });
-  }
-  function getLiquidBubbleX(bubble) {
-    return bubble.baseX;
-  }
-  function renderLiquidBubbles2(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
-    const bubbles = PROGRESS_VISUAL_STATE.liquidBubbles;
-    if (bubbles.length === 0) return;
-    const bottomY = barY + barHeight;
-    ctx2.save();
-    ctx2.globalCompositeOperation = "lighter";
-    for (let i = 0; i < bubbles.length; i += 1) {
-      const bubble = bubbles[i];
-      const x = getLiquidBubbleX(bubble);
-      const surfaceY = getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-      const surfaceFade = clampNumber((bubble.y - surfaceY) / Math.max(1, bubble.radius * 7), 0, 1);
-      const bottomFade = clampNumber((bottomY - bubble.y + bubble.radius * 2) / Math.max(1, bubble.radius * 8), 0, 1);
-      const wobblePulse = 0.82 + Math.sin(bubble.ageMs / 1e3 * 2.2 + bubble.phase) * 0.08;
-      const alpha = bubble.alpha * Math.min(surfaceFade, bottomFade) * wobblePulse;
-      if (alpha <= 0.01) continue;
-      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], alpha * 0.12);
-      ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], alpha);
-      ctx2.lineWidth = 0.55;
-      ctx2.shadowBlur = 0;
-      ctx2.beginPath();
-      ctx2.arc(x, bubble.y, bubble.radius, 0, TWO_PI3);
-      ctx2.fill();
-      ctx2.stroke();
-      ctx2.fillStyle = rgbaArrayToCss([255, 255, 255], alpha * 0.85);
-      ctx2.beginPath();
-      ctx2.arc(x - bubble.radius * 0.32, bubble.y - bubble.radius * 0.35, Math.max(0.18, bubble.radius * 0.18), 0, TWO_PI3);
-      ctx2.fill();
-    }
-    ctx2.restore();
-  }
-  function renderLiquidSurfaceHighlight(ctx2, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now) {
-    const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
-    const surfaceGlow = clampNumber(0.22 + fillRatio * 0.34, 0, 0.5);
-    const step = 2;
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.rect(barX, barY, barWidth, barHeight);
-    ctx2.clip();
-    ctx2.globalCompositeOperation = "lighter";
-    ctx2.lineCap = "round";
-    ctx2.beginPath();
-    for (let x = barX; x <= barX + barWidth; x += step) {
-      const y = getLiquidSurfaceY(x, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-      if (x === barX) {
-        ctx2.moveTo(x, y);
-      } else {
-        ctx2.lineTo(x, y);
-      }
-    }
-    ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], surfaceGlow);
-    ctx2.lineWidth = 1.5;
-    ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.18);
-    ctx2.shadowBlur = 1 + waveHeight * 0.4;
-    ctx2.stroke();
-    ctx2.restore();
-  }
-  function renderProgressGlow(ctx2, barX, barY, barWidth, barHeight, fillRatio, isFull, now, collectionPulse = 0) {
-    if (fillRatio <= 0 && collectionPulse <= 0) return;
-    const hasCollectionGlow = collectionPulse > 0;
-    const collectionFade = hasCollectionGlow ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1) : 0;
-    const glowColor = collectionPulse > 0 ? COLORS.bar.progress.fillEnd : getProgressColorArray(fillRatio * 100);
-    const charge = Math.pow(fillRatio, 0.85);
-    const pulse = isFull ? getFullPulse(now) : 1;
-    const baseGlowPower = charge * pulse;
-    const glowPower = hasCollectionGlow ? collectionPulse : baseGlowPower;
-    const strokeBaseFade = hasCollectionGlow ? collectionFade : charge;
-    const shadowAlpha = 0.8 * glowPower;
-    const strokeAlpha = 0.12 * strokeBaseFade + 0.5 * glowPower;
-    if (shadowAlpha <= 1e-3 && strokeAlpha <= 1e-3) return;
-    ctx2.save();
-    ctx2.globalCompositeOperation = "lighter";
-    ctx2.shadowColor = rgbaArrayToCss(glowColor, shadowAlpha);
-    ctx2.shadowBlur = 10 + 46 * glowPower;
-    ctx2.strokeStyle = rgbaArrayToCss(glowColor, strokeAlpha);
-    ctx2.lineWidth = 1 + 6 * glowPower;
-    ctx2.strokeRect(barX + 0.5, barY + 0.5, barWidth - 1, barHeight - 1);
-    if (isFull) {
-      ctx2.shadowColor = rgbaArrayToCss([255, 255, 255], 0.5 * pulse);
-      ctx2.shadowBlur = 38 + 36 * pulse;
-      ctx2.strokeStyle = rgbaArrayToCss([255, 255, 255], 0.16 + 0.32 * pulse);
-      ctx2.lineWidth = 2 + 3 * pulse;
-      ctx2.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
-    }
-    ctx2.restore();
-  }
-  function renderRisingEnergy(ctx2, barX, barY, barWidth, barHeight, now) {
-    const innerX = barX + 4;
-    const innerY = barY + 3;
-    const innerWidth = barWidth - 8;
-    const innerHeight = barHeight - 6;
-    const pulse = getFullPulse(now);
-    if (innerWidth <= 0 || innerHeight <= 0) return;
-    ctx2.save();
-    ctx2.beginPath();
-    ctx2.rect(innerX, innerY, innerWidth, innerHeight);
-    ctx2.clip();
-    ctx2.globalCompositeOperation = "lighter";
-    for (let i = 0; i < 3; i += 1) {
-      const phase = (now * 22e-5 + i / 3) % 1;
-      const y = innerY + innerHeight - phase * innerHeight;
-      const alpha = Math.sin(phase * Math.PI) * 0.2 * pulse;
-      const bandGradient = ctx2.createLinearGradient(innerX, y, innerX + innerWidth, y);
-      bandGradient.addColorStop(0, rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0));
-      bandGradient.addColorStop(0.5, rgbaArrayToCss([255, 255, 255], alpha));
-      bandGradient.addColorStop(1, rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0));
-      ctx2.fillStyle = bandGradient;
-      ctx2.fillRect(innerX, y, innerWidth, 2);
-    }
-    ctx2.restore();
-  }
-  function spawnProgressCompletionBurst(barX, barY, barWidth, barHeight) {
-    if (spawnGpuProgressCompletionBurst(
-      barX,
-      barY,
-      barWidth,
-      barHeight,
-      COMPLETION_BURST_COLORS,
-      { countMultiplier: 1.5, gravity: 100 }
-    )) {
-      return;
-    }
-    const centerX = barX + barWidth / 2;
-    const centerY = barY + barHeight / 2;
-    for (let i = 0; i < 81; i += 1) {
-      const originX = barX + Math.random() * barWidth;
-      const originY = barY + Math.random() * barHeight;
-      const outwardAngle = Math.atan2(originY - centerY, originX - centerX);
-      const angle = outwardAngle + (Math.random() - 0.5) * 0.95;
-      const speed = 90 + Math.random() * 250;
-      const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
-      const colorCss = rgbArrayToCss(color);
-      PROGRESS_VISUAL_STATE.completionParticles.push({
-        x: originX,
-        y: originY,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        drag: 0.94 + Math.random() * 0.03,
-        radius: 1.4 + Math.random() * 3.2,
-        lineWidth: 1.1 + Math.random() * 1.5,
-        colorCss,
-        elapsedMs: 0,
-        lifeMs: 560 + Math.random() * 520
-      });
-    }
-    for (let i = 0; i < 27; i += 1) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
-      const speed = 150 + Math.random() * 260;
-      const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
-      const colorCss = rgbArrayToCss(color);
-      PROGRESS_VISUAL_STATE.completionParticles.push({
-        x: barX + Math.random() * barWidth,
-        y: barY + Math.random() * 10,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        drag: 0.93 + Math.random() * 0.03,
-        radius: 1.2 + Math.random() * 2.4,
-        lineWidth: 1 + Math.random() * 1.3,
-        colorCss,
-        elapsedMs: 0,
-        lifeMs: 520 + Math.random() * 480
-      });
-    }
-    if (PROGRESS_VISUAL_STATE.completionParticles.length > MAX_PROGRESS_COMPLETION_PARTICLES) {
-      PROGRESS_VISUAL_STATE.completionParticles.splice(
-        0,
-        PROGRESS_VISUAL_STATE.completionParticles.length - MAX_PROGRESS_COMPLETION_PARTICLES
-      );
-    }
-  }
-  function updateProgressCompletionParticles(deltaTime) {
-    const particles = PROGRESS_VISUAL_STATE.completionParticles;
-    if (particles.length === 0) return;
-    const deltaSeconds = deltaTime / 1e3;
-    let writeIndex = 0;
-    for (let i = 0; i < particles.length; i += 1) {
-      const particle = particles[i];
-      particle.elapsedMs += deltaTime;
-      if (particle.elapsedMs >= particle.lifeMs) {
-        continue;
-      }
-      const drag = Math.pow(particle.drag, deltaTime / 16.67);
-      particle.vx *= drag;
-      particle.vy *= drag;
-      particle.x += particle.vx * deltaSeconds;
-      particle.y += particle.vy * deltaSeconds;
-      particles[writeIndex] = particle;
-      writeIndex += 1;
-    }
-    particles.length = writeIndex;
-  }
-  function renderProgressCompletionParticles(ctx2) {
-    const particles = PROGRESS_VISUAL_STATE.completionParticles;
-    if (particles.length === 0) return;
-    ctx2.save();
-    ctx2.globalCompositeOperation = "lighter";
-    ctx2.lineCap = "round";
-    for (let i = 0; i < particles.length; i += 1) {
-      const particle = particles[i];
-      const lifeProgress = particle.elapsedMs / particle.lifeMs;
-      const alpha = Math.pow(Math.max(0, 1 - lifeProgress), 1.45);
-      const tailScale = 0.018 + (1 - lifeProgress) * 0.034;
-      ctx2.globalAlpha = alpha;
-      ctx2.strokeStyle = particle.colorCss;
-      ctx2.fillStyle = particle.colorCss;
-      ctx2.shadowColor = particle.colorCss;
-      ctx2.shadowBlur = 14 * alpha;
-      ctx2.lineWidth = particle.lineWidth;
-      ctx2.beginPath();
-      ctx2.moveTo(particle.x, particle.y);
-      ctx2.lineTo(
-        particle.x - particle.vx * tailScale,
-        particle.y - particle.vy * tailScale
-      );
-      ctx2.stroke();
-      ctx2.beginPath();
-      ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI3);
-      ctx2.fill();
-    }
-    ctx2.restore();
-  }
-  function getProgressBarLayout(canvas2) {
-    const baseHeight = canvas2.height - 120;
-    const barHeight = baseHeight * 0.72;
-    return {
-      x: canvas2.width - 92,
-      y: 90,
-      width: PROGRESS_BAR_WIDTH,
-      height: barHeight
-    };
-  }
-
   // src/features/progress/claim-effects.ts
+  var nextLevelUpNoticeGroupId = 1;
   var POPUP_OFFSET = Object.freeze({
     exp: { x: -55, y: -20 },
     coins: { x: 55, y: -20 },
@@ -2137,6 +2188,7 @@
   });
   function spawnProgressClaimRewardEffects(floatingTexts, canvas2, textMeasureContext, currentAmounts, newAmounts, anchorPoint = null) {
     const expGain = Math.max(0, Math.floor(newAmounts.exp) - Math.floor(currentAmounts.exp));
+    const levelGain = Math.max(0, Math.floor(newAmounts.level) - Math.floor(currentAmounts.level));
     const coinGain = Math.max(0, Math.floor(newAmounts.coins) - Math.floor(currentAmounts.coins));
     const shardGain = Math.max(0, Math.floor(newAmounts.shards) - Math.floor(currentAmounts.shards));
     const coreGain = Math.max(0, Math.floor(newAmounts.cores) - Math.floor(currentAmounts.cores));
@@ -2160,6 +2212,10 @@
       y: barLayout.y + barLayout.height / 2
     };
     const anchor = clampRewardAnchorToCanvas(textMeasureContext, canvas2, rawAnchor, rewardGroupEntries);
+    if (levelGain > 0) {
+      const levelUps = computeLevelUps(currentAmounts.level, newAmounts.level);
+      spawnLevelUpEffects(floatingTexts, canvas2, levelUps);
+    }
     spawnRewardPopup(
       floatingTexts,
       canvas2,
@@ -2246,6 +2302,62 @@
     const width = textMeasureContext.measureText(text).width;
     textMeasureContext.restore();
     return width;
+  }
+  function getAvailableNoticeGroupIndexes(floatingTexts, type, count) {
+    const occupiedIndexes = /* @__PURE__ */ new Set();
+    for (const floatingText of floatingTexts) {
+      if (floatingText.type === type && floatingText.stackGroupId !== null && Number.isFinite(floatingText.stackIndex)) {
+        occupiedIndexes.add(floatingText.stackIndex);
+      }
+    }
+    const indexes = [];
+    let nextIndex = 0;
+    while (indexes.length < count) {
+      if (!occupiedIndexes.has(nextIndex)) {
+        indexes.push(nextIndex);
+        occupiedIndexes.add(nextIndex);
+      }
+      nextIndex += 1;
+    }
+    return indexes;
+  }
+  function spawnLevelUpEffects(floatingTexts, canvas2, levelUps) {
+    if (levelUps.length === 0) return;
+    const popupLifeMs = 5e3;
+    const popupRiseSpeed = 2;
+    const baseX = TOP_HUD_EXP_BAR_X + 8;
+    const baseY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 52;
+    const lineStep = 30;
+    const groupStep = 108;
+    const groupIndexes = getAvailableNoticeGroupIndexes(floatingTexts, "level_up", levelUps.length);
+    for (let i = 0; i < levelUps.length; i += 1) {
+      const levelUp = levelUps[i];
+      const groupId = nextLevelUpNoticeGroupId;
+      const groupIndex = groupIndexes[i];
+      nextLevelUpNoticeGroupId += 1;
+      const popupOptions = {
+        lifeMs: popupLifeMs,
+        riseSpeed: popupRiseSpeed,
+        font: REWARD_POPUP_FONT,
+        textAlign: "left",
+        type: "level_up",
+        stackGroupId: groupId,
+        stackIndex: groupIndex
+      };
+      const baseLineY = baseY + groupIndex * groupStep;
+      const levelText = `Level Up!`;
+      const coinText = formatSignedNumber(levelUp.rewards.coins);
+      const shardText = formatSignedNumber(levelUp.rewards.shards);
+      const coreText = formatSignedNumber(levelUp.rewards.cores);
+      spawnFloatingText(floatingTexts, levelText, baseX, baseLineY, COLORS.rewards.achievement, popupOptions);
+      spawnFloatingText(floatingTexts, coinText, baseX, baseLineY + lineStep, COLORS.rewards.coins, popupOptions);
+      if (levelUp.rewards.shards > 0) {
+        spawnFloatingText(floatingTexts, shardText, baseX, baseLineY + lineStep * 2, COLORS.rewards.shards, popupOptions);
+      }
+      if (levelUp.rewards.cores > 0) {
+        spawnFloatingText(floatingTexts, coreText, baseX, baseLineY + lineStep * 3, COLORS.rewards.cores, popupOptions);
+      }
+    }
   }
 
   // src/features/progress/view-model.ts
@@ -2359,6 +2471,7 @@
       if (effects && previousAmounts) {
         spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, effects.ctx, previousAmounts, {
           exp: result.exp,
+          level: result.level,
           coins: result.coins,
           shards: result.shards,
           cores: result.cores
@@ -2471,10 +2584,424 @@
     });
   }
 
+  // src/features/hud/view-model.ts
+  var state = {
+    displayedExp: 0,
+    displayedLevel: 1,
+    displayedCoins: 0,
+    displayedShards: 0,
+    displayedCores: 0,
+    collectionGlowStartedAt: 0,
+    particles: []
+  };
+  var queuedLevelUps = 0;
+  function getAndClearQueuedLevelUps() {
+    const count = queuedLevelUps;
+    queuedLevelUps = 0;
+    return count;
+  }
+  function updateHudViewModel(dtMs, authoritative) {
+    const dtS = dtMs / 1e3;
+    const lerpSpeed = 7;
+    if (state.displayedLevel !== authoritative.level) {
+      const levelsGained = Math.max(0, authoritative.level - state.displayedLevel);
+      queuedLevelUps += levelsGained;
+      state.displayedLevel = authoritative.level;
+      state.displayedExp = authoritative.exp;
+      state.collectionGlowStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+    }
+    state.displayedExp = lerp(state.displayedExp, authoritative.exp, dtS * lerpSpeed);
+    state.displayedCoins = lerp(state.displayedCoins, authoritative.coins, dtS * lerpSpeed);
+    state.displayedShards = lerp(state.displayedShards, authoritative.shards, dtS * lerpSpeed);
+    state.displayedCores = lerp(state.displayedCores, authoritative.cores, dtS * lerpSpeed);
+    if (Math.abs(state.displayedCoins - authoritative.coins) < 0.5) state.displayedCoins = authoritative.coins;
+    if (Math.abs(state.displayedShards - authoritative.shards) < 0.5) state.displayedShards = authoritative.shards;
+    if (Math.abs(state.displayedCores - authoritative.cores) < 0.5) state.displayedCores = authoritative.cores;
+    if (Math.abs(state.displayedExp - authoritative.exp) < 0.5) state.displayedExp = authoritative.exp;
+  }
+  function getHudViewModel() {
+    return state;
+  }
+  function syncHudInstantly(authoritative) {
+    state.displayedLevel = authoritative.level;
+    state.displayedExp = authoritative.exp;
+    state.displayedCoins = authoritative.coins;
+    state.displayedShards = authoritative.shards;
+    state.displayedCores = authoritative.cores;
+  }
+
+  // src/render/currency-icons.ts
+  var CURRENCY_FALLBACK_COLORS = Object.freeze({
+    coins: COLORS.hud.coins,
+    shards: COLORS.hud.shards,
+    cores: COLORS.hud.cores
+  });
+  var currencyIconImages = /* @__PURE__ */ new Map();
+  var smoothedCurrencyIconCanvases = /* @__PURE__ */ new Map();
+  function getCurrencyIconImage(currencyKey) {
+    if (!currencyKey || typeof Image === "undefined") {
+      return null;
+    }
+    if (!currencyIconImages.has(currencyKey)) {
+      const image = new Image();
+      image.src = `images/${currencyKey}.png`;
+      currencyIconImages.set(currencyKey, image);
+    }
+    return currencyIconImages.get(currencyKey) || null;
+  }
+  function drawCurrencyIcon(ctx2, currencyKey, x, y, size) {
+    if (!ctx2 || size <= 0) {
+      return;
+    }
+    const image = getCurrencyIconImage(currencyKey);
+    const iconSize = Math.max(1, Math.round(size));
+    ctx2.save();
+    ctx2.imageSmoothingEnabled = true;
+    ctx2.imageSmoothingQuality = "high";
+    if (image?.complete && image.naturalWidth > 0) {
+      const smoothedIcon = getSmoothedCurrencyIconCanvas(currencyKey, image, iconSize);
+      ctx2.drawImage(smoothedIcon || image, x, y, size, size);
+      ctx2.restore();
+      return;
+    }
+    ctx2.fillStyle = CURRENCY_FALLBACK_COLORS[currencyKey] || COLORS.hud.textPrimary;
+    ctx2.beginPath();
+    ctx2.arc(x + size / 2, y + size / 2, size * 0.42, 0, Math.PI * 2);
+    ctx2.fill();
+    ctx2.restore();
+  }
+  function drawCurrencyAmount(ctx2, currencyKey, amount, x, y, iconSize, options = {}) {
+    if (!ctx2) {
+      return 0;
+    }
+    const {
+      align = "left",
+      font = ctx2.font,
+      textColor = ctx2.fillStyle,
+      iconGap = 5,
+      iconPosition = "left",
+      formatter = formatNumber,
+      alpha = 1
+    } = options;
+    const resolvedIconSize = resolveIconSize(iconSize);
+    const amountText = formatter(amount);
+    ctx2.save();
+    ctx2.font = font;
+    const amountMetrics = ctx2.measureText(amountText);
+    const width = resolvedIconSize + iconGap + amountMetrics.width;
+    let startX = x;
+    if (align === "center") {
+      startX = x - width / 2;
+    } else if (align === "right") {
+      startX = x - width;
+    }
+    const fallbackFontSize = getFontPixelSize(font);
+    const ascent = amountMetrics.actualBoundingBoxAscent || fallbackFontSize * 0.75;
+    const descent = amountMetrics.actualBoundingBoxDescent || fallbackFontSize * 0.25;
+    const textHeight = ascent + descent;
+    const iconY = y - ascent + (textHeight - resolvedIconSize) / 2;
+    ctx2.globalAlpha *= Math.max(0, Math.min(1, alpha));
+    const amountX = iconPosition === "right" ? startX : startX + resolvedIconSize + iconGap;
+    const iconX = iconPosition === "right" ? startX + amountMetrics.width + iconGap : startX;
+    drawCurrencyIcon(ctx2, currencyKey, iconX, iconY, resolvedIconSize);
+    ctx2.fillStyle = textColor;
+    ctx2.textAlign = "left";
+    ctx2.fillText(amountText, amountX, y);
+    ctx2.restore();
+    return width;
+  }
+  function getSmoothedCurrencyIconCanvas(currencyKey, image, size) {
+    if (typeof document === "undefined") {
+      return null;
+    }
+    const cacheKey = `${currencyKey}:${size}`;
+    if (smoothedCurrencyIconCanvases.has(cacheKey)) {
+      return smoothedCurrencyIconCanvases.get(cacheKey);
+    }
+    const canvas2 = downsampleImage(image, size);
+    smoothedCurrencyIconCanvases.set(cacheKey, canvas2);
+    return canvas2;
+  }
+  function getFontPixelSize(font) {
+    const match = String(font || "").match(/(\d+(?:\.\d+)?)px/);
+    return match ? Number(match[1]) : 16;
+  }
+  function resolveIconSize(iconSize) {
+    const size = Number(iconSize);
+    return Number.isFinite(size) && size > 0 ? size : 16;
+  }
+  function downsampleImage(image, targetSize) {
+    let source = image;
+    let sourceWidth = "naturalWidth" in image ? image.naturalWidth : image.width;
+    let sourceHeight = "naturalHeight" in image ? image.naturalHeight : image.height;
+    while (sourceWidth > targetSize * 2 && sourceHeight > targetSize * 2) {
+      const nextWidth = Math.max(targetSize, Math.round(sourceWidth / 2));
+      const nextHeight = Math.max(targetSize, Math.round(sourceHeight / 2));
+      const nextCanvas = createSmoothedCanvas(nextWidth, nextHeight);
+      nextCanvas.getContext("2d").drawImage(source, 0, 0, nextWidth, nextHeight);
+      source = nextCanvas;
+      sourceWidth = nextWidth;
+      sourceHeight = nextHeight;
+    }
+    const targetCanvas = createSmoothedCanvas(targetSize, targetSize);
+    targetCanvas.getContext("2d").drawImage(source, 0, 0, targetSize, targetSize);
+    return targetCanvas;
+  }
+  function createSmoothedCanvas(width, height) {
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = width;
+    canvas2.height = height;
+    const canvasContext = canvas2.getContext("2d");
+    canvasContext.imageSmoothingEnabled = true;
+    canvasContext.imageSmoothingQuality = "high";
+    return canvas2;
+  }
+
+  // src/features/hud/render.ts
+  var TWO_PI4 = Math.PI * 2;
+  var EXP_BAR_FULL_PULSE_MAX = 1.6;
+  var EXP_BAR_COLLECTION_GLOW_FADE_MS = Math.PI * 165 / (BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER);
+  var MAX_EXP_BAR_LEVEL_UP_PARTICLES = 228;
+  var EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
+  var EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER = 2;
+  var EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
+    COLORS.bar.exp.fillStart,
+    COLORS.bar.exp.fillEnd,
+    "#ffffff",
+    COLORS.rewards.expGain
+  ]);
+  function getNowMs2() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }
+  function rgbaHexToCss(color, alpha) {
+    if (Array.isArray(color)) {
+      return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${Math.min(Math.max(alpha, 0), 1)})`;
+    }
+    const hex = String(color || "").trim().replace(/^#/, "");
+    const expanded = hex.length === 3 ? hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2] : hex;
+    const value = Number.parseInt(expanded, 16);
+    if (!Number.isFinite(value)) return `rgba(255, 255, 255, ${Math.min(Math.max(alpha, 0), 1)})`;
+    const red = value >> 16 & 255;
+    const green = value >> 8 & 255;
+    const blue = value & 255;
+    return `rgba(${red}, ${green}, ${blue}, ${Math.min(Math.max(alpha, 0), 1)})`;
+  }
+  function renderTopHUD(ctx2, canvas2, dtMs) {
+    const model = getHudViewModel();
+    const now = getNowMs2();
+    const queued = getAndClearQueuedLevelUps();
+    for (let i = 0; i < queued; i++) {
+      spawnExpBarLevelUpBurst(model);
+    }
+    updateExpBarLevelUpParticles(model, dtMs);
+    const startedAt = model.collectionGlowStartedAt;
+    let collectionPulse = 0;
+    if (startedAt > 0) {
+      const progress = Math.min(Math.max((now - startedAt) / EXP_BAR_COLLECTION_GLOW_FADE_MS, 0), 1);
+      if (progress >= 1) {
+        model.collectionGlowStartedAt = 0;
+      } else {
+        collectionPulse = EXP_BAR_FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
+      }
+    }
+    ctx2.fillStyle = COLORS.hud.panel;
+    ctx2.fillRect(0, 0, canvas2.width, TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 16);
+    ctx2.fillStyle = COLORS.bar.track;
+    ctx2.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
+    const requiredExp = getRequiredExp(model.displayedLevel);
+    const fillRatio = Math.min(1, Math.max(0, model.displayedExp / requiredExp));
+    const gradient = ctx2.createLinearGradient(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_Y);
+    gradient.addColorStop(0, COLORS.bar.exp.fillStart);
+    gradient.addColorStop(1, COLORS.bar.exp.fillEnd);
+    ctx2.fillStyle = gradient;
+    ctx2.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH * fillRatio, TOP_HUD_EXP_BAR_HEIGHT);
+    ctx2.strokeStyle = COLORS.bar.border;
+    ctx2.lineWidth = 2;
+    ctx2.strokeRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
+    renderExpBarCollectionGlow(ctx2, collectionPulse);
+    renderExpBarLevelUpParticles(ctx2, model);
+    ctx2.fillStyle = COLORS.hud.textPrimary;
+    ctx2.font = TOP_HUD_EXP_FONT;
+    ctx2.textAlign = "center";
+    ctx2.fillText(`${formatNumberRatio(Math.floor(model.displayedExp), requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
+    ctx2.fillStyle = COLORS.hud.textPrimary;
+    ctx2.font = TOP_HUD_LEVEL_FONT;
+    ctx2.textAlign = "left";
+    ctx2.fillText(formatShortLevel(model.displayedLevel), TOP_HUD_LEVEL_X, 35);
+    drawCurrency(ctx2, canvas2, "Coins", Math.floor(model.displayedCoins), COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
+    if (model.displayedLevel > 1 || model.displayedShards > 0) {
+      drawCurrency(ctx2, canvas2, "Shards", Math.floor(model.displayedShards), COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
+    }
+    if (model.displayedLevel > 10 || model.displayedCores > 0) {
+      drawCurrency(ctx2, canvas2, "Cores", Math.floor(model.displayedCores), COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+    }
+  }
+  function drawCurrency(ctx2, canvas2, label, amount, color, iconRight, counterRight) {
+    drawCurrencyAmount(
+      ctx2,
+      label.toLowerCase(),
+      amount,
+      canvas2.width - counterRight,
+      TOP_HUD_COIN_COUNTER_Y,
+      TOP_HUD_CURRENCY_ICON_SIZE,
+      {
+        align: "right",
+        font: TOP_HUD_COINS_FONT,
+        textColor: color,
+        iconGap: 6,
+        iconPosition: "right"
+      }
+    );
+  }
+  function renderExpBarCollectionGlow(ctx2, collectionPulse) {
+    if (collectionPulse <= 0) return;
+    const glowPower = collectionPulse;
+    const collectionFade = Math.min(1, Math.max(0, collectionPulse / EXP_BAR_FULL_PULSE_MAX));
+    const glowAlpha = Math.min(
+      0.62,
+      collectionFade * 0.16 + glowPower * 0.36 + collectionFade * 0.18
+    );
+    ctx2.save();
+    ctx2.globalCompositeOperation = "lighter";
+    ctx2.shadowColor = rgbaHexToCss(COLORS.bar.exp.fillEnd, 0.8 * collectionFade);
+    ctx2.shadowBlur = 8 + 34 * glowPower;
+    ctx2.strokeStyle = rgbaHexToCss(COLORS.bar.exp.fillEnd, glowAlpha);
+    ctx2.lineWidth = 1 + collectionFade + 4 * glowPower;
+    ctx2.strokeRect(
+      TOP_HUD_EXP_BAR_X + 0.5,
+      TOP_HUD_EXP_BAR_Y + 0.5,
+      TOP_HUD_EXP_BAR_WIDTH - 1,
+      TOP_HUD_EXP_BAR_HEIGHT - 1
+    );
+    if (collectionPulse > 0) {
+      ctx2.shadowColor = `rgba(255, 255, 255, ${0.7 * collectionFade})`;
+      ctx2.shadowBlur = 24 + 22 * collectionFade;
+      ctx2.strokeStyle = `rgba(255, 255, 255, ${0.4 * collectionFade})`;
+      ctx2.lineWidth = 0.5 + 3.5 * collectionFade;
+      ctx2.strokeRect(
+        TOP_HUD_EXP_BAR_X - 1,
+        TOP_HUD_EXP_BAR_Y - 1,
+        TOP_HUD_EXP_BAR_WIDTH + 2,
+        TOP_HUD_EXP_BAR_HEIGHT + 2
+      );
+    }
+    ctx2.restore();
+  }
+  function spawnExpBarLevelUpBurst(model) {
+    spawnGpuProgressCompletionBurst(
+      TOP_HUD_EXP_BAR_X,
+      TOP_HUD_EXP_BAR_Y,
+      TOP_HUD_EXP_BAR_WIDTH,
+      TOP_HUD_EXP_BAR_HEIGHT,
+      EXP_BAR_LEVEL_UP_COLORS,
+      {
+        countMultiplier: 3,
+        gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
+        lifeMultiplier: EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
+      }
+    );
+    const centerX = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
+    const centerY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT / 2;
+    for (let i = 0; i < 126; i += 1) {
+      const originX = TOP_HUD_EXP_BAR_X + Math.random() * TOP_HUD_EXP_BAR_WIDTH;
+      const originY = TOP_HUD_EXP_BAR_Y + Math.random() * TOP_HUD_EXP_BAR_HEIGHT;
+      const outwardAngle = Math.atan2(originY - centerY, originX - centerX);
+      const angle = outwardAngle + (Math.random() - 0.5) * 0.8;
+      const speed = 90 + Math.random() * 240;
+      const color = EXP_BAR_LEVEL_UP_COLORS[Math.floor(Math.random() * EXP_BAR_LEVEL_UP_COLORS.length)];
+      model.particles.push({
+        x: originX,
+        y: originY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        drag: 0.93 + Math.random() * 0.04,
+        radius: 1.2 + Math.random() * 2.6,
+        lineWidth: 1 + Math.random() * 1.2,
+        color,
+        gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
+        elapsedMs: 0,
+        lifeMs: (480 + Math.random() * 460) * EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
+      });
+    }
+    for (let i = 0; i < 42; i += 1) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.35;
+      const speed = 120 + Math.random() * 220;
+      const color = EXP_BAR_LEVEL_UP_COLORS[Math.floor(Math.random() * EXP_BAR_LEVEL_UP_COLORS.length)];
+      model.particles.push({
+        x: TOP_HUD_EXP_BAR_X + Math.random() * TOP_HUD_EXP_BAR_WIDTH,
+        y: TOP_HUD_EXP_BAR_Y + Math.random() * 6,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        drag: 0.92 + Math.random() * 0.04,
+        radius: 1 + Math.random() * 2.1,
+        lineWidth: 0.9 + Math.random() * 1.1,
+        color,
+        gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
+        elapsedMs: 0,
+        lifeMs: (440 + Math.random() * 420) * EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
+      });
+    }
+    if (model.particles.length > MAX_EXP_BAR_LEVEL_UP_PARTICLES) {
+      model.particles.splice(0, model.particles.length - MAX_EXP_BAR_LEVEL_UP_PARTICLES);
+    }
+  }
+  function updateExpBarLevelUpParticles(model, deltaTime) {
+    const particles = model.particles;
+    if (particles.length === 0) return;
+    const deltaSeconds = deltaTime / 1e3;
+    let writeIndex = 0;
+    for (let i = 0; i < particles.length; i += 1) {
+      const particle = particles[i];
+      particle.elapsedMs += deltaTime;
+      if (particle.elapsedMs >= particle.lifeMs) continue;
+      const drag = Math.pow(particle.drag, deltaTime / 16.67);
+      particle.vx *= drag;
+      particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
+      particle.x += particle.vx * deltaSeconds;
+      particle.y += particle.vy * deltaSeconds;
+      particles[writeIndex] = particle;
+      writeIndex += 1;
+    }
+    particles.length = writeIndex;
+  }
+  function renderExpBarLevelUpParticles(ctx2, model) {
+    const particles = model.particles;
+    if (particles.length === 0) return;
+    ctx2.save();
+    ctx2.globalCompositeOperation = "lighter";
+    ctx2.lineCap = "round";
+    for (let i = 0; i < particles.length; i += 1) {
+      const particle = particles[i];
+      const lifeProgress = particle.elapsedMs / particle.lifeMs;
+      const alpha = Math.pow(Math.max(0, 1 - lifeProgress), 1.35);
+      const tailScale = 0.018 + (1 - lifeProgress) * 0.024;
+      ctx2.globalAlpha = alpha;
+      ctx2.strokeStyle = particle.color;
+      ctx2.fillStyle = particle.color;
+      ctx2.shadowColor = particle.color;
+      ctx2.shadowBlur = 11 * alpha;
+      ctx2.lineWidth = particle.lineWidth;
+      ctx2.beginPath();
+      ctx2.moveTo(particle.x, particle.y);
+      ctx2.lineTo(
+        particle.x - particle.vx * tailScale,
+        particle.y - particle.vy * tailScale
+      );
+      ctx2.stroke();
+      ctx2.beginPath();
+      ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI4);
+      ctx2.fill();
+    }
+    ctx2.restore();
+  }
+
   // src/core/store.ts
   var Store = class {
-    constructor(state) {
-      this.state = state;
+    constructor(state2) {
+      this.state = state2;
     }
   };
 
@@ -2538,6 +3065,7 @@
         this.store.state.slots = [result.save_slot];
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
+          syncHudInstantly(this.store.state.snapshot.state);
         }
         if (result.pending_result) {
           await this.applyAndAck(result.pending_result);
@@ -2586,6 +3114,7 @@
       if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
+          syncHudInstantly(this.store.state.snapshot.state);
         }
       }
       this.applyProgressEffects(result, previousAmounts);
@@ -2601,6 +3130,7 @@
         if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
           if (this.store.state.snapshot) {
             getStateFromSnapshot(this.store.state.snapshot);
+            syncHudInstantly(this.store.state.snapshot.state);
           }
         }
         const applied = next;
@@ -2616,6 +3146,7 @@
       if (!snapshot) return null;
       return {
         exp: snapshot.state.exp,
+        level: snapshot.state.level,
         coins: snapshot.state.coins,
         shards: snapshot.state.shards,
         cores: snapshot.state.cores
@@ -2679,6 +3210,11 @@
       this.ctx.fillStyle = COLORS.game.background;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       renderProgressBar(this.ctx, this.canvas);
+      const amounts = this.snapshotAmounts();
+      if (amounts) {
+        updateHudViewModel(dt, amounts);
+        renderTopHUD(this.ctx, this.canvas);
+      }
       updateFloatingTexts(this.floatingTexts, dt);
       updateWebGLEffects(dt);
       renderWebGLEffects();

@@ -20,6 +20,8 @@ import { progressClaimIn } from "../net/commands";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress/claim-effects";
+import { updateHudViewModel, syncHudInstantly } from "../features/hud/view-model";
+import { renderTopHUD } from "../features/hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 
@@ -69,6 +71,7 @@ export class GameClient {
 
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
+        syncHudInstantly(this.store.state.snapshot.state);
       }
 
 
@@ -130,6 +133,7 @@ export class GameClient {
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
+        syncHudInstantly(this.store.state.snapshot.state);
       }
     }
 
@@ -152,6 +156,7 @@ export class GameClient {
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
+          syncHudInstantly(this.store.state.snapshot.state);
         }
       }
       // The server releases at most one queued result per acknowledgement so the
@@ -172,6 +177,7 @@ export class GameClient {
 
     return {
       exp: snapshot.state.exp,
+      level: snapshot.state.level,
       coins: snapshot.state.coins,
       shards: snapshot.state.shards,
       cores: snapshot.state.cores
@@ -250,6 +256,12 @@ export class GameClient {
     this.ctx.fillStyle = COLORS.game.background;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     renderProgressBar(this.ctx, this.canvas);
+
+    const amounts = this.snapshotAmounts();
+    if (amounts) {
+      updateHudViewModel(dt, amounts);
+      renderTopHUD(this.ctx, this.canvas);
+    }
 
     updateFloatingTexts(this.floatingTexts, dt);
 

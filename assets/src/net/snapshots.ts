@@ -34,15 +34,31 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     state.slots = upsertSlot(state.slots, snapshot.save_slot);
   }
 
-  if (result.type === "progress.claim_reward.result" && state.snapshot) {
-    state.snapshot.state.coins = result.coins;
-    state.snapshot.state.exp = result.exp;
-    state.snapshot.state.shards = result.shards;
-    state.snapshot.state.cores = result.cores;
+  if (result.type === "progress.claim_reward.result") {
+    applyAuthoritativeData(state, result);
   }
 
   state.statusTone = result.status === "error" ? "error" : "ok";
   state.status = statusForResult(result);
+}
+
+export function applyAuthoritativeData(
+  state: ServerState,
+  data: {
+    coins?: number;
+    exp?: number;
+    level?: number;
+    shards?: number;
+    cores?: number;
+  }
+) {
+  if (!state.snapshot) return;
+
+  if (data.coins !== undefined) state.snapshot.state.coins = data.coins;
+  if (data.exp !== undefined) state.snapshot.state.exp = data.exp;
+  if (data.level !== undefined) state.snapshot.state.level = data.level;
+  if (data.shards !== undefined) state.snapshot.state.shards = data.shards;
+  if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
 }
 
 function snapshotFromResult(result: ServerResult): GameSnapshot | null {

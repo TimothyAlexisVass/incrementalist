@@ -241,12 +241,13 @@ Deliverable: the core incremental loop works with server-authorized collectibili
 ### Phase 3: Currencies, Levels, and Rewards
 
 - Port or refine level-up reward events that need distinct presentation beyond the Phase 2 claim mutation.
+- Implement a centralized state handler on the client (e.g., `applyAuthoritativeData(state, data)`) to ensure that EXP gains, level-ups, and currency mutations returned in *any* server result are merged consistently and trigger their respective presentations, instead of mutating state across multiple individual command handlers willy-nilly.
+- Omit cross-feature dependencies from server reward evaluation (e.g., Sisu refills on level-up) until their respective features are ported in later phases.
 - EXP bar and level are calculated client-side, but without authority.
-- Ask server for current exp and level on client assumed level up and overwrite client state with authority from server.
-- Return changed final authoritative values from the server; do not send presentation-only reward or level-up events.
+- Return changed final authoritative values from the server; do not send presentation-only reward or level-up events. The client derives level-up presentation from changes in the authoritative `exp` and `level` returned in standard command results.
 - Render the top HUD currency and level display from authoritative snapshots and command results.
 - Render top-HUD resource counters and level-up reward presentation by deriving display behavior from authoritative values and local unauthorized UI state.
-- Add rule tests for deterministic reward paths.
+- Add rule tests for deterministic reward paths. Use Elixir's process dictionary seed (`:rand.seed/2`) in tests to make standard library RNG (`Enum.random/1`, `:rand.uniform/0`) deterministic without polluting the `Game.State` with a seed.
 
 ### Phase 4: Canvas Menu Shell and Save Files
 

@@ -61,6 +61,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           new_state =
             scheduled_state
             |> Bar.claim_reward()
+            |> Incrementalist.Game.Rewards.apply_level_ups()
             |> Bar.finalize_claim(now)
 
           updated_slot =
@@ -74,6 +75,7 @@ defmodule Incrementalist.Game.CommandExecutor do
              "command_id" => command.command_id,
              "coins" => new_state.coins,
              "exp" => new_state.exp,
+             "level" => new_state.level,
              "shards" => new_state.shards,
              "cores" => new_state.cores
            }, active_slot.id}

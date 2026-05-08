@@ -58,6 +58,9 @@ The only gameplay communication pattern is client command, server result. Client
 
 Every client command must receive a server result. Server results should include only the minimum authoritative values needed for that command and must not include UI instructions, animation directives, popup semantics, layout anchors, or presentation-only events. Do not add speculative bookkeeping fields. Protocol types must be discriminated unions keyed by `type`. Queue acceptance returns `command.queued` with only `command_id`; queue acceptance, queue rejection, and ACK responses are not ACKed. Error reasons must be machine-readable fields on explicit error result types. `command.ack` carries only the applied client `command_id`. Use server snapshots for boot or reconnect, and prefer cached client snapshots for boot or save-slot loading when visible state already exists.
 
+## State Synchronization Rule
+When handling command results on the client, always use the centralized `applyAuthoritativeData(state, result)` handler in `assets/src/net/snapshots.ts` instead of writing ad-hoc inline mutations. This ensures all server-provided authoritative values (like `level`, `exp`, `coins`, `shards`, `cores`) are safely and consistently merged into the local snapshot across the entire application without duplicated logic. Do not add inline state mutations in feature modules when applying server results.
+
 ## Testing Expectations
 Add backend rule tests for any gameplay logic moved or introduced. Add frontend tests for protocol handling, projection state machines, and hit testing when practical. For hidden-information features, especially Card Pick, add tests that prove unrevealed outcomes are never serialized to the client.
 

@@ -83,6 +83,7 @@ export type ProgressClaimRewardResult = {
   command_id: number;
   coins: number;
   exp: number;
+  level: number;
   shards: number;
   cores: number;
 };

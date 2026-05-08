@@ -175,6 +175,7 @@ export function applyProgressResult(
     if (effects && previousAmounts) {
       spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, effects.ctx, previousAmounts, {
         exp: result.exp,
+        level: result.level,
         coins: result.coins,
         shards: result.shards,
         cores: result.cores
