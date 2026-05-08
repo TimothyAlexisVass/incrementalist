@@ -4,7 +4,8 @@ import {
   ackAppliedResult, 
   switchSaveSlot, 
   resetSaveSlot, 
-  progressClaimIn 
+  progressClaimIn,
+  selectArea
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "../net/protocol";
@@ -15,6 +16,7 @@ import {
   getStateFromSnapshot,
   applyProgressResult
 } from "../features/progress/view-model";
+import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
   claimRewardOnAnyInput,
@@ -22,6 +24,7 @@ import {
   clearPendingClaimPopupPoint
 } from "../features/progress/interactions";
 import { renderProgressBar } from "../features/progress/render";
+import { renderAreaBackground, renderAreaSpecifics } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress/claim-effects";
@@ -109,7 +112,12 @@ export class GameClient {
       this.snapshotCache = new SnapshotCache(result.username);
 
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
-      if (result.snapshot) this.snapshotCache.save(result.snapshot);
+      if (result.snapshot) {
+        this.snapshotCache.save(result.snapshot);
+        updateAreaViewModel(result.snapshot.state);
+      } else if (this.store.state.snapshot) {
+        updateAreaViewModel(this.store.state.snapshot.state);
+      }
       this.store.state.slots = [result.save_slot];
 
       if (this.store.state.snapshot) {
@@ -357,10 +365,16 @@ export class GameClient {
     }
 
     // Render the core 2D progress bar UI (fill ratio and text)
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.fillStyle = COLORS.game.background;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    renderAreaBackground(this.ctx, this.canvas);
+    
     renderProgressBar(this.ctx, this.canvas);
+    
+    if (this.store.state.snapshot) {
+      renderAreaSpecifics(this.ctx, this.canvas, this.store.state.snapshot.state.level);
+    }
 
     const amounts = this.snapshotAmounts();
     if (amounts) {
@@ -386,6 +400,10 @@ export class GameClient {
     // toggle overlays without being immediately countered by "click-outside" logic.
     renderBottomHUD(this.ctx, this.canvas, input, () => {
       this.uiManager.overlayManager.toggle(this.mainMenu);
+    }, (areaKey) => {
+      if (this.channel) {
+        this.runCommand(() => selectArea(this.channel!, areaKey));
+      }
     });
 
     // The UI is drawn over the game world. It can consume clicks.

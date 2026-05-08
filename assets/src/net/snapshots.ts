@@ -1,4 +1,5 @@
-import type { GameSnapshot, SaveSlotSummary, ServerResult } from "./protocol";
+import type { GameSnapshot, SaveSlotSummary, ServerResult, AreaSelectResult } from "./protocol";
+import { updateAreaViewModel } from "../features/areas/view-model";
 
 export type ServerState = {
   snapshot: GameSnapshot | null;
@@ -24,6 +25,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   if (snapshot) {
     state.snapshot = snapshot;
+    updateAreaViewModel(snapshot.state);
   }
 
   if ("slots" in result) {
@@ -36,6 +38,10 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   if (result.type === "progress.claim_reward.result") {
     applyAuthoritativeData(state, result);
+  }
+
+  if (result.type === "area.select.result") {
+    applyAreaResult(state, result);
   }
 
   state.statusTone = result.status === "error" ? "error" : "ok";
@@ -61,6 +67,12 @@ export function applyAuthoritativeData(
   if (data.level !== undefined) state.snapshot.state.level = data.level;
   if (data.shards !== undefined) state.snapshot.state.shards = data.shards;
   if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
+}
+
+export function applyAreaResult(state: ServerState, result: AreaSelectResult) {
+  if (!state.snapshot) return;
+  state.snapshot.state.area = result.area;
+  updateAreaViewModel(state.snapshot.state);
 }
 
 function snapshotFromResult(result: ServerResult): GameSnapshot | null {

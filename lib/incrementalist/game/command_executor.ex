@@ -109,6 +109,28 @@ defmodule Incrementalist.Game.CommandExecutor do
       "save_slot.reset" ->
         execute_reset(player, command, now)
 
+      "area.select" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, area_key} <- fetch_area_key(command.intent),
+             {:ok, next_state} <- Incrementalist.Game.Features.Areas.select_area(active_slot.state, area_key) do
+          updated_slot =
+            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+
+          Repo.update!(updated_slot)
+
+          {"succeeded",
+           %{
+             "type" => "area.select.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "area" => area_key
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
       _unknown ->
         active_slot = active_slot(player, now)
 
@@ -187,6 +209,10 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_slot_index(%{slot_index: slot_index}), do: normalize_slot_index(slot_index)
   defp fetch_slot_index(_intent), do: {:error, "slot_index_required"}
 
+  defp fetch_area_key(%{"area" => area}) when is_binary(area), do: {:ok, area}
+  defp fetch_area_key(%{area: area}) when is_binary(area), do: {:ok, area}
+  defp fetch_area_key(_intent), do: {:error, "area_required"}
+
   defp normalize_slot_index(slot_index)
        when is_integer(slot_index) do
     if slot_index in Constants.valid_slot_indexes() do
@@ -223,7 +249,7 @@ defmodule Incrementalist.Game.CommandExecutor do
       "type" => "command.error",
       "status" => "error",
       "command_id" => command.command_id,
-      "reason" => reason
+      "reason" => to_string(reason)
     })
   end
 end

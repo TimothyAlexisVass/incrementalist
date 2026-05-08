@@ -161,6 +161,22 @@ defmodule Incrementalist.Game.CommandsTest do
     assert empty_slot_result["snapshot"]["active_save_slot"] == 2
   end
 
+  test "area.select updates the current area when unlocked" do
+    player = create_player()
+    
+    # Sage is unlocked by default
+    result = Commands.enqueue(player.id, "area.select", intent(0, %{"area" => "sage"}), @now)
+    assert result["type"] == "area.select.result"
+    assert result["area"] == "sage"
+    
+    Commands.ack(player.id, 0, @now)
+    
+    # Cloverfield is locked at level 1
+    locked = Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+    assert locked["type"] == "command.error"
+    assert locked["reason"] == "area_locked"
+  end
+
   test "stored results replay without re-executing command rules" do
     player = create_player()
 

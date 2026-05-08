@@ -10,6 +10,14 @@ export type SaveSlotSummary = {
   saved_at: string | null;
 };
 
+export type AreaDefinition = {
+  key: string;
+  name: string;
+  description: string;
+  unlock_level: number;
+  is_locked: boolean;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -32,6 +40,7 @@ export type GameSnapshot = {
       reward_multiplier: number;
       rewards_claimed: number;
     };
+    areas: AreaDefinition[];
   };
   save_slot: SaveSlotSummary;
 };
@@ -90,11 +99,20 @@ export type ProgressClaimRewardResult = {
   cores: BigNum;
 };
 
+export type AreaSelectResult = {
+  type: "area.select.result";
+  status: "ok";
+  command_id: number;
+  area: string;
+};
+
 export type CommandErrorReason =
   | "unknown_command"
   | "slot_index_required"
   | "invalid_slot_index"
-  | "claim_not_ready";
+  | "claim_not_ready"
+  | "area_locked"
+  | "unknown_area";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -112,6 +130,7 @@ export type AckableCommandResult =
   | SaveSlotResetResult
   | ProgressClaimInResult
   | ProgressClaimRewardResult
+  | AreaSelectResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -155,6 +174,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "save_slot.reset.result" ||
     result.type === "progress.claim_in.result" ||
     result.type === "progress.claim_reward.result" ||
+    result.type === "area.select.result" ||
     result.type === "command.error"
   );
 }

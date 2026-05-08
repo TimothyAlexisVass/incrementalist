@@ -237,7 +237,11 @@ defmodule Incrementalist.Game.State do
           if(state.progress_bar, do: state.progress_bar.reward_multiplier, else: 1.0),
         "rewards_claimed" =>
           if(state.progress_bar, do: state.progress_bar.rewards_claimed, else: 0)
-      }
+      },
+      "areas" =>
+        Enum.map(Incrementalist.Game.Constants.area_defs(), fn def ->
+          Map.put(def, :is_locked, (state.level || 1) < def.unlock_level)
+        end)
     }
   end
 

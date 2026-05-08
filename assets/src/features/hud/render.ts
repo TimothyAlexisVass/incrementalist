@@ -115,8 +115,15 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
 
 import { doButton } from '../../ui/components/button';
 import { InputState } from '../../ui/input';
+import { renderAreaDropdown } from '../areas/render';
 
-export function renderBottomHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onMenuClick: () => void) {
+export function renderBottomHUD(
+  ctx: CanvasRenderingContext2D, 
+  canvas: HTMLCanvasElement, 
+  input: InputState, 
+  onMenuClick: () => void,
+  onAreaSelect?: (areaKey: string) => void
+) {
   ctx.save();
 
   // Draw background for bottom HUD
@@ -134,6 +141,11 @@ export function renderBottomHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanva
   if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]')) {
     onMenuClick();
   }
+
+  // Draw Area selection dropdown on the left
+  renderAreaDropdown(ctx, canvas, input, (areaKey) => {
+    if (onAreaSelect) onAreaSelect(areaKey);
+  });
 
   ctx.restore();
 }

@@ -21,7 +21,10 @@
   var TOP_HUD_LEVEL_FONT = "bold 26px Arial";
   var TOP_HUD_EXP_FONT = "14px Arial";
   var TOP_HUD_COINS_FONT = "18px Arial";
+  var BOTTOM_HUD_BUTTON_FONT = "bold 12px Arial";
   var REWARD_POPUP_FONT = "25px Arial";
+  var SMALL_TEXT_FONT = "13px Arial";
+  var TINY_TEXT_FONT = "12px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
   var SAVE_AUTOSAVE_FONT = "14px Arial";
@@ -1179,6 +1182,9 @@
   function progressClaimReward(channel) {
     return channel.pushCommand("progress.claim_reward");
   }
+  function selectArea(channel, areaKey) {
+    return channel.pushCommand("area.select", { area: areaKey });
+  }
   async function ackAppliedResult(channel, commandId) {
     const ack = await channel.ackCommand(commandId);
     return ack.released_result;
@@ -1351,7 +1357,25 @@
 
   // src/net/protocol.ts
   function isAckableCommandResult(result) {
-    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "command.error";
+    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "command.error";
+  }
+
+  // src/features/areas/view-model.ts
+  var areaViewModel = {
+    currentArea: "sage",
+    availableAreas: [],
+    sage: {
+      lastLevelForTip: -1,
+      tipStartTime: 0,
+      tipText: ""
+    }
+  };
+  function getAreaViewModel() {
+    return areaViewModel;
+  }
+  function updateAreaViewModel(snapshotState) {
+    areaViewModel.currentArea = snapshotState.area;
+    areaViewModel.availableAreas = snapshotState.areas || [];
   }
 
   // src/net/snapshots.ts
@@ -1367,6 +1391,7 @@
     const snapshot = snapshotFromResult(result);
     if (snapshot) {
       state2.snapshot = snapshot;
+      updateAreaViewModel(snapshot.state);
     }
     if ("slots" in result) {
       state2.slots = result.slots;
@@ -1375,6 +1400,9 @@
     }
     if (result.type === "progress.claim_reward.result") {
       applyAuthoritativeData(state2, result);
+    }
+    if (result.type === "area.select.result") {
+      applyAreaResult(state2, result);
     }
     state2.statusTone = result.status === "error" ? "error" : "ok";
     state2.status = statusForResult(result);
@@ -1386,6 +1414,11 @@
     if (data.level !== void 0) state2.snapshot.state.level = data.level;
     if (data.shards !== void 0) state2.snapshot.state.shards = data.shards;
     if (data.cores !== void 0) state2.snapshot.state.cores = data.cores;
+  }
+  function applyAreaResult(state2, result) {
+    if (!state2.snapshot) return;
+    state2.snapshot.state.area = result.area;
+    updateAreaViewModel(state2.snapshot.state);
   }
   function snapshotFromResult(result) {
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
@@ -2904,6 +2937,271 @@
     });
   }
 
+  // src/features/areas/sage/tips.ts
+  var SAGE_TIPS = {
+    1: [
+      "Your journey to become the Incrementalist begins now.",
+      "A journey around the globe begins with one step.",
+      "Collect your first reward.",
+      "You collect rewards by performing any kind of action when the progress-bar is full."
+    ],
+    2: [
+      "You can unlock new capabilities in the shop. Go now and unlock Idle mode.",
+      "Right now, idling will reduce your reward speed, but you will be able to upgrade this skill in the future."
+    ],
+    4: [
+      "I can sense an immense power dormant in you. You are now ready to unlock some of that potential.",
+      "We are going to have to release your inner nature gradually.",
+      "Sisu is a Finnish concept meaning deep inner strength, grit, and determination. It is the ability to keep going through difficulty, not through loud force, but through quiet endurance, resilience, and willpower."
+    ],
+    10: [
+      "Before we release you fully into the Incrementiverse, we are going to have to improve your luck. Go to the Cloverfield and search for the seven leaf clover."
+    ],
+    15: [
+      "You have collected many resources on your journey. It is time to trade them.",
+      "Go to the Market to trade your goods and acquire new capabilities."
+    ]
+  };
+
+  // src/features/areas/sage/render.ts
+  var LETTERS_PER_SECOND = 40;
+  function renderSageArea(ctx2, canvas2, level) {
+    const model = getAreaViewModel().sage;
+    const tips = SAGE_TIPS[level];
+    if (!tips) {
+      model.lastLevelForTip = level;
+      return;
+    }
+    const now = performance.now();
+    if (model.lastLevelForTip !== level) {
+      model.lastLevelForTip = level;
+      model.tipStartTime = now;
+      model.tipText = tips.join("\n");
+    }
+    const elapsedSeconds = (now - model.tipStartTime) / 1e3;
+    const lettersToShow = Math.floor(elapsedSeconds * LETTERS_PER_SECOND);
+    const fullText = `The Sage: ${model.tipText}`;
+    const visibleText = fullText.substring(0, lettersToShow + 10);
+    ctx2.save();
+    ctx2.font = SMALL_TEXT_FONT;
+    const lines = visibleText.split("\n");
+    const fullLines = fullText.split("\n");
+    let maxLineWidth = 0;
+    for (const line of fullLines) {
+      const width = ctx2.measureText(line).width;
+      if (width > maxLineWidth) {
+        maxLineWidth = width;
+      }
+    }
+    const lineHeight = 20;
+    const padding = 16;
+    const boxWidth = maxLineWidth + padding * 2;
+    const boxHeight = fullLines.length * lineHeight + padding * 2;
+    const bottomHudY = canvas2.height - BOTTOM_HUD_HEIGHT;
+    const boxY = bottomHudY - 30 - boxHeight;
+    const boxX = (canvas2.width - boxWidth) / 2;
+    ctx2.fillStyle = COLORS.panel.bg;
+    ctx2.fillRect(boxX, boxY, boxWidth, boxHeight);
+    ctx2.strokeStyle = COLORS.panel.border;
+    ctx2.lineWidth = 1;
+    ctx2.strokeRect(boxX + 0.5, boxY + 0.5, boxWidth - 1, boxHeight - 1);
+    ctx2.fillStyle = COLORS.panel.textPrimary;
+    ctx2.textAlign = "left";
+    ctx2.textBaseline = "top";
+    for (let i = 0; i < lines.length; i++) {
+      ctx2.fillText(lines[i], boxX + padding, boxY + padding + i * lineHeight);
+    }
+    ctx2.restore();
+  }
+
+  // src/ui/components/tooltip.ts
+  function drawTooltip(ctx2, canvas2, anchorPoint, content, options = {}) {
+    if (!ctx2 || !canvas2 || !anchorPoint) {
+      return null;
+    }
+    const lines = normalizeTooltipLines(content);
+    if (lines.length === 0) {
+      return null;
+    }
+    const {
+      font = TINY_TEXT_FONT,
+      textColor = "#f4f7ff",
+      backgroundColor = "rgba(9, 14, 24, 0.94)",
+      borderColor = "#6f88b4",
+      paddingX = 10,
+      paddingY = 8,
+      lineHeight = Math.max(14, parseFontSizePx(font, 12) + 4),
+      offsetX = 14,
+      offsetY = 14,
+      margin = 8
+    } = options;
+    ctx2.save();
+    ctx2.font = font;
+    const contentWidth = lines.reduce((widest, line) => {
+      return Math.max(widest, ctx2.measureText(line).width);
+    }, 0);
+    const width = Math.ceil(contentWidth + paddingX * 2);
+    const height = Math.ceil(lines.length * lineHeight + paddingY * 2);
+    let x = anchorPoint.x + offsetX;
+    let y = anchorPoint.y - height - offsetY;
+    if (x + width > canvas2.width - margin) {
+      x = canvas2.width - margin - width;
+    }
+    if (x < margin) {
+      x = margin;
+    }
+    if (y < margin) {
+      y = anchorPoint.y + offsetY;
+    }
+    if (y + height > canvas2.height - margin) {
+      y = canvas2.height - margin - height;
+    }
+    ctx2.fillStyle = backgroundColor;
+    ctx2.fillRect(x, y, width, height);
+    ctx2.strokeStyle = borderColor;
+    ctx2.lineWidth = 1;
+    ctx2.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+    ctx2.fillStyle = textColor;
+    ctx2.textAlign = "left";
+    ctx2.textBaseline = "top";
+    for (let i = 0; i < lines.length; i += 1) {
+      ctx2.fillText(lines[i], x + paddingX, y + paddingY + i * lineHeight);
+    }
+    ctx2.restore();
+    return { x, y, width, height };
+  }
+  function normalizeTooltipLines(content) {
+    const sourceLines = Array.isArray(content) ? content : String(content ?? "").split("\n");
+    return sourceLines.map((line) => String(line ?? "").trim()).filter((line) => line.length > 0);
+  }
+
+  // src/ui/components/locked-element.ts
+  function drawLockedElement2(ctx2, canvas2, input, rect, drawElement, options = {}) {
+    const {
+      label = "LOCKED",
+      opacity = 0.1,
+      criteria
+    } = options;
+    ctx2.save();
+    ctx2.globalAlpha = opacity;
+    drawElement();
+    ctx2.restore();
+    ctx2.save();
+    ctx2.font = "bold 12px Arial";
+    ctx2.textAlign = "center";
+    ctx2.textBaseline = "middle";
+    const textX = rect.x + rect.width / 2;
+    const textY = rect.y + rect.height / 2;
+    ctx2.strokeStyle = "rgba(0, 0, 0, 0.8)";
+    ctx2.lineWidth = 3;
+    ctx2.strokeText(label, textX, textY);
+    ctx2.fillStyle = COLORS.panel.textPrimary;
+    ctx2.fillText(label, textX, textY);
+    ctx2.restore();
+    if (criteria && pointInRect(input.pointer, rect)) {
+      drawTooltip(ctx2, canvas2, input.pointer, criteria);
+    }
+  }
+
+  // src/features/areas/render.ts
+  var areaBackgroundImages = /* @__PURE__ */ new Map();
+  function getAreaBackgroundImage(areaKey) {
+    if (!areaBackgroundImages.has(areaKey)) {
+      const image = new Image();
+      image.src = `images/${areaKey}_background.png`;
+      areaBackgroundImages.set(areaKey, image);
+    }
+    return areaBackgroundImages.get(areaKey);
+  }
+  function renderAreaBackground(ctx2, canvas2) {
+    const model = getAreaViewModel();
+    const areaKey = model.currentArea;
+    const image = getAreaBackgroundImage(areaKey);
+    if (image.complete && image.naturalWidth > 0) {
+      ctx2.drawImage(image, DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT);
+      return;
+    }
+    ctx2.fillStyle = COLORS.game.background;
+    ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+  }
+  function renderAreaSpecifics(ctx2, canvas2, level) {
+    const model = getAreaViewModel();
+    if (model.currentArea === "sage") {
+      renderSageArea(ctx2, canvas2, level);
+    }
+  }
+  var isDropdownOpen = false;
+  function renderAreaDropdown(ctx2, canvas2, input, onSelect) {
+    const model = getAreaViewModel();
+    const buttonWidth = 140;
+    const buttonHeight = 34;
+    const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
+    const buttonX = 20;
+    const buttonY = canvas2.height - buttonHeight - paddingBottom;
+    const currentArea = model.availableAreas.find((a) => a.key === model.currentArea);
+    const buttonLabel = currentArea ? currentArea.name : "Unknown Area";
+    const buttonRect = { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight };
+    const isHoveringButton = pointInRect(input.pointer, buttonRect);
+    if (isHoveringButton) {
+      isDropdownOpen = true;
+    }
+    if (isDropdownOpen) {
+      const availableAreas = model.availableAreas.filter((a) => a.key !== model.currentArea);
+      if (availableAreas.length > 0) {
+        const itemHeight = 34;
+        const menuWidth = buttonWidth;
+        const menuHeight = availableAreas.length * itemHeight;
+        const menuRect = { x: buttonX, y: buttonY - menuHeight, width: menuWidth, height: menuHeight };
+        const isHoveringMenu = pointInRect(input.pointer, menuRect);
+        if (!isHoveringButton && !isHoveringMenu) {
+          isDropdownOpen = false;
+        } else {
+          ctx2.save();
+          ctx2.fillStyle = COLORS.panel.bg;
+          ctx2.fillRect(menuRect.x, menuRect.y, menuRect.width, menuRect.height);
+          ctx2.strokeStyle = COLORS.panel.border;
+          ctx2.lineWidth = 1;
+          ctx2.strokeRect(menuRect.x + 0.5, menuRect.y + 0.5, menuRect.width - 1, menuRect.height - 1);
+          availableAreas.forEach((area, i) => {
+            const itemRect = {
+              x: menuRect.x,
+              y: menuRect.y + i * itemHeight,
+              width: menuWidth,
+              height: itemHeight
+            };
+            const isHovered = pointInRect(input.pointer, itemRect);
+            const renderItem = () => {
+              if (isHovered && !area.is_locked) {
+                ctx2.fillStyle = COLORS.panel.highlight;
+                ctx2.fillRect(itemRect.x, itemRect.y, itemRect.width, itemRect.height);
+              }
+              ctx2.fillStyle = area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary;
+              ctx2.font = BOTTOM_HUD_BUTTON_FONT;
+              ctx2.textAlign = "center";
+              ctx2.textBaseline = "middle";
+              ctx2.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
+            };
+            if (area.is_locked) {
+              drawLockedElement2(ctx2, canvas2, input, itemRect, renderItem, {
+                criteria: `Requires Level ${area.unlock_level}`
+              });
+            } else {
+              renderItem();
+            }
+            if (isHovered && input.clicked && !area.is_locked) {
+              onSelect(area.key);
+              isDropdownOpen = false;
+              input.consumed = true;
+            }
+          });
+          ctx2.restore();
+        }
+      }
+    }
+    if (doButton(ctx2, input, buttonRect, buttonLabel)) {
+    }
+  }
+
   // src/features/hud/view-model.ts
   var state = {
     displayedExp: ZERO,
@@ -3152,7 +3450,7 @@
     drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
     drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
   }
-  function renderBottomHUD(ctx2, canvas2, input, onMenuClick) {
+  function renderBottomHUD(ctx2, canvas2, input, onMenuClick, onAreaSelect) {
     ctx2.save();
     ctx2.fillStyle = COLORS.panel.bg;
     ctx2.fillRect(0, canvas2.height - BOTTOM_HUD_HEIGHT, canvas2.width, BOTTOM_HUD_HEIGHT);
@@ -3165,6 +3463,9 @@
     if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]")) {
       onMenuClick();
     }
+    renderAreaDropdown(ctx2, canvas2, input, (areaKey) => {
+      if (onAreaSelect) onAreaSelect(areaKey);
+    });
     ctx2.restore();
   }
   function drawCurrency(ctx2, canvas2, label, amount, color, iconRight, counterRight) {
@@ -3880,7 +4181,12 @@
         window.localStorage.setItem(usernameKey, result.username);
         this.snapshotCache = new SnapshotCache(result.username);
         this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
-        if (result.snapshot) this.snapshotCache.save(result.snapshot);
+        if (result.snapshot) {
+          this.snapshotCache.save(result.snapshot);
+          updateAreaViewModel(result.snapshot.state);
+        } else if (this.store.state.snapshot) {
+          updateAreaViewModel(this.store.state.snapshot.state);
+        }
         this.store.state.slots = [result.save_slot];
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
@@ -4072,10 +4378,13 @@
         const channel = this.channel;
         this.runCommand(() => progressClaimIn(channel));
       }
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.ctx.fillStyle = COLORS.game.background;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      renderAreaBackground(this.ctx, this.canvas);
       renderProgressBar(this.ctx, this.canvas);
+      if (this.store.state.snapshot) {
+        renderAreaSpecifics(this.ctx, this.canvas, this.store.state.snapshot.state.level);
+      }
       const amounts = this.snapshotAmounts();
       if (amounts) {
         updateHudViewModel(dt, amounts);
@@ -4090,6 +4399,10 @@
       }
       renderBottomHUD(this.ctx, this.canvas, input, () => {
         this.uiManager.overlayManager.toggle(this.mainMenu);
+      }, (areaKey) => {
+        if (this.channel) {
+          this.runCommand(() => selectArea(this.channel, areaKey));
+        }
       });
       this.uiManager.tick(dt, input);
       this.uiManager.render(this.ctx, this.canvas, input, this.store.state);

@@ -261,34 +261,7 @@ Deliverable: the core incremental loop works with server-authorized collectibili
 
 Deliverable: save-file selection and reset live in the Canvas menu overlay, and the temporary HTML save-slot UI is gone.
 
-### Phase 5: Shop and Locked Elements
-
-- Port feature shop definitions to Elixir.
-- Implement `shop.purchase`.
-- Render the Shop tab inside the Canvas menu overlay.
-- Implement unlock destination metadata in snapshots.
-- Keep locked-element UI as presentation only.
-- Highlight unlock destination on client based on server metadata.
-
-Deliverable: Idle Mode, Sisu Generator, and Bonus Time unlocks are server-authorized.
-
-### Phase 6: Idle Mode
-
-- Implement `progress.set_idle_mode`.
-- Make idle-mode fill rate part of server-issued projection parameters.
-
-Deliverable: idle mode changes fill pacing and updates the HUD smoothly.
-
-### Phase 7: Sisu
-
-- Port Sisu state, refill tiers, max upgrade costs, and decay to Elixir.
-- Use lazy time advancement for Sisu decay.
-- Implement `sisu.refill` and `sisu.upgrade_max`.
-- Frontend renders Sisu meter and refill controls from snapshots.
-
-Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
-
-### Phase 8: Areas
+### Phase 5: Areas
 
 - Port area definitions and unlock requirements to Elixir.
 - Implement `area.select`.
@@ -296,6 +269,33 @@ Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
 - Locked areas display server-provided unlock requirements.
 
 Deliverable: area selection and unlock visibility work without client rule ownership.
+
+### Phase 6: Shop and Locked Elements
+
+- Port feature shop definitions to Elixir.
+- Implement `shop.purchase`.
+- Render the Shop tab inside the main menu overlay.
+- Implement unlock destination metadata in snapshots.
+- Keep locked-element UI as presentation only.
+- Highlight unlock destination on client based on server metadata.
+
+Deliverable: Idle Mode, Sisu Generator, and Bonus Time unlocks are server-authorized. The features themselves 
+
+### Phase 7: Idle Mode
+
+- Implement `progress.set_idle_mode`.
+- Make idle-mode fill rate part of server-issued projection parameters.
+
+Deliverable: idle mode changes fill pacing and updates the HUD smoothly.
+
+### Phase 8: Sisu
+
+- Port Sisu state, refill tiers, max upgrade costs, and decay to Elixir.
+- Use lazy time advancement for Sisu decay.
+- Implement `sisu.refill` and `sisu.upgrade_max`.
+- Frontend renders Sisu meter and refill controls from snapshots.
+
+Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
 
 ### Phase 9: Quests and Achievements
 
@@ -328,13 +328,6 @@ Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
 - Bonus phases reveal only allowed information.
 
 Deliverable: Card Pick session lifecycle and reveal flow are ported.
-
-### Phase 12: WebGL and Visual Polish
-
-- Move particles, floating text, and WebGL effects into render/effects modules.
-- Trigger effects from server events and local cosmetic input events.
-
-Deliverable: legacy visual effects and player-visible behavior are restored on the new architecture.
 
 ### Phase 13: Legacy Removal
 
