@@ -28,6 +28,10 @@ export class OverlayManager {
     return this.activeOverlay !== null;
   }
 
+  getActiveOverlay(): Overlay | null {
+    return this.activeOverlay;
+  }
+
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState) {
     if (!this.activeOverlay) return;
 

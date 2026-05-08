@@ -235,10 +235,38 @@ export class GameClient {
 
   private onKeydown(event: KeyboardEvent) {
     this.hasActivityThisFrame = true;
+
+    if (this.uiManager.modalManager.isOpen()) {
+      return;
+    }
+
     if (event.key === 'Escape') {
       this.uiManager.overlayManager.toggle(this.mainMenu);
       event.preventDefault();
       return;
+    }
+
+    const key = event.key.toLowerCase();
+    const overlay = this.uiManager.overlayManager.getActiveOverlay();
+    const isMainMenuOpen = overlay === this.mainMenu;
+    const isNoOverlayOpen = overlay === null;
+
+    if (isNoOverlayOpen || isMainMenuOpen) {
+      let targetTab: string | null = null;
+      if (key === 's') targetTab = 'shop';
+      if (key === 'q') targetTab = 'quest';
+      if (key === 'a') targetTab = 'achievements';
+
+      if (targetTab) {
+        if (isMainMenuOpen && this.mainMenu.getActiveTabId() === targetTab) {
+          this.uiManager.overlayManager.close();
+        } else {
+          this.mainMenu.setTab(targetTab);
+          this.uiManager.overlayManager.open(this.mainMenu);
+        }
+        event.preventDefault();
+        return;
+      }
     }
 
     if (this.channel) {

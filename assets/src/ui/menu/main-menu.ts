@@ -1,6 +1,7 @@
 import { Overlay } from '../overlay-manager';
 import { COLORS } from '../../colors';
 import { InputState, pointInRect } from '../input';
+import { TabMenu, TabDefinition, Rect } from '../components/tab-menu/tab-menu';
 import {
   TOP_HUD_HEIGHT,
   BOTTOM_HUD_HEIGHT,
@@ -9,11 +10,68 @@ import {
 } from '../../config';
 
 export class MainMenu implements Overlay {
+  private tabMenu: TabMenu;
+
+  public setTab(id: string) {
+    this.tabMenu.setActiveTabId(id);
+  }
+
+  public getActiveTabId(): string {
+    return this.tabMenu.getActiveTabId();
+  }
+
+  constructor() {
+    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, rect: Rect) => {
+      ctx.fillStyle = COLORS.panel.textPrimary;
+      ctx.font = '24px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${title} Placeholder`, rect.x + rect.width / 2, rect.y + rect.height / 2);
+    };
+
+    const tabs: TabDefinition[] = [
+      {
+        id: 'shop',
+        label: 'Shop',
+        hotkey: 'S',
+        renderContent: renderPlaceholder('Shop')
+      },
+      {
+        id: 'quest',
+        label: 'Quest',
+        hotkey: 'Q',
+        renderContent: renderPlaceholder('Quest')
+      },
+      {
+        id: 'achievements',
+        label: 'Achievements',
+        hotkey: 'A',
+        renderContent: renderPlaceholder('Achievements')
+      },
+      {
+        id: 'stats',
+        label: 'Stats',
+        renderContent: renderPlaceholder('Stats')
+      },
+      {
+        id: 'save',
+        label: 'Save Files',
+        renderContent: renderPlaceholder('Save Files')
+      }
+    ];
+
+    this.tabMenu = new TabMenu(tabs, {
+      layout: 'horizontal',
+      position: 'top-left',
+      tabHeight: 36,
+      tabPadding: 24,
+      font: 'bold 16px Arial'
+    });
+  }
+
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onClose: () => void) {
     ctx.save();
 
-    // Cover only the display area — leaves the top HUD, bottom HUD, and
-    // the right-hand progress bar column completely untouched.
     const x = DISPLAY_AREA_X;
     const y = TOP_HUD_HEIGHT;
     const width = DISPLAY_AREA_WIDTH;
@@ -23,22 +81,19 @@ export class MainMenu implements Overlay {
     ctx.fillStyle = COLORS.panel.bg;
     ctx.fillRect(x, y, width, height);
 
-    // Placeholder Title
-    ctx.fillStyle = COLORS.overlay.titleText;
-    ctx.font = 'bold 24px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Menu Placeholder', x + 20, y + 20);
-
-    // Placeholder Close Text
-    ctx.fillStyle = COLORS.button.text;
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('[ESC] or click outside to close', x + width - 20, y + 24);
-
     ctx.restore();
 
-    // Consume input inside the overlay. Clicks outside close it.
+    // Render TabMenu
+    // We give it a slightly inset rect so it's not flush with the very edges
+    const menuRect = {
+      x: x + 16,
+      y: y + 16,
+      width: width - 32,
+      height: height - 32
+    };
+
+    this.tabMenu.render(ctx, canvas, input, menuRect);
+
     if (!input.consumed) {
       if (pointInRect(input.pointer, shellRect)) {
         input.consumed = true;
@@ -48,5 +103,7 @@ export class MainMenu implements Overlay {
     }
   }
 
-  tick(dt: number) { }
+  tick(dt: number) {
+    this.tabMenu.tick(dt);
+  }
 }

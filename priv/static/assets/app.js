@@ -3247,6 +3247,9 @@
     isOpen() {
       return this.activeOverlay !== null;
     }
+    getActiveOverlay() {
+      return this.activeOverlay;
+    }
     render(ctx2, canvas2, input) {
       if (!this.activeOverlay) return;
       this.activeOverlay.render(ctx2, canvas2, input, () => this.close());
@@ -3278,8 +3281,211 @@
     }
   };
 
+  // src/ui/components/tab-menu/tab-menu.ts
+  var TabMenu = class {
+    constructor(tabs, config = {}, initialTabId) {
+      this.tabs = tabs;
+      this.config = config;
+      __publicField(this, "activeTabId");
+      if (tabs.length === 0) {
+        throw new Error("TabMenu must have at least one tab.");
+      }
+      this.activeTabId = initialTabId && tabs.some((t) => t.id === initialTabId) ? initialTabId : tabs[0].id;
+    }
+    getActiveTabId() {
+      return this.activeTabId;
+    }
+    setActiveTabId(id) {
+      if (this.tabs.some((t) => t.id === id)) {
+        this.activeTabId = id;
+      }
+    }
+    tick(dt) {
+      const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
+      if (activeTab?.tickContent) {
+        activeTab.tickContent(dt);
+      }
+    }
+    render(ctx2, canvas2, input, containerRect) {
+      const layout = this.config.layout || "horizontal";
+      const position = this.config.position || "top-left";
+      const tabHeight = this.config.tabHeight || 30;
+      const tabPadding = this.config.tabPadding || 16;
+      const gap = this.config.gap || 4;
+      const font = this.config.font || "bold 14px Arial";
+      ctx2.save();
+      ctx2.font = font;
+      const textWidths = this.tabs.map((t) => {
+        const label = t.hotkey ? `${t.label} (${t.hotkey})` : t.label;
+        return ctx2.measureText(label).width;
+      });
+      const maxTextWidth = Math.max(...textWidths);
+      let contentRect;
+      const tabRects = [];
+      if (layout === "horizontal") {
+        const uniformTabWidth = maxTextWidth + tabPadding * 2;
+        const totalUniformWidth = uniformTabWidth * this.tabs.length + gap * (this.tabs.length - 1);
+        let actualTabWidths;
+        if (totalUniformWidth > containerRect.width) {
+          actualTabWidths = textWidths.map((w) => w + tabPadding * 2);
+        } else {
+          actualTabWidths = this.tabs.map(() => uniformTabWidth);
+        }
+        const totalActualWidth = actualTabWidths.reduce((a, b) => a + b, 0) + gap * (this.tabs.length - 1);
+        let startX = containerRect.x;
+        if (position === "top-right" || position === "bottom-right") {
+          startX = containerRect.x + containerRect.width - totalActualWidth;
+        }
+        let startY = containerRect.y;
+        if (position === "bottom-left" || position === "bottom-right") {
+          startY = containerRect.y + containerRect.height - tabHeight;
+        }
+        let currentX = startX;
+        for (let i = 0; i < this.tabs.length; i++) {
+          tabRects.push({
+            x: currentX,
+            y: startY,
+            width: actualTabWidths[i],
+            height: tabHeight
+          });
+          currentX += actualTabWidths[i] + gap;
+        }
+        if (position === "top-left" || position === "top-right") {
+          contentRect = {
+            x: containerRect.x,
+            y: containerRect.y + tabHeight,
+            width: containerRect.width,
+            height: containerRect.height - tabHeight
+          };
+        } else {
+          contentRect = {
+            x: containerRect.x,
+            y: containerRect.y,
+            width: containerRect.width,
+            height: containerRect.height - tabHeight
+          };
+        }
+      } else {
+        const uniformTabWidth = maxTextWidth + tabPadding * 2;
+        const totalHeight = tabHeight * this.tabs.length + gap * (this.tabs.length - 1);
+        let startX = containerRect.x;
+        if (position === "top-right" || position === "bottom-right") {
+          startX = containerRect.x + containerRect.width - uniformTabWidth;
+        }
+        let startY = containerRect.y;
+        if (position === "bottom-left" || position === "bottom-right") {
+          startY = containerRect.y + containerRect.height - totalHeight;
+        }
+        let currentY = startY;
+        for (let i = 0; i < this.tabs.length; i++) {
+          tabRects.push({
+            x: startX,
+            y: currentY,
+            width: uniformTabWidth,
+            height: tabHeight
+          });
+          currentY += tabHeight + gap;
+        }
+        if (position === "top-left" || position === "bottom-left") {
+          contentRect = {
+            x: containerRect.x + uniformTabWidth,
+            y: containerRect.y,
+            width: containerRect.width - uniformTabWidth,
+            height: containerRect.height
+          };
+        } else {
+          contentRect = {
+            x: containerRect.x,
+            y: containerRect.y,
+            width: containerRect.width - uniformTabWidth,
+            height: containerRect.height
+          };
+        }
+      }
+      ctx2.restore();
+      for (let i = 0; i < this.tabs.length; i++) {
+        const tab = this.tabs[i];
+        const rect = tabRects[i];
+        const isActive = this.activeTabId === tab.id;
+        let label = tab.label;
+        if (tab.hotkey) {
+          label += ` (${tab.hotkey})`;
+        }
+        const clicked = doButton(ctx2, input, rect, label, {
+          active: isActive || void 0,
+          activeSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
+          inactiveSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
+          activeBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
+          inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
+          textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
+          font
+        });
+        if (clicked) {
+          this.activeTabId = tab.id;
+        }
+      }
+      const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
+      if (activeTab) {
+        activeTab.renderContent(ctx2, canvas2, input, contentRect);
+      }
+    }
+  };
+
   // src/ui/menu/main-menu.ts
   var MainMenu = class {
+    constructor() {
+      __publicField(this, "tabMenu");
+      const renderPlaceholder = (title) => (ctx2, canvas2, input, rect) => {
+        ctx2.fillStyle = COLORS.panel.textPrimary;
+        ctx2.font = "24px Arial";
+        ctx2.textAlign = "center";
+        ctx2.textBaseline = "middle";
+        ctx2.fillText(`${title} Placeholder`, rect.x + rect.width / 2, rect.y + rect.height / 2);
+      };
+      const tabs = [
+        {
+          id: "shop",
+          label: "Shop",
+          hotkey: "S",
+          renderContent: renderPlaceholder("Shop")
+        },
+        {
+          id: "quest",
+          label: "Quest",
+          hotkey: "Q",
+          renderContent: renderPlaceholder("Quest")
+        },
+        {
+          id: "achievements",
+          label: "Achievements",
+          hotkey: "A",
+          renderContent: renderPlaceholder("Achievements")
+        },
+        {
+          id: "stats",
+          label: "Stats",
+          renderContent: renderPlaceholder("Stats")
+        },
+        {
+          id: "save",
+          label: "Save Files",
+          renderContent: renderPlaceholder("Save Files")
+        }
+      ];
+      this.tabMenu = new TabMenu(tabs, {
+        layout: "horizontal",
+        position: "top-left",
+        tabHeight: 36,
+        tabPadding: 24,
+        font: "bold 16px Arial"
+      });
+    }
+    setTab(id) {
+      this.tabMenu.setActiveTabId(id);
+    }
+    getActiveTabId() {
+      return this.tabMenu.getActiveTabId();
+    }
     render(ctx2, canvas2, input, onClose) {
       ctx2.save();
       const x = DISPLAY_AREA_X;
@@ -3289,16 +3495,14 @@
       const shellRect = { x, y, width, height };
       ctx2.fillStyle = COLORS.panel.bg;
       ctx2.fillRect(x, y, width, height);
-      ctx2.fillStyle = COLORS.overlay.titleText;
-      ctx2.font = "bold 24px Arial";
-      ctx2.textAlign = "left";
-      ctx2.textBaseline = "top";
-      ctx2.fillText("Menu Placeholder", x + 20, y + 20);
-      ctx2.fillStyle = COLORS.button.text;
-      ctx2.font = "bold 14px Arial";
-      ctx2.textAlign = "right";
-      ctx2.fillText("[ESC] or click outside to close", x + width - 20, y + 24);
       ctx2.restore();
+      const menuRect = {
+        x: x + 16,
+        y: y + 16,
+        width: width - 32,
+        height: height - 32
+      };
+      this.tabMenu.render(ctx2, canvas2, input, menuRect);
       if (!input.consumed) {
         if (pointInRect(input.pointer, shellRect)) {
           input.consumed = true;
@@ -3308,6 +3512,7 @@
       }
     }
     tick(dt) {
+      this.tabMenu.tick(dt);
     }
   };
 
@@ -3477,10 +3682,33 @@
     }
     onKeydown(event) {
       this.hasActivityThisFrame = true;
+      if (this.uiManager.modalManager.isOpen()) {
+        return;
+      }
       if (event.key === "Escape") {
         this.uiManager.overlayManager.toggle(this.mainMenu);
         event.preventDefault();
         return;
+      }
+      const key = event.key.toLowerCase();
+      const overlay = this.uiManager.overlayManager.getActiveOverlay();
+      const isMainMenuOpen = overlay === this.mainMenu;
+      const isNoOverlayOpen = overlay === null;
+      if (isNoOverlayOpen || isMainMenuOpen) {
+        let targetTab = null;
+        if (key === "s") targetTab = "shop";
+        if (key === "q") targetTab = "quest";
+        if (key === "a") targetTab = "achievements";
+        if (targetTab) {
+          if (isMainMenuOpen && this.mainMenu.getActiveTabId() === targetTab) {
+            this.uiManager.overlayManager.close();
+          } else {
+            this.mainMenu.setTab(targetTab);
+            this.uiManager.overlayManager.open(this.mainMenu);
+          }
+          event.preventDefault();
+          return;
+        }
       }
       if (this.channel) {
       }
