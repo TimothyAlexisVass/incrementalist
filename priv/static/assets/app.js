@@ -4114,12 +4114,12 @@
     );
   }
 
-  // src/ui/layout/main-menu/index.ts
-  var MainMenu = class {
-    constructor() {
-      __publicField(this, "tabMenu");
-      __publicField(this, "actions", null);
-      const renderPlaceholder = (title) => (ctx2, canvas2, input, state2, rect) => {
+  // src/ui/layout/main-menu/view-model.ts
+  var tabMenu = null;
+  var saveSlotActions = null;
+  function getTabMenu() {
+    if (!tabMenu) {
+      const renderPlaceholder = (title) => (ctx2, _canvas, _input, _state, rect) => {
         ctx2.fillStyle = COLORS.panel.textPrimary;
         ctx2.font = "24px Arial";
         ctx2.textAlign = "center";
@@ -4154,8 +4154,8 @@
           id: "save",
           label: "Save Files",
           renderContent: (ctx2, canvas2, input, state2, rect) => {
-            if (this.actions) {
-              renderSaveFilesTab(ctx2, canvas2, input, state2, rect, this.actions);
+            if (saveSlotActions) {
+              renderSaveFilesTab(ctx2, canvas2, input, state2, rect, saveSlotActions);
             } else {
               ctx2.fillStyle = COLORS.panel.textPrimary;
               ctx2.font = "18px Arial";
@@ -4165,7 +4165,7 @@
           }
         }
       ];
-      this.tabMenu = new TabMenu(tabs, {
+      tabMenu = new TabMenu(tabs, {
         layout: "horizontal",
         position: "top-left",
         tabHeight: 36,
@@ -4173,14 +4173,32 @@
         font: "bold 16px Arial"
       });
     }
+    return tabMenu;
+  }
+  function setSaveSlotActions(actions) {
+    saveSlotActions = actions;
+  }
+
+  // src/ui/layout/main-menu/interactions.ts
+  function handleMainMenuInteractions(input, shellRect, onClose) {
+    if (input.consumed) return;
+    if (pointInRect(input.pointer, shellRect)) {
+      input.consumed = true;
+    } else if (input.clicked) {
+      onClose();
+    }
+  }
+
+  // src/ui/layout/main-menu/render.ts
+  var MainMenu = class {
     setActions(actions) {
-      this.actions = actions;
+      setSaveSlotActions(actions);
     }
     setTab(id) {
-      this.tabMenu.setActiveTabId(id);
+      getTabMenu().setActiveTabId(id);
     }
     getActiveTabId() {
-      return this.tabMenu.getActiveTabId();
+      return getTabMenu().getActiveTabId();
     }
     render(ctx2, canvas2, input, state2, onClose) {
       ctx2.save();
@@ -4198,17 +4216,11 @@
         width: width - 32,
         height: height - 32
       };
-      this.tabMenu.render(ctx2, canvas2, input, state2, menuRect);
-      if (!input.consumed) {
-        if (pointInRect(input.pointer, shellRect)) {
-          input.consumed = true;
-        } else if (input.clicked) {
-          onClose();
-        }
-      }
+      getTabMenu().render(ctx2, canvas2, input, state2, menuRect);
+      handleMainMenuInteractions(input, shellRect, onClose);
     }
     tick(dt) {
-      this.tabMenu.tick(dt);
+      getTabMenu().tick(dt);
     }
   };
 

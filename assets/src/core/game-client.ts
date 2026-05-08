@@ -34,7 +34,7 @@ import { renderBottomHUD } from "../ui/layout/bottom-hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 import { UIManager } from "../ui/ui-manager";
-import { MainMenu } from "../ui/layout/main-menu";
+import { MainMenu } from "../ui/layout/main-menu/render";
 import { InteractionManager, InteractionState } from "../ui/interaction-manager";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
