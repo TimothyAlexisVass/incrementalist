@@ -25,7 +25,7 @@ import { renderTopHUD, renderBottomHUD } from "../features/hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 import { UIManager } from "../ui/ui-manager";
-import { MenuShell } from "../ui/menu/menu-shell";
+import { MainMenu } from "../ui/menu/main-menu";
 import { InputState } from "../ui/input";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
@@ -40,7 +40,7 @@ export class GameClient {
   private lastPointerPoint: { x: number; y: number } | null = null;
   private readonly gameLoop: GameLoop;
   public readonly uiManager = new UIManager();
-  private readonly menuShell = new MenuShell();
+  private readonly mainMenu = new MainMenu();
   private pendingClick = false;
   private currentPointer: { x: number; y: number } | null = null;
   private hasActivityThisFrame = false;
@@ -236,7 +236,7 @@ export class GameClient {
   private onKeydown(event: KeyboardEvent) {
     this.hasActivityThisFrame = true;
     if (event.key === 'Escape') {
-      this.uiManager.overlayManager.toggle(this.menuShell);
+      this.uiManager.overlayManager.toggle(this.mainMenu);
       event.preventDefault();
       return;
     }
@@ -301,7 +301,7 @@ export class GameClient {
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
     renderBottomHUD(this.ctx, this.canvas, input, () => {
-      this.uiManager.overlayManager.toggle(this.menuShell);
+      this.uiManager.overlayManager.toggle(this.mainMenu);
     });
 
     // The UI is drawn over the game world. It can consume clicks.

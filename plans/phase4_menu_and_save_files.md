@@ -19,8 +19,8 @@ Handles high-priority, blocking UI elements.
 - **Backdrop**: Renders the global dimmed backdrop when any modal is active.
 
 ### 3. OverlayManager (`assets/src/ui/components/overlay-manager/`)
-Handles the main menu shell.
-- **Menu Shell**: Renders the outer frame, title (e.g., "Quest"), and the "Close" button.
+Handles the main menu.
+- **Main Menu**: Renders the outer frame, title (e.g., "Quest"), and the "Close" button.
 - **State**: Manages the open/close visibility of the main menu.
 - **Tab Integration**: Hosts the `TabMenu`.
 
@@ -29,7 +29,7 @@ Handles the main menu shell.
 ### TabMenu (`assets/src/ui/components/tab-menu/`)
 A flexible component for switching between feature views.
 - **Orientation**: Supports horizontal (top/bottom) and vertical (left/right) tab placement.
-- **Responsibility**: Manages a row of tab buttons and a designated content box.
+- **Responsibility**: Manages a row/column of tab buttons and a designated content box.
 - **Nesting**: Supports nested instances (e.g., Quests -> Main/Daily).
 
 ### SaveSlotCard (`assets/src/ui/components/cards/save-slot/`)
@@ -49,10 +49,9 @@ Individual cards for the "Save Files" tab.
 - Implement the "Menu [ESC]" button in the bottom-right of the Canvas HUD.
 - Implement `Escape` key handling to toggle the `OverlayManager`.
 
-### 3. The Menu Shell & Tab System
-- Create the `MenuShell` component with the "Close" button.
+### 3. The Main Menu & Tab System
 - Implement the `TabMenu` with top-aligned tabs.
-- Set up the main tabs: [Quest (Q)], [Achievements (A)], [Stats (E)], [Save Files], [Shop (S)]. (Non-Save tabs will be placeholders).
+- Set up the main tabs: [Shop (S)], [Quest (Q)], [Achievements (A)], [Stats], [Save Files]. (Non-Save tabs will be placeholders).
 
 ### 4. Save Files Tab
 - Port the save slot rendering logic to `SaveSlotCard`.

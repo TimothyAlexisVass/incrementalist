@@ -8,7 +8,7 @@ import {
   DISPLAY_AREA_WIDTH,
 } from '../../config';
 
-export class MenuShell implements Overlay {
+export class MainMenu implements Overlay {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onClose: () => void) {
     ctx.save();
 

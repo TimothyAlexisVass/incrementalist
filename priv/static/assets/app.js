@@ -3278,8 +3278,8 @@
     }
   };
 
-  // src/ui/menu/menu-shell.ts
-  var MenuShell = class {
+  // src/ui/menu/main-menu.ts
+  var MainMenu = class {
     render(ctx2, canvas2, input, onClose) {
       ctx2.save();
       const x = DISPLAY_AREA_X;
@@ -3324,7 +3324,7 @@
       __publicField(this, "lastPointerPoint", null);
       __publicField(this, "gameLoop");
       __publicField(this, "uiManager", new UIManager());
-      __publicField(this, "menuShell", new MenuShell());
+      __publicField(this, "mainMenu", new MainMenu());
       __publicField(this, "pendingClick", false);
       __publicField(this, "currentPointer", null);
       __publicField(this, "hasActivityThisFrame", false);
@@ -3478,7 +3478,7 @@
     onKeydown(event) {
       this.hasActivityThisFrame = true;
       if (event.key === "Escape") {
-        this.uiManager.overlayManager.toggle(this.menuShell);
+        this.uiManager.overlayManager.toggle(this.mainMenu);
         event.preventDefault();
         return;
       }
@@ -3520,7 +3520,7 @@
         claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
       }
       renderBottomHUD(this.ctx, this.canvas, input, () => {
-        this.uiManager.overlayManager.toggle(this.menuShell);
+        this.uiManager.overlayManager.toggle(this.mainMenu);
       });
       this.uiManager.tick(dt);
       this.uiManager.render(this.ctx, this.canvas, input);
