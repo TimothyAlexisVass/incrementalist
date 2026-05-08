@@ -1912,15 +1912,17 @@
 
   // src/features/hud/progression.ts
   function getRequiredExp(level) {
-    return level * level * 10 + 10;
+    return Math.floor(10.1 * Math.pow(level, 2) + 9);
   }
   function getLevelUpRewards(newLevel) {
     let shards = newLevel;
-    let cores = 0;
+    let cores = Math.floor(newLevel / 10);
     if (newLevel % 1e3 === 0) {
+      cores = 10 * newLevel;
+    }
+    if (newLevel % 100 === 0) {
+      shards *= 100;
       cores = newLevel;
-    } else if (newLevel % 100 === 0) {
-      shards *= 10;
     }
     return {
       coins: 200 * newLevel,

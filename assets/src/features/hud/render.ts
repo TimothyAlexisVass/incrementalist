@@ -9,7 +9,7 @@ import {
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
 } from "../../config";
-import { formatInteger, formatShortLevel, formatNumberRatio } from "../../format";
+import { formatShortLevel, formatNumberRatio } from "../../format";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../render/currency-icons";
@@ -81,11 +81,11 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
 
   const requiredExp = getRequiredExp(model.displayedLevel);
   const fillRatio = Math.min(1, Math.max(0, model.displayedExp / requiredExp));
-  
+
   const gradient = ctx.createLinearGradient(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_Y);
   gradient.addColorStop(0, COLORS.bar.exp.fillStart);
   gradient.addColorStop(1, COLORS.bar.exp.fillEnd);
-  
+
   ctx.fillStyle = gradient;
   ctx.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH * fillRatio, TOP_HUD_EXP_BAR_HEIGHT);
 
