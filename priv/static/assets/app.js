@@ -1276,22 +1276,137 @@
     return true;
   }
 
+  // src/core/bignum.ts
+  var PRECISION_DIGITS = 15;
+  var ADD_CUTOFF = PRECISION_DIGITS + 1;
+  var ZERO = { m: 0, e: 0 };
+  function normalize(n) {
+    if (n.m === 0 || !Number.isFinite(n.m)) {
+      return { m: 0, e: 0 };
+    }
+    const shift = Math.floor(Math.log10(Math.abs(n.m)));
+    let m = n.m / 10 ** shift;
+    let e = n.e + shift;
+    if (Math.abs(m) >= 10) {
+      m /= 10;
+      e += 1;
+    }
+    if (Math.abs(m) < 1) {
+      m *= 10;
+      e -= 1;
+    }
+    m = Number(m.toPrecision(PRECISION_DIGITS));
+    return { m, e };
+  }
+  function fromNumber(value) {
+    if (value === 0) return ZERO;
+    return normalize({ m: value, e: 0 });
+  }
+  function toNumber(n) {
+    return n.m * 10 ** n.e;
+  }
+  function mul(a, b) {
+    if (a.m === 0 || b.m === 0) return ZERO;
+    return normalize({
+      m: a.m * b.m,
+      e: a.e + b.e
+    });
+  }
+  function add(a, b) {
+    if (a.m === 0) return b;
+    if (b.m === 0) return a;
+    const diff = a.e - b.e;
+    if (diff > ADD_CUTOFF) return a;
+    if (diff < -ADD_CUTOFF) return b;
+    let upper = a;
+    let lower = b;
+    let absDiff = diff;
+    if (diff < 0) {
+      upper = b;
+      lower = a;
+      absDiff = -diff;
+    }
+    return normalize({
+      m: upper.m + lower.m * 10 ** -absDiff,
+      e: upper.e
+    });
+  }
+  function sub(a, b) {
+    if (a.m === 0) return { m: -b.m, e: b.e };
+    if (b.m === 0) return a;
+    const diff = a.e - b.e;
+    if (diff > ADD_CUTOFF) return a;
+    if (diff < -ADD_CUTOFF) return { m: -b.m, e: b.e };
+    return add(a, { m: -b.m, e: b.e });
+  }
+  function pow(a, p) {
+    if (a.m === 0) return ZERO;
+    if (a.m < 0 && !Number.isInteger(p)) {
+      throw new Error("Cannot raise negative number to non-integer power");
+    }
+    const log10Value = Math.log10(Math.abs(a.m)) + a.e;
+    const resultLog = log10Value * p;
+    const e = Math.floor(resultLog);
+    let m = 10 ** (resultLog - e);
+    if (a.m < 0 && Number.isInteger(p) && p % 2 !== 0) {
+      m = -m;
+    }
+    return normalize({ m, e });
+  }
+  function compare(a, b) {
+    if (a.m === 0 && b.m === 0) return 0;
+    if (a.m >= 0 && b.m < 0) return 1;
+    if (a.m < 0 && b.m >= 0) return -1;
+    const sign = a.m < 0 ? -1 : 1;
+    if (a.e > b.e) return sign;
+    if (a.e < b.e) return -sign;
+    if (Math.abs(a.m) > Math.abs(b.m)) return sign;
+    if (Math.abs(a.m) < Math.abs(b.m)) return -sign;
+    return 0;
+  }
+  function formatScientific(n, digits = 15) {
+    if (n.m === 0) return "0";
+    return `${n.m.toPrecision(digits)}e${n.e}`;
+  }
+
   // src/format.ts
+  var currentDisplayMode = "suffixed";
   function toFiniteNumber(value, fallback = 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
-  function formatNumber(value, fallback = 0) {
-    const number = toFiniteNumber(value, fallback);
-    const sign = number < 0 ? "-" : "";
-    const absolute = Math.abs(number);
-    if (absolute < 1e3) {
-      return `${sign}${Math.floor(absolute)}`;
+  function formatBigNum(value) {
+    if (value.m === 0) return "0";
+    if (currentDisplayMode === "scientific") {
+      return formatScientific(value, 3);
     }
-    const tier = Math.floor(Math.log10(absolute) / 3);
+    const sign = value.m < 0 ? "-" : "";
+    const absM = Math.abs(value.m);
+    const e = value.e;
+    if (e < 3) {
+      const num = toNumber(value);
+      if (Math.abs(num) < 1e3) {
+        if (Math.abs(num) < 1 && num !== 0) {
+          return `${sign}${Math.round(absM * 10 ** e * 100) / 100}`;
+        }
+        return `${sign}${Math.floor(Math.abs(num))}`;
+      }
+    }
+    const tier = Math.floor(e / 3);
     const suffix = getSuffix(tier);
-    const scaled = absolute / 10 ** (tier * 3);
+    if (!suffix || suffix.startsWith("e")) {
+      return formatScientific(value, 3);
+    }
+    const remainder = e % 3;
+    const scaled = absM * 10 ** remainder;
     return `${sign}${Math.round(scaled * 1e3) / 1e3}${suffix}`;
+  }
+  function formatNumber(value, fallback = 0) {
+    if (typeof value === "object" && "m" in value && "e" in value) {
+      return formatBigNum(value);
+    }
+    const num = toFiniteNumber(value, fallback);
+    return formatBigNum({ m: num, e: 0 });
   }
   function getSuffix(tier) {
     const base = [
@@ -1317,16 +1432,20 @@
     return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
   }
   function formatInteger(value, fallback = 0) {
+    if (typeof value === "object" && "m" in value && "e" in value) {
+      return formatBigNum(value);
+    }
     return Math.floor(toFiniteNumber(value, fallback)).toString();
   }
   function formatShortLevel(value, fallback = 1) {
-    return `Lv.${formatInteger(Math.max(1, toFiniteNumber(value, fallback)))}`;
+    return `Lv.${formatInteger(value, fallback)}`;
   }
   function formatNumberRatio(current, maximum) {
     return `${formatNumber(current)} / ${formatNumber(maximum)}`;
   }
   function formatSignedNumber(value) {
-    return `+${formatNumber(value)}`;
+    const isNegative = typeof value === "object" && "m" in value ? value.m < 0 : value < 0;
+    return isNegative ? formatNumber(value) : `+${formatNumber(value)}`;
   }
   function formatPercent(value, decimals = 2, fallback = 0) {
     return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
@@ -1912,20 +2031,22 @@
 
   // src/features/hud/progression.ts
   function getRequiredExp(level) {
-    return Math.floor(10.1 * Math.pow(level, 2) + 9);
+    const base = fromNumber(level);
+    const term1 = mul(fromNumber(10.1), pow(base, 2));
+    return add(term1, fromNumber(9));
   }
   function getLevelUpRewards(newLevel) {
-    let shards = newLevel;
-    let cores = Math.floor(newLevel / 10);
+    let shards = fromNumber(newLevel);
+    let cores = fromNumber(Math.floor(newLevel / 10));
     if (newLevel % 1e3 === 0) {
-      cores = 10 * newLevel;
+      cores = mul(fromNumber(10), fromNumber(newLevel));
     }
     if (newLevel % 100 === 0) {
-      shards *= 100;
-      cores = newLevel;
+      shards = mul(shards, fromNumber(100));
+      cores = fromNumber(newLevel);
     }
     return {
-      coins: 200 * newLevel,
+      coins: mul(fromNumber(200), fromNumber(newLevel)),
       shards,
       cores
     };
@@ -2189,11 +2310,11 @@
     cores: { x: 55, y: 12 }
   });
   function spawnProgressClaimRewardEffects(floatingTexts, canvas2, textMeasureContext, currentAmounts, newAmounts, anchorPoint = null) {
-    const expGain = Math.max(0, Math.floor(newAmounts.exp) - Math.floor(currentAmounts.exp));
-    const levelGain = Math.max(0, Math.floor(newAmounts.level) - Math.floor(currentAmounts.level));
-    const coinGain = Math.max(0, Math.floor(newAmounts.coins) - Math.floor(currentAmounts.coins));
-    const shardGain = Math.max(0, Math.floor(newAmounts.shards) - Math.floor(currentAmounts.shards));
-    const coreGain = Math.max(0, Math.floor(newAmounts.cores) - Math.floor(currentAmounts.cores));
+    const expGain = sub(newAmounts.exp, currentAmounts.exp);
+    const levelGain = Math.max(0, newAmounts.level - currentAmounts.level);
+    const coinGain = sub(newAmounts.coins, currentAmounts.coins);
+    const shardGain = sub(newAmounts.shards, currentAmounts.shards);
+    const coreGain = sub(newAmounts.cores, currentAmounts.cores);
     const expText = formatSignedNumber(expGain);
     const coinText = formatSignedNumber(coinGain);
     const shardText = formatSignedNumber(shardGain);
@@ -2202,10 +2323,10 @@
       { text: expText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.exp.x, offsetY: POPUP_OFFSET.exp.y },
       { text: coinText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.coins.x, offsetY: POPUP_OFFSET.coins.y }
     ];
-    if (shardGain > 0) {
+    if (compare(shardGain, ZERO) > 0) {
       rewardGroupEntries.push({ text: shardText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.shards.x, offsetY: POPUP_OFFSET.shards.y });
     }
-    if (coreGain > 0) {
+    if (compare(coreGain, ZERO) > 0) {
       rewardGroupEntries.push({ text: coreText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.cores.x, offsetY: POPUP_OFFSET.cores.y });
     }
     const barLayout = getProgressBarLayout(canvas2);
@@ -2236,7 +2357,7 @@
       COLORS.rewards.coins,
       "coins"
     );
-    if (shardGain > 0) {
+    if (compare(shardGain, ZERO) > 0) {
       spawnRewardPopup(
         floatingTexts,
         canvas2,
@@ -2247,7 +2368,7 @@
         "shards"
       );
     }
-    if (coreGain > 0) {
+    if (compare(coreGain, ZERO) > 0) {
       spawnRewardPopup(
         floatingTexts,
         canvas2,
@@ -2353,10 +2474,10 @@
       const coreText = formatSignedNumber(levelUp.rewards.cores);
       spawnFloatingText(floatingTexts, levelText, baseX, baseLineY, COLORS.rewards.achievement, popupOptions);
       spawnFloatingText(floatingTexts, coinText, baseX, baseLineY + lineStep, COLORS.rewards.coins, popupOptions);
-      if (levelUp.rewards.shards > 0) {
+      if (compare(levelUp.rewards.shards, ZERO) > 0) {
         spawnFloatingText(floatingTexts, shardText, baseX, baseLineY + lineStep * 2, COLORS.rewards.shards, popupOptions);
       }
-      if (levelUp.rewards.cores > 0) {
+      if (compare(levelUp.rewards.cores, ZERO) > 0) {
         spawnFloatingText(floatingTexts, coreText, baseX, baseLineY + lineStep * 3, COLORS.rewards.cores, popupOptions);
       }
     }
@@ -2366,7 +2487,7 @@
   var currentViewModel = {
     state: "projecting",
     projectedFill: 0,
-    sisu: 1,
+    sisu: { m: 1, e: 0 },
     rewardMultiplier: 1,
     level: 1,
     firstPlayedAtMs: 0,
@@ -2500,7 +2621,7 @@
     currentViewModel.pendingClaimIntent = value;
   }
   function getProgressBarFillRate(viewModel, nowMs) {
-    const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
+    const sisuMultiplier = Math.max(1, toNumber(viewModel.sisu));
     const baseRate = (viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE) * sisuMultiplier;
     if (viewModel.idleMode) {
       return baseRate;
@@ -2588,11 +2709,11 @@
 
   // src/features/hud/view-model.ts
   var state = {
-    displayedExp: 0,
+    displayedExp: ZERO,
     displayedLevel: 1,
-    displayedCoins: 0,
-    displayedShards: 0,
-    displayedCores: 0,
+    displayedCoins: ZERO,
+    displayedShards: ZERO,
+    displayedCores: ZERO,
     collectionGlowStartedAt: 0,
     particles: []
   };
@@ -2612,14 +2733,10 @@
       state.displayedExp = authoritative.exp;
       state.collectionGlowStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
     }
-    state.displayedExp = lerp(state.displayedExp, authoritative.exp, dtS * lerpSpeed);
-    state.displayedCoins = lerp(state.displayedCoins, authoritative.coins, dtS * lerpSpeed);
-    state.displayedShards = lerp(state.displayedShards, authoritative.shards, dtS * lerpSpeed);
-    state.displayedCores = lerp(state.displayedCores, authoritative.cores, dtS * lerpSpeed);
-    if (Math.abs(state.displayedCoins - authoritative.coins) < 0.5) state.displayedCoins = authoritative.coins;
-    if (Math.abs(state.displayedShards - authoritative.shards) < 0.5) state.displayedShards = authoritative.shards;
-    if (Math.abs(state.displayedCores - authoritative.cores) < 0.5) state.displayedCores = authoritative.cores;
-    if (Math.abs(state.displayedExp - authoritative.exp) < 0.5) state.displayedExp = authoritative.exp;
+    state.displayedExp = authoritative.exp;
+    state.displayedCoins = authoritative.coins;
+    state.displayedShards = authoritative.shards;
+    state.displayedCores = authoritative.cores;
   }
   function getHudViewModel() {
     return state;
@@ -2814,7 +2931,7 @@
     ctx2.fillStyle = COLORS.bar.track;
     ctx2.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
     const requiredExp = getRequiredExp(model.displayedLevel);
-    const fillRatio = Math.min(1, Math.max(0, model.displayedExp / requiredExp));
+    const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
     const gradient = ctx2.createLinearGradient(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_Y);
     gradient.addColorStop(0, COLORS.bar.exp.fillStart);
     gradient.addColorStop(1, COLORS.bar.exp.fillEnd);
@@ -2828,18 +2945,14 @@
     ctx2.fillStyle = COLORS.hud.textPrimary;
     ctx2.font = TOP_HUD_EXP_FONT;
     ctx2.textAlign = "center";
-    ctx2.fillText(`${formatNumberRatio(Math.floor(model.displayedExp), requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
+    ctx2.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
     ctx2.fillStyle = COLORS.hud.textPrimary;
     ctx2.font = TOP_HUD_LEVEL_FONT;
     ctx2.textAlign = "left";
     ctx2.fillText(formatShortLevel(model.displayedLevel), TOP_HUD_LEVEL_X, 35);
-    drawCurrency(ctx2, canvas2, "Coins", Math.floor(model.displayedCoins), COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
-    if (model.displayedLevel > 1 || model.displayedShards > 0) {
-      drawCurrency(ctx2, canvas2, "Shards", Math.floor(model.displayedShards), COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
-    }
-    if (model.displayedLevel > 10 || model.displayedCores > 0) {
-      drawCurrency(ctx2, canvas2, "Cores", Math.floor(model.displayedCores), COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
-    }
+    drawCurrency(ctx2, canvas2, "Coins", model.displayedCoins, COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
+    drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
+    drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
   }
   function drawCurrency(ctx2, canvas2, label, amount, color, iconRight, counterRight) {
     drawCurrencyAmount(

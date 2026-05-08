@@ -1,5 +1,6 @@
 import { COLORS } from '../colors';
 import { formatNumber } from '../format';
+import { BigNum } from '../core/bignum';
 
 const CURRENCY_FALLBACK_COLORS: Record<string, string> = Object.freeze({
   coins: COLORS.hud.coins,
@@ -50,7 +51,7 @@ export function drawCurrencyIcon(ctx: CanvasRenderingContext2D, currencyKey: str
   ctx.restore();
 }
 
-export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: number, iconSize: number, options: any = {}) {
+export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: number | BigNum, iconSize: number, options: any = {}) {
   if (!ctx) {
     return 0;
   }
@@ -71,7 +72,7 @@ export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: num
   return width;
 }
 
-export function drawCurrencyAmount(ctx: CanvasRenderingContext2D, currencyKey: string, amount: number, x: number, y: number, iconSize: number, options: any = {}) {
+export function drawCurrencyAmount(ctx: CanvasRenderingContext2D, currencyKey: string, amount: number | BigNum, x: number, y: number, iconSize: number, options: any = {}) {
   if (!ctx) {
     return 0;
   }

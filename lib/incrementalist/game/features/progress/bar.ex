@@ -13,7 +13,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
   def get_progress_bar_fill_rate(%State{} = state, now) do
     progress_bar = state.progress_bar
-    sisu = (if progress_bar, do: progress_bar.sisu, else: 1) |> max(@sisu_min_multiplier)
+    sisu_bn = if progress_bar, do: progress_bar.sisu, else: BigNum.one()
+    sisu = sisu_bn |> BigNum.to_float() |> max(@sisu_min_multiplier)
     idle_mode = state.idle_mode || false
 
     base_rate =
@@ -88,7 +89,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
   def claim_reward(%State{} = state, random_fn \\ &rand/0) do
     progress_bar = state.progress_bar || %State.ProgressBar{}
-    sisu = (progress_bar.sisu || 1) |> max(@sisu_min_multiplier)
+    sisu_bn = progress_bar.sisu || BigNum.one()
+    sisu = sisu_bn |> BigNum.to_float() |> max(@sisu_min_multiplier)
     level = state.level || 1
     idle_mode = state.idle_mode || false
     reward_multiplier = progress_bar.reward_multiplier || 1.0
@@ -104,35 +106,36 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
     {exp_gain, coin_gain, shard_gain, core_gain} =
       if level == 1 do
-        {4, 500, 100, 20}
+        {BigNum.from_number(4), BigNum.from_number(500), BigNum.from_number(100), BigNum.from_number(20)}
       else
-        exp = trunc(exp_base * sisu * level_pow * reward_multiplier)
+        exp = BigNum.from_number(trunc(exp_base * sisu * level_pow * reward_multiplier))
 
         variance = 0.8 + random_fn.() * 0.4
-        coin = trunc(35 * sisu * level_pow * reward_multiplier * variance)
+        coin = BigNum.from_number(trunc(35 * sisu * level_pow * reward_multiplier * variance))
 
         idle_mult = if idle_mode, do: 1, else: 2
-        shard = trunc((coin / (4.0 + random_fn.() * 12.0)) * idle_mult)
+        shard = BigNum.from_number(trunc((BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0)) * idle_mult))
 
         core =
           if not idle_mode do
             c1 = if random_fn.() < 0.1, do: 1, else: 0
             c2 = if random_fn.() < 0.01, do: 10, else: 0
-            c1 + c2
+            BigNum.from_number(c1 + c2)
           else
-            0
+            BigNum.zero()
           end
 
         {exp, coin, shard, core}
       end
 
     %{state |
-      exp: (state.exp || 0) + exp_gain,
-      coins: (state.coins || 0) + coin_gain,
-      shards: (state.shards || 0) + shard_gain,
-      cores: (state.cores || 0) + core_gain
+      exp: BigNum.add(state.exp || BigNum.zero(), exp_gain),
+      coins: BigNum.add(state.coins || BigNum.zero(), coin_gain),
+      shards: BigNum.add(state.shards || BigNum.zero(), shard_gain),
+      cores: BigNum.add(state.cores || BigNum.zero(), core_gain)
     }
   end
+
 
   defp rand() do
     :rand.uniform()

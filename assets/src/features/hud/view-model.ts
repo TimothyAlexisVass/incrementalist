@@ -1,11 +1,12 @@
 import { lerp } from "../../utils";
+import { BigNum, ZERO } from "../../core/bignum";
 
 export type HudViewModel = {
-  displayedExp: number;
+  displayedExp: BigNum;
   displayedLevel: number;
-  displayedCoins: number;
-  displayedShards: number;
-  displayedCores: number;
+  displayedCoins: BigNum;
+  displayedShards: BigNum;
+  displayedCores: BigNum;
   
   // Level up visual state
   collectionGlowStartedAt: number;
@@ -17,11 +18,11 @@ export type HudViewModel = {
 };
 
 const state: HudViewModel = {
-  displayedExp: 0,
+  displayedExp: ZERO,
   displayedLevel: 1,
-  displayedCoins: 0,
-  displayedShards: 0,
-  displayedCores: 0,
+  displayedCoins: ZERO,
+  displayedShards: ZERO,
+  displayedCores: ZERO,
   collectionGlowStartedAt: 0,
   particles: []
 };
@@ -35,7 +36,7 @@ export function getAndClearQueuedLevelUps() {
 }
 
 export function updateHudViewModel(dtMs: number, authoritative: {
-  exp: number, level: number, coins: number, shards: number, cores: number
+  exp: BigNum, level: number, coins: BigNum, shards: BigNum, cores: BigNum
 }) {
   const dtS = dtMs / 1000;
   const lerpSpeed = 7;
@@ -49,15 +50,12 @@ export function updateHudViewModel(dtMs: number, authoritative: {
     state.collectionGlowStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
-  state.displayedExp = lerp(state.displayedExp, authoritative.exp, dtS * lerpSpeed);
-  state.displayedCoins = lerp(state.displayedCoins, authoritative.coins, dtS * lerpSpeed);
-  state.displayedShards = lerp(state.displayedShards, authoritative.shards, dtS * lerpSpeed);
-  state.displayedCores = lerp(state.displayedCores, authoritative.cores, dtS * lerpSpeed);
-
-  if (Math.abs(state.displayedCoins - authoritative.coins) < 0.5) state.displayedCoins = authoritative.coins;
-  if (Math.abs(state.displayedShards - authoritative.shards) < 0.5) state.displayedShards = authoritative.shards;
-  if (Math.abs(state.displayedCores - authoritative.cores) < 0.5) state.displayedCores = authoritative.cores;
-  if (Math.abs(state.displayedExp - authoritative.exp) < 0.5) state.displayedExp = authoritative.exp;
+  // Simple instant sync for now to avoid complex BigNum lerping in UI.
+  // We can add log-scale lerping later if we want smooth count-ups for massive numbers.
+  state.displayedExp = authoritative.exp;
+  state.displayedCoins = authoritative.coins;
+  state.displayedShards = authoritative.shards;
+  state.displayedCores = authoritative.cores;
 }
 
 export function getHudViewModel() {
@@ -65,7 +63,7 @@ export function getHudViewModel() {
 }
 
 export function syncHudInstantly(authoritative: {
-  exp: number, level: number, coins: number, shards: number, cores: number
+  exp: BigNum, level: number, coins: BigNum, shards: BigNum, cores: BigNum
 }) {
   state.displayedLevel = authoritative.level;
   state.displayedExp = authoritative.exp;

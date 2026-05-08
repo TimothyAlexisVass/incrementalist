@@ -6,15 +6,16 @@ import { getProgressBarLayout } from "./render";
 import { computeLevelUps } from "../hud/progression";
 import { spawnFloatingText, spawnRewardPopup } from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
+import { BigNum, ZERO, sub, compare } from "../../core/bignum";
 
 let nextLevelUpNoticeGroupId = 1;
 
 export type ResourceAmounts = {
-  exp: number;
+  exp: BigNum;
   level: number;
-  coins: number;
-  shards: number;
-  cores: number;
+  coins: BigNum;
+  shards: BigNum;
+  cores: BigNum;
 };
 
 type RewardEntry = {
@@ -39,11 +40,11 @@ export function spawnProgressClaimRewardEffects(
   newAmounts: ResourceAmounts,
   anchorPoint: { x: number; y: number } | null = null
 ) {
-  const expGain = Math.max(0, Math.floor(newAmounts.exp) - Math.floor(currentAmounts.exp));
-  const levelGain = Math.max(0, Math.floor(newAmounts.level) - Math.floor(currentAmounts.level));
-  const coinGain = Math.max(0, Math.floor(newAmounts.coins) - Math.floor(currentAmounts.coins));
-  const shardGain = Math.max(0, Math.floor(newAmounts.shards) - Math.floor(currentAmounts.shards));
-  const coreGain = Math.max(0, Math.floor(newAmounts.cores) - Math.floor(currentAmounts.cores));
+  const expGain = sub(newAmounts.exp, currentAmounts.exp);
+  const levelGain = Math.max(0, newAmounts.level - currentAmounts.level);
+  const coinGain = sub(newAmounts.coins, currentAmounts.coins);
+  const shardGain = sub(newAmounts.shards, currentAmounts.shards);
+  const coreGain = sub(newAmounts.cores, currentAmounts.cores);
 
   const expText = formatSignedNumber(expGain);
   const coinText = formatSignedNumber(coinGain);
@@ -55,11 +56,11 @@ export function spawnProgressClaimRewardEffects(
     { text: coinText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.coins.x, offsetY: POPUP_OFFSET.coins.y }
   ];
 
-  if (shardGain > 0) {
+  if (compare(shardGain, ZERO) > 0) {
     rewardGroupEntries.push({ text: shardText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.shards.x, offsetY: POPUP_OFFSET.shards.y });
   }
 
-  if (coreGain > 0) {
+  if (compare(coreGain, ZERO) > 0) {
     rewardGroupEntries.push({ text: coreText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.cores.x, offsetY: POPUP_OFFSET.cores.y });
   }
 
@@ -95,7 +96,7 @@ export function spawnProgressClaimRewardEffects(
     "coins"
   );
 
-  if (shardGain > 0) {
+  if (compare(shardGain, ZERO) > 0) {
     spawnRewardPopup(
       floatingTexts,
       canvas,
@@ -107,7 +108,7 @@ export function spawnProgressClaimRewardEffects(
     );
   }
 
-  if (coreGain > 0) {
+  if (compare(coreGain, ZERO) > 0) {
     spawnRewardPopup(
       floatingTexts,
       canvas,
@@ -250,13 +251,14 @@ function spawnLevelUpEffects(floatingTexts: unknown[], canvas: HTMLCanvasElement
     spawnFloatingText(floatingTexts, levelText, baseX, baseLineY, COLORS.rewards.achievement, popupOptions);
     spawnFloatingText(floatingTexts, coinText, baseX, baseLineY + lineStep, COLORS.rewards.coins, popupOptions);
 
-    if (levelUp.rewards.shards > 0) {
+    if (compare(levelUp.rewards.shards, ZERO) > 0) {
       spawnFloatingText(floatingTexts, shardText, baseX, baseLineY + (lineStep * 2), COLORS.rewards.shards, popupOptions);
     }
 
-    if (levelUp.rewards.cores > 0) {
+    if (compare(levelUp.rewards.cores, ZERO) > 0) {
       spawnFloatingText(floatingTexts, coreText, baseX, baseLineY + (lineStep * 3), COLORS.rewards.cores, popupOptions);
     }
   }
 }
+
 

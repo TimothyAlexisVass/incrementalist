@@ -53,6 +53,12 @@ Persistence boundary rules:
 ## Constants Rule
 Do not introduce backend gameplay magic numbers inline. Shared server-owned limits, thresholds, slot counts, queue sizes, timers, and other domain constants must live in `lib/incrementalist/game/constants.ex` and be referenced from there. Frontend presentation-only constants may live in `assets/src/config.ts` or nearby feature files, but they must mirror server-owned rules rather than invent their own authoritative values.
 
+## BigNum and High-Precision Math Rule
+Gameplay values that can exceed standard double-precision float limits (EXP, coins, shards, cores, sisu, required_exp, multipliers) MUST use the high-precision `BigNum` representation (`{m, e}` where `1 <= abs(m) < 10`). 
+- **Persistence & Wire**: Persist `BigNum` fields as `embeds_one` in Ecto schemas. They serialize natively to JSON objects (`{"m": 1.5, "e": 10}`).
+- **Operations**: Never use raw mathematical operators (`+`, `-`, `*`, `/`) directly on `BigNum` objects or struct fields. Always use the provided math libraries (`lib/incrementalist/game/big_num.ex` and `assets/src/core/bignum.ts`). These functions enforce normalization, handle zero edge-cases, and optimize with early returns for massive exponent differences.
+- **Presentation**: Use the dual-mode formatting system in `assets/src/format.ts` to convert `BigNum` instances into human-readable suffixed strings or scientific notation. Do not write ad-hoc formatting logic in UI features.
+
 ## Client/Server Protocol Rules
 The only gameplay communication pattern is client command, server result. Client commands describe player intent, include only a client-generated integer `command_id`, and omit UI display details. The client command ids are the indexes of a 10-slot local boolean queue and must not be stored in LocalStorage. The server owns durable command sequencing, idempotent execution, active save slot, FIFO queue order, replay state, and persisted command results until ACK. Do not require active save slots, version markers, or generic payload envelopes from the client. Cache hints are allowed only to reduce snapshot payload size.
 

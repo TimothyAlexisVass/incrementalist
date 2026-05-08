@@ -10,6 +10,7 @@ import {
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
 } from "../../config";
 import { formatShortLevel, formatNumberRatio } from "../../format";
+import { compare, ZERO, toNumber } from "../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../render/currency-icons";
@@ -80,7 +81,7 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   ctx.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
 
   const requiredExp = getRequiredExp(model.displayedLevel);
-  const fillRatio = Math.min(1, Math.max(0, model.displayedExp / requiredExp));
+  const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
 
   const gradient = ctx.createLinearGradient(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_Y);
   gradient.addColorStop(0, COLORS.bar.exp.fillStart);
@@ -99,25 +100,19 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   ctx.fillStyle = COLORS.hud.textPrimary;
   ctx.font = TOP_HUD_EXP_FONT;
   ctx.textAlign = 'center';
-  ctx.fillText(`${formatNumberRatio(Math.floor(model.displayedExp), requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
+  ctx.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
 
   ctx.fillStyle = COLORS.hud.textPrimary;
   ctx.font = TOP_HUD_LEVEL_FONT;
   ctx.textAlign = 'left';
   ctx.fillText(formatShortLevel(model.displayedLevel), TOP_HUD_LEVEL_X, 35);
 
-  drawCurrency(ctx, canvas, "Coins", Math.floor(model.displayedCoins), COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
-
-  if (model.displayedLevel > 1 || model.displayedShards > 0) {
-    drawCurrency(ctx, canvas, "Shards", Math.floor(model.displayedShards), COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
-  }
-
-  if (model.displayedLevel > 10 || model.displayedCores > 0) {
-    drawCurrency(ctx, canvas, "Cores", Math.floor(model.displayedCores), COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
-  }
+  drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
+  drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
+  drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
 }
 
-function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: number, color: string, iconRight: number, counterRight: number) {
+function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, iconRight: number, counterRight: number) {
   drawCurrencyAmount(
     ctx,
     label.toLowerCase(),

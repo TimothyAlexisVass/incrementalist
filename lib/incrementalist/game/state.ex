@@ -20,14 +20,15 @@ defmodule Incrementalist.Game.State do
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      field :sisu, :integer, default: 1
+      embeds_one :sisu, BigNum, on_replace: :update
       field :reward_multiplier, :float, default: 1.0
       field :rewards_claimed, :integer, default: 0
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
       schema
-      |> cast(attrs, [:sisu, :reward_multiplier, :rewards_claimed])
+      |> cast(attrs, [:reward_multiplier, :rewards_claimed])
+      |> cast_embed(:sisu)
     end
   end
 
@@ -62,14 +63,16 @@ defmodule Incrementalist.Game.State do
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      field :current, :integer, default: 1
-      field :max, :integer, default: 1
+      embeds_one :current, BigNum, on_replace: :update
+      embeds_one :max, BigNum, on_replace: :update
       field :level, :integer, default: 1
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
       schema
-      |> cast(attrs, [:current, :max, :level])
+      |> cast(attrs, [:level])
+      |> cast_embed(:current)
+      |> cast_embed(:max)
     end
   end
 
@@ -79,11 +82,13 @@ defmodule Incrementalist.Game.State do
     field :version, :integer, default: @current_version
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
-    field :exp, :integer, default: 0
-    field :required_exp, :integer, default: 20
-    field :coins, :integer, default: 0
-    field :shards, :integer, default: 0
-    field :cores, :integer, default: 0
+    
+    embeds_one :exp, BigNum, on_replace: :update
+    embeds_one :required_exp, BigNum, on_replace: :update
+    embeds_one :coins, BigNum, on_replace: :update
+    embeds_one :shards, BigNum, on_replace: :update
+    embeds_one :cores, BigNum, on_replace: :update
+
     field :idle_mode, :boolean, default: false
     field :first_played_at, :string
     field :last_claimed_at, :string
@@ -103,17 +108,17 @@ defmodule Incrementalist.Game.State do
       :version,
       :area,
       :level,
-      :exp,
-      :required_exp,
-      :coins,
-      :shards,
-      :cores,
       :idle_mode,
       :first_played_at,
       :last_claimed_at,
       :can_claim_at,
       :saved_at
     ])
+    |> cast_embed(:exp)
+    |> cast_embed(:required_exp)
+    |> cast_embed(:coins)
+    |> cast_embed(:shards)
+    |> cast_embed(:cores)
     |> cast_embed(:progress_bar)
     |> cast_embed(:features)
     |> cast_embed(:sisu)
@@ -121,15 +126,30 @@ defmodule Incrementalist.Game.State do
 
   defp normalize_attrs(%__MODULE__{} = attrs) do
     attrs
-    |> Map.from_struct()
+    |> to_map()
     |> normalize_embed_fields()
   end
 
   defp normalize_attrs(attrs) when is_map(attrs), do: normalize_embed_fields(attrs)
   defp normalize_attrs(attrs), do: attrs
 
+  defp to_map(struct) when is_struct(struct) do
+    struct
+    |> Map.from_struct()
+    |> Enum.map(fn {k, v} -> {k, to_map(v)} end)
+    |> Map.new()
+  end
+
+  defp to_map(list) when is_list(list), do: Enum.map(list, &to_map/1)
+  defp to_map(val), do: val
+
   defp normalize_embed_fields(attrs) do
     attrs
+    |> maybe_put_embed(:exp)
+    |> maybe_put_embed(:required_exp)
+    |> maybe_put_embed(:coins)
+    |> maybe_put_embed(:shards)
+    |> maybe_put_embed(:cores)
     |> maybe_put_embed(:progress_bar)
     |> maybe_put_embed(:features)
     |> maybe_put_embed(:sisu)
@@ -149,10 +169,11 @@ defmodule Incrementalist.Game.State do
       end
 
     case value do
-      %_{} = struct -> Map.put(attrs, lookup_key, Map.from_struct(struct))
+      %_{} = struct -> Map.put(attrs, lookup_key, to_map(struct))
       _ -> attrs
     end
   end
+
 
   def new(now \\ Time.now()) do
     timestamp = Time.iso8601(now)
@@ -161,18 +182,18 @@ defmodule Incrementalist.Game.State do
       version: @current_version,
       area: "sage",
       level: 1,
-      exp: 0,
-      required_exp: 20,
-      coins: 0,
-      shards: 0,
-      cores: 0,
+      exp: BigNum.zero(),
+      required_exp: BigNum.from_number(20),
+      coins: BigNum.zero(),
+      shards: BigNum.zero(),
+      cores: BigNum.zero(),
       idle_mode: false,
       first_played_at: timestamp,
       last_claimed_at: timestamp,
       can_claim_at: nil,
       saved_at: timestamp,
       progress_bar: %ProgressBar{
-        sisu: 1,
+        sisu: BigNum.one(),
         reward_multiplier: 1.0,
         rewards_claimed: 0
       },
@@ -183,8 +204,8 @@ defmodule Incrementalist.Game.State do
         bonus_time_purchased: false
       },
       sisu: %Sisu{
-        current: 1,
-        max: 1,
+        current: BigNum.one(),
+        max: BigNum.one(),
         level: 1
       }
     }
@@ -202,16 +223,16 @@ defmodule Incrementalist.Game.State do
     %{
       "area" => state.area || "sage",
       "level" => state.level || 1,
-      "exp" => state.exp || 0,
-      "required_exp" => state.required_exp || 20,
-      "coins" => state.coins || 0,
-      "shards" => state.shards || 0,
-      "cores" => state.cores || 0,
+      "exp" => state.exp || BigNum.zero(),
+      "required_exp" => state.required_exp || BigNum.from_number(20),
+      "coins" => state.coins || BigNum.zero(),
+      "shards" => state.shards || BigNum.zero(),
+      "cores" => state.cores || BigNum.zero(),
       "idle_mode" => state.idle_mode || false,
       "first_played_at" => state.first_played_at,
       "saved_at" => state.saved_at,
       "progress_bar" => %{
-        "sisu" => if(state.progress_bar, do: state.progress_bar.sisu, else: 1),
+        "sisu" => if(state.progress_bar, do: state.progress_bar.sisu, else: BigNum.one()),
         "reward_multiplier" =>
           if(state.progress_bar, do: state.progress_bar.reward_multiplier, else: 1.0),
         "rewards_claimed" =>
@@ -219,6 +240,7 @@ defmodule Incrementalist.Game.State do
       }
     }
   end
+
 
   def summary(slot, active_slot_index) do
     state = slot.state

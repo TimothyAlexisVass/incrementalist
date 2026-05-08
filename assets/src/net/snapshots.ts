@@ -42,14 +42,16 @@ export function applyResult(state: ServerState, result: ServerResult): void {
   state.status = statusForResult(result);
 }
 
+import type { BigNum } from "../core/bignum";
+
 export function applyAuthoritativeData(
   state: ServerState,
   data: {
-    coins?: number;
-    exp?: number;
+    coins?: BigNum;
+    exp?: BigNum;
     level?: number;
-    shards?: number;
-    cores?: number;
+    shards?: BigNum;
+    cores?: BigNum;
   }
 ) {
   if (!state.snapshot) return;

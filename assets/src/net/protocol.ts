@@ -1,3 +1,5 @@
+import type { BigNum } from "../core/bignum";
+
 export type SaveSlotSummary = {
   slot_index: number;
   file_index: number;
@@ -18,15 +20,15 @@ export type GameSnapshot = {
   state: {
     area: string;
     level: number;
-    exp: number;
-    required_exp: number;
-    coins: number;
-    shards: number;
-    cores: number;
+    exp: BigNum;
+    required_exp: BigNum;
+    coins: BigNum;
+    shards: BigNum;
+    cores: BigNum;
     idle_mode: boolean;
     first_played_at: string | null;
     progress_bar: {
-      sisu: number;
+      sisu: BigNum;
       reward_multiplier: number;
       rewards_claimed: number;
     };
@@ -81,11 +83,11 @@ export type ProgressClaimRewardResult = {
   type: "progress.claim_reward.result";
   status: "ok";
   command_id: number;
-  coins: number;
-  exp: number;
+  coins: BigNum;
+  exp: BigNum;
   level: number;
-  shards: number;
-  cores: number;
+  shards: BigNum;
+  cores: BigNum;
 };
 
 export type CommandErrorReason =

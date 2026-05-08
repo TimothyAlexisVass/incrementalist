@@ -1,4 +1,5 @@
 import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult, ServerResult } from "../../net/protocol";
+import { BigNum, toNumber, ZERO } from "../../core/bignum";
 import {
   BASE_IDLE_MODE_OFF_FILL_RATE,
   BASE_IDLE_MODE_ON_FILL_RATE,
@@ -14,7 +15,7 @@ export type ProgressState = "projecting" | "awaiting_server_confirmation" | "con
 export type ProgressViewModel = {
   state: ProgressState;
   projectedFill: number;
-  sisu: number;
+  sisu: BigNum;
   rewardMultiplier: number;
   level: number;
   firstPlayedAtMs: number;
@@ -27,7 +28,7 @@ export type ProgressViewModel = {
 let currentViewModel: ProgressViewModel = {
   state: "projecting",
   projectedFill: 0,
-  sisu: 1,
+  sisu: { m: 1, e: 0 },
   rewardMultiplier: 1.0,
   level: 1,
   firstPlayedAtMs: 0,
@@ -214,7 +215,7 @@ export function hasPendingClaimIntent() {
 }
 
 function getProgressBarFillRate(viewModel: ProgressViewModel, nowMs: number) {
-  const sisuMultiplier = Math.max(1, Number(viewModel.sisu) || 1);
+  const sisuMultiplier = Math.max(1, toNumber(viewModel.sisu));
   const baseRate = (
     viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE
   ) * sisuMultiplier;
