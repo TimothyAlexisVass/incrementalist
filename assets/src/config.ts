@@ -19,7 +19,7 @@ export const GENERIC_FLOAT_LIFE_MS = 2500;
 export const GENERIC_FLOAT_RISE_SPEED = 16;
 
 // Top HUD fonts
-export const TOP_HUD_LEVEL_FONT = 'bold 24px Arial';
+export const TOP_HUD_LEVEL_FONT = 'bold 26px Arial';
 export const TOP_HUD_EXP_FONT = '14px Arial';
 export const TOP_HUD_COINS_FONT = '18px Arial';
 export const BOTTOM_HUD_BUTTON_FONT = 'bold 12px Arial';
@@ -111,7 +111,7 @@ export const TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
 export const TOP_HUD_EXP_BAR_Y = 15;
 export const TOP_HUD_EXP_BAR_WIDTH = 300;
 export const TOP_HUD_EXP_BAR_HEIGHT = 20;
-export const TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH;
+export const TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH - 10;
 export const TOP_HUD_EXP_COUNTER_X = TOP_HUD_EXP_BAR_X + (TOP_HUD_EXP_BAR_WIDTH / 2);
 export const TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
 export const TOP_HUD_CURRENCY_ICON_SIZE = 32;

@@ -7,9 +7,9 @@ import {
   TOP_HUD_CURRENCY_ICON_SIZE, TOP_HUD_CURRENCY_ICON_Y,
   TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_CORES_ICON_RIGHT,
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
-  TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
+  TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT, BOTTOM_HUD_HEIGHT
 } from "../../config";
-import { formatShortLevel, formatNumberRatio } from "../../format";
+import { formatNumberRatio } from "../../format";
 import { compare, ZERO, toNumber } from "../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
@@ -100,16 +100,51 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   ctx.fillStyle = COLORS.hud.textPrimary;
   ctx.font = TOP_HUD_EXP_FONT;
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
   ctx.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
 
   ctx.fillStyle = COLORS.hud.textPrimary;
   ctx.font = TOP_HUD_LEVEL_FONT;
   ctx.textAlign = 'left';
-  ctx.fillText(formatShortLevel(model.displayedLevel), TOP_HUD_LEVEL_X, 35);
+  ctx.fillText(String(model.displayedLevel), TOP_HUD_LEVEL_X, 34);
 
   drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+}
+
+export function renderBottomHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, menuButtonHovered: boolean) {
+  ctx.save();
+
+  // Draw background for bottom HUD
+  ctx.fillStyle = COLORS.hud.panel;
+  ctx.fillRect(0, canvas.height - BOTTOM_HUD_HEIGHT, canvas.width, BOTTOM_HUD_HEIGHT);
+
+  const buttonWidth = 120;
+  const buttonHeight = 34;
+  const paddingRight = 20;
+  const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2; // Center vertically in HUD
+
+  const buttonX = canvas.width - buttonWidth - paddingRight;
+  const buttonY = canvas.height - buttonHeight - paddingBottom;
+
+  const activeSurface = COLORS.button.secondary.surface;
+  const inactiveSurface = COLORS.button.surface.inactive;
+
+  ctx.fillStyle = menuButtonHovered ? activeSurface : inactiveSurface;
+  ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+  ctx.strokeStyle = menuButtonHovered ? COLORS.button.secondary.border : COLORS.button.border.inactive;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+  ctx.fillStyle = COLORS.hud.textPrimary;
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Menu [ESC]', buttonX + buttonWidth / 2, buttonY + buttonHeight / 2);
+
+  ctx.restore();
 }
 
 function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, iconRight: number, counterRight: number) {

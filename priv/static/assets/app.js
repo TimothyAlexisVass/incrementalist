@@ -18,7 +18,7 @@
   var REWARD_POPUP_HOLD_RISE_SPEED = 12;
   var GENERIC_FLOAT_LIFE_MS = 2500;
   var GENERIC_FLOAT_RISE_SPEED = 16;
-  var TOP_HUD_LEVEL_FONT = "bold 24px Arial";
+  var TOP_HUD_LEVEL_FONT = "bold 26px Arial";
   var TOP_HUD_EXP_FONT = "14px Arial";
   var TOP_HUD_COINS_FONT = "18px Arial";
   var REWARD_POPUP_FONT = "25px Arial";
@@ -36,7 +36,7 @@
   var TOP_HUD_EXP_BAR_Y = 15;
   var TOP_HUD_EXP_BAR_WIDTH = 300;
   var TOP_HUD_EXP_BAR_HEIGHT = 20;
-  var TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH;
+  var TOP_HUD_LEVEL_X = TOP_HUD_EXP_BAR_X * 2 + TOP_HUD_EXP_BAR_WIDTH - 10;
   var TOP_HUD_EXP_COUNTER_X = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
   var TOP_HUD_EXP_COUNTER_Y = TOP_HUD_EXP_BAR_Y + 15;
   var TOP_HUD_CURRENCY_ICON_SIZE = 32;
@@ -1430,15 +1430,6 @@
     const one = n % 10;
     const ten = Math.floor(n / 10);
     return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
-  }
-  function formatInteger(value, fallback = 0) {
-    if (typeof value === "object" && "m" in value && "e" in value) {
-      return formatBigNum(value);
-    }
-    return Math.floor(toFiniteNumber(value, fallback)).toString();
-  }
-  function formatShortLevel(value, fallback = 1) {
-    return `Lv.${formatInteger(value, fallback)}`;
   }
   function formatNumberRatio(current, maximum) {
     return `${formatNumber(current)} / ${formatNumber(maximum)}`;
@@ -2945,11 +2936,12 @@
     ctx2.fillStyle = COLORS.hud.textPrimary;
     ctx2.font = TOP_HUD_EXP_FONT;
     ctx2.textAlign = "center";
+    ctx2.textBaseline = "alphabetic";
     ctx2.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
     ctx2.fillStyle = COLORS.hud.textPrimary;
     ctx2.font = TOP_HUD_LEVEL_FONT;
     ctx2.textAlign = "left";
-    ctx2.fillText(formatShortLevel(model.displayedLevel), TOP_HUD_LEVEL_X, 35);
+    ctx2.fillText(String(model.displayedLevel), TOP_HUD_LEVEL_X, 34);
     drawCurrency(ctx2, canvas2, "Coins", model.displayedCoins, COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
     drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
     drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);

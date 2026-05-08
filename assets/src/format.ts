@@ -44,7 +44,7 @@ export function formatBigNum(value: BigNum): string {
   // Suffixed mode
   const tier = Math.floor(e / 3);
   const suffix = getSuffix(tier);
-  
+
   if (!suffix || suffix.startsWith('e')) {
     // Fallback to scientific if suffix is missing or just an exponent
     return formatScientific(value, 3);
@@ -94,10 +94,6 @@ export function formatInteger(value: any, fallback = 0): string {
 
 export function formatLevel(value: any, fallback = 1): string {
   return `Level ${formatInteger(value, fallback)}`;
-}
-
-export function formatShortLevel(value: any, fallback = 1): string {
-  return `Lv.${formatInteger(value, fallback)}`;
 }
 
 export function formatFileLabel(fileIndex: any, fallback = 0): string {
