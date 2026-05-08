@@ -1,6 +1,12 @@
 import { COLORS } from "../colors";
 import { GameChannel } from "../net/game-channel";
-import { ackAppliedResult } from "../net/commands";
+import { 
+  ackAppliedResult, 
+  switchSaveSlot, 
+  resetSaveSlot, 
+  progressClaimIn 
+} from "../net/commands";
+import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "../net/protocol";
 import { applyResult, createServerState, type ServerState } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
@@ -16,7 +22,6 @@ import {
   clearPendingClaimPopupPoint
 } from "../features/progress/interactions";
 import { renderProgressBar } from "../features/progress/render";
-import { progressClaimIn } from "../net/commands";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress/claim-effects";
@@ -42,14 +47,17 @@ export class GameClient {
   public readonly uiManager = new UIManager();
   private readonly mainMenu = new MainMenu();
   private pendingClick = false;
+  private isPointerPressed = false;
+  private pressStartPointer: { x: number; y: number } | null = null;
   private currentPointer: { x: number; y: number } | null = null;
   private hasActivityThisFrame = false;
 
   // Bound event handlers for add/removeEventListener symmetry.
-  private readonly onClickBound = (e: MouseEvent) => this.onClick(e);
+  private readonly onMouseDownBound = (e: MouseEvent) => this.onMouseDown(e);
+  private readonly onMouseUpBound = (e: MouseEvent) => this.onMouseUp(e);
   private readonly onMouseMoveBound = (e: MouseEvent) => this.onMouseMove(e);
   private readonly onKeydownBound = (e: KeyboardEvent) => this.onKeydown(e);
-  private readonly onMouseLeaveBound = () => { this.lastPointerPoint = null; };
+  private readonly onMouseLeaveBound = () => { this.lastPointerPoint = null; this.isPointerPressed = false; };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -63,6 +71,33 @@ export class GameClient {
     const username = window.localStorage.getItem(usernameKey);
     this.snapshotCache = new SnapshotCache(username);
     this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
+
+    // Initialize Save Slot Actions
+    this.mainMenu.setActions({
+      onSwitch: (index: number) => {
+        if (!this.channel) return;
+        this.uiManager.modalManager.open(new LoadingModal('Switching save slot...'));
+        this.runCommand(() => switchSaveSlot(this.channel!, index, false)).then(() => {
+          this.uiManager.modalManager.close();
+          this.uiManager.overlayManager.close();
+        });
+      },
+      onReset: (index: number) => {
+        this.uiManager.modalManager.open(new ResetConfirmationModal(
+          'Reset Save Slot',
+          'Are you sure you want to delete this file?\nThis cannot be undone.',
+          () => {
+            if (!this.channel) return;
+            this.uiManager.modalManager.open(new LoadingModal('Resetting save slot...'));
+            this.runCommand(() => resetSaveSlot(this.channel!, index)).then(() => {
+              this.uiManager.modalManager.close();
+              this.uiManager.overlayManager.close();
+            });
+          },
+          () => this.uiManager.modalManager.close()
+        ));
+      }
+    });
 
     this.channel.onStatusChange = (status) => {
       this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
@@ -92,6 +127,9 @@ export class GameClient {
 
     try {
       await this.channel.connect();
+      // Fetch all save slots to ensure the UI shows all 4 slots immediately.
+      // This is done after connect resolves to ensure the channel is fully ready.
+      await this.runCommand(() => listSaveSlots(this.channel!));
     } catch (error) {
       this.store.state.statusTone = "error";
       this.store.state.status = error instanceof Error ? error.message : "Boot failed";
@@ -99,7 +137,8 @@ export class GameClient {
   }
 
   start() {
-    document.addEventListener("click", this.onClickBound);
+    document.addEventListener("mousedown", this.onMouseDownBound);
+    document.addEventListener("mouseup", this.onMouseUpBound);
     document.addEventListener("mousemove", this.onMouseMoveBound);
     document.addEventListener("keydown", this.onKeydownBound);
     this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
@@ -108,7 +147,8 @@ export class GameClient {
 
   stop() {
     this.gameLoop.stop();
-    document.removeEventListener("click", this.onClickBound);
+    document.removeEventListener("mousedown", this.onMouseDownBound);
+    document.removeEventListener("mouseup", this.onMouseUpBound);
     document.removeEventListener("mousemove", this.onMouseMoveBound);
     document.removeEventListener("keydown", this.onKeydownBound);
     this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
@@ -139,6 +179,7 @@ export class GameClient {
     this.cacheSnapshotFromResult(result);
 
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+      this.uiManager.modalManager.close();
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
         syncHudInstantly(this.store.state.snapshot.state);
@@ -222,8 +263,16 @@ export class GameClient {
   // Input handlers
   // ---------------------------------------------------------------------------
 
-  private onClick(event: MouseEvent) {
+  private onMouseDown(event: MouseEvent) {
     this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+    this.isPointerPressed = true;
+    this.pressStartPointer = this.currentPointer;
+    this.hasActivityThisFrame = true;
+  }
+
+  private onMouseUp(event: MouseEvent) {
+    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+    this.isPointerPressed = false;
     this.pendingClick = true;
     this.hasActivityThisFrame = true;
   }
@@ -284,10 +333,17 @@ export class GameClient {
     // 1. Snapshot input state for this frame
     const input: InputState = { 
       pointer: this.currentPointer, 
+      pressStartPointer: this.pressStartPointer,
       clicked: this.pendingClick,
+      isPressed: this.isPointerPressed,
       consumed: false 
     };
     this.pendingClick = false;
+    
+    // Reset pressStartPointer after the click frame, or if the pointer is no longer pressed.
+    if (!this.isPointerPressed) {
+        this.pressStartPointer = null;
+    }
     const activity = this.hasActivityThisFrame;
     this.hasActivityThisFrame = false;
 
@@ -333,8 +389,8 @@ export class GameClient {
     });
 
     // The UI is drawn over the game world. It can consume clicks.
-    this.uiManager.tick(dt);
-    this.uiManager.render(this.ctx, this.canvas, input);
+    this.uiManager.tick(dt, input);
+    this.uiManager.render(this.ctx, this.canvas, input, this.store.state);
   }
 }
 

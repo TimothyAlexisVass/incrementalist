@@ -1,13 +1,17 @@
 export interface InputState {
   pointer: { x: number; y: number } | null;
+  pressStartPointer: { x: number; y: number } | null;
   clicked: boolean;
+  isPressed: boolean;
   consumed: boolean;
 }
 
 export function createInputState(): InputState {
   return {
     pointer: null,
+    pressStartPointer: null,
     clicked: false,
+    isPressed: false,
     consumed: false
   };
 }

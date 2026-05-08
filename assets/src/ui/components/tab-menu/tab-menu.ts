@@ -1,6 +1,7 @@
 import { COLORS } from '../../../colors';
 import { doButton } from '../button';
 import { InputState } from '../../input';
+import { ServerState } from '../../../net/snapshots';
 
 export type TabMenuLayout = 'horizontal' | 'vertical';
 export type TabMenuPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -16,7 +17,7 @@ export interface TabDefinition {
   id: string;
   label: string;
   hotkey?: string;
-  renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, rect: Rect) => void;
+  renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
 }
 
@@ -66,6 +67,7 @@ export class TabMenu {
     ctx: CanvasRenderingContext2D, 
     canvas: HTMLCanvasElement, 
     input: InputState, 
+    state: ServerState,
     containerRect: Rect
   ) {
     const layout = this.config.layout || 'horizontal';
@@ -217,7 +219,9 @@ export class TabMenu {
     // Render Content
     const activeTab = this.tabs.find(t => t.id === this.activeTabId);
     if (activeTab) {
-      activeTab.renderContent(ctx, canvas, input, contentRect);
+      ctx.save();
+      activeTab.renderContent(ctx, canvas, input, state, contentRect);
+      ctx.restore();
     }
   }
 }

@@ -69,14 +69,20 @@ export function doButton(
   options: ButtonOptions = {}
 ): boolean {
   const isHovered = pointInRect(input.pointer, rect);
+  const startedInside = pointInRect(input.pressStartPointer, rect);
   let clicked = false;
 
-  if (isHovered && input.clicked && !input.consumed) {
+  if (isHovered && startedInside && input.clicked && !input.consumed) {
     clicked = true;
     input.consumed = true; // Block clicks falling through to game world
   }
 
-  options.active = isHovered;
+  // Visual "active" state:
+  // 1. If currently pressing, only show active if started inside and still hovering
+  // 2. If not pressing, show active if hovering
+  const isDown = input.isPressed;
+  options.active = isDown ? (startedInside && isHovered) : isHovered;
+
   drawButton(ctx, rect, label, options);
 
   return clicked;

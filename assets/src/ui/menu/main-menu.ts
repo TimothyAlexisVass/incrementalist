@@ -2,6 +2,8 @@ import { Overlay } from '../overlay-manager';
 import { COLORS } from '../../colors';
 import { InputState, pointInRect } from '../input';
 import { TabMenu, TabDefinition, Rect } from '../components/tab-menu/tab-menu';
+import { renderSaveFilesTab } from '../features/save-files/save-files-tab';
+import { SaveSlotActions } from '../components/cards/save-slot';
 import {
   TOP_HUD_HEIGHT,
   BOTTOM_HUD_HEIGHT,
@@ -11,6 +13,11 @@ import {
 
 export class MainMenu implements Overlay {
   private tabMenu: TabMenu;
+  private actions: SaveSlotActions | null = null;
+
+  public setActions(actions: SaveSlotActions) {
+    this.actions = actions;
+  }
 
   public setTab(id: string) {
     this.tabMenu.setActiveTabId(id);
@@ -21,7 +28,7 @@ export class MainMenu implements Overlay {
   }
 
   constructor() {
-    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, rect: Rect) => {
+    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, rect: Rect) => {
       ctx.fillStyle = COLORS.panel.textPrimary;
       ctx.font = '24px Arial';
       ctx.textAlign = 'center';
@@ -56,7 +63,16 @@ export class MainMenu implements Overlay {
       {
         id: 'save',
         label: 'Save Files',
-        renderContent: renderPlaceholder('Save Files')
+        renderContent: (ctx, canvas, input, state, rect) => {
+          if (this.actions) {
+            renderSaveFilesTab(ctx, canvas, input, state, rect, this.actions);
+          } else {
+            ctx.fillStyle = COLORS.panel.textPrimary;
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Actions not initialized', rect.x + rect.width / 2, rect.y + rect.height / 2);
+          }
+        }
       }
     ];
 
@@ -69,7 +85,7 @@ export class MainMenu implements Overlay {
     });
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onClose: () => void) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, onClose: () => void) {
     ctx.save();
 
     const x = DISPLAY_AREA_X;
@@ -80,7 +96,7 @@ export class MainMenu implements Overlay {
 
     ctx.fillStyle = COLORS.panel.bg;
     ctx.fillRect(x, y, width, height);
-
+    
     ctx.restore();
 
     // Render TabMenu
@@ -91,8 +107,8 @@ export class MainMenu implements Overlay {
       width: width - 32,
       height: height - 32
     };
-
-    this.tabMenu.render(ctx, canvas, input, menuRect);
+    
+    this.tabMenu.render(ctx, canvas, input, state, menuRect);
 
     if (!input.consumed) {
       if (pointInRect(input.pointer, shellRect)) {

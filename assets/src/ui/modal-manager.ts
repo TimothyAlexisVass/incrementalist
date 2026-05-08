@@ -3,7 +3,7 @@ import { InputState } from './input';
 
 export interface Modal {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState): void;
-  tick(dt: number): void;
+  tick(dt: number, input: InputState): void;
 }
 
 export class ModalManager {
@@ -31,9 +31,9 @@ export class ModalManager {
     this.activeModal.render(ctx, canvas, input);
   }
 
-  tick(dt: number) {
+  tick(dt: number, input: InputState) {
     if (this.activeModal) {
-      this.activeModal.tick(dt);
+      this.activeModal.tick(dt, input);
     }
   }
 }

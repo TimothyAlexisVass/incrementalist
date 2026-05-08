@@ -24,6 +24,13 @@
   var REWARD_POPUP_FONT = "25px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
+  var SAVE_AUTOSAVE_FONT = "14px Arial";
+  var SAVE_FILE_LABEL_FONT = "bold 16px Arial";
+  var SAVE_FILE_INFO_FONT = "13px Arial";
+  var SAVE_FILE_STATUS_FONT = "bold 13px Arial";
+  var SAVE_DELETE_FONT = "bold 11px Arial";
+  var MODAL_TITLE_FONT = "bold 16px Arial";
+  var MODAL_BODY_FONT = "13px Arial";
   var BUTTON_DEFAULT_FONT = "12px Arial";
   var CANVAS_WIDTH = 1280;
   var CANVAS_HEIGHT = 760;
@@ -1157,6 +1164,15 @@
   };
 
   // src/net/commands.ts
+  function switchSaveSlot(channel, slotIndex, hasCachedSnapshot) {
+    return channel.pushCommand("save_slot.switch", {
+      slot_index: slotIndex,
+      has_cached_snapshot: hasCachedSnapshot
+    });
+  }
+  function resetSaveSlot(channel) {
+    return channel.pushCommand("save_slot.reset");
+  }
   function progressClaimIn(channel) {
     return channel.pushCommand("progress.claim_in");
   }
@@ -1167,6 +1183,171 @@
     const ack = await channel.ackCommand(commandId);
     return ack.released_result;
   }
+
+  // src/ui/input.ts
+  function pointInRect(point, rect) {
+    if (!point) return false;
+    return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+  }
+
+  // src/ui/components/button.ts
+  function drawButton(ctx2, rect, label, options = {}) {
+    if (!ctx2 || !rect) {
+      return;
+    }
+    ctx2.save();
+    const {
+      active = false,
+      activeSurface = COLORS.button.surface.active,
+      inactiveSurface = COLORS.button.surface.inactive,
+      activeBorder = COLORS.button.border.active,
+      inactiveBorder = COLORS.button.border.inactive,
+      textColor = COLORS.button.text,
+      lineWidth = 2,
+      font = BUTTON_DEFAULT_FONT,
+      textAlign = "center",
+      textX = rect.x + rect.width / 2,
+      textY = rect.y + 19
+    } = options;
+    ctx2.fillStyle = active ? activeSurface : inactiveSurface;
+    ctx2.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.strokeStyle = active ? activeBorder : inactiveBorder;
+    ctx2.lineWidth = lineWidth;
+    ctx2.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.fillStyle = textColor;
+    ctx2.font = font;
+    ctx2.textAlign = textAlign;
+    ctx2.textBaseline = "middle";
+    const actualTextY = options.textY !== void 0 ? options.textY : rect.y + rect.height / 2 + 1;
+    ctx2.fillText(label, textX, actualTextY);
+    ctx2.restore();
+  }
+  function doButton(ctx2, input, rect, label, options = {}) {
+    const isHovered = pointInRect(input.pointer, rect);
+    const startedInside = pointInRect(input.pressStartPointer, rect);
+    let clicked = false;
+    if (isHovered && startedInside && input.clicked && !input.consumed) {
+      clicked = true;
+      input.consumed = true;
+    }
+    const isDown = input.isPressed;
+    options.active = isDown ? startedInside && isHovered : isHovered;
+    drawButton(ctx2, rect, label, options);
+    return clicked;
+  }
+
+  // src/ui/components/modals/confirmation-modal.ts
+  var ResetConfirmationModal = class {
+    constructor(title, body, onConfirm, onCancel) {
+      this.title = title;
+      this.body = body;
+      this.onConfirm = onConfirm;
+      this.onCancel = onCancel;
+      __publicField(this, "holdTime", 0);
+      __publicField(this, "requiredHoldTime", 3e3);
+      __publicField(this, "okRect", null);
+    }
+    render(ctx2, canvas2, input) {
+      const modalWidth = 400;
+      const modalHeight = 220;
+      const modalX = (canvas2.width - modalWidth) / 2;
+      const modalY = (canvas2.height - modalHeight) / 2;
+      ctx2.fillStyle = COLORS.panel.bg;
+      ctx2.fillRect(modalX, modalY, modalWidth, modalHeight);
+      ctx2.strokeStyle = COLORS.overlay.panelBorder;
+      ctx2.lineWidth = 2;
+      ctx2.strokeRect(modalX, modalY, modalWidth, modalHeight);
+      ctx2.fillStyle = COLORS.overlay.titleText;
+      ctx2.font = MODAL_TITLE_FONT;
+      ctx2.textAlign = "center";
+      ctx2.textBaseline = "top";
+      ctx2.fillText(this.title, modalX + modalWidth / 2, modalY + 20);
+      ctx2.fillStyle = COLORS.overlay.bodyText;
+      ctx2.font = MODAL_BODY_FONT;
+      const lines = this.body.split("\n");
+      lines.forEach((line, i) => {
+        ctx2.fillText(line, modalX + modalWidth / 2, modalY + 60 + i * 20);
+      });
+      const btnWidth = 140;
+      const btnHeight = 40;
+      const btnY = modalY + modalHeight - 60;
+      const cancelRect = { x: modalX + 40, y: btnY, width: btnWidth, height: btnHeight };
+      this.okRect = { x: modalX + modalWidth - 40 - btnWidth, y: btnY, width: btnWidth, height: btnHeight };
+      if (drawButton(ctx2, cancelRect, "Cancel", {
+        active: pointInRect(input.pointer, cancelRect),
+        activeSurface: COLORS.button.secondary.surface,
+        inactiveSurface: COLORS.button.secondary.surface,
+        activeBorder: COLORS.button.secondary.border,
+        inactiveBorder: COLORS.button.secondary.border,
+        textColor: COLORS.button.secondary.text
+      })) {
+      }
+      ctx2.save();
+      const cancelClicked = doButton(ctx2, input, cancelRect, "Cancel", {
+        activeSurface: COLORS.button.secondary.surface,
+        inactiveSurface: COLORS.button.secondary.surface,
+        activeBorder: COLORS.button.secondary.border,
+        inactiveBorder: COLORS.button.secondary.border,
+        textColor: COLORS.button.secondary.text
+      });
+      if (cancelClicked) {
+        this.onCancel();
+      }
+      ctx2.restore();
+      const isHoveringOk = pointInRect(input.pointer, this.okRect);
+      const isHoldingOk = isHoveringOk && input.isPressed;
+      const holdProgress = Math.min(1, this.holdTime / this.requiredHoldTime);
+      const label = holdProgress > 0 ? `HOLD (${Math.ceil((this.requiredHoldTime - this.holdTime) / 1e3)}s)` : "HOLD TO RESET";
+      drawButton(ctx2, this.okRect, label, {
+        active: isHoveringOk,
+        activeSurface: COLORS.button.surface.active,
+        inactiveSurface: COLORS.button.surface.inactive
+      });
+      if (holdProgress > 0) {
+        ctx2.fillStyle = "rgba(255, 255, 255, 0.4)";
+        ctx2.fillRect(this.okRect.x, this.okRect.y + this.okRect.height - 6, this.okRect.width * holdProgress, 6);
+      }
+    }
+    tick(dt, input) {
+      if (this.okRect && pointInRect(input.pointer, this.okRect) && input.isPressed) {
+        this.holdTime += dt;
+        if (this.holdTime >= this.requiredHoldTime) {
+          this.onConfirm();
+          this.holdTime = 0;
+        }
+      } else {
+        this.holdTime = Math.max(0, this.holdTime - dt * 2);
+      }
+    }
+  };
+  var LoadingModal = class {
+    constructor(message = "Loading authoritative state...") {
+      this.message = message;
+      __publicField(this, "angle", 0);
+    }
+    render(ctx2, canvas2, input) {
+      const centerX = canvas2.width / 2;
+      const centerY = canvas2.height / 2;
+      ctx2.save();
+      ctx2.translate(centerX, centerY);
+      ctx2.rotate(this.angle);
+      ctx2.strokeStyle = COLORS.panel.textPrimary;
+      ctx2.lineWidth = 4;
+      ctx2.beginPath();
+      ctx2.arc(0, 0, 30, 0, Math.PI * 1.5);
+      ctx2.stroke();
+      ctx2.restore();
+      ctx2.fillStyle = COLORS.panel.textPrimary;
+      ctx2.font = "bold 16px Arial";
+      ctx2.textAlign = "center";
+      ctx2.fillText(this.message, centerX, centerY + 60);
+      input.consumed = true;
+    }
+    tick(dt, input) {
+      this.angle += dt * 5e-3;
+      input.consumed = true;
+    }
+  };
 
   // src/net/protocol.ts
   function isAckableCommandResult(result) {
@@ -1431,6 +1612,18 @@
     const ten = Math.floor(n / 10);
     return ten < tens.length ? `${ones[one]}${tens[ten]}` : `e${tier * 3}`;
   }
+  function formatInteger(value, fallback = 0) {
+    if (typeof value === "object" && "m" in value && "e" in value) {
+      return formatBigNum(value);
+    }
+    return Math.floor(toFiniteNumber(value, fallback)).toString();
+  }
+  function formatLevel(value, fallback = 1) {
+    return `Level ${formatInteger(value, fallback)}`;
+  }
+  function formatFileLabel(fileIndex, fallback = 0) {
+    return `File ${formatInteger(toFiniteNumber(fileIndex, fallback) + 1)}`;
+  }
   function formatNumberRatio(current, maximum) {
     return `${formatNumber(current)} / ${formatNumber(maximum)}`;
   }
@@ -1440,6 +1633,17 @@
   }
   function formatPercent(value, decimals = 2, fallback = 0) {
     return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
+  }
+  function formatTimestamp(timestamp, emptyText = "Never", invalidText = "Unknown") {
+    const value = toFiniteNumber(timestamp, 0);
+    if (value <= 0) {
+      return emptyText;
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return invalidText;
+    }
+    return date.toLocaleString();
   }
 
   // src/utils.ts
@@ -1469,56 +1673,6 @@
     }
     const parsed = Number(match[1]);
     return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  // src/ui/input.ts
-  function pointInRect(point, rect) {
-    if (!point) return false;
-    return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
-  }
-
-  // src/ui/components/button.ts
-  function drawButton(ctx2, rect, label, options = {}) {
-    if (!ctx2 || !rect) {
-      return;
-    }
-    ctx2.save();
-    const {
-      active = false,
-      activeSurface = COLORS.button.surface.active,
-      inactiveSurface = COLORS.button.surface.inactive,
-      activeBorder = COLORS.button.border.active,
-      inactiveBorder = COLORS.button.border.inactive,
-      textColor = COLORS.button.text,
-      lineWidth = 2,
-      font = BUTTON_DEFAULT_FONT,
-      textAlign = "center",
-      textX = rect.x + rect.width / 2,
-      textY = rect.y + 19
-    } = options;
-    ctx2.fillStyle = active ? activeSurface : inactiveSurface;
-    ctx2.fillRect(rect.x, rect.y, rect.width, rect.height);
-    ctx2.strokeStyle = active ? activeBorder : inactiveBorder;
-    ctx2.lineWidth = lineWidth;
-    ctx2.strokeRect(rect.x, rect.y, rect.width, rect.height);
-    ctx2.fillStyle = textColor;
-    ctx2.font = font;
-    ctx2.textAlign = textAlign;
-    ctx2.textBaseline = "middle";
-    const actualTextY = options.textY !== void 0 ? options.textY : rect.y + rect.height / 2 + 1;
-    ctx2.fillText(label, textX, actualTextY);
-    ctx2.restore();
-  }
-  function doButton(ctx2, input, rect, label, options = {}) {
-    const isHovered = pointInRect(input.pointer, rect);
-    let clicked = false;
-    if (isHovered && input.clicked && !input.consumed) {
-      clicked = true;
-      input.consumed = true;
-    }
-    options.active = isHovered;
-    drawButton(ctx2, rect, label, options);
-    return clicked;
   }
 
   // src/features/progress/render.ts
@@ -1647,7 +1801,8 @@
     ctx2.fillStyle = getProgressColor(progressPercent);
     ctx2.font = PROGRESS_PERCENT_FONT;
     ctx2.textAlign = "center";
-    ctx2.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 8);
+    ctx2.textBaseline = "middle";
+    ctx2.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 16);
     ctx2.restore();
     if (isFull) {
       const pulse2 = getFullPulse(now);
@@ -1657,6 +1812,7 @@
       ctx2.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22);
       ctx2.shadowBlur = 2;
       ctx2.textAlign = "center";
+      ctx2.textBaseline = "middle";
       ctx2.fillText("ACT!", barX + barWidth / 2, barY + barHeight + 16);
       ctx2.restore();
     }
@@ -3219,9 +3375,9 @@
       ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
       this.activeModal.render(ctx2, canvas2, input);
     }
-    tick(dt) {
+    tick(dt, input) {
       if (this.activeModal) {
-        this.activeModal.tick(dt);
+        this.activeModal.tick(dt, input);
       }
     }
   };
@@ -3250,9 +3406,9 @@
     getActiveOverlay() {
       return this.activeOverlay;
     }
-    render(ctx2, canvas2, input) {
+    render(ctx2, canvas2, input, state2) {
       if (!this.activeOverlay) return;
-      this.activeOverlay.render(ctx2, canvas2, input, () => this.close());
+      this.activeOverlay.render(ctx2, canvas2, input, state2, () => this.close());
     }
     tick(dt) {
       if (this.activeOverlay) {
@@ -3267,17 +3423,17 @@
       __publicField(this, "modalManager", new ModalManager());
       __publicField(this, "overlayManager", new OverlayManager());
     }
-    render(ctx2, canvas2, input) {
+    render(ctx2, canvas2, input, state2) {
       if (this.modalManager.isOpen()) {
         this.modalManager.render(ctx2, canvas2, input);
         input.consumed = true;
       } else {
-        this.overlayManager.render(ctx2, canvas2, input);
+        this.overlayManager.render(ctx2, canvas2, input, state2);
       }
     }
-    tick(dt) {
+    tick(dt, input) {
       this.overlayManager.tick(dt);
-      this.modalManager.tick(dt);
+      this.modalManager.tick(dt, input);
     }
   };
 
@@ -3306,7 +3462,7 @@
         activeTab.tickContent(dt);
       }
     }
-    render(ctx2, canvas2, input, containerRect) {
+    render(ctx2, canvas2, input, state2, containerRect) {
       const layout = this.config.layout || "horizontal";
       const position = this.config.position || "top-left";
       const tabHeight = this.config.tabHeight || 30;
@@ -3426,16 +3582,144 @@
       }
       const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
       if (activeTab) {
-        activeTab.renderContent(ctx2, canvas2, input, contentRect);
+        ctx2.save();
+        activeTab.renderContent(ctx2, canvas2, input, state2, contentRect);
+        ctx2.restore();
       }
     }
   };
+
+  // src/ui/components/cards/save-slot.ts
+  function drawSaveSlotCard(ctx2, input, rect, slot, actions) {
+    const isCurrent = slot.is_current;
+    ctx2.fillStyle = isCurrent ? COLORS.button.surface.active : COLORS.button.surface.inactive;
+    ctx2.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.strokeStyle = isCurrent ? COLORS.button.border.active : COLORS.button.border.inactive;
+    ctx2.lineWidth = 2;
+    ctx2.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.fillStyle = COLORS.button.text;
+    ctx2.font = SAVE_FILE_LABEL_FONT;
+    ctx2.textAlign = "center";
+    ctx2.textBaseline = "top";
+    ctx2.fillText(formatFileLabel(slot.file_index), rect.x + rect.width / 2, rect.y + 20);
+    ctx2.font = SAVE_FILE_INFO_FONT;
+    const statsY = rect.y + 60;
+    const lineGap = 24;
+    ctx2.fillText(slot.has_data ? formatLevel(slot.level) : "Empty Slot", rect.x + rect.width / 2, statsY);
+    ctx2.fillText(
+      slot.has_data ? `Rewards Claimed: ${formatNumber(slot.rewards_claimed)}` : "Rewards Claimed: 0",
+      rect.x + rect.width / 2,
+      statsY + lineGap
+    );
+    const savedAtVal = slot.saved_at ? new Date(slot.saved_at).getTime() : 0;
+    ctx2.fillText(
+      slot.has_data ? `Saved: ${formatTimestamp(savedAtVal)}` : "Saved: Never",
+      rect.x + rect.width / 2,
+      statsY + lineGap * 2
+    );
+    ctx2.fillStyle = isCurrent ? COLORS.overlay.statusUnlocked : COLORS.button.text;
+    ctx2.font = SAVE_FILE_STATUS_FONT;
+    const statusY = rect.y + rect.height - 25;
+    if (isCurrent) {
+      ctx2.fillText("Active File", rect.x + rect.width / 2, statusY);
+    } else {
+      const btnWidth = 140;
+      const btnHeight = 28;
+      const switchClicked = doButton(
+        ctx2,
+        input,
+        {
+          x: rect.x + (rect.width - btnWidth) / 2,
+          y: statusY - 14,
+          width: btnWidth,
+          height: btnHeight
+        },
+        "Switch",
+        { font: SAVE_FILE_STATUS_FONT }
+      );
+      if (switchClicked) {
+        actions.onSwitch(slot.slot_index);
+      }
+    }
+    if (slot.has_data && isCurrent) {
+      const deleteBtnWidth = 70;
+      const deleteBtnHeight = 22;
+      const deleteRect = {
+        x: rect.x + (rect.width - deleteBtnWidth) / 2,
+        y: rect.y + rect.height + 8,
+        width: deleteBtnWidth,
+        height: deleteBtnHeight
+      };
+      if (doButton(ctx2, input, deleteRect, "DELETE", {
+        font: SAVE_DELETE_FONT,
+        activeSurface: COLORS.button.secondary.surface,
+        inactiveSurface: COLORS.button.secondary.surface,
+        activeBorder: COLORS.button.secondary.border,
+        inactiveBorder: COLORS.button.secondary.border,
+        textColor: COLORS.button.secondary.text
+      })) {
+        actions.onReset(slot.slot_index);
+      }
+    }
+  }
+
+  // src/ui/features/save-files/save-files-tab.ts
+  function renderSaveFilesTab(ctx2, canvas2, input, state2, rect, actions) {
+    const slots = state2.slots;
+    if (slots.length === 0) {
+      ctx2.fillStyle = COLORS.panel.textPrimary;
+      ctx2.font = "18px Arial";
+      ctx2.textAlign = "center";
+      ctx2.fillText("Loading save files...", rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return;
+    }
+    const slotWidth = 250;
+    const slotHeight = 210;
+    const slotGap = 28;
+    const maxSlots = 4;
+    const totalWidth = slotWidth * maxSlots + slotGap * (maxSlots - 1);
+    const slotStartX = rect.x + Math.floor((rect.width - totalWidth) / 2);
+    const totalHeight = slotHeight;
+    const slotY = rect.y + Math.floor((rect.height - totalHeight) / 2) - 20;
+    for (let i = 0; i < maxSlots; i++) {
+      const slot = slots.find((s) => s.slot_index === i);
+      const slotRect = {
+        x: slotStartX + i * (slotWidth + slotGap),
+        y: slotY,
+        width: slotWidth,
+        height: slotHeight
+      };
+      if (slot) {
+        drawSaveSlotCard(ctx2, input, slotRect, slot, actions);
+      } else {
+        drawSaveSlotCard(ctx2, input, slotRect, {
+          slot_index: i,
+          file_index: i,
+          is_current: false,
+          has_data: false,
+          level: 1,
+          rewards_claimed: 0,
+          saved_at: ""
+        }, actions);
+      }
+    }
+    ctx2.fillStyle = COLORS.overlay.bodyText;
+    ctx2.font = SAVE_AUTOSAVE_FONT;
+    ctx2.textAlign = "left";
+    ctx2.textBaseline = "bottom";
+    ctx2.fillText(
+      "Progress is autosaved continuously.",
+      rect.x + 24,
+      rect.y + rect.height - 24
+    );
+  }
 
   // src/ui/menu/main-menu.ts
   var MainMenu = class {
     constructor() {
       __publicField(this, "tabMenu");
-      const renderPlaceholder = (title) => (ctx2, canvas2, input, rect) => {
+      __publicField(this, "actions", null);
+      const renderPlaceholder = (title) => (ctx2, canvas2, input, state2, rect) => {
         ctx2.fillStyle = COLORS.panel.textPrimary;
         ctx2.font = "24px Arial";
         ctx2.textAlign = "center";
@@ -3469,7 +3753,16 @@
         {
           id: "save",
           label: "Save Files",
-          renderContent: renderPlaceholder("Save Files")
+          renderContent: (ctx2, canvas2, input, state2, rect) => {
+            if (this.actions) {
+              renderSaveFilesTab(ctx2, canvas2, input, state2, rect, this.actions);
+            } else {
+              ctx2.fillStyle = COLORS.panel.textPrimary;
+              ctx2.font = "18px Arial";
+              ctx2.textAlign = "center";
+              ctx2.fillText("Actions not initialized", rect.x + rect.width / 2, rect.y + rect.height / 2);
+            }
+          }
         }
       ];
       this.tabMenu = new TabMenu(tabs, {
@@ -3480,13 +3773,16 @@
         font: "bold 16px Arial"
       });
     }
+    setActions(actions) {
+      this.actions = actions;
+    }
     setTab(id) {
       this.tabMenu.setActiveTabId(id);
     }
     getActiveTabId() {
       return this.tabMenu.getActiveTabId();
     }
-    render(ctx2, canvas2, input, onClose) {
+    render(ctx2, canvas2, input, state2, onClose) {
       ctx2.save();
       const x = DISPLAY_AREA_X;
       const y = TOP_HUD_HEIGHT;
@@ -3502,7 +3798,7 @@
         width: width - 32,
         height: height - 32
       };
-      this.tabMenu.render(ctx2, canvas2, input, menuRect);
+      this.tabMenu.render(ctx2, canvas2, input, state2, menuRect);
       if (!input.consumed) {
         if (pointInRect(input.pointer, shellRect)) {
           input.consumed = true;
@@ -3531,14 +3827,18 @@
       __publicField(this, "uiManager", new UIManager());
       __publicField(this, "mainMenu", new MainMenu());
       __publicField(this, "pendingClick", false);
+      __publicField(this, "isPointerPressed", false);
+      __publicField(this, "pressStartPointer", null);
       __publicField(this, "currentPointer", null);
       __publicField(this, "hasActivityThisFrame", false);
       // Bound event handlers for add/removeEventListener symmetry.
-      __publicField(this, "onClickBound", (e) => this.onClick(e));
+      __publicField(this, "onMouseDownBound", (e) => this.onMouseDown(e));
+      __publicField(this, "onMouseUpBound", (e) => this.onMouseUp(e));
       __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
       __publicField(this, "onKeydownBound", (e) => this.onKeydown(e));
       __publicField(this, "onMouseLeaveBound", () => {
         this.lastPointerPoint = null;
+        this.isPointerPressed = false;
       });
       this.store = new Store(createServerState());
       this.gameLoop = new GameLoop((dt) => this.tick(dt));
@@ -3547,6 +3847,31 @@
       const username = window.localStorage.getItem(usernameKey);
       this.snapshotCache = new SnapshotCache(username);
       this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
+      this.mainMenu.setActions({
+        onSwitch: (index) => {
+          if (!this.channel) return;
+          this.uiManager.modalManager.open(new LoadingModal("Switching save slot..."));
+          this.runCommand(() => switchSaveSlot(this.channel, index, false)).then(() => {
+            this.uiManager.modalManager.close();
+            this.uiManager.overlayManager.close();
+          });
+        },
+        onReset: (index) => {
+          this.uiManager.modalManager.open(new ResetConfirmationModal(
+            "Reset Save Slot",
+            "Are you sure you want to delete this file?\nThis cannot be undone.",
+            () => {
+              if (!this.channel) return;
+              this.uiManager.modalManager.open(new LoadingModal("Resetting save slot..."));
+              this.runCommand(() => resetSaveSlot(this.channel, index)).then(() => {
+                this.uiManager.modalManager.close();
+                this.uiManager.overlayManager.close();
+              });
+            },
+            () => this.uiManager.modalManager.close()
+          ));
+        }
+      });
       this.channel.onStatusChange = (status) => {
         this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
         this.store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
@@ -3567,13 +3892,15 @@
       };
       try {
         await this.channel.connect();
+        await this.runCommand(() => listSaveSlots(this.channel));
       } catch (error) {
         this.store.state.statusTone = "error";
         this.store.state.status = error instanceof Error ? error.message : "Boot failed";
       }
     }
     start() {
-      document.addEventListener("click", this.onClickBound);
+      document.addEventListener("mousedown", this.onMouseDownBound);
+      document.addEventListener("mouseup", this.onMouseUpBound);
       document.addEventListener("mousemove", this.onMouseMoveBound);
       document.addEventListener("keydown", this.onKeydownBound);
       this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
@@ -3581,7 +3908,8 @@
     }
     stop() {
       this.gameLoop.stop();
-      document.removeEventListener("click", this.onClickBound);
+      document.removeEventListener("mousedown", this.onMouseDownBound);
+      document.removeEventListener("mouseup", this.onMouseUpBound);
       document.removeEventListener("mousemove", this.onMouseMoveBound);
       document.removeEventListener("keydown", this.onKeydownBound);
       this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
@@ -3606,6 +3934,7 @@
       applyResult(this.store.state, result);
       this.cacheSnapshotFromResult(result);
       if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+        this.uiManager.modalManager.close();
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
           syncHudInstantly(this.store.state.snapshot.state);
@@ -3671,8 +4000,15 @@
     // ---------------------------------------------------------------------------
     // Input handlers
     // ---------------------------------------------------------------------------
-    onClick(event) {
+    onMouseDown(event) {
       this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+      this.isPointerPressed = true;
+      this.pressStartPointer = this.currentPointer;
+      this.hasActivityThisFrame = true;
+    }
+    onMouseUp(event) {
+      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+      this.isPointerPressed = false;
       this.pendingClick = true;
       this.hasActivityThisFrame = true;
     }
@@ -3720,10 +4056,15 @@
     tick(dt) {
       const input = {
         pointer: this.currentPointer,
+        pressStartPointer: this.pressStartPointer,
         clicked: this.pendingClick,
+        isPressed: this.isPointerPressed,
         consumed: false
       };
       this.pendingClick = false;
+      if (!this.isPointerPressed) {
+        this.pressStartPointer = null;
+      }
       const activity = this.hasActivityThisFrame;
       this.hasActivityThisFrame = false;
       updateProjectedFill(dt);
@@ -3750,8 +4091,8 @@
       renderBottomHUD(this.ctx, this.canvas, input, () => {
         this.uiManager.overlayManager.toggle(this.mainMenu);
       });
-      this.uiManager.tick(dt);
-      this.uiManager.render(this.ctx, this.canvas, input);
+      this.uiManager.tick(dt, input);
+      this.uiManager.render(this.ctx, this.canvas, input, this.store.state);
     }
   };
   function clearsCommandQueue(result) {

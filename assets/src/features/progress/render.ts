@@ -210,7 +210,8 @@ export function renderProgressBar(
   ctx.fillStyle = getProgressColor(progressPercent);
   ctx.font = PROGRESS_PERCENT_FONT;
   ctx.textAlign = 'center';
-  ctx.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 8);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 16);
   ctx.restore();
 
   if (isFull) {
@@ -221,6 +222,7 @@ export function renderProgressBar(
     ctx.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22);
     ctx.shadowBlur = 2;
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText('ACT!', barX + barWidth / 2, barY + barHeight + 16);
     ctx.restore();
   }
