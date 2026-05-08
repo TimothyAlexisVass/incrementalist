@@ -9,12 +9,17 @@ import {
   DISPLAY_AREA_X,
   DISPLAY_AREA_WIDTH,
 } from '../../../config';
-import { getTabMenu, setSaveSlotActions } from './view-model';
+import { getTabMenu, setSaveSlotActions, setShopActions } from './view-model';
+import { ShopActions } from './panels/basic-shop/index';
 import { handleMainMenuInteractions } from './interactions';
 
 export class MainMenu implements Overlay {
   public setActions(actions: SaveSlotActions) {
     setSaveSlotActions(actions);
+  }
+
+  public setShopActions(actions: ShopActions) {
+    setShopActions(actions);
   }
 
   public setTab(id: string) {

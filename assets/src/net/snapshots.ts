@@ -44,6 +44,10 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyAreaResult(state, result);
   }
 
+  if (result.type === "shop.purchase.result") {
+    applyAuthoritativeData(state, result);
+  }
+
   state.statusTone = result.status === "error" ? "error" : "ok";
   state.status = statusForResult(result);
 }
@@ -58,15 +62,39 @@ export function applyAuthoritativeData(
     level?: number;
     shards?: BigNum;
     cores?: BigNum;
+    item_id?: string;
   }
 ) {
   if (!state.snapshot) return;
 
   if (data.coins !== undefined) state.snapshot.state.coins = data.coins;
   if (data.exp !== undefined) state.snapshot.state.exp = data.exp;
-  if (data.level !== undefined) state.snapshot.state.level = data.level;
+  if (data.level !== undefined) {
+    state.snapshot.state.level = data.level;
+    
+    // Update shop item purchase eligibility
+    for (const item of state.snapshot.state.shop) {
+      item.can_purchase = !item.is_purchased && state.snapshot.state.level >= item.required_level;
+    }
+
+    // Update area locks in the snapshot so updateAreaViewModel sees them
+    for (const area of state.snapshot.state.areas) {
+      area.is_locked = state.snapshot.state.level < area.unlock_level;
+    }
+
+    updateAreaViewModel(state.snapshot.state);
+  }
+
   if (data.shards !== undefined) state.snapshot.state.shards = data.shards;
   if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
+
+  if (data.item_id !== undefined) {
+    const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
+    if (item) {
+      item.is_purchased = true;
+      item.can_purchase = false;
+    }
+  }
 }
 
 export function applyAreaResult(state: ServerState, result: AreaSelectResult) {
@@ -96,5 +124,6 @@ function statusForResult(result: ServerResult): string {
   if (result.type === "save_slots.list.result") return "Save files";
   if (result.type === "save_slot.switch.result") return "Save file loaded";
   if (result.type === "save_slot.reset.result") return "Save file reset";
+  if (result.type === "shop.purchase.result") return "Purchase successful";
   return "Ready";
 }

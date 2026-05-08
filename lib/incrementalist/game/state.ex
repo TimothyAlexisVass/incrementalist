@@ -241,6 +241,26 @@ defmodule Incrementalist.Game.State do
       "areas" =>
         Enum.map(Incrementalist.Game.Constants.area_defs(), fn def ->
           Map.put(def, :is_locked, (state.level || 1) < def.unlock_level)
+        end),
+      "features" => %{
+        "idle_mode_purchased" => state.features.idle_mode_purchased,
+        "world_map_unlocked" => state.features.world_map_unlocked,
+        "sisu_generator_purchased" => state.features.sisu_generator_purchased,
+        "bonus_time_purchased" => state.features.bonus_time_purchased
+      },
+      "shop" =>
+        Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
+          is_purchased =
+            case def.id do
+              "idle_mode" -> state.features.idle_mode_purchased
+              "sisu_generator" -> state.features.sisu_generator_purchased
+              "bonus_time" -> state.features.bonus_time_purchased
+              _ -> false
+            end
+
+          def
+          |> Map.put(:is_purchased, is_purchased)
+          |> Map.put(:can_purchase, !is_purchased && state.level >= def.required_level)
         end)
     }
   end

@@ -56,6 +56,7 @@ export const COLORS = Object.freeze({
   panel: {
     bg: '#16213e',
     textPrimary: '#FFFFFF',
+    textSecondary: '#A0AEC0',
     coins: '#FFD700',
     shards: '#FF8C1A',
     cores: '#FF4D4D',
@@ -104,6 +105,12 @@ export const COLORS = Object.freeze({
     optionsCheckboxCheckmark: '#dbe8ff',
     optionsDropdownBackground: '#2b3f60',
     optionsDropdownBorder: '#4d678f'
+  },
+  hud: {
+    coins: '#FFD700',
+    shards: '#FF8C1A',
+    cores: '#FF4D4D',
+    textPrimary: '#FFFFFF'
   }
 });
 

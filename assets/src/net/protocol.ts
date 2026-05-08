@@ -18,6 +18,17 @@ export type AreaDefinition = {
   is_locked: boolean;
 };
 
+export type ShopItemDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  cost: BigNum;
+  currency: "coins" | "shards" | "cores";
+  required_level: number;
+  is_purchased: boolean;
+  can_purchase: boolean;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -41,6 +52,13 @@ export type GameSnapshot = {
       rewards_claimed: number;
     };
     areas: AreaDefinition[];
+    features: {
+      idle_mode_purchased: boolean;
+      world_map_unlocked: boolean;
+      sisu_generator_purchased: boolean;
+      bonus_time_purchased: boolean;
+    };
+    shop: ShopItemDefinition[];
   };
   save_slot: SaveSlotSummary;
 };
@@ -106,6 +124,16 @@ export type AreaSelectResult = {
   area: string;
 };
 
+export type ShopPurchaseResult = {
+  type: "shop.purchase.result";
+  status: "ok";
+  command_id: number;
+  item_id: string;
+  coins?: BigNum;
+  shards?: BigNum;
+  cores?: BigNum;
+};
+
 export type CommandErrorReason =
   | "unknown_command"
   | "slot_index_required"
@@ -131,6 +159,7 @@ export type AckableCommandResult =
   | ProgressClaimInResult
   | ProgressClaimRewardResult
   | AreaSelectResult
+  | ShopPurchaseResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -175,6 +204,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "progress.claim_in.result" ||
     result.type === "progress.claim_reward.result" ||
     result.type === "area.select.result" ||
+    result.type === "shop.purchase.result" ||
     result.type === "command.error"
   );
 }

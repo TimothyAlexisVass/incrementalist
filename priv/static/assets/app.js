@@ -27,6 +27,10 @@
   var TINY_TEXT_FONT = "12px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
+  var SHOP_ITEM_NAME_FONT = "bold 20px Arial";
+  var SHOP_ITEM_DESC_FONT = "17px Arial";
+  var SHOP_ITEM_COST_FONT = "18px Arial";
+  var SHOP_ITEM_REQ_FONT = "16px Arial";
   var SAVE_AUTOSAVE_FONT = "14px Arial";
   var SAVE_FILE_LABEL_FONT = "bold 16px Arial";
   var SAVE_FILE_INFO_FONT = "13px Arial";
@@ -123,6 +127,7 @@
     panel: {
       bg: "#16213e",
       textPrimary: "#FFFFFF",
+      textSecondary: "#A0AEC0",
       coins: "#FFD700",
       shards: "#FF8C1A",
       cores: "#FF4D4D",
@@ -171,6 +176,12 @@
       optionsCheckboxCheckmark: "#dbe8ff",
       optionsDropdownBackground: "#2b3f60",
       optionsDropdownBorder: "#4d678f"
+    },
+    hud: {
+      coins: "#FFD700",
+      shards: "#FF8C1A",
+      cores: "#FF4D4D",
+      textPrimary: "#FFFFFF"
     }
   });
   var CSS_COLOR_VARIABLES = Object.freeze({
@@ -1185,6 +1196,9 @@
   function selectArea(channel, areaKey) {
     return channel.pushCommand("area.select", { area: areaKey });
   }
+  function shopPurchase(channel, itemId) {
+    return channel.pushCommand("shop.purchase", { item_id: itemId });
+  }
   async function ackAppliedResult(channel, commandId) {
     const ack = await channel.ackCommand(commandId);
     return ack.released_result;
@@ -1453,7 +1467,7 @@
 
   // src/net/protocol.ts
   function isAckableCommandResult(result) {
-    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "command.error";
+    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "shop.purchase.result" || result.type === "command.error";
   }
 
   // src/features/areas/view-model.ts
@@ -1500,6 +1514,9 @@
     if (result.type === "area.select.result") {
       applyAreaResult(state2, result);
     }
+    if (result.type === "shop.purchase.result") {
+      applyAuthoritativeData(state2, result);
+    }
     state2.statusTone = result.status === "error" ? "error" : "ok";
     state2.status = statusForResult(result);
   }
@@ -1507,9 +1524,25 @@
     if (!state2.snapshot) return;
     if (data.coins !== void 0) state2.snapshot.state.coins = data.coins;
     if (data.exp !== void 0) state2.snapshot.state.exp = data.exp;
-    if (data.level !== void 0) state2.snapshot.state.level = data.level;
+    if (data.level !== void 0) {
+      state2.snapshot.state.level = data.level;
+      for (const item of state2.snapshot.state.shop) {
+        item.can_purchase = !item.is_purchased && state2.snapshot.state.level >= item.required_level;
+      }
+      for (const area of state2.snapshot.state.areas) {
+        area.is_locked = state2.snapshot.state.level < area.unlock_level;
+      }
+      updateAreaViewModel(state2.snapshot.state);
+    }
     if (data.shards !== void 0) state2.snapshot.state.shards = data.shards;
     if (data.cores !== void 0) state2.snapshot.state.cores = data.cores;
+    if (data.item_id !== void 0) {
+      const item = state2.snapshot.state.shop.find((i) => i.id === data.item_id);
+      if (item) {
+        item.is_purchased = true;
+        item.can_purchase = false;
+      }
+    }
   }
   function applyAreaResult(state2, result) {
     if (!state2.snapshot) return;
@@ -1534,6 +1567,7 @@
     if (result.type === "save_slots.list.result") return "Save files";
     if (result.type === "save_slot.switch.result") return "Save file loaded";
     if (result.type === "save_slot.reset.result") return "Save file reset";
+    if (result.type === "shop.purchase.result") return "Purchase successful";
     return "Ready";
   }
 
@@ -4114,9 +4148,191 @@
     );
   }
 
+  // src/ui/layout/main-menu/panels/basic-shop/view-model.ts
+  function getShopViewModel(state2) {
+    const shopItems = state2.snapshot?.state.shop || [];
+    return shopItems.map((item) => {
+      const balance = state2.snapshot?.state[item.currency] || { m: 0, e: 0 };
+      return {
+        ...item,
+        canAfford: compare(balance, item.cost) >= 0
+      };
+    }).sort((a, b) => {
+      if (a.is_purchased && !b.is_purchased) return 1;
+      if (!a.is_purchased && b.is_purchased) return -1;
+      return 0;
+    });
+  }
+
+  // src/ui/components/cards/shop-item.ts
+  function drawShopItemCard(ctx2, rect, props) {
+    const { item, canAfford } = props;
+    const isPurchased = item.is_purchased;
+    ctx2.save();
+    ctx2.fillStyle = COLORS.button.surface.inactive;
+    let opacity = 1;
+    if (isPurchased) {
+      opacity = 0.25;
+    } else if (!item.can_purchase) {
+      opacity = 0.7;
+    }
+    ctx2.globalAlpha = opacity;
+    ctx2.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.strokeStyle = COLORS.button.border.inactive;
+    ctx2.lineWidth = 2;
+    ctx2.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.fillStyle = COLORS.panel.textPrimary;
+    ctx2.font = SHOP_ITEM_NAME_FONT;
+    ctx2.textAlign = "left";
+    ctx2.textBaseline = "top";
+    ctx2.fillText(item.name, rect.x + 16, rect.y + 16);
+    ctx2.fillStyle = COLORS.panel.textSecondary;
+    ctx2.font = SHOP_ITEM_DESC_FONT;
+    ctx2.fillText(item.description, rect.x + 16, rect.y + 44);
+    if (isPurchased) {
+      ctx2.fillStyle = COLORS.overlay.statusUnlocked;
+      ctx2.font = SHOP_ITEM_NAME_FONT;
+      ctx2.textAlign = "right";
+      ctx2.fillText("OWNED", rect.x + rect.width - 16, rect.y + 16);
+    } else {
+      drawCurrencyAmount(
+        ctx2,
+        item.currency,
+        item.cost,
+        rect.x + rect.width - 16,
+        rect.y + 16,
+        24,
+        {
+          align: "right",
+          font: SHOP_ITEM_COST_FONT,
+          textColor: COLORS.hud[item.currency] || COLORS.panel.textPrimary,
+          iconGap: 6,
+          iconPosition: "right",
+          formatter: formatBigNum
+        }
+      );
+      if (!item.can_purchase) {
+        ctx2.fillStyle = COLORS.panel.textSecondary;
+        ctx2.font = SHOP_ITEM_REQ_FONT;
+        ctx2.textAlign = "right";
+        ctx2.fillText(
+          `Requires ${formatLevel(item.required_level)}`,
+          rect.x + rect.width - 16,
+          rect.y + 44
+        );
+      } else {
+        const btnWidth = 120;
+        const btnHeight = 32;
+        const btnRect = {
+          x: rect.x + rect.width - btnWidth - 16,
+          y: rect.y + rect.height - btnHeight - 16,
+          width: btnWidth,
+          height: btnHeight
+        };
+        drawButton(ctx2, btnRect, "Purchase", {
+          active: canAfford,
+          textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary
+        });
+      }
+    }
+    ctx2.restore();
+  }
+  function handleShopItemCardInteractions(input, rect, props, actions) {
+    const { item, canAfford } = props;
+    if (item.is_purchased || !item.can_purchase || !canAfford) return;
+    const btnWidth = 120;
+    const btnHeight = 32;
+    const btnRect = {
+      x: rect.x + rect.width - btnWidth - 16,
+      y: rect.y + rect.height - btnHeight - 16,
+      width: btnWidth,
+      height: btnHeight
+    };
+    if (pointInRect(input.pointer, btnRect) && pointInRect(input.pressStartPointer, btnRect) && input.clicked && !input.consumed) {
+      actions.onPurchase(item.id);
+      input.consumed = true;
+    }
+  }
+
+  // src/ui/components/utils/lazy-loader.ts
+  function drawLazyLoader(ctx2, rect, message = "Loading...") {
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    const time = Date.now() / 1e3;
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.arc(centerX, centerY - 20, 24, time * 4, time * 4 + Math.PI * 1.6);
+    ctx2.strokeStyle = COLORS.panel.textPrimary;
+    ctx2.lineWidth = 3;
+    ctx2.lineCap = "round";
+    ctx2.stroke();
+    const pulse = Math.sin(time * 6) * 0.2 + 0.8;
+    ctx2.beginPath();
+    ctx2.arc(centerX, centerY - 20, 12, 0, Math.PI * 2);
+    ctx2.fillStyle = COLORS.sisu.blue || "#1E90FF";
+    ctx2.globalAlpha = pulse;
+    ctx2.fill();
+    ctx2.globalAlpha = 1;
+    ctx2.fillStyle = COLORS.panel.textPrimary;
+    ctx2.font = "bold 16px Arial";
+    ctx2.textAlign = "center";
+    ctx2.textBaseline = "middle";
+    ctx2.fillText(message, centerX, centerY + 30);
+    ctx2.restore();
+  }
+
+  // src/ui/layout/main-menu/panels/basic-shop/render.ts
+  function drawShopPanel(ctx2, rect, items) {
+    if (items.length === 0) {
+      drawLazyLoader(ctx2, rect, "Fetching items...");
+      return;
+    }
+    const startX = rect.x + 32;
+    const startY = rect.y + 32;
+    const itemWidth = rect.width - 64;
+    const itemHeight = 100;
+    const itemGap = 16;
+    items.forEach((item, index) => {
+      const itemRect = {
+        x: startX,
+        y: startY + (itemHeight + itemGap) * index,
+        width: itemWidth,
+        height: itemHeight
+      };
+      drawShopItemCard(ctx2, itemRect, { item, canAfford: item.canAfford });
+    });
+  }
+
+  // src/ui/layout/main-menu/panels/basic-shop/interactions.ts
+  function handleShopInteractions(input, rect, items, actions) {
+    if (items.length === 0) return;
+    const startX = rect.x + 32;
+    const startY = rect.y + 32;
+    const itemWidth = rect.width - 64;
+    const itemHeight = 100;
+    const itemGap = 16;
+    items.forEach((item, index) => {
+      const itemRect = {
+        x: startX,
+        y: startY + (itemHeight + itemGap) * index,
+        width: itemWidth,
+        height: itemHeight
+      };
+      handleShopItemCardInteractions(input, itemRect, { item, canAfford: item.canAfford }, actions);
+    });
+  }
+
+  // src/ui/layout/main-menu/panels/basic-shop/index.ts
+  function renderBasicShopTab(ctx2, _canvas, input, state2, rect, actions) {
+    const viewModel = getShopViewModel(state2);
+    handleShopInteractions(input, rect, viewModel, actions);
+    drawShopPanel(ctx2, rect, viewModel);
+  }
+
   // src/ui/layout/main-menu/view-model.ts
   var tabMenu = null;
   var saveSlotActions = null;
+  var shopActions = null;
   function getTabMenu() {
     if (!tabMenu) {
       const renderPlaceholder = (title) => (ctx2, _canvas, _input, _state, rect) => {
@@ -4131,7 +4347,13 @@
           id: "shop",
           label: "Shop",
           hotkey: "S",
-          renderContent: renderPlaceholder("Shop")
+          renderContent: (ctx2, canvas2, input, state2, rect) => {
+            if (shopActions) {
+              renderBasicShopTab(ctx2, canvas2, input, state2, rect, shopActions);
+            } else {
+              drawLazyLoader(ctx2, rect, "Initializing Shop...");
+            }
+          }
         },
         {
           id: "quest",
@@ -4178,6 +4400,9 @@
   function setSaveSlotActions(actions) {
     saveSlotActions = actions;
   }
+  function setShopActions(actions) {
+    shopActions = actions;
+  }
 
   // src/ui/layout/main-menu/interactions.ts
   function handleMainMenuInteractions(input, shellRect, onClose) {
@@ -4193,6 +4418,9 @@
   var MainMenu = class {
     setActions(actions) {
       setSaveSlotActions(actions);
+    }
+    setShopActions(actions) {
+      setShopActions(actions);
     }
     setTab(id) {
       getTabMenu().setActiveTabId(id);
@@ -4269,6 +4497,12 @@
             },
             () => this.uiManager.modalManager.close()
           ));
+        }
+      });
+      this.mainMenu.setShopActions({
+        onPurchase: (itemId) => {
+          if (!this.channel) return;
+          this.runCommand(() => shopPurchase(this.channel, itemId));
         }
       });
       this.channel.onStatusChange = (status) => {

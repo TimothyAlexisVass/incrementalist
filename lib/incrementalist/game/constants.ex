@@ -30,4 +30,36 @@ defmodule Incrementalist.Game.Constants do
       }
     ]
   end
+
+  def shop_item_defs do
+    [
+      %{
+        id: "idle_mode",
+        name: "Idle Mode",
+        description: "Allows you to claim rewards automatically, but slowly!",
+        cost: BigNum.from_number(500),
+        currency: :coins,
+        required_level: 2,
+        unlocks: [:world_map]
+      },
+      %{
+        id: "sisu_generator",
+        name: "Sisu Generator",
+        description: "Refill Sisu and upgrade Max Sisu!",
+        cost: BigNum.from_number(2000),
+        currency: :coins,
+        required_level: 4,
+        unlocks: []
+      },
+      %{
+        id: "bonus_time",
+        name: "BONUSTIME",
+        description: "Play daily bonus games when a daily token is ready!",
+        cost: BigNum.from_number(1000),
+        currency: :shards,
+        required_level: 15,
+        unlocks: []
+      }
+    ]
+  end
 end

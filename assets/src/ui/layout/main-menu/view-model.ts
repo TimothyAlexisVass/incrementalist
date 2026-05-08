@@ -2,11 +2,14 @@ import { TabMenu, TabDefinition, Rect } from '../../components/tab-menu/tab-menu
 import { SaveSlotActions } from '../../components/cards/save-slot';
 import { COLORS } from '../../../colors';
 import { renderSaveFilesTab } from './panels/save-files';
+import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
+import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../interaction-manager';
 import { ServerState } from '../../../net/snapshots';
 
 let tabMenu: TabMenu | null = null;
 let saveSlotActions: SaveSlotActions | null = null;
+let shopActions: ShopActions | null = null;
 
 export function getTabMenu(): TabMenu {
   if (!tabMenu) {
@@ -23,7 +26,13 @@ export function getTabMenu(): TabMenu {
         id: 'shop',
         label: 'Shop',
         hotkey: 'S',
-        renderContent: renderPlaceholder('Shop')
+        renderContent: (ctx, canvas, input, state, rect) => {
+          if (shopActions) {
+            renderBasicShopTab(ctx, canvas, input, state, rect, shopActions);
+          } else {
+            drawLazyLoader(ctx, rect, 'Initializing Shop...');
+          }
+        }
       },
       {
         id: 'quest',
@@ -75,4 +84,12 @@ export function setSaveSlotActions(actions: SaveSlotActions) {
 
 export function getSaveSlotActions(): SaveSlotActions | null {
   return saveSlotActions;
+}
+
+export function setShopActions(actions: ShopActions) {
+  shopActions = actions;
+}
+
+export function getShopActions(): ShopActions | null {
+  return shopActions;
 }

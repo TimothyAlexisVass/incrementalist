@@ -5,7 +5,8 @@ import {
   switchSaveSlot, 
   resetSaveSlot, 
   progressClaimIn,
-  selectArea
+  selectArea,
+  shopPurchase
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "../net/protocol";
@@ -90,6 +91,13 @@ export class GameClient {
           },
           () => this.uiManager.modalManager.close()
         ));
+      }
+    });
+    
+    this.mainMenu.setShopActions({
+      onPurchase: (itemId: string) => {
+        if (!this.channel) return;
+        this.runCommand(() => shopPurchase(this.channel!, itemId));
       }
     });
 

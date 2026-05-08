@@ -7,7 +7,8 @@ import type {
   SaveSlotSwitchResult,
   ProgressClaimInResult,
   ProgressClaimRewardResult,
-  AreaSelectResult
+  AreaSelectResult,
+  ShopPurchaseResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -37,6 +38,10 @@ export function progressClaimReward(channel: GameChannel) {
 
 export function selectArea(channel: GameChannel, areaKey: string) {
   return channel.pushCommand<CommandPushResult<AreaSelectResult | CommandErrorResult>>("area.select", { area: areaKey });
+}
+
+export function shopPurchase(channel: GameChannel, itemId: string) {
+  return channel.pushCommand<CommandPushResult<ShopPurchaseResult | CommandErrorResult>>("shop.purchase", { item_id: itemId });
 }
 
 export async function ackAppliedResult(

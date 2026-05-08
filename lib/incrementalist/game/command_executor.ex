@@ -131,6 +131,31 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result(reason, command), active_slot.id}
         end
 
+      "shop.purchase" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, item_id} <- fetch_item_id(command.intent),
+             {:ok, next_state} <- Incrementalist.Game.Features.Shop.purchase(active_slot.state, item_id) do
+          updated_slot =
+            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+
+          Repo.update!(updated_slot)
+
+          {"succeeded",
+           %{
+             "type" => "shop.purchase.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "item_id" => item_id,
+             "coins" => next_state.coins,
+             "shards" => next_state.shards,
+             "cores" => next_state.cores
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
       _unknown ->
         active_slot = active_slot(player, now)
 
@@ -212,6 +237,10 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_area_key(%{"area" => area}) when is_binary(area), do: {:ok, area}
   defp fetch_area_key(%{area: area}) when is_binary(area), do: {:ok, area}
   defp fetch_area_key(_intent), do: {:error, "area_required"}
+  
+  defp fetch_item_id(%{"item_id" => item_id}) when is_binary(item_id), do: {:ok, item_id}
+  defp fetch_item_id(%{item_id: item_id}) when is_binary(item_id), do: {:ok, item_id}
+  defp fetch_item_id(_intent), do: {:error, "item_id_required"}
 
   defp normalize_slot_index(slot_index)
        when is_integer(slot_index) do

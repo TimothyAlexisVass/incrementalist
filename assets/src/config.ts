@@ -49,10 +49,10 @@ export const PROGRESS_PERCENT_FONT = 'bold 16px Arial';
 export const IDLE_TOGGLE_FONT = 'bold 11px Arial';
 
 // Shop fonts
-export const SHOP_ITEM_NAME_FONT = 'bold 16px Arial';
-export const SHOP_ITEM_DESC_FONT = '13px Arial';
-export const SHOP_ITEM_COST_FONT = '14px Arial';
-export const SHOP_ITEM_REQ_FONT = '12px Arial';
+export const SHOP_ITEM_NAME_FONT = 'bold 20px Arial';
+export const SHOP_ITEM_DESC_FONT = '17px Arial';
+export const SHOP_ITEM_COST_FONT = '18px Arial';
+export const SHOP_ITEM_REQ_FONT = '16px Arial';
 
 // Quest panel fonts
 export const QUEST_PANEL_TOKENS_FONT = 'bold 14px Arial';
@@ -106,6 +106,8 @@ export const BOTTOM_HUD_HEIGHT = 50;
 export const DISPLAY_AREA_X = 0;
 export const DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
 // Ends just before the progress bar column (bar is at canvas.width - 92)
+// TODO: progress bar must hvae PROGRESS_BAR_X, PROGRESS_BAR_Y and PROGRESS_BAR_HEIGHT
+// TODO: when progress bar has these, set DISPLAY_AREA_WIDTH based on that instead of this hardcoded number
 export const DISPLAY_AREA_WIDTH = CANVAS_WIDTH - 146;
 export const DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
 export const TOP_HUD_EXP_BAR_X = 20;
