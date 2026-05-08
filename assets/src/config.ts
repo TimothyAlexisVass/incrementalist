@@ -103,11 +103,12 @@ export const CANVAS_WIDTH = 1280;
 export const CANVAS_HEIGHT = 760;
 export const TOP_HUD_HEIGHT = 50;
 export const BOTTOM_HUD_HEIGHT = 50;
-export const DISPLAY_AREA_X = 20;
+export const DISPLAY_AREA_X = 0;
 export const DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
-export const DISPLAY_AREA_WIDTH = 1112;
+// Ends just before the progress bar column (bar is at canvas.width - 92)
+export const DISPLAY_AREA_WIDTH = CANVAS_WIDTH - 146;
 export const DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
-export const TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
+export const TOP_HUD_EXP_BAR_X = 20;
 export const TOP_HUD_EXP_BAR_Y = 15;
 export const TOP_HUD_EXP_BAR_WIDTH = 300;
 export const TOP_HUD_EXP_BAR_HEIGHT = 20;

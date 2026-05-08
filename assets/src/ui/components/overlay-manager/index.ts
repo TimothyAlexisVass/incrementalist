@@ -1,6 +1,7 @@
+import { InputState } from '../../input';
+
 export interface Overlay {
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void;
-  handleInput(event: Event, point: { x: number; y: number } | null): boolean;
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, onClose: () => void): void;
   tick(dt: number): void;
 }
 
@@ -27,21 +28,12 @@ export class OverlayManager {
     return this.activeOverlay !== null;
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState) {
     if (!this.activeOverlay) return;
 
     // Overlays can optionally draw their own backdrop, but typically they do.
     // For now we assume the overlay handles its own background/backdrop.
-    this.activeOverlay.render(ctx, canvas);
-  }
-
-  handleInput(event: Event, point: { x: number; y: number } | null): boolean {
-    if (!this.activeOverlay) return false;
-    
-    // We pass input to the overlay. The overlay itself might decide if it consumes the input.
-    // Usually, an open overlay blocks game interaction.
-    this.activeOverlay.handleInput(event, point);
-    return true; 
+    this.activeOverlay.render(ctx, canvas, input, () => this.close());
   }
 
   tick(dt: number) {

@@ -24,15 +24,16 @@
   var REWARD_POPUP_FONT = "25px Arial";
   var PROGRESS_PERCENT_FONT = "bold 16px Arial";
   var IDLE_TOGGLE_FONT = "bold 11px Arial";
+  var BUTTON_DEFAULT_FONT = "12px Arial";
   var CANVAS_WIDTH = 1280;
   var CANVAS_HEIGHT = 760;
   var TOP_HUD_HEIGHT = 50;
   var BOTTOM_HUD_HEIGHT = 50;
-  var DISPLAY_AREA_X = 20;
+  var DISPLAY_AREA_X = 0;
   var DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
-  var DISPLAY_AREA_WIDTH = 1112;
+  var DISPLAY_AREA_WIDTH = CANVAS_WIDTH - 146;
   var DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
-  var TOP_HUD_EXP_BAR_X = DISPLAY_AREA_X;
+  var TOP_HUD_EXP_BAR_X = 20;
   var TOP_HUD_EXP_BAR_Y = 15;
   var TOP_HUD_EXP_BAR_WIDTH = 300;
   var TOP_HUD_EXP_BAR_HEIGHT = 20;
@@ -109,8 +110,8 @@
         off: "#777"
       }
     },
-    hud: {
-      panel: "#16213e",
+    panel: {
+      bg: "#16213e",
       textPrimary: "#FFFFFF",
       coins: "#FFD700",
       shards: "#FF8C1A",
@@ -142,7 +143,6 @@
     },
     overlay: {
       backdrop: "rgba(0, 0, 0, 0.72)",
-      panel: "#111f34",
       panelBorder: "#3a5273",
       titleText: "#dbe8ff",
       starsText: "#ffd966",
@@ -1471,6 +1471,56 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  // src/ui/input.ts
+  function pointInRect(point, rect) {
+    if (!point) return false;
+    return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+  }
+
+  // src/ui/components/button.ts
+  function drawButton(ctx2, rect, label, options = {}) {
+    if (!ctx2 || !rect) {
+      return;
+    }
+    ctx2.save();
+    const {
+      active = false,
+      activeSurface = COLORS.button.surface.active,
+      inactiveSurface = COLORS.button.surface.inactive,
+      activeBorder = COLORS.button.border.active,
+      inactiveBorder = COLORS.button.border.inactive,
+      textColor = COLORS.button.text,
+      lineWidth = 2,
+      font = BUTTON_DEFAULT_FONT,
+      textAlign = "center",
+      textX = rect.x + rect.width / 2,
+      textY = rect.y + 19
+    } = options;
+    ctx2.fillStyle = active ? activeSurface : inactiveSurface;
+    ctx2.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.strokeStyle = active ? activeBorder : inactiveBorder;
+    ctx2.lineWidth = lineWidth;
+    ctx2.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx2.fillStyle = textColor;
+    ctx2.font = font;
+    ctx2.textAlign = textAlign;
+    ctx2.textBaseline = "middle";
+    const actualTextY = options.textY !== void 0 ? options.textY : rect.y + rect.height / 2 + 1;
+    ctx2.fillText(label, textX, actualTextY);
+    ctx2.restore();
+  }
+  function doButton(ctx2, input, rect, label, options = {}) {
+    const isHovered = pointInRect(input.pointer, rect);
+    let clicked = false;
+    if (isHovered && input.clicked && !input.consumed) {
+      clicked = true;
+      input.consumed = true;
+    }
+    options.active = isHovered;
+    drawButton(ctx2, rect, label, options);
+    return clicked;
+  }
+
   // src/features/progress/render.ts
   var TWO_PI2 = Math.PI * 2;
   var PROGRESS_VISUAL_STATE = {
@@ -2742,9 +2792,9 @@
 
   // src/render/currency-icons.ts
   var CURRENCY_FALLBACK_COLORS = Object.freeze({
-    coins: COLORS.hud.coins,
-    shards: COLORS.hud.shards,
-    cores: COLORS.hud.cores
+    coins: COLORS.panel.coins,
+    shards: COLORS.panel.shards,
+    cores: COLORS.panel.cores
   });
   var currencyIconImages = /* @__PURE__ */ new Map();
   var smoothedCurrencyIconCanvases = /* @__PURE__ */ new Map();
@@ -2774,7 +2824,7 @@
       ctx2.restore();
       return;
     }
-    ctx2.fillStyle = CURRENCY_FALLBACK_COLORS[currencyKey] || COLORS.hud.textPrimary;
+    ctx2.fillStyle = CURRENCY_FALLBACK_COLORS[currencyKey] || COLORS.panel.textPrimary;
     ctx2.beginPath();
     ctx2.arc(x + size / 2, y + size / 2, size * 0.42, 0, Math.PI * 2);
     ctx2.fill();
@@ -2917,7 +2967,7 @@
         collectionPulse = EXP_BAR_FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
       }
     }
-    ctx2.fillStyle = COLORS.hud.panel;
+    ctx2.fillStyle = COLORS.panel.bg;
     ctx2.fillRect(0, 0, canvas2.width, TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 16);
     ctx2.fillStyle = COLORS.bar.track;
     ctx2.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
@@ -2933,18 +2983,33 @@
     ctx2.strokeRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
     renderExpBarCollectionGlow(ctx2, collectionPulse);
     renderExpBarLevelUpParticles(ctx2, model);
-    ctx2.fillStyle = COLORS.hud.textPrimary;
+    ctx2.fillStyle = COLORS.panel.textPrimary;
     ctx2.font = TOP_HUD_EXP_FONT;
     ctx2.textAlign = "center";
     ctx2.textBaseline = "alphabetic";
     ctx2.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
-    ctx2.fillStyle = COLORS.hud.textPrimary;
+    ctx2.fillStyle = COLORS.panel.textPrimary;
     ctx2.font = TOP_HUD_LEVEL_FONT;
     ctx2.textAlign = "left";
     ctx2.fillText(String(model.displayedLevel), TOP_HUD_LEVEL_X, 34);
-    drawCurrency(ctx2, canvas2, "Coins", model.displayedCoins, COLORS.hud.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
-    drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.hud.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
-    drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.hud.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+    drawCurrency(ctx2, canvas2, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
+    drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
+    drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+  }
+  function renderBottomHUD(ctx2, canvas2, input, onMenuClick) {
+    ctx2.save();
+    ctx2.fillStyle = COLORS.panel.bg;
+    ctx2.fillRect(0, canvas2.height - BOTTOM_HUD_HEIGHT, canvas2.width, BOTTOM_HUD_HEIGHT);
+    const buttonWidth = 120;
+    const buttonHeight = 34;
+    const paddingRight = 20;
+    const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
+    const buttonX = canvas2.width - buttonWidth - paddingRight;
+    const buttonY = canvas2.height - buttonHeight - paddingBottom;
+    if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]")) {
+      onMenuClick();
+    }
+    ctx2.restore();
   }
   function drawCurrency(ctx2, canvas2, label, amount, color, iconRight, counterRight) {
     drawCurrencyAmount(
@@ -3148,16 +3213,11 @@
     isOpen() {
       return this.activeModal !== null;
     }
-    render(ctx2, canvas2) {
+    render(ctx2, canvas2, input) {
       if (!this.activeModal) return;
       ctx2.fillStyle = COLORS.overlay.backdrop;
       ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
-      this.activeModal.render(ctx2, canvas2);
-    }
-    handleInput(event, point) {
-      if (!this.activeModal) return false;
-      this.activeModal.handleInput(event, point);
-      return true;
+      this.activeModal.render(ctx2, canvas2, input);
     }
     tick(dt) {
       if (this.activeModal) {
@@ -3187,14 +3247,9 @@
     isOpen() {
       return this.activeOverlay !== null;
     }
-    render(ctx2, canvas2) {
+    render(ctx2, canvas2, input) {
       if (!this.activeOverlay) return;
-      this.activeOverlay.render(ctx2, canvas2);
-    }
-    handleInput(event, point) {
-      if (!this.activeOverlay) return false;
-      this.activeOverlay.handleInput(event, point);
-      return true;
+      this.activeOverlay.render(ctx2, canvas2, input, () => this.close());
     }
     tick(dt) {
       if (this.activeOverlay) {
@@ -3209,22 +3264,50 @@
       __publicField(this, "modalManager", new ModalManager());
       __publicField(this, "overlayManager", new OverlayManager());
     }
-    render(ctx2, canvas2) {
-      this.overlayManager.render(ctx2, canvas2);
-      this.modalManager.render(ctx2, canvas2);
-    }
-    handleInput(event, point) {
-      if (this.modalManager.handleInput(event, point)) {
-        return true;
+    render(ctx2, canvas2, input) {
+      if (this.modalManager.isOpen()) {
+        this.modalManager.render(ctx2, canvas2, input);
+        input.consumed = true;
+      } else {
+        this.overlayManager.render(ctx2, canvas2, input);
       }
-      if (this.overlayManager.handleInput(event, point)) {
-        return true;
-      }
-      return false;
     }
     tick(dt) {
       this.overlayManager.tick(dt);
       this.modalManager.tick(dt);
+    }
+  };
+
+  // src/ui/menu/menu-shell.ts
+  var MenuShell = class {
+    render(ctx2, canvas2, input, onClose) {
+      ctx2.save();
+      const x = DISPLAY_AREA_X;
+      const y = TOP_HUD_HEIGHT;
+      const width = DISPLAY_AREA_WIDTH;
+      const height = canvas2.height - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
+      const shellRect = { x, y, width, height };
+      ctx2.fillStyle = COLORS.panel.bg;
+      ctx2.fillRect(x, y, width, height);
+      ctx2.fillStyle = COLORS.overlay.titleText;
+      ctx2.font = "bold 24px Arial";
+      ctx2.textAlign = "left";
+      ctx2.textBaseline = "top";
+      ctx2.fillText("Menu Placeholder", x + 20, y + 20);
+      ctx2.fillStyle = COLORS.button.text;
+      ctx2.font = "bold 14px Arial";
+      ctx2.textAlign = "right";
+      ctx2.fillText("[ESC] or click outside to close", x + width - 20, y + 24);
+      ctx2.restore();
+      if (!input.consumed) {
+        if (pointInRect(input.pointer, shellRect)) {
+          input.consumed = true;
+        } else if (input.clicked) {
+          onClose();
+        }
+      }
+    }
+    tick(dt) {
     }
   };
 
@@ -3241,6 +3324,10 @@
       __publicField(this, "lastPointerPoint", null);
       __publicField(this, "gameLoop");
       __publicField(this, "uiManager", new UIManager());
+      __publicField(this, "menuShell", new MenuShell());
+      __publicField(this, "pendingClick", false);
+      __publicField(this, "currentPointer", null);
+      __publicField(this, "hasActivityThisFrame", false);
       // Bound event handlers for add/removeEventListener symmetry.
       __publicField(this, "onClickBound", (e) => this.onClick(e));
       __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
@@ -3380,32 +3467,22 @@
     // Input handlers
     // ---------------------------------------------------------------------------
     onClick(event) {
-      const point = getCanvasPointFromInputEvent(event, this.canvas);
-      this.lastPointerPoint = point;
-      if (this.uiManager.handleInput(event, point)) {
-        return;
-      }
-      if (this.channel) {
-        claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
-      }
+      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+      this.pendingClick = true;
+      this.hasActivityThisFrame = true;
     }
     onMouseMove(event) {
-      const point = getCanvasPointFromInputEvent(event, this.canvas);
-      this.lastPointerPoint = point;
-      if (this.uiManager.handleInput(event, point)) {
-        return;
-      }
-      if (this.channel) {
-        claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
-      }
+      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+      this.hasActivityThisFrame = true;
     }
     onKeydown(event) {
-      if (this.uiManager.handleInput(event, this.lastPointerPoint)) {
+      this.hasActivityThisFrame = true;
+      if (event.key === "Escape") {
+        this.uiManager.overlayManager.toggle(this.menuShell);
         event.preventDefault();
         return;
       }
       if (this.channel) {
-        claimRewardOnAnyInput(this.channel, this.canvas, this.lastPointerPoint, (cmd) => this.runCommand(cmd));
       }
       event.preventDefault();
     }
@@ -3413,6 +3490,14 @@
     // Game loop
     // ---------------------------------------------------------------------------
     tick(dt) {
+      const input = {
+        pointer: this.currentPointer,
+        clicked: this.pendingClick,
+        consumed: false
+      };
+      this.pendingClick = false;
+      const activity = this.hasActivityThisFrame;
+      this.hasActivityThisFrame = false;
       updateProjectedFill(dt);
       if (this.channel && handleProgressLoop(this.channel)) {
         const channel = this.channel;
@@ -3431,8 +3516,14 @@
       updateWebGLEffects(dt);
       renderWebGLEffects();
       renderFloatingTexts(this.ctx, this.floatingTexts);
+      if (activity && this.channel) {
+        claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
+      }
+      renderBottomHUD(this.ctx, this.canvas, input, () => {
+        this.uiManager.overlayManager.toggle(this.menuShell);
+      });
       this.uiManager.tick(dt);
-      this.uiManager.render(this.ctx, this.canvas);
+      this.uiManager.render(this.ctx, this.canvas, input);
     }
   };
   function clearsCommandQueue(result) {

@@ -49,3 +49,34 @@ export function drawCheckbox(
   ctx.stroke();
   ctx.restore();
 }
+
+import { InputState, pointInRect } from '../input';
+
+export function doCheckbox(
+  ctx: CanvasRenderingContext2D,
+  input: InputState,
+  x: number,
+  y: number,
+  size: number,
+  checked: boolean,
+  options: CheckboxOptions = {}
+): boolean {
+  const isHovered = pointInRect(input.pointer, { x, y, width: size, height: size });
+  let toggled = false;
+
+  if (isHovered && input.clicked && !input.consumed) {
+    toggled = true;
+    input.consumed = true;
+  }
+
+  // Checkboxes might highlight their border when hovered
+  const drawOptions = { ...options };
+  if (isHovered) {
+    drawOptions.borderColor = drawOptions.borderColor || COLORS.button.border.active;
+  }
+
+  drawCheckbox(ctx, x, y, size, checked, drawOptions);
+
+  return toggled;
+}
+

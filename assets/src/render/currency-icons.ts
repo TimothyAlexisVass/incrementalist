@@ -3,9 +3,9 @@ import { formatNumber } from '../format';
 import { BigNum } from '../core/bignum';
 
 const CURRENCY_FALLBACK_COLORS: Record<string, string> = Object.freeze({
-  coins: COLORS.hud.coins,
-  shards: COLORS.hud.shards,
-  cores: COLORS.hud.cores
+  coins: COLORS.panel.coins,
+  shards: COLORS.panel.shards,
+  cores: COLORS.panel.cores
 });
 
 const currencyIconImages = new Map<string, HTMLImageElement>();
@@ -44,7 +44,7 @@ export function drawCurrencyIcon(ctx: CanvasRenderingContext2D, currencyKey: str
     return;
   }
 
-  ctx.fillStyle = CURRENCY_FALLBACK_COLORS[currencyKey] || COLORS.hud.textPrimary;
+  ctx.fillStyle = CURRENCY_FALLBACK_COLORS[currencyKey] || COLORS.panel.textPrimary;
   ctx.beginPath();
   ctx.arc(x + size / 2, y + size / 2, size * 0.42, 0, Math.PI * 2);
   ctx.fill();

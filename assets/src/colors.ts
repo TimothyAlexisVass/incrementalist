@@ -53,8 +53,8 @@ export const COLORS = Object.freeze({
       off: '#777'
     }
   },
-  hud: {
-    panel: '#16213e',
+  panel: {
+    bg: '#16213e',
     textPrimary: '#FFFFFF',
     coins: '#FFD700',
     shards: '#FF8C1A',
@@ -86,7 +86,6 @@ export const COLORS = Object.freeze({
   },
   overlay: {
     backdrop: 'rgba(0, 0, 0, 0.72)',
-    panel: '#111f34',
     panelBorder: '#3a5273',
     titleText: '#dbe8ff',
     starsText: '#ffd966',

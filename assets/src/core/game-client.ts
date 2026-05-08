@@ -21,10 +21,12 @@ import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects"
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress/claim-effects";
 import { updateHudViewModel, syncHudInstantly } from "../features/hud/view-model";
-import { renderTopHUD } from "../features/hud/render";
+import { renderTopHUD, renderBottomHUD } from "../features/hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 import { UIManager } from "../ui/ui-manager";
+import { MenuShell } from "../ui/menu/menu-shell";
+import { InputState } from "../ui/input";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -38,6 +40,10 @@ export class GameClient {
   private lastPointerPoint: { x: number; y: number } | null = null;
   private readonly gameLoop: GameLoop;
   public readonly uiManager = new UIManager();
+  private readonly menuShell = new MenuShell();
+  private pendingClick = false;
+  private currentPointer: { x: number; y: number } | null = null;
+  private hasActivityThisFrame = false;
 
   // Bound event handlers for add/removeEventListener symmetry.
   private readonly onClickBound = (e: MouseEvent) => this.onClick(e);
@@ -217,34 +223,27 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private onClick(event: MouseEvent) {
-    const point = getCanvasPointFromInputEvent(event, this.canvas);
-    this.lastPointerPoint = point;
-    if (this.uiManager.handleInput(event, point)) {
-      return;
-    }
-    if (this.channel) {
-      claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
-    }
+    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+    this.pendingClick = true;
+    this.hasActivityThisFrame = true;
   }
 
   private onMouseMove(event: MouseEvent) {
-    const point = getCanvasPointFromInputEvent(event, this.canvas);
-    this.lastPointerPoint = point;
-    if (this.uiManager.handleInput(event, point)) {
-      return;
-    }
-    if (this.channel) {
-      claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
-    }
+    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
+    this.hasActivityThisFrame = true;
   }
 
   private onKeydown(event: KeyboardEvent) {
-    if (this.uiManager.handleInput(event, this.lastPointerPoint)) {
+    this.hasActivityThisFrame = true;
+    if (event.key === 'Escape') {
+      this.uiManager.overlayManager.toggle(this.menuShell);
       event.preventDefault();
       return;
     }
+
     if (this.channel) {
-      claimRewardOnAnyInput(this.channel, this.canvas, this.lastPointerPoint, (cmd) => this.runCommand(cmd));
+      // For keyboard, we don't know if UI consumed it yet without waiting for tick,
+      // but previously it claimed immediately. We'll leave it to the tick fallback.
     }
     event.preventDefault();
   }
@@ -254,6 +253,16 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private tick(dt: number) {
+    // 1. Snapshot input state for this frame
+    const input: InputState = { 
+      pointer: this.currentPointer, 
+      clicked: this.pendingClick,
+      consumed: false 
+    };
+    this.pendingClick = false;
+    const activity = this.hasActivityThisFrame;
+    this.hasActivityThisFrame = false;
+
     // Advance client-side estimation of progress bar fill
     updateProjectedFill(dt);
 
@@ -277,14 +286,27 @@ export class GameClient {
 
     updateFloatingTexts(this.floatingTexts, dt);
 
-    // Update and render reward collection effects
+    // Update and render reward collection effects.
     updateWebGLEffects(dt);
     renderWebGLEffects();
 
     renderFloatingTexts(this.ctx, this.floatingTexts);
 
+    // Any activity collects the progress bar if it's ready. input.consumed is
+    // intentionally NOT set here so nothing else is blocked.
+    if (activity && this.channel) {
+      claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
+    }
+
+    // Render BottomHUD before overlays so its buttons can consume input and 
+    // toggle overlays without being immediately countered by "click-outside" logic.
+    renderBottomHUD(this.ctx, this.canvas, input, () => {
+      this.uiManager.overlayManager.toggle(this.menuShell);
+    });
+
+    // The UI is drawn over the game world. It can consume clicks.
     this.uiManager.tick(dt);
-    this.uiManager.render(this.ctx, this.canvas);
+    this.uiManager.render(this.ctx, this.canvas, input);
   }
 }
 

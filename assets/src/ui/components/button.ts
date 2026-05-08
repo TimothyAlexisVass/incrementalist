@@ -25,6 +25,8 @@ export function drawButton(
     return;
   }
 
+  ctx.save();
+
   const {
     active = false,
     activeSurface = COLORS.button.surface.active,
@@ -49,5 +51,34 @@ export function drawButton(
   ctx.fillStyle = textColor;
   ctx.font = font;
   ctx.textAlign = textAlign;
-  ctx.fillText(label, textX, textY);
+  ctx.textBaseline = 'middle';
+  
+  // Use explicitly provided textY, or default to exact middle of the rect
+  const actualTextY = options.textY !== undefined ? options.textY : rect.y + (rect.height / 2) + 1;
+  ctx.fillText(label, textX, actualTextY);
+  ctx.restore();
 }
+
+import { InputState, pointInRect } from '../input';
+
+export function doButton(
+  ctx: CanvasRenderingContext2D,
+  input: InputState,
+  rect: { x: number; y: number; width: number; height: number },
+  label: string,
+  options: ButtonOptions = {}
+): boolean {
+  const isHovered = pointInRect(input.pointer, rect);
+  let clicked = false;
+
+  if (isHovered && input.clicked && !input.consumed) {
+    clicked = true;
+    input.consumed = true; // Block clicks falling through to game world
+  }
+
+  options.active = isHovered;
+  drawButton(ctx, rect, label, options);
+
+  return clicked;
+}
+

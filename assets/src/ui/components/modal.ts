@@ -41,7 +41,7 @@ export function renderConfirmationModal(
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Draw modal panel
-  ctx.fillStyle = COLORS.overlay.panel;
+  ctx.fillStyle = COLORS.panel.bg;
   ctx.fillRect(modalX, modalY, modalWidth, modalHeight);
   ctx.strokeStyle = COLORS.overlay.panelBorder;
   ctx.lineWidth = 2;
