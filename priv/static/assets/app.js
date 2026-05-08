@@ -3142,6 +3142,100 @@
     }
   };
 
+  // src/ui/components/modal-manager/index.ts
+  var ModalManager = class {
+    constructor() {
+      __publicField(this, "activeModal", null);
+    }
+    open(modal) {
+      this.activeModal = modal;
+    }
+    close() {
+      this.activeModal = null;
+    }
+    isOpen() {
+      return this.activeModal !== null;
+    }
+    render(ctx2, canvas2) {
+      if (!this.activeModal) return;
+      ctx2.fillStyle = COLORS.overlay.backdrop;
+      ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+      this.activeModal.render(ctx2, canvas2);
+    }
+    handleInput(event, point) {
+      if (!this.activeModal) return false;
+      this.activeModal.handleInput(event, point);
+      return true;
+    }
+    tick(dt) {
+      if (this.activeModal) {
+        this.activeModal.tick(dt);
+      }
+    }
+  };
+
+  // src/ui/components/overlay-manager/index.ts
+  var OverlayManager = class {
+    constructor() {
+      __publicField(this, "activeOverlay", null);
+    }
+    open(overlay) {
+      this.activeOverlay = overlay;
+    }
+    close() {
+      this.activeOverlay = null;
+    }
+    toggle(overlay) {
+      if (this.activeOverlay === overlay) {
+        this.close();
+      } else {
+        this.open(overlay);
+      }
+    }
+    isOpen() {
+      return this.activeOverlay !== null;
+    }
+    render(ctx2, canvas2) {
+      if (!this.activeOverlay) return;
+      this.activeOverlay.render(ctx2, canvas2);
+    }
+    handleInput(event, point) {
+      if (!this.activeOverlay) return false;
+      this.activeOverlay.handleInput(event, point);
+      return true;
+    }
+    tick(dt) {
+      if (this.activeOverlay) {
+        this.activeOverlay.tick(dt);
+      }
+    }
+  };
+
+  // src/ui/ui-manager.ts
+  var UIManager = class {
+    constructor() {
+      __publicField(this, "modalManager", new ModalManager());
+      __publicField(this, "overlayManager", new OverlayManager());
+    }
+    render(ctx2, canvas2) {
+      this.overlayManager.render(ctx2, canvas2);
+      this.modalManager.render(ctx2, canvas2);
+    }
+    handleInput(event, point) {
+      if (this.modalManager.handleInput(event, point)) {
+        return true;
+      }
+      if (this.overlayManager.handleInput(event, point)) {
+        return true;
+      }
+      return false;
+    }
+    tick(dt) {
+      this.overlayManager.tick(dt);
+      this.modalManager.tick(dt);
+    }
+  };
+
   // src/core/game-client.ts
   var usernameKey = "incrementalist.playerUsername";
   var GameClient = class {
@@ -3154,6 +3248,7 @@
       __publicField(this, "floatingTexts", createFloatingTextState());
       __publicField(this, "lastPointerPoint", null);
       __publicField(this, "gameLoop");
+      __publicField(this, "uiManager", new UIManager());
       // Bound event handlers for add/removeEventListener symmetry.
       __publicField(this, "onClickBound", (e) => this.onClick(e));
       __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
@@ -3295,6 +3390,9 @@
     onClick(event) {
       const point = getCanvasPointFromInputEvent(event, this.canvas);
       this.lastPointerPoint = point;
+      if (this.uiManager.handleInput(event, point)) {
+        return;
+      }
       if (this.channel) {
         claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
       }
@@ -3302,11 +3400,18 @@
     onMouseMove(event) {
       const point = getCanvasPointFromInputEvent(event, this.canvas);
       this.lastPointerPoint = point;
+      if (this.uiManager.handleInput(event, point)) {
+        return;
+      }
       if (this.channel) {
         claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
       }
     }
     onKeydown(event) {
+      if (this.uiManager.handleInput(event, this.lastPointerPoint)) {
+        event.preventDefault();
+        return;
+      }
       if (this.channel) {
         claimRewardOnAnyInput(this.channel, this.canvas, this.lastPointerPoint, (cmd) => this.runCommand(cmd));
       }
@@ -3334,6 +3439,8 @@
       updateWebGLEffects(dt);
       renderWebGLEffects();
       renderFloatingTexts(this.ctx, this.floatingTexts);
+      this.uiManager.tick(dt);
+      this.uiManager.render(this.ctx, this.canvas);
     }
   };
   function clearsCommandQueue(result) {

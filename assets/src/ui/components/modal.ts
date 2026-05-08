@@ -1,5 +1,5 @@
-import { COLORS } from '../colors';
-import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../config';
+import { COLORS } from '../../colors';
+import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../../config';
 import { drawButton } from './button';
 
 export interface ModalState {

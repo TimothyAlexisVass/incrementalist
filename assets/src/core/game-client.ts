@@ -24,6 +24,7 @@ import { updateHudViewModel, syncHudInstantly } from "../features/hud/view-model
 import { renderTopHUD } from "../features/hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
+import { UIManager } from "../ui/ui-manager";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -36,6 +37,7 @@ export class GameClient {
   private readonly floatingTexts = createFloatingTextState();
   private lastPointerPoint: { x: number; y: number } | null = null;
   private readonly gameLoop: GameLoop;
+  public readonly uiManager = new UIManager();
 
   // Bound event handlers for add/removeEventListener symmetry.
   private readonly onClickBound = (e: MouseEvent) => this.onClick(e);
@@ -217,6 +219,9 @@ export class GameClient {
   private onClick(event: MouseEvent) {
     const point = getCanvasPointFromInputEvent(event, this.canvas);
     this.lastPointerPoint = point;
+    if (this.uiManager.handleInput(event, point)) {
+      return;
+    }
     if (this.channel) {
       claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
     }
@@ -225,12 +230,19 @@ export class GameClient {
   private onMouseMove(event: MouseEvent) {
     const point = getCanvasPointFromInputEvent(event, this.canvas);
     this.lastPointerPoint = point;
+    if (this.uiManager.handleInput(event, point)) {
+      return;
+    }
     if (this.channel) {
       claimRewardOnAnyInput(this.channel, this.canvas, point, (cmd) => this.runCommand(cmd));
     }
   }
 
   private onKeydown(event: KeyboardEvent) {
+    if (this.uiManager.handleInput(event, this.lastPointerPoint)) {
+      event.preventDefault();
+      return;
+    }
     if (this.channel) {
       claimRewardOnAnyInput(this.channel, this.canvas, this.lastPointerPoint, (cmd) => this.runCommand(cmd));
     }
@@ -270,6 +282,9 @@ export class GameClient {
     renderWebGLEffects();
 
     renderFloatingTexts(this.ctx, this.floatingTexts);
+
+    this.uiManager.tick(dt);
+    this.uiManager.render(this.ctx, this.canvas);
   }
 }
 

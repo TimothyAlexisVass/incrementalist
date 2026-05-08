@@ -1,5 +1,5 @@
-import { TINY_TEXT_FONT } from '../config';
-import { parseFontSizePx } from '../utils';
+import { TINY_TEXT_FONT } from '../../config';
+import { parseFontSizePx } from '../../utils';
 
 export interface TooltipOptions {
   font?: string;

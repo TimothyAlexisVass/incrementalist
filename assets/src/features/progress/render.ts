@@ -7,7 +7,7 @@ import {
   IDLE_TOGGLE_FONT,
 } from '../../config';
 import { COLORS } from '../../colors';
-import { drawButton } from '../../ui/button';
+import { drawButton } from '../../ui/components/button';
 import { formatPercent } from '../../format';
 import { clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
 import {

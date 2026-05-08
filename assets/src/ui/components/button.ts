@@ -1,5 +1,5 @@
-import { COLORS } from '../colors';
-import { BUTTON_DEFAULT_FONT } from '../config';
+import { COLORS } from '../../colors';
+import { BUTTON_DEFAULT_FONT } from '../../config';
 
 export interface ButtonOptions {
   active?: boolean;
