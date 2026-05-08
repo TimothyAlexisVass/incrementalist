@@ -50,11 +50,11 @@ export function drawCheckbox(
   ctx.restore();
 }
 
-import { InputState, pointInRect } from '../input';
+import { InteractionState, pointInRect } from '../interaction-manager';
 
 export function doCheckbox(
   ctx: CanvasRenderingContext2D,
-  input: InputState,
+  input: InteractionState,
   x: number,
   y: number,
   size: number,

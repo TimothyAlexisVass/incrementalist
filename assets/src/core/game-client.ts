@@ -15,26 +15,27 @@ import {
   updateProjectedFill,
   getStateFromSnapshot,
   applyProgressResult
-} from "../features/progress/view-model";
+} from "../features/progress-bar/view-model";
 import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
   claimRewardOnAnyInput,
   getPendingClaimPopupPoint,
   clearPendingClaimPopupPoint
-} from "../features/progress/interactions";
-import { renderProgressBar } from "../features/progress/render";
+} from "../features/progress-bar/interactions";
+import { renderProgressBar } from "../features/progress-bar/render";
 import { renderAreaBackground, renderAreaSpecifics } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
-import type { ResourceAmounts } from "../features/progress/claim-effects";
-import { updateHudViewModel, syncHudInstantly } from "../features/hud/view-model";
-import { renderTopHUD, renderBottomHUD } from "../features/hud/render";
+import type { ResourceAmounts } from "../features/progress-bar/claim-effects";
+import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-model";
+import { renderTopHUD } from "../ui/layout/top-hud/render";
+import { renderBottomHUD } from "../ui/layout/bottom-hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 import { UIManager } from "../ui/ui-manager";
-import { MainMenu } from "../ui/menu/main-menu";
-import { InputState } from "../ui/input";
+import { MainMenu } from "../ui/layout/main-menu";
+import { InteractionManager, InteractionState } from "../ui/interaction-manager";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -45,22 +46,10 @@ export class GameClient {
   private channel: GameChannel | null = null;
   private snapshotCache: SnapshotCache | null = null;
   private readonly floatingTexts = createFloatingTextState();
-  private lastPointerPoint: { x: number; y: number } | null = null;
   private readonly gameLoop: GameLoop;
   public readonly uiManager = new UIManager();
   private readonly mainMenu = new MainMenu();
-  private pendingClick = false;
-  private isPointerPressed = false;
-  private pressStartPointer: { x: number; y: number } | null = null;
-  private currentPointer: { x: number; y: number } | null = null;
-  private hasActivityThisFrame = false;
-
-  // Bound event handlers for add/removeEventListener symmetry.
-  private readonly onMouseDownBound = (e: MouseEvent) => this.onMouseDown(e);
-  private readonly onMouseUpBound = (e: MouseEvent) => this.onMouseUp(e);
-  private readonly onMouseMoveBound = (e: MouseEvent) => this.onMouseMove(e);
-  private readonly onKeydownBound = (e: KeyboardEvent) => this.onKeydown(e);
-  private readonly onMouseLeaveBound = () => { this.lastPointerPoint = null; this.isPointerPressed = false; };
+  private readonly interactionManager: InteractionManager;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -68,9 +57,11 @@ export class GameClient {
   ) {
     this.store = new Store(createServerState());
     this.gameLoop = new GameLoop((dt) => this.tick(dt));
+    this.interactionManager = new InteractionManager(canvas);
   }
 
   async boot() {
+    // ... (rest of boot stays the same until start())
     const username = window.localStorage.getItem(usernameKey);
     this.snapshotCache = new SnapshotCache(username);
     this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
@@ -145,21 +136,13 @@ export class GameClient {
   }
 
   start() {
-    document.addEventListener("mousedown", this.onMouseDownBound);
-    document.addEventListener("mouseup", this.onMouseUpBound);
-    document.addEventListener("mousemove", this.onMouseMoveBound);
-    document.addEventListener("keydown", this.onKeydownBound);
-    this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
+    this.interactionManager.start((e) => this.onKeydown(e));
     this.gameLoop.start();
   }
 
   stop() {
     this.gameLoop.stop();
-    document.removeEventListener("mousedown", this.onMouseDownBound);
-    document.removeEventListener("mouseup", this.onMouseUpBound);
-    document.removeEventListener("mousemove", this.onMouseMoveBound);
-    document.removeEventListener("keydown", this.onKeydownBound);
-    this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
+    this.interactionManager.stop();
   }
 
   // ---------------------------------------------------------------------------
@@ -271,28 +254,7 @@ export class GameClient {
   // Input handlers
   // ---------------------------------------------------------------------------
 
-  private onMouseDown(event: MouseEvent) {
-    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-    this.isPointerPressed = true;
-    this.pressStartPointer = this.currentPointer;
-    this.hasActivityThisFrame = true;
-  }
-
-  private onMouseUp(event: MouseEvent) {
-    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-    this.isPointerPressed = false;
-    this.pendingClick = true;
-    this.hasActivityThisFrame = true;
-  }
-
-  private onMouseMove(event: MouseEvent) {
-    this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-    this.hasActivityThisFrame = true;
-  }
-
   private onKeydown(event: KeyboardEvent) {
-    this.hasActivityThisFrame = true;
-
     if (this.uiManager.modalManager.isOpen()) {
       return;
     }
@@ -326,10 +288,6 @@ export class GameClient {
       }
     }
 
-    if (this.channel) {
-      // For keyboard, we don't know if UI consumed it yet without waiting for tick,
-      // but previously it claimed immediately. We'll leave it to the tick fallback.
-    }
     event.preventDefault();
   }
 
@@ -339,21 +297,7 @@ export class GameClient {
 
   private tick(dt: number) {
     // 1. Snapshot input state for this frame
-    const input: InputState = { 
-      pointer: this.currentPointer, 
-      pressStartPointer: this.pressStartPointer,
-      clicked: this.pendingClick,
-      isPressed: this.isPointerPressed,
-      consumed: false 
-    };
-    this.pendingClick = false;
-    
-    // Reset pressStartPointer after the click frame, or if the pointer is no longer pressed.
-    if (!this.isPointerPressed) {
-        this.pressStartPointer = null;
-    }
-    const activity = this.hasActivityThisFrame;
-    this.hasActivityThisFrame = false;
+    const { state: input, activity } = this.interactionManager.tick();
 
     // Advance client-side estimation of progress bar fill
     updateProjectedFill(dt);
@@ -420,34 +364,6 @@ function clearsCommandQueue(result: AckableCommandResult) {
   return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
 }
 
-
-function getCanvasPointFromInputEvent(
-  event: Event,
-  targetCanvas: HTMLCanvasElement
-): { x: number; y: number } | null {
-  const rect = targetCanvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-
-  let clientX: number | null = null;
-  let clientY: number | null = null;
-
-  if (event instanceof MouseEvent || event instanceof PointerEvent) {
-    clientX = event.clientX;
-    clientY = event.clientY;
-  } else if (event instanceof TouchEvent && event.touches.length > 0) {
-    clientX = event.touches[0].clientX;
-    clientY = event.touches[0].clientY;
-  }
-
-  if (clientX === null || clientY === null) return null;
-
-  const scaleX = targetCanvas.width / rect.width;
-  const scaleY = targetCanvas.height / rect.height;
-  const x = (clientX - rect.left) * scaleX;
-  const y = (clientY - rect.top) * scaleY;
-
-  return {
-    x: Math.min(Math.max(0, x), targetCanvas.width),
-    y: Math.min(Math.max(0, y), targetCanvas.height)
-  };
+function listSaveSlots(channel: GameChannel): Promise<ServerResult> {
+    return channel.push("save_slot.list", {});
 }

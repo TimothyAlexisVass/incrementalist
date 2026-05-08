@@ -3,7 +3,7 @@ import { DISPLAY_AREA_HEIGHT, DISPLAY_AREA_WIDTH, DISPLAY_AREA_X, DISPLAY_AREA_Y
 import { formatSignedNumber } from "../../format";
 import { clampNumber, parseFontSizePx } from "../../utils";
 import { getProgressBarLayout } from "./render";
-import { computeLevelUps } from "../hud/progression";
+import { computeLevelUps } from "../../ui/layout/top-hud/progression";
 import { spawnFloatingText, spawnRewardPopup } from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
 import { BigNum, ZERO, sub, compare } from "../../core/bignum";

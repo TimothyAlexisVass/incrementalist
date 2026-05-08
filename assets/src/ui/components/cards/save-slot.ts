@@ -11,7 +11,7 @@ import {
   formatNumber, 
   formatTimestamp 
 } from '../../../format';
-import { InputState } from '../../input';
+import { InteractionState } from '../../interaction-manager';
 import { doButton } from '../button';
 import { Rect } from '../tab-menu/tab-menu';
 import type { SaveSlotSummary } from '../../net/protocol';
@@ -23,7 +23,7 @@ export interface SaveSlotActions {
 
 export function drawSaveSlotCard(
   ctx: CanvasRenderingContext2D,
-  input: InputState,
+  input: InteractionState,
   rect: Rect,
   slot: SaveSlotSummary,
   actions: SaveSlotActions

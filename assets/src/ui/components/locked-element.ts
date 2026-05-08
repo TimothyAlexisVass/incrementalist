@@ -1,5 +1,5 @@
 import { COLORS } from "../../colors";
-import { InputState, pointInRect } from "../input";
+import { InteractionState, pointInRect } from "../interaction-manager";
 import { drawTooltip } from "./tooltip";
 
 export interface LockedElementOptions {
@@ -11,7 +11,7 @@ export interface LockedElementOptions {
 export function drawLockedElement(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  input: InputState,
+  input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   drawElement: () => void,
   options: LockedElementOptions = {}

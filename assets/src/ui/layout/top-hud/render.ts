@@ -1,4 +1,4 @@
-import { COLORS } from "../../colors";
+import { COLORS } from "../../../colors";
 import {
   BAR_COLLECTION_GLOW_FADE_MULTIPLIER,
   BAR_FULL_PULSE_SPEED,
@@ -8,13 +8,13 @@ import {
   TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_CORES_ICON_RIGHT,
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT, BOTTOM_HUD_HEIGHT
-} from "../../config";
-import { formatNumberRatio } from "../../format";
-import { compare, ZERO, toNumber } from "../../core/bignum";
+} from "../../../config";
+import { formatNumberRatio } from "../../../format";
+import { compare, ZERO, toNumber } from "../../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
-import { drawCurrencyAmount } from "../../render/currency-icons";
-import { spawnGpuProgressCompletionBurst } from "../../render/webgl-effects";
+import { drawCurrencyAmount } from "../../../render/currency-icons";
+import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 
 const TWO_PI = Math.PI * 2;
 const EXP_BAR_FULL_PULSE_MAX = 1.6;
@@ -111,43 +111,6 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
-}
-
-import { doButton } from '../../ui/components/button';
-import { InputState } from '../../ui/input';
-import { renderAreaDropdown } from '../areas/render';
-
-export function renderBottomHUD(
-  ctx: CanvasRenderingContext2D, 
-  canvas: HTMLCanvasElement, 
-  input: InputState, 
-  onMenuClick: () => void,
-  onAreaSelect?: (areaKey: string) => void
-) {
-  ctx.save();
-
-  // Draw background for bottom HUD
-  ctx.fillStyle = COLORS.panel.bg;
-  ctx.fillRect(0, canvas.height - BOTTOM_HUD_HEIGHT, canvas.width, BOTTOM_HUD_HEIGHT);
-
-  const buttonWidth = 120;
-  const buttonHeight = 34;
-  const paddingRight = 20;
-  const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2; // Center vertically in HUD
-  
-  const buttonX = canvas.width - buttonWidth - paddingRight;
-  const buttonY = canvas.height - buttonHeight - paddingBottom;
-
-  if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]')) {
-    onMenuClick();
-  }
-
-  // Draw Area selection dropdown on the left
-  renderAreaDropdown(ctx, canvas, input, (areaKey) => {
-    if (onAreaSelect) onAreaSelect(areaKey);
-  });
-
-  ctx.restore();
 }
 
 function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, iconRight: number, counterRight: number) {

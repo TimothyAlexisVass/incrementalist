@@ -2,7 +2,7 @@ import { COLORS } from "../../colors";
 import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT } from "../../config";
 import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
-import { InputState, pointInRect } from "../../ui/input";
+import { InteractionState, pointInRect } from "../../ui/interaction-manager";
 import { doButton } from "../../ui/components/button";
 import { drawLockedElement } from "../../ui/components/locked-element";
 
@@ -46,7 +46,7 @@ let hoveredAreaKey: string | null = null;
 export function renderAreaDropdown(
   ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
-  input: InputState, 
+  input: InteractionState, 
   onSelect: (areaKey: string) => void
 ) {
   const model = getAreaViewModel();

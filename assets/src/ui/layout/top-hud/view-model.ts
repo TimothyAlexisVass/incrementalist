@@ -1,5 +1,5 @@
-import { lerp } from "../../utils";
-import { BigNum, ZERO } from "../../core/bignum";
+import { lerp } from "../../../utils";
+import { BigNum, ZERO } from "../../../core/bignum";
 
 export type HudViewModel = {
   displayedExp: BigNum;

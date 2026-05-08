@@ -1,6 +1,6 @@
 import { COLORS } from '../../../colors';
 import { doButton } from '../button';
-import { InputState } from '../../input';
+import { InteractionState } from '../../interaction-manager';
 import { ServerState } from '../../../net/snapshots';
 
 export type TabMenuLayout = 'horizontal' | 'vertical';
@@ -17,7 +17,7 @@ export interface TabDefinition {
   id: string;
   label: string;
   hotkey?: string;
-  renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, rect: Rect) => void;
+  renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
 }
 
@@ -66,7 +66,7 @@ export class TabMenu {
   public render(
     ctx: CanvasRenderingContext2D, 
     canvas: HTMLCanvasElement, 
-    input: InputState, 
+    input: InteractionState, 
     state: ServerState,
     containerRect: Rect
   ) {

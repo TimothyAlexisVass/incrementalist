@@ -1,7 +1,8 @@
 import { ServerState } from '../net/snapshots';
+import { InteractionState } from './interaction-manager';
 
 export interface Overlay {
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, onClose: () => void): void;
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void): void;
   tick(dt: number): void;
 }
 
@@ -32,7 +33,7 @@ export class OverlayManager {
     return this.activeOverlay;
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     if (!this.activeOverlay) return;
 
     // Overlays can optionally draw their own backdrop, but typically they do.

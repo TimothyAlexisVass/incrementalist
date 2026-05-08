@@ -1,14 +1,14 @@
-import { COLORS } from '../../../colors';
-import { SAVE_AUTOSAVE_FONT } from '../../../config';
-import { InputState } from '../../input';
-import { ServerState } from '../../../net/snapshots';
-import { Rect } from '../../components/tab-menu/tab-menu';
-import { drawSaveSlotCard, SaveSlotActions } from '../../components/cards/save-slot';
+import { COLORS } from '../../../../colors';
+import { SAVE_AUTOSAVE_FONT } from '../../../../config';
+import { InteractionState } from '../../../interaction-manager';
+import { ServerState } from '../../../../net/snapshots';
+import { Rect } from '../../../components/tab-menu/tab-menu';
+import { drawSaveSlotCard, SaveSlotActions } from '../../../components/cards/save-slot';
 
 export function renderSaveFilesTab(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
-  input: InputState,
+  input: InteractionState,
   state: ServerState,
   rect: Rect,
   actions: SaveSlotActions

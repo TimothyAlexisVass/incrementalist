@@ -1190,11 +1190,107 @@
     return ack.released_result;
   }
 
-  // src/ui/input.ts
+  // src/ui/interaction-manager.ts
   function pointInRect(point, rect) {
     if (!point) return false;
     return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
   }
+  var InteractionManager = class {
+    constructor(canvas2) {
+      this.canvas = canvas2;
+      __publicField(this, "currentPointer", null);
+      __publicField(this, "pressStartPointer", null);
+      __publicField(this, "isPointerPressed", false);
+      __publicField(this, "pendingClick", false);
+      __publicField(this, "hasActivityThisFrame", false);
+      __publicField(this, "onMouseDownBound", (e) => this.onMouseDown(e));
+      __publicField(this, "onMouseUpBound", (e) => this.onMouseUp(e));
+      __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
+      __publicField(this, "onKeydownBound", (e) => this.onKeydown(e));
+      __publicField(this, "onMouseLeaveBound", () => {
+        this.isPointerPressed = false;
+      });
+      __publicField(this, "onKeydownCallback", null);
+    }
+    start(onKeydown) {
+      this.onKeydownCallback = onKeydown || null;
+      document.addEventListener("mousedown", this.onMouseDownBound);
+      document.addEventListener("mouseup", this.onMouseUpBound);
+      document.addEventListener("mousemove", this.onMouseMoveBound);
+      document.addEventListener("keydown", this.onKeydownBound);
+      this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
+    }
+    stop() {
+      document.removeEventListener("mousedown", this.onMouseDownBound);
+      document.removeEventListener("mouseup", this.onMouseUpBound);
+      document.removeEventListener("mousemove", this.onMouseMoveBound);
+      document.removeEventListener("keydown", this.onKeydownBound);
+      this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
+    }
+    /**
+     * Captures the current state for the frame and resets one-shot flags.
+     */
+    tick() {
+      const state2 = {
+        pointer: this.currentPointer,
+        pressStartPointer: this.pressStartPointer,
+        clicked: this.pendingClick,
+        isPressed: this.isPointerPressed,
+        consumed: false
+      };
+      const activity = this.hasActivityThisFrame;
+      this.pendingClick = false;
+      this.hasActivityThisFrame = false;
+      if (!this.isPointerPressed) {
+        this.pressStartPointer = null;
+      }
+      return { state: state2, activity };
+    }
+    onMouseDown(event) {
+      this.currentPointer = this.getCanvasPoint(event);
+      this.isPointerPressed = true;
+      this.pressStartPointer = this.currentPointer;
+      this.hasActivityThisFrame = true;
+    }
+    onMouseUp(event) {
+      this.currentPointer = this.getCanvasPoint(event);
+      this.isPointerPressed = false;
+      this.pendingClick = true;
+      this.hasActivityThisFrame = true;
+    }
+    onMouseMove(event) {
+      this.currentPointer = this.getCanvasPoint(event);
+      this.hasActivityThisFrame = true;
+    }
+    onKeydown(event) {
+      this.hasActivityThisFrame = true;
+      if (this.onKeydownCallback) {
+        this.onKeydownCallback(event);
+      }
+    }
+    getCanvasPoint(event) {
+      const rect = this.canvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      let clientX = null;
+      let clientY = null;
+      if (event instanceof MouseEvent) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+      } else if (typeof TouchEvent !== "undefined" && event instanceof TouchEvent && event.touches.length > 0) {
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+      }
+      if (clientX === null || clientY === null) return null;
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+      return {
+        x: Math.min(Math.max(0, x), this.canvas.width),
+        y: Math.min(Math.max(0, y), this.canvas.height)
+      };
+    }
+  };
 
   // src/ui/components/button.ts
   function drawButton(ctx2, rect, label, options = {}) {
@@ -1708,7 +1804,7 @@
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  // src/features/progress/render.ts
+  // src/features/progress-bar/render.ts
   var TWO_PI2 = Math.PI * 2;
   var PROGRESS_VISUAL_STATE = {
     wasFull: false,
@@ -2259,7 +2355,7 @@
     };
   }
 
-  // src/features/hud/progression.ts
+  // src/ui/layout/top-hud/progression.ts
   function getRequiredExp(level) {
     const base = fromNumber(level);
     const term1 = mul(fromNumber(10.1), pow(base, 2));
@@ -2531,7 +2627,7 @@
     return ft.elapsedMs >= ft.lifeMs;
   }
 
-  // src/features/progress/claim-effects.ts
+  // src/features/progress-bar/claim-effects.ts
   var nextLevelUpNoticeGroupId = 1;
   var POPUP_OFFSET = Object.freeze({
     exp: { x: -55, y: -20 },
@@ -2713,7 +2809,7 @@
     }
   }
 
-  // src/features/progress/view-model.ts
+  // src/features/progress-bar/view-model.ts
   var currentViewModel = {
     state: "projecting",
     projectedFill: 0,
@@ -2890,7 +2986,7 @@
     return Math.max(1, Math.floor(100 * 1e3 / rate));
   }
 
-  // src/features/progress/interactions.ts
+  // src/features/progress-bar/interactions.ts
   var claimResolutionInFlight = false;
   var pendingClaimPopupPoint = null;
   function getPendingClaimPopupPoint() {
@@ -2995,11 +3091,12 @@
     }
     const lineHeight = 20;
     const padding = 16;
-    const boxWidth = maxLineWidth + padding * 2;
+    const boxWidth = Math.min(maxLineWidth + padding * 2, DISPLAY_AREA_WIDTH - 40);
     const boxHeight = fullLines.length * lineHeight + padding * 2;
     const bottomHudY = canvas2.height - BOTTOM_HUD_HEIGHT;
-    const boxY = bottomHudY - 30 - boxHeight;
-    const boxX = (canvas2.width - boxWidth) / 2;
+    const boxX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH - boxWidth) / 2;
+    let boxY = bottomHudY - 30 - boxHeight;
+    boxY = Math.max(DISPLAY_AREA_Y + 10, Math.min(boxY, DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - boxHeight - 10));
     ctx2.fillStyle = COLORS.panel.bg;
     ctx2.fillRect(boxX, boxY, boxWidth, boxHeight);
     ctx2.strokeStyle = COLORS.panel.border;
@@ -3202,7 +3299,7 @@
     }
   }
 
-  // src/features/hud/view-model.ts
+  // src/ui/layout/top-hud/view-model.ts
   var state = {
     displayedExp: ZERO,
     displayedLevel: 1,
@@ -3371,7 +3468,7 @@
     return canvas2;
   }
 
-  // src/features/hud/render.ts
+  // src/ui/layout/top-hud/render.ts
   var TWO_PI4 = Math.PI * 2;
   var EXP_BAR_FULL_PULSE_MAX = 1.6;
   var EXP_BAR_COLLECTION_GLOW_FADE_MS = Math.PI * 165 / (BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER);
@@ -3449,24 +3546,6 @@
     drawCurrency(ctx2, canvas2, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
     drawCurrency(ctx2, canvas2, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
     drawCurrency(ctx2, canvas2, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
-  }
-  function renderBottomHUD(ctx2, canvas2, input, onMenuClick, onAreaSelect) {
-    ctx2.save();
-    ctx2.fillStyle = COLORS.panel.bg;
-    ctx2.fillRect(0, canvas2.height - BOTTOM_HUD_HEIGHT, canvas2.width, BOTTOM_HUD_HEIGHT);
-    const buttonWidth = 120;
-    const buttonHeight = 34;
-    const paddingRight = 20;
-    const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
-    const buttonX = canvas2.width - buttonWidth - paddingRight;
-    const buttonY = canvas2.height - buttonHeight - paddingBottom;
-    if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]")) {
-      onMenuClick();
-    }
-    renderAreaDropdown(ctx2, canvas2, input, (areaKey) => {
-      if (onAreaSelect) onAreaSelect(areaKey);
-    });
-    ctx2.restore();
   }
   function drawCurrency(ctx2, canvas2, label, amount, color, iconRight, counterRight) {
     drawCurrencyAmount(
@@ -3624,6 +3703,26 @@
       ctx2.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI4);
       ctx2.fill();
     }
+    ctx2.restore();
+  }
+
+  // src/ui/layout/bottom-hud/render.ts
+  function renderBottomHUD(ctx2, canvas2, input, onMenuClick, onAreaSelect) {
+    ctx2.save();
+    ctx2.fillStyle = COLORS.panel.bg;
+    ctx2.fillRect(0, canvas2.height - BOTTOM_HUD_HEIGHT, canvas2.width, BOTTOM_HUD_HEIGHT);
+    const buttonWidth = 120;
+    const buttonHeight = 34;
+    const paddingRight = 20;
+    const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
+    const buttonX = canvas2.width - buttonWidth - paddingRight;
+    const buttonY = canvas2.height - buttonHeight - paddingBottom;
+    if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]")) {
+      onMenuClick();
+    }
+    renderAreaDropdown(ctx2, canvas2, input, (areaKey) => {
+      if (onAreaSelect) onAreaSelect(areaKey);
+    });
     ctx2.restore();
   }
 
@@ -3964,7 +4063,7 @@
     }
   }
 
-  // src/ui/features/save-files/save-files-tab.ts
+  // src/ui/layout/main-menu/panels/save-files.ts
   function renderSaveFilesTab(ctx2, canvas2, input, state2, rect, actions) {
     const slots = state2.slots;
     if (slots.length === 0) {
@@ -4015,7 +4114,7 @@
     );
   }
 
-  // src/ui/menu/main-menu.ts
+  // src/ui/layout/main-menu/index.ts
   var MainMenu = class {
     constructor() {
       __publicField(this, "tabMenu");
@@ -4123,26 +4222,13 @@
       __publicField(this, "channel", null);
       __publicField(this, "snapshotCache", null);
       __publicField(this, "floatingTexts", createFloatingTextState());
-      __publicField(this, "lastPointerPoint", null);
       __publicField(this, "gameLoop");
       __publicField(this, "uiManager", new UIManager());
       __publicField(this, "mainMenu", new MainMenu());
-      __publicField(this, "pendingClick", false);
-      __publicField(this, "isPointerPressed", false);
-      __publicField(this, "pressStartPointer", null);
-      __publicField(this, "currentPointer", null);
-      __publicField(this, "hasActivityThisFrame", false);
-      // Bound event handlers for add/removeEventListener symmetry.
-      __publicField(this, "onMouseDownBound", (e) => this.onMouseDown(e));
-      __publicField(this, "onMouseUpBound", (e) => this.onMouseUp(e));
-      __publicField(this, "onMouseMoveBound", (e) => this.onMouseMove(e));
-      __publicField(this, "onKeydownBound", (e) => this.onKeydown(e));
-      __publicField(this, "onMouseLeaveBound", () => {
-        this.lastPointerPoint = null;
-        this.isPointerPressed = false;
-      });
+      __publicField(this, "interactionManager");
       this.store = new Store(createServerState());
       this.gameLoop = new GameLoop((dt) => this.tick(dt));
+      this.interactionManager = new InteractionManager(canvas2);
     }
     async boot() {
       const username = window.localStorage.getItem(usernameKey);
@@ -4205,20 +4291,12 @@
       }
     }
     start() {
-      document.addEventListener("mousedown", this.onMouseDownBound);
-      document.addEventListener("mouseup", this.onMouseUpBound);
-      document.addEventListener("mousemove", this.onMouseMoveBound);
-      document.addEventListener("keydown", this.onKeydownBound);
-      this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
+      this.interactionManager.start((e) => this.onKeydown(e));
       this.gameLoop.start();
     }
     stop() {
       this.gameLoop.stop();
-      document.removeEventListener("mousedown", this.onMouseDownBound);
-      document.removeEventListener("mouseup", this.onMouseUpBound);
-      document.removeEventListener("mousemove", this.onMouseMoveBound);
-      document.removeEventListener("keydown", this.onKeydownBound);
-      this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
+      this.interactionManager.stop();
     }
     // ---------------------------------------------------------------------------
     // Command execution
@@ -4306,24 +4384,7 @@
     // ---------------------------------------------------------------------------
     // Input handlers
     // ---------------------------------------------------------------------------
-    onMouseDown(event) {
-      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-      this.isPointerPressed = true;
-      this.pressStartPointer = this.currentPointer;
-      this.hasActivityThisFrame = true;
-    }
-    onMouseUp(event) {
-      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-      this.isPointerPressed = false;
-      this.pendingClick = true;
-      this.hasActivityThisFrame = true;
-    }
-    onMouseMove(event) {
-      this.currentPointer = getCanvasPointFromInputEvent(event, this.canvas);
-      this.hasActivityThisFrame = true;
-    }
     onKeydown(event) {
-      this.hasActivityThisFrame = true;
       if (this.uiManager.modalManager.isOpen()) {
         return;
       }
@@ -4352,27 +4413,13 @@
           return;
         }
       }
-      if (this.channel) {
-      }
       event.preventDefault();
     }
     // ---------------------------------------------------------------------------
     // Game loop
     // ---------------------------------------------------------------------------
     tick(dt) {
-      const input = {
-        pointer: this.currentPointer,
-        pressStartPointer: this.pressStartPointer,
-        clicked: this.pendingClick,
-        isPressed: this.isPointerPressed,
-        consumed: false
-      };
-      this.pendingClick = false;
-      if (!this.isPointerPressed) {
-        this.pressStartPointer = null;
-      }
-      const activity = this.hasActivityThisFrame;
-      this.hasActivityThisFrame = false;
+      const { state: input, activity } = this.interactionManager.tick();
       updateProjectedFill(dt);
       if (this.channel && handleProgressLoop(this.channel)) {
         const channel = this.channel;
@@ -4411,27 +4458,8 @@
   function clearsCommandQueue(result) {
     return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
   }
-  function getCanvasPointFromInputEvent(event, targetCanvas) {
-    const rect = targetCanvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return null;
-    let clientX = null;
-    let clientY = null;
-    if (event instanceof MouseEvent || event instanceof PointerEvent) {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    } else if (event instanceof TouchEvent && event.touches.length > 0) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    }
-    if (clientX === null || clientY === null) return null;
-    const scaleX = targetCanvas.width / rect.width;
-    const scaleY = targetCanvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
-    return {
-      x: Math.min(Math.max(0, x), targetCanvas.width),
-      y: Math.min(Math.max(0, y), targetCanvas.height)
-    };
+  function listSaveSlots(channel) {
+    return channel.push("save_slot.list", {});
   }
 
   // src/app.ts

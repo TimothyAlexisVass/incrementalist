@@ -59,11 +59,11 @@ export function drawButton(
   ctx.restore();
 }
 
-import { InputState, pointInRect } from '../input';
+import { InteractionState, pointInRect } from '../interaction-manager';
 
 export function doButton(
   ctx: CanvasRenderingContext2D,
-  input: InputState,
+  input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   label: string,
   options: ButtonOptions = {}

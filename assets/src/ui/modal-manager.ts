@@ -1,9 +1,9 @@
 import { COLORS } from '../colors';
-import { InputState } from './input';
+import { InteractionState } from './interaction-manager';
 
 export interface Modal {
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState): void;
-  tick(dt: number, input: InputState): void;
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState): void;
+  tick(dt: number, input: InteractionState): void;
 }
 
 export class ModalManager {
@@ -21,7 +21,7 @@ export class ModalManager {
     return this.activeModal !== null;
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
     if (!this.activeModal) return;
 
     // Draw backdrop
@@ -31,7 +31,7 @@ export class ModalManager {
     this.activeModal.render(ctx, canvas, input);
   }
 
-  tick(dt: number, input: InputState) {
+  tick(dt: number, input: InteractionState) {
     if (this.activeModal) {
       this.activeModal.tick(dt, input);
     }

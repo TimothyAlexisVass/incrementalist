@@ -1,5 +1,5 @@
 import { SAGE_TIPS } from './tips';
-import { BOTTOM_HUD_HEIGHT, SMALL_TEXT_FONT } from '../../../config';
+import { BOTTOM_HUD_HEIGHT, DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, SMALL_TEXT_FONT } from '../../../config';
 import { COLORS } from '../../../colors';
 import { getAreaViewModel } from '../view-model';
 
@@ -43,12 +43,21 @@ export function renderSageArea(ctx: CanvasRenderingContext2D, canvas: HTMLCanvas
 
   const lineHeight = 20;
   const padding = 16;
-  const boxWidth = maxLineWidth + padding * 2;
+  
+  // Constrain width to display area
+  const boxWidth = Math.min(maxLineWidth + padding * 2, DISPLAY_AREA_WIDTH - 40);
   const boxHeight = (fullLines.length * lineHeight) + padding * 2;
 
   const bottomHudY = canvas.height - BOTTOM_HUD_HEIGHT;
-  const boxY = bottomHudY - 30 - boxHeight;
-  const boxX = (canvas.width - boxWidth) / 2;
+  
+  // Center horizontally within DISPLAY_AREA
+  const boxX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH - boxWidth) / 2;
+  
+  // Position vertically within DISPLAY_AREA, anchored above bottom HUD
+  let boxY = bottomHudY - 30 - boxHeight;
+  
+  // Clamp to display area boundaries
+  boxY = Math.max(DISPLAY_AREA_Y + 10, Math.min(boxY, DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - boxHeight - 10));
 
   ctx.fillStyle = COLORS.panel.bg; // Reusing panel bg for consistency
   ctx.fillRect(boxX, boxY, boxWidth, boxHeight);

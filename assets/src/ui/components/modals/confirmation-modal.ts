@@ -1,6 +1,6 @@
 import { Modal } from '../modal-manager';
 import { COLORS } from '../../../colors';
-import { InputState, pointInRect } from '../../input';
+import { InteractionState, pointInRect } from '../../interaction-manager';
 import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../../../config';
 import { drawButton, doButton } from '../button';
 
@@ -16,7 +16,7 @@ export class ResetConfirmationModal implements Modal {
     private onCancel: () => void
   ) {}
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
     const modalWidth = 400;
     const modalHeight = 220;
     const modalX = (canvas.width - modalWidth) / 2;
@@ -104,7 +104,7 @@ export class ResetConfirmationModal implements Modal {
     }
   }
 
-  tick(dt: number, input: InputState) {
+  tick(dt: number, input: InteractionState) {
     if (this.okRect && pointInRect(input.pointer, this.okRect) && input.isPressed) {
         this.holdTime += dt;
         if (this.holdTime >= this.requiredHoldTime) {
@@ -122,7 +122,7 @@ export class LoadingModal implements Modal {
 
     constructor(private message: string = 'Loading authoritative state...') {}
 
-    render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState) {
+    render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         
@@ -147,7 +147,7 @@ export class LoadingModal implements Modal {
         input.consumed = true;
     }
 
-    tick(dt: number, input: InputState) {
+    tick(dt: number, input: InteractionState) {
         this.angle += dt * 0.005;
         input.consumed = true;
     }

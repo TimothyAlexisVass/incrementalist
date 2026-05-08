@@ -1,13 +1,13 @@
 import { ModalManager } from './modal-manager';
 import { OverlayManager } from './overlay-manager';
-import { InputState } from './input';
+import { InteractionState } from './interaction-manager';
 import { ServerState } from '../net/snapshots';
 
 export class UIManager {
   public readonly modalManager = new ModalManager();
   public readonly overlayManager = new OverlayManager();
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     // Render order: Overlays first, Modals on top. 
     // Modals block input to lower layers.
     if (this.modalManager.isOpen()) {
@@ -20,7 +20,7 @@ export class UIManager {
     }
   }
 
-  tick(dt: number, input: InputState) {
+  tick(dt: number, input: InteractionState) {
     this.overlayManager.tick(dt);
     this.modalManager.tick(dt, input);
   }

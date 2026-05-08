@@ -1,4 +1,4 @@
-import { BigNum, fromNumber, pow, mul, add, big } from "../../core/bignum";
+import { BigNum, fromNumber, pow, mul, add, big } from "../../../core/bignum";
 
 export function getRequiredExp(level: number): BigNum {
   // 10.1 * level^2 + 9

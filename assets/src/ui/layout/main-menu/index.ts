@@ -1,15 +1,15 @@
-import { Overlay } from '../overlay-manager';
-import { COLORS } from '../../colors';
-import { InputState, pointInRect } from '../input';
-import { TabMenu, TabDefinition, Rect } from '../components/tab-menu/tab-menu';
-import { renderSaveFilesTab } from '../features/save-files/save-files-tab';
-import { SaveSlotActions } from '../components/cards/save-slot';
+import { Overlay } from '../../overlay-manager';
+import { COLORS } from '../../../colors';
+import { InteractionState, pointInRect } from '../../interaction-manager';
+import { TabMenu, TabDefinition, Rect } from '../../components/tab-menu/tab-menu';
+import { renderSaveFilesTab } from './panels/save-files';
+import { SaveSlotActions } from '../../components/cards/save-slot';
 import {
   TOP_HUD_HEIGHT,
   BOTTOM_HUD_HEIGHT,
   DISPLAY_AREA_X,
   DISPLAY_AREA_WIDTH,
-} from '../../config';
+} from '../../../config';
 
 export class MainMenu implements Overlay {
   private tabMenu: TabMenu;
@@ -28,7 +28,7 @@ export class MainMenu implements Overlay {
   }
 
   constructor() {
-    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, rect: Rect) => {
+    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => {
       ctx.fillStyle = COLORS.panel.textPrimary;
       ctx.font = '24px Arial';
       ctx.textAlign = 'center';
@@ -85,7 +85,7 @@ export class MainMenu implements Overlay {
     });
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InputState, state: ServerState, onClose: () => void) {
+  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void) {
     ctx.save();
 
     const x = DISPLAY_AREA_X;
