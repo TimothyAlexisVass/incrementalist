@@ -54,11 +54,6 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     end
   end
 
-  def can_claim_in(%State{} = state, now) do
-    {_state, can_claim_in} = ensure_can_claim_at(state, now)
-    can_claim_in
-  end
-
   def ensure_can_claim_at(%State{} = state, now) do
     rate = get_progress_bar_fill_rate(state, now)
     ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
@@ -78,16 +73,6 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     {state, max(0, can_claim_at_ms - now_ms)}
   end
 
-  def calculate_next_can_claim_at(%State{} = state, now) do
-    rate = get_progress_bar_fill_rate(state, now)
-    ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
-    Time.iso8601(DateTime.add(now, ms_required, :millisecond))
-  end
-
-  def claim_ready?(%State{} = state, now, tolerance_ms \\ 0) do
-    {_state, can_claim_in} = ensure_can_claim_at(state, now)
-    can_claim_in <= tolerance_ms
-  end
 
   def finalize_claim(%State{} = state, now) do
     progress_bar = state.progress_bar || %State.ProgressBar{}

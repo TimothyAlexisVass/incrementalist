@@ -14,6 +14,7 @@ import {
   REWARD_POPUP_FONT,
 } from '../config';
 import { COLORS } from '../colors';
+import { parseFontSizePx } from '../utils';
 
 const TWO_PI = Math.PI * 2;
 const CLICK_BURST_COLORS = Object.freeze([
@@ -362,15 +363,7 @@ function getFloatingTextRenderScale(ft, sprite) {
   return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
 }
 
-function parseFontSizePx(font) {
-  const match = /(\d+(?:\.\d+)?)px/.exec(font || '');
-  if (!match) {
-    return 16;
-  }
 
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : 16;
-}
 
 function updateRewardPopup(ft) {
   const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);

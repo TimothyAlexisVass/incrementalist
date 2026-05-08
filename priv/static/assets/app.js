@@ -1311,6 +1311,35 @@
     return `${toFiniteNumber(value, fallback).toFixed(decimals)}%`;
   }
 
+  // src/utils.ts
+  function clampNumber(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+  function lerpColor(c1, c2, t) {
+    return [
+      Math.floor(lerp(c1[0], c2[0], t)),
+      Math.floor(lerp(c1[1], c2[1], t)),
+      Math.floor(lerp(c1[2], c2[2], t))
+    ];
+  }
+  function rgbArrayToCss(rgb) {
+    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+  }
+  function rgbaArrayToCss(rgb, alpha) {
+    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
+  }
+  function parseFontSizePx(font, fallback = 16) {
+    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
+    if (!match) {
+      return fallback;
+    }
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
   // src/render/effects.ts
   var TWO_PI2 = Math.PI * 2;
   var CLICK_BURST_COLORS = Object.freeze([
@@ -1524,14 +1553,6 @@
     );
     return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
   }
-  function parseFontSizePx(font) {
-    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
-    if (!match) {
-      return 16;
-    }
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? parsed : 16;
-  }
   function updateRewardPopup(ft) {
     const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);
     const holdDistance = ft.holdRiseSpeed * (holdElapsed / 1e3);
@@ -1556,18 +1577,6 @@
       return ft.elapsedMs >= ft.holdMs + ft.flyMs;
     }
     return ft.elapsedMs >= ft.lifeMs;
-  }
-
-  // src/utils.ts
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-  function lerpColor(c1, c2, t) {
-    return [
-      Math.floor(lerp(c1[0], c2[0], t)),
-      Math.floor(lerp(c1[1], c2[1], t)),
-      Math.floor(lerp(c1[2], c2[2], t))
-    ];
   }
 
   // src/features/progress/render.ts
@@ -1710,12 +1719,6 @@
       ctx2.restore();
     }
   }
-  function rgbArrayToCss(rgb) {
-    return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-  }
-  function rgbaArrayToCss(rgb, alpha) {
-    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
-  }
   function getProgressColorArray(percent) {
     const start = COLORS.bar.progress.fillStart;
     const mid = COLORS.bar.progress.fillMid;
@@ -1734,9 +1737,6 @@
   function getProgressColor(percent) {
     const color = getProgressColorArray(percent);
     return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-  }
-  function clampNumber(value, min, max) {
-    return Math.min(Math.max(value, min), max);
   }
   function getNowMs() {
     if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -2222,12 +2222,12 @@
       maxY = canvas2.height / 2;
     }
     return {
-      x: clamp(point.x, minX, maxX),
-      y: clamp(point.y, minY, maxY)
+      x: clampNumber(point.x, minX, maxX),
+      y: clampNumber(point.y, minY, maxY)
     };
   }
   function getCenteredPopupAnchorBounds(textMeasureContext, canvas2, text, font, offsetX, offsetY, margin = 8) {
-    const fontSize = parseFontSizePx2(font);
+    const fontSize = parseFontSizePx(font);
     const textWidth = measureTextWidth(textMeasureContext, text, font);
     const halfWidth = textWidth / 2;
     const bottomPadding = Math.max(6, Math.round(fontSize * 0.3));
@@ -2246,17 +2246,6 @@
     const width = textMeasureContext.measureText(text).width;
     textMeasureContext.restore();
     return width;
-  }
-  function parseFontSizePx2(font) {
-    const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
-    if (!match) {
-      return 16;
-    }
-    const parsed = Number(match[1]);
-    return Number.isFinite(parsed) ? parsed : 16;
-  }
-  function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
   }
 
   // src/features/progress/view-model.ts
@@ -2486,10 +2475,6 @@
   var Store = class {
     constructor(state) {
       this.state = state;
-      __publicField(this, "dirty", false);
-    }
-    markDirty() {
-      this.dirty = true;
     }
   };
 
@@ -2544,7 +2529,6 @@
       this.channel.onStatusChange = (status) => {
         this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
         this.store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
-        this.store.markDirty();
       };
       this.channel.onBootResult = async (result) => {
         window.localStorage.setItem(usernameKey, result.username);
@@ -2555,7 +2539,6 @@
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
         }
-        this.store.markDirty();
         if (result.pending_result) {
           await this.applyAndAck(result.pending_result);
         }
@@ -2565,7 +2548,6 @@
       } catch (error) {
         this.store.state.statusTone = "error";
         this.store.state.status = error instanceof Error ? error.message : "Boot failed";
-        this.store.markDirty();
       }
     }
     start() {
@@ -2593,7 +2575,6 @@
       } catch (error) {
         this.store.state.statusTone = "error";
         this.store.state.status = error instanceof Error ? error.message : "Command failed";
-        this.store.markDirty();
         return null;
       }
     }
@@ -2608,7 +2589,6 @@
         }
       }
       this.applyProgressEffects(result, previousAmounts);
-      this.store.markDirty();
       if (!isAckableCommandResult(result)) return;
       let next = await ackAppliedResult(this.channel, result.command_id);
       if (clearsCommandQueue(result)) this.channel.clearCommandQueue();
@@ -2623,7 +2603,6 @@
             getStateFromSnapshot(this.store.state.snapshot);
           }
         }
-        this.store.markDirty();
         const applied = next;
         next = await ackAppliedResult(this.channel, applied.command_id);
         if (clearsCommandQueue(applied)) this.channel.clearCommandQueue();

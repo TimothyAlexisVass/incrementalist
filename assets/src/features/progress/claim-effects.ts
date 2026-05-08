@@ -2,6 +2,7 @@ import { COLORS } from "../../colors";
 import { DISPLAY_AREA_HEIGHT, DISPLAY_AREA_WIDTH, DISPLAY_AREA_X, DISPLAY_AREA_Y, REWARD_POPUP_FONT } from "../../config";
 import { formatSignedNumber } from "../../format";
 import { spawnRewardPopup } from "../../render/effects";
+import { clampNumber, parseFontSizePx } from "../../utils";
 import { getProgressBarLayout } from "./render";
 
 export type ResourceAmounts = {
@@ -138,8 +139,8 @@ function clampRewardAnchorToCanvas(
   }
 
   return {
-    x: clamp(point.x, minX, maxX),
-    y: clamp(point.y, minY, maxY)
+    x: clampNumber(point.x, minX, maxX),
+    y: clampNumber(point.y, minY, maxY)
   };
 }
 
@@ -175,16 +176,3 @@ function measureTextWidth(textMeasureContext: CanvasRenderingContext2D, text: st
   return width;
 }
 
-function parseFontSizePx(font: string) {
-  const match = /(\d+(?:\.\d+)?)px/.exec(font || "");
-  if (!match) {
-    return 16;
-  }
-
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : 16;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}

@@ -56,7 +56,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
         {scheduled_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
 
-        if can_claim_in <= 100 do
+        if can_claim_in <= 0 do
           # Compute changes and apply state logic
           new_state =
             scheduled_state

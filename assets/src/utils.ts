@@ -95,3 +95,17 @@ export function hexToRgbArray(color) {
 export function rgbArrayToCss(rgb) {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
+
+export function rgbaArrayToCss(rgb, alpha) {
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
+}
+
+export function parseFontSizePx(font, fallback = 16) {
+  const match = /(\d+(?:\.\d+)?)px/.exec(font || '');
+  if (!match) {
+    return fallback;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}

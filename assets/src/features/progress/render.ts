@@ -9,7 +9,7 @@ import {
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components';
 import { formatPercent } from '../../format';
-import { drawLockedElement, lerpColor } from '../../utils';
+import { clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
 import {
   setGpuProgressBarGlow,
   spawnGpuProgressCollectionLaserBurst,
@@ -226,13 +226,7 @@ export function renderProgressBar(
   }
 }
 
-function rgbArrayToCss(rgb: Rgb) {
-  return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-}
 
-function rgbaArrayToCss(rgb: Rgb, alpha: number) {
-  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
-}
 
 function getProgressColorArray(percent: number): Rgb {
   const start = COLORS.bar.progress.fillStart;
@@ -258,9 +252,7 @@ function getProgressColor(percent: number): string {
   return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
-function clampNumber(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
+
 
 function getNowMs(): number {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {

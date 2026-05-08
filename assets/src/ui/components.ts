@@ -5,6 +5,7 @@ import {
   MODAL_BODY_FONT,
   TINY_TEXT_FONT
 } from '../config';
+import { parseFontSizePx } from '../utils';
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
@@ -134,7 +135,7 @@ export function drawTooltip(ctx, canvas, anchorPoint, content, options = {}) {
     borderColor = '#6f88b4',
     paddingX = 10,
     paddingY = 8,
-    lineHeight = Math.max(14, parseFontSizePx(font) + 4),
+    lineHeight = Math.max(14, parseFontSizePx(font, 12) + 4),
     offsetX = 14,
     offsetY = 14,
     margin = 8
@@ -296,12 +297,3 @@ function normalizeTooltipLines(content) {
     .filter((line) => line.length > 0);
 }
 
-function parseFontSizePx(font) {
-  const match = /(\d+(?:\.\d+)?)px/.exec(font || '');
-  if (!match) {
-    return 12;
-  }
-
-  const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : 12;
-}

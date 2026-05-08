@@ -57,7 +57,6 @@ export class GameClient {
     this.channel.onStatusChange = (status) => {
       this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
       this.store.state.statusTone = status === "connected" ? "ok" : (status === "disconnected" ? "error" : "");
-      this.store.markDirty();
     };
 
     this.channel.onBootResult = async (result) => {
@@ -72,7 +71,6 @@ export class GameClient {
         getStateFromSnapshot(this.store.state.snapshot);
       }
 
-      this.store.markDirty();
 
       if (result.pending_result) {
         // The pending result belongs before any new local action; acknowledging it
@@ -86,7 +84,6 @@ export class GameClient {
     } catch (error) {
       this.store.state.statusTone = "error";
       this.store.state.status = error instanceof Error ? error.message : "Boot failed";
-      this.store.markDirty();
     }
   }
 
@@ -120,7 +117,6 @@ export class GameClient {
     } catch (error) {
       this.store.state.statusTone = "error";
       this.store.state.status = error instanceof Error ? error.message : "Command failed";
-      this.store.markDirty();
       return null;
     }
   }
@@ -137,9 +133,9 @@ export class GameClient {
       }
     }
 
+
     this.applyProgressEffects(result, previousAmounts);
 
-    this.store.markDirty();
 
     if (!isAckableCommandResult(result)) return;
 
@@ -158,7 +154,6 @@ export class GameClient {
           getStateFromSnapshot(this.store.state.snapshot);
         }
       }
-      this.store.markDirty();
       // The server releases at most one queued result per acknowledgement so the
       // client cannot accidentally skip over a command result.
       const applied = next;
