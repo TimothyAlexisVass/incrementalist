@@ -212,6 +212,7 @@ export type ServerResult =
 export type BootResult = {
   type: "game.boot";
   username: string;
+  token?: string;
   active_save_slot: number;
   save_slot: SaveSlotSummary;
   snapshot?: GameSnapshot | null;

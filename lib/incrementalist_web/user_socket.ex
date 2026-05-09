@@ -14,9 +14,17 @@ defmodule IncrementalistWeb.UserSocket do
 
   @impl true
   def connect(params, socket, _connect_info) do
-    # The username identifies only the player. Active slot and command order are
-    # resolved after authentication from server-side rows.
-    player = Sessions.authenticate_player(Map.get(params, "username"))
+    player_id =
+      case Map.get(params, "token") do
+        token when is_binary(token) ->
+          case Phoenix.Token.verify(socket.endpoint, "player_auth", token, max_age: 86400 * 365) do
+            {:ok, id} -> id
+            _ -> nil
+          end
+        _ -> nil
+      end
+
+    player = Sessions.authenticate_player(player_id)
 
     {:ok,
      socket
