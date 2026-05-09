@@ -9,3 +9,4 @@ erl_crash.dump
 *.plt
 *.coverdata
 .DS_Store
+node_modules/
