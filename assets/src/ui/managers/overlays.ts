@@ -1,12 +1,12 @@
-import { ServerState } from '../net/snapshots';
-import { InteractionState } from './interaction-manager';
+import { ServerState } from '../../net/snapshots';
+import { InteractionState } from './interactions';
 
 export interface Overlay {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void): void;
   tick(dt: number): void;
 }
 
-export class OverlayManager {
+export class Overlays {
   private activeOverlay: Overlay | null = null;
 
   open(overlay: Overlay) {

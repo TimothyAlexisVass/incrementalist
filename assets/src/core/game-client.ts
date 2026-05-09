@@ -36,10 +36,10 @@ import { renderTopHUD } from "../ui/layout/top-hud/render";
 import { renderBottomHUD } from "../ui/layout/bottom-hud/render";
 import { Store } from "./store";
 import { GameLoop } from "./game-loop";
-import { UIManager } from "../ui/ui-manager";
+import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
-import { InteractionManager, InteractionState } from "../ui/interaction-manager";
-import { noticeSystem } from "../ui/notice-system";
+import { Interactions, InteractionState } from "../ui/managers/interactions";
+import { notices } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
@@ -53,9 +53,9 @@ export class GameClient {
   private snapshotCache: SnapshotCache | null = null;
   private readonly floatingTexts = createFloatingTextState();
   private readonly gameLoop: GameLoop;
-  public readonly uiManager = new UIManager();
+  public readonly ui = new UserInterface();
   private readonly mainMenu = new MainMenu();
-  private readonly interactionManager: InteractionManager;
+  private readonly interactions: Interactions;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -63,7 +63,7 @@ export class GameClient {
   ) {
     this.store = new Store(createServerState());
     this.gameLoop = new GameLoop((dt) => this.tick(dt));
-    this.interactionManager = new InteractionManager(canvas);
+    this.interactions = new Interactions(canvas);
   }
 
   async boot() {
@@ -77,25 +77,25 @@ export class GameClient {
     this.mainMenu.setActions({
       onSwitch: (index: number) => {
         if (!this.channel) return;
-        this.uiManager.modalManager.open(new LoadingModal('Switching save slot...'));
+        this.ui.modals.open(new LoadingModal('Switching save slot...'));
         this.runCommand(() => switchSaveSlot(this.channel!, index, false)).then(() => {
-          this.uiManager.modalManager.close();
-          this.uiManager.overlayManager.close();
+          this.ui.modals.close();
+          this.ui.overlays.close();
         });
       },
       onReset: (index: number) => {
-        this.uiManager.modalManager.open(new ResetConfirmationModal(
+        this.ui.modals.open(new ResetConfirmationModal(
           'Reset Save Slot',
           'Are you sure you want to delete this file?\nThis cannot be undone.',
           () => {
             if (!this.channel) return;
-            this.uiManager.modalManager.open(new LoadingModal('Resetting save slot...'));
+            this.ui.modals.open(new LoadingModal('Resetting save slot...'));
             this.runCommand(() => resetSaveSlot(this.channel!, index)).then(() => {
-              this.uiManager.modalManager.close();
-              this.uiManager.overlayManager.close();
+              this.ui.modals.close();
+              this.ui.overlays.close();
             });
           },
-          () => this.uiManager.modalManager.close()
+          () => this.ui.modals.close()
         ));
       }
     });
@@ -127,7 +127,7 @@ export class GameClient {
 
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
       if (this.store.state.snapshot) {
-        noticeSystem.setSnapshot(this.store.state.snapshot);
+        notices.setSnapshot(this.store.state.snapshot);
         updateAreaViewModel(this.store.state.snapshot.state);
       }
       this.store.state.slots = [result.save_slot];
@@ -157,13 +157,13 @@ export class GameClient {
   }
 
   start() {
-    this.interactionManager.start((e) => this.onKeydown(e));
+    this.interactions.start((e) => this.onKeydown(e));
     this.gameLoop.start();
   }
 
   stop() {
     this.gameLoop.stop();
-    this.interactionManager.stop();
+    this.interactions.stop();
   }
 
   // ---------------------------------------------------------------------------
@@ -189,12 +189,12 @@ export class GameClient {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
-      noticeSystem.setSnapshot(this.store.state.snapshot);
+      notices.setSnapshot(this.store.state.snapshot);
     }
     this.cacheSnapshotFromResult(result);
 
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-      this.uiManager.modalManager.close();
+      this.ui.modals.close();
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
         syncHudInstantly(this.store.state.snapshot.state);
@@ -216,7 +216,7 @@ export class GameClient {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
-        noticeSystem.setSnapshot(this.store.state.snapshot);
+        notices.setSnapshot(this.store.state.snapshot);
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
@@ -298,18 +298,18 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private onKeydown(event: KeyboardEvent) {
-    if (this.uiManager.modalManager.isOpen()) {
+    if (this.ui.modals.isOpen()) {
       return;
     }
 
     if (event.key === 'Escape') {
-      this.uiManager.overlayManager.toggle(this.mainMenu);
+      this.ui.overlays.toggle(this.mainMenu);
       event.preventDefault();
       return;
     }
 
     const key = event.key.toLowerCase();
-    const overlay = this.uiManager.overlayManager.getActiveOverlay();
+    const overlay = this.ui.overlays.getActiveOverlay();
     const isMainMenuOpen = overlay === this.mainMenu;
     const isNoOverlayOpen = overlay === null;
 
@@ -321,10 +321,10 @@ export class GameClient {
 
       if (targetTab) {
         if (isMainMenuOpen && this.mainMenu.getActiveTabId() === targetTab) {
-          this.uiManager.overlayManager.close();
+          this.ui.overlays.close();
         } else {
           this.mainMenu.setTab(targetTab);
-          this.uiManager.overlayManager.open(this.mainMenu);
+          this.ui.overlays.open(this.mainMenu);
         }
         event.preventDefault();
         return;
@@ -340,7 +340,7 @@ export class GameClient {
 
   private tick(dt: number) {
     // 1. Snapshot input state for this frame
-    const { state: input, activity } = this.interactionManager.tick();
+    const { state: input, activity } = this.interactions.tick();
 
     // Advance client-side estimation of progress bar fill
     updateProjectedFill(dt);
@@ -385,12 +385,12 @@ export class GameClient {
 
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
-    const isMainMenuOpen = this.uiManager.overlayManager.isActive(this.mainMenu);
+    const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
     renderBottomHUD(this.ctx, this.canvas, input, isMainMenuOpen, () => {
-      const isOpening = !this.uiManager.overlayManager.isActive(this.mainMenu);
-      this.uiManager.overlayManager.toggle(this.mainMenu);
+      const isOpening = !this.ui.overlays.isActive(this.mainMenu);
+      this.ui.overlays.toggle(this.mainMenu);
       
-      if (isOpening && this.channel && noticeSystem.hasMenuNotice()) {
+      if (isOpening && this.channel && notices.hasMenuNotice()) {
         this.runCommand(() => noticeAck(this.channel!, 'menu_button'));
       }
     }, (areaKey) => {
@@ -398,15 +398,15 @@ export class GameClient {
         this.runCommand(() => selectArea(this.channel!, areaKey));
         
         // Clear area unlock notice
-        if (noticeSystem.hasLeafNotice(`area:${areaKey}`)) {
+        if (notices.hasLeafNotice(`area:${areaKey}`)) {
           this.runCommand(() => noticeSee(this.channel!, `area:${areaKey}`, ['area_dropdown', 'menu_button']));
         }
       }
     });
 
     // The UI is drawn over the game world. It can consume clicks.
-    this.uiManager.tick(dt, input);
-    this.uiManager.render(this.ctx, this.canvas, input, this.store.state);
+    this.ui.tick(dt, input);
+    this.ui.render(this.ctx, this.canvas, input, this.store.state);
   }
 }
 

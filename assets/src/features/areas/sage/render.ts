@@ -7,10 +7,10 @@ import {
   SMALL_TEXT_FONT,
   BOTTOM_HUD_BUTTON_FONT
 } from '../../../config';
-import { InteractionState } from '../../../ui/interaction-manager';
+import { InteractionState } from '../../../ui/managers/interactions';
 import { noticeSee } from '../../../net/commands';
 import { GameChannel } from '../../../net/game-channel';
-import { noticeSystem } from '../../../ui/notice-system';
+import { notices } from '../../../ui/managers/notices';
 import { COLORS } from '../../../colors';
 import { doButton } from '../../../ui/components/button';
 
@@ -159,11 +159,11 @@ function renderTipPanel(
 
   const buttonClicked = doButton(ctx, input, buttonRect, buttonLabel, {
     font: BOTTOM_HUD_BUTTON_FONT,
-    showNotice: noticeSystem.hasLeafNotice(leafId),
+    showNotice: notices.hasLeafNotice(leafId),
     showNoticePing: true
   });
 
-  if (buttonClicked && channel && runCommand && noticeSystem.hasLeafNotice(leafId)) {
+  if (buttonClicked && channel && runCommand && notices.hasLeafNotice(leafId)) {
     runCommand(() => noticeSee(channel, leafId));
     input.consumed = true;
   }
@@ -172,7 +172,7 @@ function renderTipPanel(
 function getVisibleTipLevels(level: number): number[] {
   return Object.keys(SAGE_TIPS)
     .map(Number)
-    .filter((tipLevel) => tipLevel <= level && noticeSystem.hasLeafNotice(tipLeafId(tipLevel)))
+    .filter((tipLevel) => tipLevel <= level && notices.hasLeafNotice(tipLeafId(tipLevel)))
     .sort((a, b) => a - b);
 }
 

@@ -1,6 +1,6 @@
-import { Overlay } from '../../overlay-manager';
+import { Overlay } from '../../managers/overlays';
 import { COLORS } from '../../../colors';
-import { InteractionState } from '../../interaction-manager';
+import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { SaveSlotActions } from '../../components/cards/save-slot';
 import {

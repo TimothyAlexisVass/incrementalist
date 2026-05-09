@@ -1,5 +1,5 @@
 import { COLORS } from "../../colors";
-import { InteractionState, pointInRect } from "../interaction-manager";
+import { InteractionState, pointInRect } from "../managers/interactions";
 import { drawTooltip } from "./tooltip";
 
 export interface LockedElementOptions {

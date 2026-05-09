@@ -25,7 +25,7 @@ export function pointInRect(
          point.y >= rect.y && point.y <= rect.y + rect.height;
 }
 
-export class InteractionManager {
+export class Interactions {
   private currentPointer: { x: number; y: number } | null = null;
   private pressStartPointer: { x: number; y: number } | null = null;
   private isPointerPressed = false;

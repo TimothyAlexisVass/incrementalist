@@ -1,12 +1,12 @@
-import { COLORS } from '../colors';
-import { InteractionState } from './interaction-manager';
+import { COLORS } from '../../colors';
+import { InteractionState } from './interactions';
 
 export interface Modal {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState): void;
   tick(dt: number, input: InteractionState): void;
 }
 
-export class ModalManager {
+export class Modals {
   private activeModal: Modal | null = null;
 
   open(modal: Modal) {

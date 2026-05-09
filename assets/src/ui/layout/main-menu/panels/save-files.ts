@@ -1,6 +1,6 @@
 import { COLORS } from '../../../../colors';
 import { SAVE_AUTOSAVE_FONT } from '../../../../config';
-import { InteractionState } from '../../../interaction-manager';
+import { InteractionState } from '../../../managers/interactions';
 import { ServerState } from '../../../../net/snapshots';
 import { Rect } from '../../../components/tab-menu/tab-menu';
 import { drawSaveSlotCard, SaveSlotActions } from '../../../components/cards/save-slot';

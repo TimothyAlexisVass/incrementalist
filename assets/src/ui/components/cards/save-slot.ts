@@ -11,7 +11,7 @@ import {
   formatNumber, 
   formatTimestamp 
 } from '../../../format';
-import { InteractionState } from '../../interaction-manager';
+import { InteractionState } from '../../managers/interactions';
 import { doButton } from '../button';
 import { Rect } from '../tab-menu/tab-menu';
 import type { SaveSlotSummary } from '../../net/protocol';

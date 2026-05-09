@@ -1,4 +1,4 @@
-import { InteractionState, pointInRect } from '../../interaction-manager';
+import { InteractionState, pointInRect } from '../../managers/interactions';
 import { Rect } from '../../components/tab-menu/tab-menu';
 
 export function handleMainMenuInteractions(input: InteractionState, shellRect: Rect, onClose: () => void) {

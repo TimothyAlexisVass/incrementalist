@@ -1,4 +1,4 @@
-import { InteractionState } from '../../../../interaction-manager';
+import { InteractionState } from '../../../../managers/interactions';
 import { ShopItemViewModel } from './view-model';
 import { Rect } from '../../../../components/tab-menu/tab-menu';
 import { handleShopItemCardInteractions, ShopActions } from '../../../../components/cards/shop-item';

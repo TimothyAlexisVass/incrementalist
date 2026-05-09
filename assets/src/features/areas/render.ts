@@ -2,10 +2,10 @@ import { COLORS } from "../../colors";
 import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT } from "../../config";
 import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
-import { InteractionState, pointInRect } from "../../ui/interaction-manager";
+import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawNoticeDot } from "../../ui/components/button";
 import { drawLockedElement } from "../../ui/components/locked-element";
-import { noticeSystem } from "../../ui/notice-system";
+import { notices } from "../../ui/managers/notices";
 import { GameChannel } from "../../net/game-channel";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
@@ -123,8 +123,8 @@ export function renderAreaDropdown(
             // Locked areas cannot be acted on, so they should not advertise notices.
             const hasNotice =
               !area.is_locked &&
-              (noticeSystem.hasLeafNotice(`area:${area.key}`) ||
-                (area.key === 'sage' && noticeSystem.hasSageNotice()));
+              (notices.hasLeafNotice(`area:${area.key}`) ||
+                (area.key === 'sage' && notices.hasSageNotice()));
             if (hasNotice) {
               drawNoticeDot(ctx, itemRect.x + itemRect.width - 10, itemRect.y + 10);
             }
@@ -151,7 +151,7 @@ export function renderAreaDropdown(
 
   // Draw the main button
   if (doButton(ctx, input, buttonRect, buttonLabel, {
-    showNotice: noticeSystem.hasAreaNotice()
+    showNotice: notices.hasAreaNotice()
   })) {
     // Click also toggles or handles selection if needed, but hover handles open.
   }

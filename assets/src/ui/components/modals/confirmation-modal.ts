@@ -1,6 +1,6 @@
-import { Modal } from '../modal-manager';
+import { Modal } from '../../managers/modals';
 import { COLORS } from '../../../colors';
-import { InteractionState, pointInRect } from '../../interaction-manager';
+import { InteractionState, pointInRect } from '../../managers/interactions';
 import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../../../config';
 import { drawButton, doButton } from '../button';
 

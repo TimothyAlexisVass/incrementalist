@@ -1,9 +1,9 @@
 import { COLORS } from "../../../colors";
 import { BOTTOM_HUD_HEIGHT } from "../../../config";
 import { doButton } from '../../components/button';
-import { InteractionState } from '../../interaction-manager';
+import { InteractionState } from '../../managers/interactions';
 import { renderAreaDropdown } from '../../../features/areas/render';
-import { noticeSystem } from "../../notice-system";
+import { notices } from "../../managers/notices";
 
 export function renderBottomHUD(
   ctx: CanvasRenderingContext2D, 
@@ -28,7 +28,7 @@ export function renderBottomHUD(
   const buttonY = canvas.height - buttonHeight - paddingBottom;
 
   if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
-    showNotice: !isMainMenuOpen && noticeSystem.hasMenuNotice()
+    showNotice: !isMainMenuOpen && notices.hasMenuNotice()
   })) {
     onMenuClick();
   }

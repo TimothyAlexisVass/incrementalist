@@ -1,8 +1,8 @@
 import { COLORS } from '../../../colors';
 import { doButton } from '../button';
-import { InteractionState } from '../../interaction-manager';
+import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
-import { noticeSystem } from '../../notice-system';
+import { notices } from '../../managers/notices';
 import { noticeAck } from '../../../net/commands';
 import { GameChannel } from '../../../net/game-channel';
 
@@ -218,13 +218,13 @@ export class TabMenu {
         font: font,
         showNotice:
           !isActive && tab.noticeType && tab.noticeParentId
-            ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType)
+            ? notices.hasParentNotice(tab.noticeParentId, tab.noticeType)
             : false
       });
 
       if (clicked) {
         this.activeTabId = tab.id;
-        if (channel && runCommand && tab.noticeParentId && tab.noticeType && noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType)) {
+        if (channel && runCommand && tab.noticeParentId && tab.noticeType && notices.hasParentNotice(tab.noticeParentId, tab.noticeType)) {
           const parentId = tab.noticeParentId;
           runCommand(() => noticeAck(channel, parentId));
         }

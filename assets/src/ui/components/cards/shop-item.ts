@@ -7,11 +7,11 @@ import {
 } from '../../../config';
 import { formatBigNum, formatLevel } from '../../../format';
 import { Rect } from '../tab-menu/tab-menu';
-import { InteractionState, pointInRect } from '../../interaction-manager';
+import { InteractionState, pointInRect } from '../../managers/interactions';
 import { drawButton } from '../button';
 import { drawCurrencyAmount } from '../../../render/currency-icons';
 import { ShopItemDefinition } from '../../../net/protocol';
-import { noticeSystem } from '../../notice-system';
+import { notices } from '../../managers/notices';
 
 export interface ShopItemActions {
   onPurchase: (itemId: string) => void;
@@ -110,7 +110,7 @@ export function drawShopItemCard(
       drawButton(ctx, btnRect, 'Purchase', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
-        showNotice: noticeSystem.hasLeafNotice(`shop:${item.id}`),
+        showNotice: notices.hasLeafNotice(`shop:${item.id}`),
         showNoticePing: true
       });
     }
@@ -143,7 +143,7 @@ export function handleShopItemCardInteractions(
     input.clicked && !input.consumed) {
     
     // Clear notice on interaction
-    if (noticeSystem.hasLeafNotice(`shop:${item.id}`)) {
+    if (notices.hasLeafNotice(`shop:${item.id}`)) {
       actions.onSee(item.id);
     }
 

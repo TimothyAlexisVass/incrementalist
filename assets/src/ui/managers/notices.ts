@@ -1,7 +1,7 @@
-import { GameSnapshot } from "../net/protocol";
-import { SAGE_TIPS } from "../features/areas/sage/tips";
+import { GameSnapshot } from "../../net/protocol";
+import { SAGE_TIPS } from "../../features/areas/sage/tips";
 
-export class NoticeSystem {
+export class Notices {
   private snapshot: GameSnapshot | null = null;
 
   public setSnapshot(snapshot: GameSnapshot | null) {
@@ -96,4 +96,4 @@ export class NoticeSystem {
 }
 
 // Global instance for convenience, updated by GameClient
-export const noticeSystem = new NoticeSystem();
+export const notices = new Notices();

@@ -4,7 +4,7 @@ import { COLORS } from '../../../colors';
 import { renderSaveFilesTab } from './panels/save-files';
 import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
 import { drawLazyLoader } from '../../components/utils/lazy-loader';
-import { InteractionState } from '../../interaction-manager';
+import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { GameChannel } from '../../../net/game-channel';
 

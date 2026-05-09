@@ -147,7 +147,7 @@ export function drawNoticeDot(
   ctx.restore();
 }
 
-import { InteractionState, pointInRect } from '../interaction-manager';
+import { InteractionState, pointInRect } from '../managers/interactions';
 
 export function doButton(
   ctx: CanvasRenderingContext2D,
