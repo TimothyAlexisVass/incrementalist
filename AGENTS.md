@@ -6,6 +6,8 @@ The game is under development and has not been deployed.
 IT IS FORBIDDEN TO ADD BACKWARDS COMPATIBILITY!
 RESET on conflict/breaking instead of adding compatibilty shims, versioning, etc...
 
+Edits of .ts files have to pass tsc --noEmit checks.
+
 ## Migration Hygiene
 Keep migrations free of middle states. Do not leave create -> alter -> drop, add -> remove, or create -> update chains in `priv/repo/migrations/`; update existing migrations instead, then run `mix ecto.reset && MIX_ENV=test mix ecto.reset`.
 
