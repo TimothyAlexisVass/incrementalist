@@ -3,6 +3,7 @@ import { BOTTOM_HUD_HEIGHT } from "../../../config";
 import { doButton } from '../../components/button';
 import { InteractionState } from '../../interaction-manager';
 import { renderAreaDropdown } from '../../../features/areas/render';
+import { noticeSystem } from "../../notice-system";
 
 export function renderBottomHUD(
   ctx: CanvasRenderingContext2D, 
@@ -25,7 +26,9 @@ export function renderBottomHUD(
   const buttonX = canvas.width - buttonWidth - paddingRight;
   const buttonY = canvas.height - buttonHeight - paddingBottom;
 
-  if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]')) {
+  if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
+    showNotice: noticeSystem.hasMenuNotice()
+  })) {
     onMenuClick();
   }
 

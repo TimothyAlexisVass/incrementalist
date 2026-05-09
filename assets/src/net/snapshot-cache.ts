@@ -3,10 +3,10 @@ import type { GameSnapshot } from "./protocol";
 const slotCount = 4;
 
 export class SnapshotCache {
-  constructor(private readonly username: string | null) {}
+  constructor(private readonly username: string | null) { }
 
   cachedSlotIndexes() {
-    if (!this.token) return [];
+    if (!this.username) return [];
 
     const indexes: number[] = [];
 
@@ -20,7 +20,7 @@ export class SnapshotCache {
   }
 
   load(slotIndex: number) {
-    if (!this.token) return null;
+    if (!this.username) return null;
 
     try {
       const encoded = window.localStorage.getItem(this.key(slotIndex));

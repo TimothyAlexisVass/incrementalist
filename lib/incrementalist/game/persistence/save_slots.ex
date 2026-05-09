@@ -10,7 +10,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
 
   import Ecto.Query
 
-  alias Incrementalist.Game.{Constants, Snapshots, State, Time}
+  alias Incrementalist.Game.{Constants, Snapshots, State, Time, Notices}
   alias Incrementalist.Game.Persistence.{Player, SaveSlot}
   alias Incrementalist.Repo
 
@@ -91,6 +91,16 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.new(now),
+      notices: Notices.new(),
+      last_saved_at: now
+    })
+    |> Repo.update!()
+  end
+
+  def initialize_if_empty(%SaveSlot{notices: nil} = save_slot, now) do
+    save_slot
+    |> SaveSlot.changeset(%{
+      notices: Notices.new(),
       last_saved_at: now
     })
     |> Repo.update!()
@@ -102,6 +112,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.touch_saved_at(save_slot.state, now),
+      notices: save_slot.notices,
       last_saved_at: now
     })
     |> Repo.update!()
@@ -111,6 +122,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: State.new(now),
+      notices: Notices.new(),
       last_saved_at: now
     })
     |> Repo.update!()

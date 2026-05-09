@@ -32,6 +32,12 @@ export type ShopItemDefinition = {
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
+export type NoticeState = {
+  seen_leaf_ids: string[];
+  last_ack_level: Record<string, number>;
+  last_ack_time: Record<string, string>;
+};
+
 export type GameSnapshot = {
   type: "game.snapshot";
   server_time: string;
@@ -60,6 +66,7 @@ export type GameSnapshot = {
     };
     shop: ShopItemDefinition[];
   };
+  notices: NoticeState;
   save_slot: SaveSlotSummary;
 };
 
@@ -134,6 +141,20 @@ export type ShopPurchaseResult = {
   cores?: BigNum;
 };
 
+export type NoticeSeeResult = {
+  type: "notice.see.result";
+  status: "ok";
+  command_id: number;
+  leaf_id: string;
+};
+
+export type NoticeAckResult = {
+  type: "notice.ack.result";
+  status: "ok";
+  command_id: number;
+  parent_id: string;
+};
+
 export type CommandErrorReason =
   | "unknown_command"
   | "slot_index_required"
@@ -160,6 +181,8 @@ export type AckableCommandResult =
   | ProgressClaimRewardResult
   | AreaSelectResult
   | ShopPurchaseResult
+  | NoticeSeeResult
+  | NoticeAckResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -205,6 +228,8 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "progress.claim_reward.result" ||
     result.type === "area.select.result" ||
     result.type === "shop.purchase.result" ||
+    result.type === "notice.see.result" ||
+    result.type === "notice.ack.result" ||
     result.type === "command.error"
   );
 }

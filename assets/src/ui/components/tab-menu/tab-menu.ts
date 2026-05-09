@@ -2,6 +2,9 @@ import { COLORS } from '../../../colors';
 import { doButton } from '../button';
 import { InteractionState } from '../../interaction-manager';
 import { ServerState } from '../../../net/snapshots';
+import { noticeSystem } from '../../notice-system';
+import { noticeAck } from '../../../net/commands';
+import { GameChannel } from '../../../net/game-channel';
 
 export type TabMenuLayout = 'horizontal' | 'vertical';
 export type TabMenuPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -19,6 +22,8 @@ export interface TabDefinition {
   hotkey?: string;
   renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
+  noticeType?: 'shop_item' | 'area_unlock' | 'sage_tip';
+  noticeParentId?: string;
 }
 
 export interface TabMenuConfig {
@@ -68,7 +73,9 @@ export class TabMenu {
     canvas: HTMLCanvasElement, 
     input: InteractionState, 
     state: ServerState,
-    containerRect: Rect
+    containerRect: Rect,
+    channel?: GameChannel,
+    runCommand?: (cmd: () => Promise<any>) => void
   ) {
     const layout = this.config.layout || 'horizontal';
     const position = this.config.position || 'top-left';
@@ -208,11 +215,16 @@ export class TabMenu {
         activeBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
         inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
         textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
-        font: font
+        font: font,
+        showNotice: tab.noticeType && tab.noticeParentId ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType) : false
       });
 
       if (clicked) {
         this.activeTabId = tab.id;
+        if (channel && runCommand && tab.noticeParentId && tab.noticeType && noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType)) {
+          const parentId = tab.noticeParentId;
+          runCommand(() => noticeAck(channel, parentId));
+        }
       }
     }
 

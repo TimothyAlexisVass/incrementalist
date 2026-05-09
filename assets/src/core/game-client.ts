@@ -6,7 +6,9 @@ import {
   resetSaveSlot, 
   progressClaimIn,
   selectArea,
-  shopPurchase
+  shopPurchase,
+  noticeSee,
+  noticeAck
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "../net/protocol";
@@ -37,6 +39,8 @@ import { GameLoop } from "./game-loop";
 import { UIManager } from "../ui/ui-manager";
 import { MainMenu } from "../ui/layout/main-menu/render";
 import { InteractionManager, InteractionState } from "../ui/interaction-manager";
+import { noticeSystem } from "../ui/notice-system";
+import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -98,8 +102,14 @@ export class GameClient {
       onPurchase: (itemId: string) => {
         if (!this.channel) return;
         this.runCommand(() => shopPurchase(this.channel!, itemId));
+      },
+      onSee: (itemId: string) => {
+        if (!this.channel) return;
+        this.runCommand(() => noticeSee(this.channel!, `shop:${itemId}`, ['shop_tab', 'menu_button']));
       }
     });
+
+    setMainMenuNetwork(this.channel, (cmd) => this.runCommand(cmd));
 
     this.channel.onStatusChange = (status) => {
       this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
@@ -111,10 +121,8 @@ export class GameClient {
       this.snapshotCache = new SnapshotCache(result.username);
 
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
-      if (result.snapshot) {
-        this.snapshotCache.save(result.snapshot);
-        updateAreaViewModel(result.snapshot.state);
-      } else if (this.store.state.snapshot) {
+      if (this.store.state.snapshot) {
+        noticeSystem.setSnapshot(this.store.state.snapshot);
         updateAreaViewModel(this.store.state.snapshot.state);
       }
       this.store.state.slots = [result.save_slot];
@@ -175,6 +183,9 @@ export class GameClient {
     this.hydrateSnapshotFromCache(result);
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
     applyResult(this.store.state, result);
+    if (this.store.state.snapshot) {
+      noticeSystem.setSnapshot(this.store.state.snapshot);
+    }
     this.cacheSnapshotFromResult(result);
 
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
@@ -199,6 +210,9 @@ export class GameClient {
       this.hydrateSnapshotFromCache(next);
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
       applyResult(this.store.state, next);
+      if (this.store.state.snapshot) {
+        noticeSystem.setSnapshot(this.store.state.snapshot);
+      }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
@@ -325,7 +339,7 @@ export class GameClient {
     renderProgressBar(this.ctx, this.canvas);
     
     if (this.store.state.snapshot) {
-      renderAreaSpecifics(this.ctx, this.canvas, this.store.state.snapshot.state.level);
+      renderAreaSpecifics(this.ctx, this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
     }
 
     const amounts = this.snapshotAmounts();
@@ -351,10 +365,25 @@ export class GameClient {
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
     renderBottomHUD(this.ctx, this.canvas, input, () => {
+      const isOpening = !this.uiManager.overlayManager.isActive(this.mainMenu);
       this.uiManager.overlayManager.toggle(this.mainMenu);
+      
+      if (isOpening && this.channel && noticeSystem.hasMenuNotice()) {
+        this.runCommand(() => noticeAck(this.channel!, 'menu_button'));
+      }
     }, (areaKey) => {
       if (this.channel) {
         this.runCommand(() => selectArea(this.channel!, areaKey));
+        
+        // Clear area unlock notice
+        if (noticeSystem.hasLeafNotice(`area:${areaKey}`)) {
+          this.runCommand(() => noticeSee(this.channel!, `area:${areaKey}`, ['area_dropdown', 'menu_button']));
+        }
+        
+        // Special case: clicking Sage area also clears sage tips notice
+        if (areaKey === 'sage' && noticeSystem.hasSageNotice()) {
+          this.runCommand(() => noticeAck(this.channel!, 'area_dropdown'));
+        }
       }
     });
 

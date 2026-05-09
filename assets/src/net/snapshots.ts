@@ -1,4 +1,4 @@
-import type { GameSnapshot, SaveSlotSummary, ServerResult, AreaSelectResult } from "./protocol";
+import type { GameSnapshot, SaveSlotSummary, ServerResult, AreaSelectResult, NoticeSeeResult, NoticeAckResult } from "./protocol";
 import { updateAreaViewModel } from "../features/areas/view-model";
 
 export type ServerState = {
@@ -46,6 +46,10 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   if (result.type === "shop.purchase.result") {
     applyAuthoritativeData(state, result);
+  }
+
+  if (result.type === "notice.see.result" || result.type === "notice.ack.result") {
+    applyNoticeResult(state, result);
   }
 
   state.statusTone = result.status === "error" ? "error" : "ok";
@@ -101,6 +105,24 @@ export function applyAreaResult(state: ServerState, result: AreaSelectResult) {
   if (!state.snapshot) return;
   state.snapshot.state.area = result.area;
   updateAreaViewModel(state.snapshot.state);
+}
+
+export function applyNoticeResult(state: ServerState, result: NoticeSeeResult | NoticeAckResult) {
+  if (!state.snapshot) return;
+
+  if (result.type === "notice.see.result") {
+    if (!state.snapshot.notices.seen_leaf_ids.includes(result.leaf_id)) {
+      state.snapshot.notices.seen_leaf_ids.push(result.leaf_id);
+    }
+    // Bubbling clear on the client: marking a leaf as seen should also clear its parents.
+    // The server handles this durably, but we do it here for instant UI feedback.
+    // We don't know the parent IDs here though, unless we pass them or the UI manager handles it.
+  }
+
+  if (result.type === "notice.ack.result") {
+    state.snapshot.notices.last_ack_level[result.parent_id] = state.snapshot.state.level;
+    state.snapshot.notices.last_ack_time[result.parent_id] = new Date().toISOString();
+  }
 }
 
 function snapshotFromResult(result: ServerResult): GameSnapshot | null {

@@ -3,8 +3,10 @@ import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT
 import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/interaction-manager";
-import { doButton } from "../../ui/components/button";
+import { doButton, drawNoticeDot } from "../../ui/components/button";
 import { drawLockedElement } from "../../ui/components/locked-element";
+import { noticeSystem } from "../../ui/notice-system";
+import { GameChannel } from "../../net/game-channel";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
 
@@ -32,10 +34,17 @@ export function renderAreaBackground(ctx: CanvasRenderingContext2D, canvas: HTML
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-export function renderAreaSpecifics(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, level: number) {
+export function renderAreaSpecifics(
+  ctx: CanvasRenderingContext2D, 
+  canvas: HTMLCanvasElement, 
+  input: InteractionState,
+  level: number,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
+) {
   const model = getAreaViewModel();
   if (model.currentArea === 'sage') {
-    renderSageArea(ctx, canvas, level);
+    renderSageArea(ctx, canvas, input, level, channel, runCommand);
   }
 }
 
@@ -108,7 +117,14 @@ export function renderAreaDropdown(
             ctx.font = BOTTOM_HUD_BUTTON_FONT;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.textBaseline = 'middle';
             ctx.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
+
+            // Show dot if new area or new sage tip
+            const hasNotice = noticeSystem.hasLeafNotice(`area:${area.key}`) || (area.key === 'sage' && noticeSystem.hasSageNotice());
+            if (hasNotice) {
+              drawNoticeDot(ctx, itemRect.x + itemRect.width - 10, itemRect.y + 10);
+            }
           };
 
           if (area.is_locked) {
@@ -131,7 +147,9 @@ export function renderAreaDropdown(
   }
 
   // Draw the main button
-  if (doButton(ctx, input, buttonRect, buttonLabel)) {
+  if (doButton(ctx, input, buttonRect, buttonLabel, {
+    showNotice: noticeSystem.hasAreaNotice()
+  })) {
     // Click also toggles or handles selection if needed, but hover handles open.
   }
 }

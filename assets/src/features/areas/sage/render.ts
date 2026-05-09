@@ -1,11 +1,22 @@
 import { SAGE_TIPS } from './tips';
 import { BOTTOM_HUD_HEIGHT, DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, SMALL_TEXT_FONT } from '../../../config';
+import { InteractionState, pointInRect } from '../../../ui/interaction-manager';
+import { noticeAck } from '../../../net/commands';
+import { GameChannel } from '../../../net/game-channel';
+import { noticeSystem } from '../../../ui/notice-system';
 import { COLORS } from '../../../colors';
 import { getAreaViewModel } from '../view-model';
 
 const LETTERS_PER_SECOND = 40;
 
-export function renderSageArea(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, level: number) {
+export function renderSageArea(
+  ctx: CanvasRenderingContext2D, 
+  canvas: HTMLCanvasElement, 
+  input: InteractionState, 
+  level: number,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
+) {
   const model = getAreaViewModel().sage;
   const tips = SAGE_TIPS[level];
   
@@ -71,6 +82,14 @@ export function renderSageArea(ctx: CanvasRenderingContext2D, canvas: HTMLCanvas
 
   for (let i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], boxX + padding, boxY + padding + i * lineHeight);
+  }
+
+  // Handle interaction to clear notice
+  if (pointInRect(input.pointer, { x: boxX, y: boxY, width: boxWidth, height: boxHeight }) && input.clicked && !input.consumed) {
+    if (channel && runCommand && noticeSystem.hasSageNotice()) {
+      runCommand(() => noticeAck(channel, 'area_dropdown'));
+      input.consumed = true;
+    }
   }
 
   ctx.restore();

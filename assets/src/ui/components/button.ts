@@ -13,6 +13,7 @@ export interface ButtonOptions {
   textAlign?: CanvasTextAlign;
   textX?: number;
   textY?: number;
+  showNotice?: boolean;
 }
 
 export function drawButton(
@@ -56,6 +57,26 @@ export function drawButton(
   // Use explicitly provided textY, or default to exact middle of the rect
   const actualTextY = options.textY !== undefined ? options.textY : rect.y + (rect.height / 2) + 1;
   ctx.fillText(label, textX, actualTextY);
+  
+  if (options.showNotice) {
+    drawNoticeDot(ctx, rect.x + rect.width - 2, rect.y + 2);
+  }
+
+  ctx.restore();
+}
+
+export function drawNoticeDot(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number = 4) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = '#00ff00'; // Pure green for the dot
+  ctx.fill();
+  
+  // Subtle outer glow
+  ctx.shadowBlur = 4;
+  ctx.shadowColor = '#00ff00';
+  ctx.stroke();
+  
   ctx.restore();
 }
 

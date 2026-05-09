@@ -29,6 +29,10 @@ export class OverlayManager {
     return this.activeOverlay !== null;
   }
 
+  isActive(overlay: Overlay): boolean {
+    return this.activeOverlay === overlay;
+  }
+
   getActiveOverlay(): Overlay | null {
     return this.activeOverlay;
   }

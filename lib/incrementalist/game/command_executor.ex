@@ -156,6 +156,65 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result(reason, command), active_slot.id}
         end
 
+      "notice.see" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, leaf_id} <- fetch_leaf_id(command.intent) do
+          parent_ids = Map.get(command.intent, "parent_ids", []) || Map.get(command.intent, :parent_ids, [])
+
+          # 1. Mark leaf as seen
+          next_notices = Incrementalist.Game.Notices.see(active_slot.notices, leaf_id, active_slot.state.level, now)
+
+          # 2. Acknowledge parents (bubbling clear)
+          next_notices =
+            Enum.reduce(parent_ids, next_notices, fn pid, acc ->
+              Incrementalist.Game.Notices.ack(acc, pid, active_slot.state.level, now)
+            end)
+
+          active_slot
+          |> SaveSlot.changeset(%{notices: next_notices, last_saved_at: now})
+          |> Repo.update!()
+
+          {"succeeded",
+           %{
+             "type" => "notice.see.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "leaf_id" => leaf_id
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
+      "notice.ack" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, parent_id} <- fetch_parent_id(command.intent) do
+          next_notices =
+            Incrementalist.Game.Notices.ack(
+              active_slot.notices,
+              parent_id,
+              active_slot.state.level,
+              now
+            )
+
+          active_slot
+          |> SaveSlot.changeset(%{notices: next_notices, last_saved_at: now})
+          |> Repo.update!()
+
+          {"succeeded",
+           %{
+             "type" => "notice.ack.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "parent_id" => parent_id
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
       _unknown ->
         active_slot = active_slot(player, now)
 
@@ -241,6 +300,14 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_item_id(%{"item_id" => item_id}) when is_binary(item_id), do: {:ok, item_id}
   defp fetch_item_id(%{item_id: item_id}) when is_binary(item_id), do: {:ok, item_id}
   defp fetch_item_id(_intent), do: {:error, "item_id_required"}
+
+  defp fetch_leaf_id(%{"leaf_id" => id}) when is_binary(id), do: {:ok, id}
+  defp fetch_leaf_id(%{leaf_id: id}) when is_binary(id), do: {:ok, id}
+  defp fetch_leaf_id(_intent), do: {:error, "leaf_id_required"}
+
+  defp fetch_parent_id(%{"parent_id" => id}) when is_binary(id), do: {:ok, id}
+  defp fetch_parent_id(%{parent_id: id}) when is_binary(id), do: {:ok, id}
+  defp fetch_parent_id(_intent), do: {:error, "parent_id_required"}
 
   defp normalize_slot_index(slot_index)
        when is_integer(slot_index) do

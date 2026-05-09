@@ -8,7 +8,9 @@ import type {
   ProgressClaimInResult,
   ProgressClaimRewardResult,
   AreaSelectResult,
-  ShopPurchaseResult
+  ShopPurchaseResult,
+  NoticeSeeResult,
+  NoticeAckResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -42,6 +44,19 @@ export function selectArea(channel: GameChannel, areaKey: string) {
 
 export function shopPurchase(channel: GameChannel, itemId: string) {
   return channel.pushCommand<CommandPushResult<ShopPurchaseResult | CommandErrorResult>>("shop.purchase", { item_id: itemId });
+}
+
+export function noticeSee(channel: GameChannel, leafId: string, parentIds: string[] = []) {
+  return channel.pushCommand<CommandPushResult<NoticeSeeResult | CommandErrorResult>>("notice.see", { 
+    leaf_id: leafId,
+    parent_ids: parentIds
+  });
+}
+
+export function noticeAck(channel: GameChannel, parentId: string) {
+  return channel.pushCommand<CommandPushResult<NoticeAckResult | CommandErrorResult>>("notice.ack", { 
+    parent_id: parentId 
+  });
 }
 
 export async function ackAppliedResult(

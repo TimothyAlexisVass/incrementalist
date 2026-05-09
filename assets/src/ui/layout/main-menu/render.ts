@@ -9,7 +9,7 @@ import {
   DISPLAY_AREA_X,
   DISPLAY_AREA_WIDTH,
 } from '../../../config';
-import { getTabMenu, setSaveSlotActions, setShopActions } from './view-model';
+import { getTabMenu, setSaveSlotActions, setShopActions, getNetwork } from './view-model';
 import { ShopActions } from './panels/basic-shop/index';
 import { handleMainMenuInteractions } from './interactions';
 
@@ -53,7 +53,8 @@ export class MainMenu implements Overlay {
       height: height - 32
     };
     
-    getTabMenu().render(ctx, canvas, input, state, menuRect);
+    const { channel, runCommand } = getNetwork();
+    getTabMenu().render(ctx, canvas, input, state, menuRect, channel || undefined, runCommand || undefined);
 
     handleMainMenuInteractions(input, shellRect, onClose);
   }

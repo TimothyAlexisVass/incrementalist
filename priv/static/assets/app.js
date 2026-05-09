@@ -1178,29 +1178,40 @@
   };
 
   // src/net/commands.ts
-  function switchSaveSlot(channel, slotIndex, hasCachedSnapshot) {
-    return channel.pushCommand("save_slot.switch", {
+  function switchSaveSlot(channel2, slotIndex, hasCachedSnapshot) {
+    return channel2.pushCommand("save_slot.switch", {
       slot_index: slotIndex,
       has_cached_snapshot: hasCachedSnapshot
     });
   }
-  function resetSaveSlot(channel) {
-    return channel.pushCommand("save_slot.reset");
+  function resetSaveSlot(channel2) {
+    return channel2.pushCommand("save_slot.reset");
   }
-  function progressClaimIn(channel) {
-    return channel.pushCommand("progress.claim_in");
+  function progressClaimIn(channel2) {
+    return channel2.pushCommand("progress.claim_in");
   }
-  function progressClaimReward(channel) {
-    return channel.pushCommand("progress.claim_reward");
+  function progressClaimReward(channel2) {
+    return channel2.pushCommand("progress.claim_reward");
   }
-  function selectArea(channel, areaKey) {
-    return channel.pushCommand("area.select", { area: areaKey });
+  function selectArea(channel2, areaKey) {
+    return channel2.pushCommand("area.select", { area: areaKey });
   }
-  function shopPurchase(channel, itemId) {
-    return channel.pushCommand("shop.purchase", { item_id: itemId });
+  function shopPurchase(channel2, itemId) {
+    return channel2.pushCommand("shop.purchase", { item_id: itemId });
   }
-  async function ackAppliedResult(channel, commandId) {
-    const ack = await channel.ackCommand(commandId);
+  function noticeSee(channel2, leafId, parentIds = []) {
+    return channel2.pushCommand("notice.see", {
+      leaf_id: leafId,
+      parent_ids: parentIds
+    });
+  }
+  function noticeAck(channel2, parentId) {
+    return channel2.pushCommand("notice.ack", {
+      parent_id: parentId
+    });
+  }
+  async function ackAppliedResult(channel2, commandId) {
+    const ack = await channel2.ackCommand(commandId);
     return ack.released_result;
   }
 
@@ -1336,6 +1347,20 @@
     ctx2.textBaseline = "middle";
     const actualTextY = options.textY !== void 0 ? options.textY : rect.y + rect.height / 2 + 1;
     ctx2.fillText(label, textX, actualTextY);
+    if (options.showNotice) {
+      drawNoticeDot(ctx2, rect.x + rect.width - 2, rect.y + 2);
+    }
+    ctx2.restore();
+  }
+  function drawNoticeDot(ctx2, x, y, radius = 4) {
+    ctx2.save();
+    ctx2.beginPath();
+    ctx2.arc(x, y, radius, 0, Math.PI * 2);
+    ctx2.fillStyle = "#00ff00";
+    ctx2.fill();
+    ctx2.shadowBlur = 4;
+    ctx2.shadowColor = "#00ff00";
+    ctx2.stroke();
     ctx2.restore();
   }
   function doButton(ctx2, input, rect, label, options = {}) {
@@ -1467,7 +1492,7 @@
 
   // src/net/protocol.ts
   function isAckableCommandResult(result) {
-    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "shop.purchase.result" || result.type === "command.error";
+    return result.type === "game.noop.result" || result.type === "save_slots.list.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result" || result.type === "progress.claim_in.result" || result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "shop.purchase.result" || result.type === "notice.see.result" || result.type === "notice.ack.result" || result.type === "command.error";
   }
 
   // src/features/areas/view-model.ts
@@ -1517,6 +1542,9 @@
     if (result.type === "shop.purchase.result") {
       applyAuthoritativeData(state2, result);
     }
+    if (result.type === "notice.see.result" || result.type === "notice.ack.result") {
+      applyNoticeResult(state2, result);
+    }
     state2.statusTone = result.status === "error" ? "error" : "ok";
     state2.status = statusForResult(result);
   }
@@ -1549,6 +1577,18 @@
     state2.snapshot.state.area = result.area;
     updateAreaViewModel(state2.snapshot.state);
   }
+  function applyNoticeResult(state2, result) {
+    if (!state2.snapshot) return;
+    if (result.type === "notice.see.result") {
+      if (!state2.snapshot.notices.seen_leaf_ids.includes(result.leaf_id)) {
+        state2.snapshot.notices.seen_leaf_ids.push(result.leaf_id);
+      }
+    }
+    if (result.type === "notice.ack.result") {
+      state2.snapshot.notices.last_ack_level[result.parent_id] = state2.snapshot.state.level;
+      state2.snapshot.notices.last_ack_time[result.parent_id] = (/* @__PURE__ */ new Date()).toISOString();
+    }
+  }
   function snapshotFromResult(result) {
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
       return result.snapshot ?? null;
@@ -1578,7 +1618,7 @@
       this.username = username;
     }
     cachedSlotIndexes() {
-      if (!this.token) return [];
+      if (!this.username) return [];
       const indexes = [];
       for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
         if (this.load(slotIndex)) {
@@ -1588,7 +1628,7 @@
       return indexes;
     }
     load(slotIndex) {
-      if (!this.token) return null;
+      if (!this.username) return null;
       try {
         const encoded = window.localStorage.getItem(this.key(slotIndex));
         if (!encoded) return null;
@@ -3029,32 +3069,32 @@
   function clearPendingClaimPopupPoint() {
     pendingClaimPopupPoint = null;
   }
-  function handleProgressLoop(channel) {
-    void channel;
+  function handleProgressLoop(channel2) {
+    void channel2;
     return shouldSendClaimIn(Date.now());
   }
-  function tryClaimReward(channel) {
+  function tryClaimReward(channel2) {
     const vm = getViewModel();
     if (vm.state === "confirmed_collectible") {
       return true;
     }
     return false;
   }
-  function claimRewardOnAnyInput(channel, canvas2, clickPoint, runCommand) {
-    if (!tryClaimReward(channel)) return;
+  function claimRewardOnAnyInput(channel2, canvas2, clickPoint, runCommand2) {
+    if (!tryClaimReward(channel2)) return;
     pendingClaimPopupPoint = clickPoint;
     triggerProgressBarCollectionEffect(canvas2);
     beginAsyncClaimResolution();
-    void resolveClaimAsync(channel, runCommand);
+    void resolveClaimAsync(channel2, runCommand2);
   }
-  async function resolveClaimAsync(channel, runCommand) {
+  async function resolveClaimAsync(channel2, runCommand2) {
     if (claimResolutionInFlight) return;
     claimResolutionInFlight = true;
     try {
-      let reward = await runCommand(() => progressClaimReward(channel));
+      let reward = await runCommand2(() => progressClaimReward(channel2));
       while (reward && reward.type === "command.error" && reward.reason === "claim_not_ready" && typeof reward.can_claim_in === "number" && reward.can_claim_in > 0) {
         await sleep(reward.can_claim_in);
-        reward = await runCommand(() => progressClaimReward(channel));
+        reward = await runCommand2(() => progressClaimReward(channel2));
       }
     } finally {
       setPendingClaimIntent(false);
@@ -3094,9 +3134,74 @@
     ]
   };
 
+  // src/ui/notice-system.ts
+  var NoticeSystem = class {
+    constructor() {
+      __publicField(this, "snapshot", null);
+    }
+    setSnapshot(snapshot) {
+      this.snapshot = snapshot;
+    }
+    hasLeafNotice(id) {
+      if (!this.snapshot) return false;
+      return !this.snapshot.notices.seen_leaf_ids.includes(id);
+    }
+    /**
+     * Checks if a parent element should show a notice dot.
+     * A parent shows a dot if any of its children are "new" 
+     * (unlocked at a level higher than the last time this parent was acknowledged).
+     */
+    hasParentNotice(parentId, type) {
+      if (!this.snapshot) return false;
+      const lastAckLevel = this.snapshot.notices.last_ack_level[parentId] ?? 0;
+      if (type === "shop_item") {
+        return this.snapshot.state.shop.some(
+          (item) => !item.is_purchased && item.can_purchase && item.required_level > lastAckLevel
+        );
+      }
+      if (type === "area_unlock") {
+        return this.snapshot.state.areas.some(
+          (area) => !area.is_locked && area.unlock_level > lastAckLevel
+        );
+      }
+      if (type === "sage_tip") {
+        const tips = Object.keys(SAGE_TIPS).map(Number).filter((l) => l <= this.snapshot.state.level);
+        const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
+        return maxTipLevel > lastAckLevel;
+      }
+      return false;
+    }
+    hasAreaNotice() {
+      return this.hasParentNotice("area_dropdown", "area_unlock") || this.hasSageNotice();
+    }
+    hasSageNotice() {
+      return this.hasParentNotice("area_dropdown", "sage_tip");
+    }
+    /**
+     * Special case for the Menu button which aggregates multiple types.
+     */
+    hasMenuNotice() {
+      if (!this.snapshot) return false;
+      const lastAckLevel = this.snapshot.notices.last_ack_level["menu_button"] ?? 0;
+      const hasNewShop = this.snapshot.state.shop.some(
+        (i) => !i.is_purchased && i.can_purchase && i.required_level > lastAckLevel
+      );
+      if (hasNewShop) return true;
+      const hasNewArea = this.snapshot.state.areas.some(
+        (a) => !a.is_locked && a.unlock_level > lastAckLevel
+      );
+      if (hasNewArea) return true;
+      const tips = Object.keys(SAGE_TIPS).map(Number).filter((l) => l <= this.snapshot.state.level);
+      const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
+      if (maxTipLevel > lastAckLevel) return true;
+      return false;
+    }
+  };
+  var noticeSystem = new NoticeSystem();
+
   // src/features/areas/sage/render.ts
   var LETTERS_PER_SECOND = 40;
-  function renderSageArea(ctx2, canvas2, level) {
+  function renderSageArea(ctx2, canvas2, input, level, channel2, runCommand2) {
     const model = getAreaViewModel().sage;
     const tips = SAGE_TIPS[level];
     if (!tips) {
@@ -3142,6 +3247,12 @@
     ctx2.textBaseline = "top";
     for (let i = 0; i < lines.length; i++) {
       ctx2.fillText(lines[i], boxX + padding, boxY + padding + i * lineHeight);
+    }
+    if (pointInRect(input.pointer, { x: boxX, y: boxY, width: boxWidth, height: boxHeight }) && input.clicked && !input.consumed) {
+      if (channel2 && runCommand2 && noticeSystem.hasSageNotice()) {
+        runCommand2(() => noticeAck(channel2, "area_dropdown"));
+        input.consumed = true;
+      }
     }
     ctx2.restore();
   }
@@ -3256,10 +3367,10 @@
     ctx2.fillStyle = COLORS.game.background;
     ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
   }
-  function renderAreaSpecifics(ctx2, canvas2, level) {
+  function renderAreaSpecifics(ctx2, canvas2, input, level, channel2, runCommand2) {
     const model = getAreaViewModel();
     if (model.currentArea === "sage") {
-      renderSageArea(ctx2, canvas2, level);
+      renderSageArea(ctx2, canvas2, input, level, channel2, runCommand2);
     }
   }
   var isDropdownOpen = false;
@@ -3311,7 +3422,12 @@
               ctx2.font = BOTTOM_HUD_BUTTON_FONT;
               ctx2.textAlign = "center";
               ctx2.textBaseline = "middle";
+              ctx2.textBaseline = "middle";
               ctx2.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
+              const hasNotice = noticeSystem.hasLeafNotice(`area:${area.key}`) || area.key === "sage" && noticeSystem.hasSageNotice();
+              if (hasNotice) {
+                drawNoticeDot(ctx2, itemRect.x + itemRect.width - 10, itemRect.y + 10);
+              }
             };
             if (area.is_locked) {
               drawLockedElement2(ctx2, canvas2, input, itemRect, renderItem, {
@@ -3330,7 +3446,9 @@
         }
       }
     }
-    if (doButton(ctx2, input, buttonRect, buttonLabel)) {
+    if (doButton(ctx2, input, buttonRect, buttonLabel, {
+      showNotice: noticeSystem.hasAreaNotice()
+    })) {
     }
   }
 
@@ -3752,7 +3870,9 @@
     const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
     const buttonX = canvas2.width - buttonWidth - paddingRight;
     const buttonY = canvas2.height - buttonHeight - paddingBottom;
-    if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]")) {
+    if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]", {
+      showNotice: noticeSystem.hasMenuNotice()
+    })) {
       onMenuClick();
     }
     renderAreaDropdown(ctx2, canvas2, input, (areaKey) => {
@@ -3838,6 +3958,9 @@
     isOpen() {
       return this.activeOverlay !== null;
     }
+    isActive(overlay) {
+      return this.activeOverlay === overlay;
+    }
     getActiveOverlay() {
       return this.activeOverlay;
     }
@@ -3897,7 +4020,7 @@
         activeTab.tickContent(dt);
       }
     }
-    render(ctx2, canvas2, input, state2, containerRect) {
+    render(ctx2, canvas2, input, state2, containerRect, channel2, runCommand2) {
       const layout = this.config.layout || "horizontal";
       const position = this.config.position || "top-left";
       const tabHeight = this.config.tabHeight || 30;
@@ -4009,10 +4132,15 @@
           activeBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
           inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
           textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
-          font
+          font,
+          showNotice: tab.noticeType && tab.noticeParentId ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType) : false
         });
         if (clicked) {
           this.activeTabId = tab.id;
+          if (channel2 && runCommand2 && tab.noticeParentId && tab.noticeType && noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType)) {
+            const parentId = tab.noticeParentId;
+            runCommand2(() => noticeAck(channel2, parentId));
+          }
         }
       }
       const activeTab = this.tabs.find((t) => t.id === this.activeTabId);
@@ -4232,7 +4360,8 @@
         };
         drawButton(ctx2, btnRect, "Purchase", {
           active: canAfford,
-          textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary
+          textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
+          showNotice: noticeSystem.hasLeafNotice(`shop:${item.id}`)
         });
       }
     }
@@ -4250,7 +4379,12 @@
       height: btnHeight
     };
     if (pointInRect(input.pointer, btnRect) && pointInRect(input.pressStartPointer, btnRect) && input.clicked && !input.consumed) {
-      actions.onPurchase(item.id);
+      if (noticeSystem.hasLeafNotice(`shop:${item.id}`)) {
+        actions.onSee(item.id);
+      }
+      if (canAfford) {
+        actions.onPurchase(item.id);
+      }
       input.consumed = true;
     }
   }
@@ -4334,6 +4468,8 @@
   var tabMenu = null;
   var saveSlotActions = null;
   var shopActions = null;
+  var channel = null;
+  var runCommand = null;
   function getTabMenu() {
     if (!tabMenu) {
       const renderPlaceholder = (title) => (ctx2, _canvas, _input, _state, rect) => {
@@ -4348,6 +4484,8 @@
           id: "shop",
           label: "Shop",
           hotkey: "S",
+          noticeType: "shop_item",
+          noticeParentId: "shop_tab",
           renderContent: (ctx2, canvas2, input, state2, rect) => {
             if (shopActions) {
               renderBasicShopTab(ctx2, canvas2, input, state2, rect, shopActions);
@@ -4360,12 +4498,16 @@
           id: "quest",
           label: "Quest",
           hotkey: "Q",
+          noticeType: "quest",
+          noticeParentId: "quest_tab",
           renderContent: renderPlaceholder("Quest")
         },
         {
           id: "achievements",
           label: "Achievements",
           hotkey: "A",
+          noticeType: "achievement",
+          noticeParentId: "achievement_tab",
           renderContent: renderPlaceholder("Achievements")
         },
         {
@@ -4403,6 +4545,13 @@
   }
   function setShopActions(actions) {
     shopActions = actions;
+  }
+  function setNetwork(newChannel, newRunCommand) {
+    channel = newChannel;
+    runCommand = newRunCommand;
+  }
+  function getNetwork() {
+    return { channel, runCommand };
   }
 
   // src/ui/layout/main-menu/interactions.ts
@@ -4445,7 +4594,8 @@
         width: width - 32,
         height: height - 32
       };
-      getTabMenu().render(ctx2, canvas2, input, state2, menuRect);
+      const { channel: channel2, runCommand: runCommand2 } = getNetwork();
+      getTabMenu().render(ctx2, canvas2, input, state2, menuRect, channel2 || void 0, runCommand2 || void 0);
       handleMainMenuInteractions(input, shellRect, onClose);
     }
     tick(dt) {
@@ -4504,8 +4654,13 @@
         onPurchase: (itemId) => {
           if (!this.channel) return;
           this.runCommand(() => shopPurchase(this.channel, itemId));
+        },
+        onSee: (itemId) => {
+          if (!this.channel) return;
+          this.runCommand(() => noticeSee(this.channel, `shop:${itemId}`, ["shop_tab", "menu_button"]));
         }
       });
+      setNetwork(this.channel, (cmd) => this.runCommand(cmd));
       this.channel.onStatusChange = (status) => {
         this.store.state.status = status === "connected" ? "Ready" : status.charAt(0).toUpperCase() + status.slice(1);
         this.store.state.statusTone = status === "connected" ? "ok" : status === "disconnected" ? "error" : "";
@@ -4514,10 +4669,8 @@
         window.localStorage.setItem(usernameKey, result.username);
         this.snapshotCache = new SnapshotCache(result.username);
         this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
-        if (result.snapshot) {
-          this.snapshotCache.save(result.snapshot);
-          updateAreaViewModel(result.snapshot.state);
-        } else if (this.store.state.snapshot) {
+        if (this.store.state.snapshot) {
+          noticeSystem.setSnapshot(this.store.state.snapshot);
           updateAreaViewModel(this.store.state.snapshot.state);
         }
         this.store.state.slots = [result.save_slot];
@@ -4563,6 +4716,9 @@
       this.hydrateSnapshotFromCache(result);
       const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
       applyResult(this.store.state, result);
+      if (this.store.state.snapshot) {
+        noticeSystem.setSnapshot(this.store.state.snapshot);
+      }
       this.cacheSnapshotFromResult(result);
       if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
         this.uiManager.modalManager.close();
@@ -4579,6 +4735,9 @@
         this.hydrateSnapshotFromCache(next);
         const previousAmounts2 = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
         applyResult(this.store.state, next);
+        if (this.store.state.snapshot) {
+          noticeSystem.setSnapshot(this.store.state.snapshot);
+        }
         this.cacheSnapshotFromResult(next);
         this.applyProgressEffects(next, previousAmounts2);
         if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
@@ -4669,15 +4828,15 @@
       const { state: input, activity } = this.interactionManager.tick();
       updateProjectedFill(dt);
       if (this.channel && handleProgressLoop(this.channel)) {
-        const channel = this.channel;
-        this.runCommand(() => progressClaimIn(channel));
+        const channel2 = this.channel;
+        this.runCommand(() => progressClaimIn(channel2));
       }
       this.ctx.fillStyle = COLORS.game.background;
       this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       renderAreaBackground(this.ctx, this.canvas);
       renderProgressBar(this.ctx, this.canvas);
       if (this.store.state.snapshot) {
-        renderAreaSpecifics(this.ctx, this.canvas, this.store.state.snapshot.state.level);
+        renderAreaSpecifics(this.ctx, this.canvas, input, this.store.state.snapshot.state.level, this.channel || void 0, (cmd) => this.runCommand(cmd));
       }
       const amounts = this.snapshotAmounts();
       if (amounts) {
@@ -4692,10 +4851,20 @@
         claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
       }
       renderBottomHUD(this.ctx, this.canvas, input, () => {
+        const isOpening = !this.uiManager.overlayManager.isActive(this.mainMenu);
         this.uiManager.overlayManager.toggle(this.mainMenu);
+        if (isOpening && this.channel && noticeSystem.hasMenuNotice()) {
+          this.runCommand(() => noticeAck(this.channel, "menu_button"));
+        }
       }, (areaKey) => {
         if (this.channel) {
           this.runCommand(() => selectArea(this.channel, areaKey));
+          if (noticeSystem.hasLeafNotice(`area:${areaKey}`)) {
+            this.runCommand(() => noticeSee(this.channel, `area:${areaKey}`, ["area_dropdown", "menu_button"]));
+          }
+          if (areaKey === "sage" && noticeSystem.hasSageNotice()) {
+            this.runCommand(() => noticeAck(this.channel, "area_dropdown"));
+          }
         }
       });
       this.uiManager.tick(dt, input);
@@ -4705,8 +4874,8 @@
   function clearsCommandQueue(result) {
     return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
   }
-  function listSaveSlots(channel) {
-    return channel.push("save_slot.list", {});
+  function listSaveSlots(channel2) {
+    return channel2.push("save_slot.list", {});
   }
 
   // src/app.ts

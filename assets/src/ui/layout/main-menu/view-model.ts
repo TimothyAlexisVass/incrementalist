@@ -6,10 +6,13 @@ import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
 import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../interaction-manager';
 import { ServerState } from '../../../net/snapshots';
+import { GameChannel } from '../../../net/game-channel';
 
 let tabMenu: TabMenu | null = null;
 let saveSlotActions: SaveSlotActions | null = null;
 let shopActions: ShopActions | null = null;
+let channel: GameChannel | null = null;
+let runCommand: ((cmd: () => Promise<any>) => void) | null = null;
 
 export function getTabMenu(): TabMenu {
   if (!tabMenu) {
@@ -26,6 +29,8 @@ export function getTabMenu(): TabMenu {
         id: 'shop',
         label: 'Shop',
         hotkey: 'S',
+        noticeType: 'shop_item',
+        noticeParentId: 'shop_tab',
         renderContent: (ctx, canvas, input, state, rect) => {
           if (shopActions) {
             renderBasicShopTab(ctx, canvas, input, state, rect, shopActions);
@@ -38,12 +43,16 @@ export function getTabMenu(): TabMenu {
         id: 'quest',
         label: 'Quest',
         hotkey: 'Q',
+        noticeType: 'quest',
+        noticeParentId: 'quest_tab',
         renderContent: renderPlaceholder('Quest')
       },
       {
         id: 'achievements',
         label: 'Achievements',
         hotkey: 'A',
+        noticeType: 'achievement',
+        noticeParentId: 'achievement_tab',
         renderContent: renderPlaceholder('Achievements')
       },
       {
@@ -92,4 +101,13 @@ export function setShopActions(actions: ShopActions) {
 
 export function getShopActions(): ShopActions | null {
   return shopActions;
+}
+
+export function setNetwork(newChannel: GameChannel, newRunCommand: (cmd: () => Promise<any>) => void) {
+  channel = newChannel;
+  runCommand = newRunCommand;
+}
+
+export function getNetwork() {
+  return { channel, runCommand };
 }

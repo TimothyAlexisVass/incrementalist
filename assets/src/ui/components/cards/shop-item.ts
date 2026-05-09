@@ -11,9 +11,11 @@ import { InteractionState, pointInRect } from '../../interaction-manager';
 import { drawButton } from '../button';
 import { drawCurrencyAmount } from '../../../render/currency-icons';
 import { ShopItemDefinition } from '../../../net/protocol';
+import { noticeSystem } from '../../notice-system';
 
 export interface ShopItemActions {
   onPurchase: (itemId: string) => void;
+  onSee: (itemId: string) => void;
 }
 
 export interface ShopItemCardProps {
@@ -107,7 +109,8 @@ export function drawShopItemCard(
       // Just draw the button, don't handle logic here
       drawButton(ctx, btnRect, 'Purchase', {
         active: canAfford,
-        textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary
+        textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
+        showNotice: noticeSystem.hasLeafNotice(`shop:${item.id}`)
       });
     }
   }
@@ -137,7 +140,16 @@ export function handleShopItemCardInteractions(
   if (pointInRect(input.pointer, btnRect) &&
     pointInRect(input.pressStartPointer, btnRect) &&
     input.clicked && !input.consumed) {
-    actions.onPurchase(item.id);
+    
+    // Clear notice on interaction
+    if (noticeSystem.hasLeafNotice(`shop:${item.id}`)) {
+      actions.onSee(item.id);
+    }
+
+    if (canAfford) {
+      actions.onPurchase(item.id);
+    }
+    
     input.consumed = true;
   }
 }

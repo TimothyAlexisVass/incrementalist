@@ -15,6 +15,7 @@ defmodule Incrementalist.Game.Snapshots do
       "server_time" => Time.iso8601(now),
       "active_save_slot" => active_slot_index,
       "state" => State.visible_state(save_slot.state),
+      "notices" => save_slot.notices,
       "save_slot" => State.summary(save_slot, active_slot_index)
     }
   end
