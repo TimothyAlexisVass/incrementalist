@@ -15,9 +15,9 @@ defmodule Incrementalist.Game.Sessions do
   alias Incrementalist.Game.Time
   alias Incrementalist.Repo
 
-  def authenticate_player(username \\ nil, now \\ Time.now()) do
+  def authenticate_player(player_id \\ nil, now \\ Time.now()) do
     Repo.transaction(fn ->
-      username
+      player_id
       |> find_player()
       |> case do
         nil -> create_player(now)
@@ -35,17 +35,11 @@ defmodule Incrementalist.Game.Sessions do
     Player.cleanup_anonymous(now)
   end
 
-  defp find_player(username) when is_binary(username) do
-    username = String.trim(username)
-
-    if username == "" do
-      nil
-    else
-      Repo.one(from player in Player, where: player.username == ^username)
-    end
+  defp find_player(player_id) when is_integer(player_id) do
+    Repo.get(Player, player_id)
   end
 
-  defp find_player(_username), do: nil
+  defp find_player(_player_id), do: nil
 
   defp create_player(now) do
     player = insert_player!(now)

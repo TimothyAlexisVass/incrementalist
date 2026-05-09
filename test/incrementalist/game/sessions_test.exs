@@ -21,11 +21,11 @@ defmodule Incrementalist.Game.SessionsTest do
     assert boot["snapshot"]["save_slot"]["has_data"]
   end
 
-  test "authenticate_player refreshes an existing player by username" do
+  test "authenticate_player refreshes an existing player by id" do
     player = Sessions.authenticate_player(nil, @now)
     later = DateTime.add(@now, 15, :minute)
 
-    refreshed = Sessions.authenticate_player(player.username, later)
+    refreshed = Sessions.authenticate_player(player.id, later)
 
     assert refreshed.id == player.id
     assert refreshed.username == player.username

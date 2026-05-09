@@ -29,6 +29,7 @@ export class GameChannel {
 
   constructor(
     private readonly username: string | null,
+    private readonly token: string | null,
     private readonly cachedSaveSlots: number[] = []
   ) {}
 
@@ -53,7 +54,7 @@ export class GameChannel {
     this.clearReconnectionTimeout();
 
     const params = new URLSearchParams({ vsn: "2.0.0" });
-    if (this.username) params.set("username", this.username);
+    if (this.token) params.set("token", this.token);
     if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";

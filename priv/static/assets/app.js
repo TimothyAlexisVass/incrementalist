@@ -1002,8 +1002,9 @@
   var maxReconnectionDelayMs = 3e4;
   var reconnectionBackoffFactor = 1.5;
   var GameChannel = class {
-    constructor(username, cachedSaveSlots = []) {
+    constructor(username, token, cachedSaveSlots = []) {
       this.username = username;
+      this.token = token;
       this.cachedSaveSlots = cachedSaveSlots;
       __publicField(this, "socket", null);
       __publicField(this, "ref", 0);
@@ -1031,7 +1032,7 @@
       this.setStatus(this._status === "disconnected" ? "connecting" : "reconnecting");
       this.clearReconnectionTimeout();
       const params = new URLSearchParams({ vsn: "2.0.0" });
-      if (this.username) params.set("username", this.username);
+      if (this.token) params.set("token", this.token);
       if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
       this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);
@@ -4605,6 +4606,7 @@
 
   // src/core/game-client.ts
   var usernameKey = "incrementalist.playerUsername";
+  var tokenKey = "incrementalist.playerToken";
   var GameClient = class {
     constructor(canvas2, ctx2) {
       this.canvas = canvas2;
@@ -4623,8 +4625,9 @@
     }
     async boot() {
       const username = window.localStorage.getItem(usernameKey);
+      const token = window.localStorage.getItem(tokenKey);
       this.snapshotCache = new SnapshotCache(username);
-      this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
+      this.channel = new GameChannel(username, token, this.snapshotCache.cachedSlotIndexes());
       this.mainMenu.setActions({
         onSwitch: (index) => {
           if (!this.channel) return;
@@ -4667,6 +4670,9 @@
       };
       this.channel.onBootResult = async (result) => {
         window.localStorage.setItem(usernameKey, result.username);
+        if (result.token) {
+          window.localStorage.setItem(tokenKey, result.token);
+        }
         this.snapshotCache = new SnapshotCache(result.username);
         this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
         if (this.store.state.snapshot) {

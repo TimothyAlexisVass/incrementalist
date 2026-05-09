@@ -20,6 +20,9 @@ defmodule IncrementalistWeb.GameChannel do
   def join("game", _params, socket) do
     boot = Sessions.boot_player(socket.assigns.player_id, socket.assigns.cached_save_slots)
 
+    token = Phoenix.Token.sign(socket.endpoint, "player_auth", socket.assigns.player_id)
+    boot = Map.put(boot, "token", token)
+
     {:ok, boot, socket}
   end
 
