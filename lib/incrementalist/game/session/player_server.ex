@@ -212,7 +212,12 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     recent_commands =
       update_recent_commands(state.recent_commands, state.unacked_command, current_unacked)
 
-    sequence = latest_sequence(state.player_id)
+    sequence =
+      if state.sequence > 0 do
+        state.sequence
+      else
+        latest_sequence(state.player_id)
+      end
 
     %{
       state
