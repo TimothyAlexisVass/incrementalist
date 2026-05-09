@@ -1,4 +1,4 @@
-import { BigNum, formatScientific, toNumber } from './core/bignum';
+import { BigNum, formatScientific, toNumber } from '../core/bignum';
 
 export type DisplayMode = 'suffixed' | 'scientific';
 
@@ -177,4 +177,3 @@ export function formatTimestamp(timestamp: any, emptyText = 'Never', invalidText
 
   return date.toLocaleString();
 }
-

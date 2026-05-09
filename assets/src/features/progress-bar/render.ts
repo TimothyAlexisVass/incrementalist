@@ -8,8 +8,7 @@ import {
 } from '../../config';
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components/button';
-import { formatPercent } from '../../format';
-import { clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { formatPercent, clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
 import {
   setGpuProgressBarGlow,
   spawnGpuProgressCollectionLaserBurst,

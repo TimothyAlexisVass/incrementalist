@@ -1,6 +1,6 @@
 import { COLORS } from '../../../../../colors';
 import { ShopItemViewModel } from './view-model';
-import { formatBigNum, formatLevel } from '../../../../../format';
+import { formatBigNum, formatLevel } from '../../../../../utils';
 import { 
   SHOP_ITEM_NAME_FONT, 
   SHOP_ITEM_DESC_FONT, 

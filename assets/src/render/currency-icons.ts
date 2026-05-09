@@ -1,5 +1,5 @@
 import { COLORS } from '../colors';
-import { formatNumber } from '../format';
+import { formatNumber } from '../utils';
 import { BigNum } from '../core/bignum';
 
 const CURRENCY_FALLBACK_COLORS: Record<string, string> = Object.freeze({

@@ -5,7 +5,7 @@ import {
   SHOP_ITEM_COST_FONT,
   SHOP_ITEM_REQ_FONT
 } from '../../../config';
-import { formatBigNum, formatLevel } from '../../../format';
+import { formatBigNum, formatLevel } from '../../../utils';
 import { Rect } from '../tab-menu/tab-menu';
 import { InteractionState, pointInRect } from '../../managers/interactions';
 import { drawButton } from '../button';

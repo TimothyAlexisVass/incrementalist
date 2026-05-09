@@ -10,7 +10,7 @@ import {
   formatLevel, 
   formatNumber, 
   formatTimestamp 
-} from '../../../format';
+} from '../../../utils';
 import { InteractionState } from '../../managers/interactions';
 import { doButton } from '../button';
 import { Rect } from '../tab-menu/tab-menu';
