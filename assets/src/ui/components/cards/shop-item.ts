@@ -1,4 +1,5 @@
 import { COLORS } from '../../../colors';
+import { rgbaArrayToCss } from '../../../utils';
 import {
   SHOP_ITEM_NAME_FONT,
   SHOP_ITEM_DESC_FONT,
@@ -21,6 +22,7 @@ export interface ShopItemActions {
 export interface ShopItemCardProps {
   item: ShopItemDefinition;
   canAfford: boolean;
+  isHighlighted?: boolean;
 }
 
 export function drawShopItemCard(
@@ -28,7 +30,7 @@ export function drawShopItemCard(
   rect: Rect,
   props: ShopItemCardProps
 ) {
-  const { item, canAfford } = props;
+  const { item, canAfford, isHighlighted } = props;
   const isPurchased = item.is_purchased;
 
   ctx.save();
@@ -47,11 +49,17 @@ export function drawShopItemCard(
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 
   // Border
-  ctx.strokeStyle = COLORS.button.border.inactive;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = isHighlighted ? COLORS.overlay.statusUnlocked : COLORS.button.border.inactive;
+  ctx.lineWidth = isHighlighted ? 4 : 2;
+  
+  if (isHighlighted) {
+    ctx.shadowColor = rgbaArrayToCss(COLORS.overlay.statusUnlocked, 0.5);
+    ctx.shadowBlur = 15;
+  }
+  
   ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-  // Name
+  ctx.shadowBlur = 0;
+  ctx.restore();
   ctx.fillStyle = COLORS.panel.textPrimary;
   ctx.font = SHOP_ITEM_NAME_FONT;
   ctx.textAlign = 'left';

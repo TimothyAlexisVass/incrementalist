@@ -226,6 +226,13 @@ export function renderProgressBar(
     ctx.fillText('ACT!', barX + barWidth / 2, barY + barHeight + 16);
     ctx.restore();
   }
+
+  renderIdleModeToggle(ctx, canvas, {
+    idleMode: state.idleMode,
+    features: {
+      idleModePurchased: state.idleModePurchased
+    }
+  });
 }
 
 

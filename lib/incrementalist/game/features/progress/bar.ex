@@ -2,26 +2,27 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   alias Incrementalist.Game.Time
   alias Incrementalist.Game.State
 
-  @new_player_bonus_window_ms 25_000
-  @new_player_bonus_fill_multiplier 2.5
-  @new_player_bonus_fill_bonus 20.0
-  @late_new_player_bonus_fill_multiplier 7.25
-  @base_idle_mode_off_fill_rate 0.8
-  @base_idle_mode_on_fill_rate 0.24
-  @sisu_min_multiplier 1.0
-  @max_fill 100.0
+  alias Incrementalist.Game.Constants
+
+  def set_idle_mode(%State{} = state, enabled) do
+    if state.features.idle_mode_purchased do
+      {:ok, %{state | idle_mode: enabled}}
+    else
+      {:error, "idle_mode_not_purchased"}
+    end
+  end
 
   def get_progress_bar_fill_rate(%State{} = state, now) do
     progress_bar = state.progress_bar
     sisu_bn = if progress_bar, do: progress_bar.sisu, else: BigNum.one()
-    sisu = sisu_bn |> BigNum.to_float() |> max(@sisu_min_multiplier)
+    sisu = sisu_bn |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
     idle_mode = state.idle_mode || false
 
     base_rate =
       if idle_mode do
-        @base_idle_mode_on_fill_rate * sisu
+        Constants.progress_bar_base_idle_mode_on_fill_rate() * sisu
       else
-        @base_idle_mode_off_fill_rate * sisu
+        Constants.progress_bar_base_idle_mode_off_fill_rate() * sisu
       end
 
     if idle_mode do
@@ -43,11 +44,11 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
       level = state.level || 1
 
       cond do
-        game_age_ms < @new_player_bonus_window_ms ->
-          (base_rate * @new_player_bonus_fill_multiplier) + @new_player_bonus_fill_bonus
+        game_age_ms < Constants.progress_bar_new_player_bonus_window_ms() ->
+          (base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier()) + Constants.progress_bar_new_player_bonus_fill_bonus()
 
         level < 35 ->
-          base_rate * @late_new_player_bonus_fill_multiplier
+          base_rate * Constants.progress_bar_late_new_player_bonus_fill_multiplier()
 
         true ->
           base_rate
@@ -57,7 +58,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
   def ensure_can_claim_at(%State{} = state, now) do
     rate = get_progress_bar_fill_rate(state, now)
-    ms_required = if rate > 0, do: trunc(@max_fill * 1000 / rate), else: 0
+    ms_required = if rate > 0, do: trunc(Constants.progress_bar_max_fill() * 1000 / rate), else: 0
 
     can_claim_at_iso = state.can_claim_at
     {state, can_claim_at_ms} =
@@ -90,7 +91,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   def claim_reward(%State{} = state, random_fn \\ &rand/0) do
     progress_bar = state.progress_bar || %State.ProgressBar{}
     sisu_bn = progress_bar.sisu || BigNum.one()
-    sisu = sisu_bn |> BigNum.to_float() |> max(@sisu_min_multiplier)
+    sisu = sisu_bn |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
     level = state.level || 1
     idle_mode = state.idle_mode || false
     reward_multiplier = progress_bar.reward_multiplier || 1.0

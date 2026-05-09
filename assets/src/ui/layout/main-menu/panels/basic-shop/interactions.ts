@@ -9,9 +9,14 @@ export function handleShopInteractions(
   input: InteractionState,
   rect: Rect,
   items: ShopItemViewModel[],
-  actions: ShopActions
+  actions: ShopActions,
+  onInteraction: () => void
 ) {
   if (items.length === 0) return;
+
+  if (input.clicked && !input.consumed) {
+    onInteraction();
+  }
 
   const startX = rect.x + 32;
   const startY = rect.y + 32;

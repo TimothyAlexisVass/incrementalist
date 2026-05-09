@@ -217,9 +217,9 @@ defmodule Incrementalist.Game.State do
     %{state | saved_at: Time.iso8601(now)}
   end
 
-  def visible_state(nil), do: visible_state(new())
+  def visible_state(nil, now), do: visible_state(new(now), now)
 
-  def visible_state(%__MODULE__{} = state) do
+  def visible_state(%__MODULE__{} = state, now) do
     %{
       "area" => state.area || "sage",
       "level" => state.level || 1,
@@ -261,7 +261,10 @@ defmodule Incrementalist.Game.State do
           def
           |> Map.put(:is_purchased, is_purchased)
           |> Map.put(:can_purchase, !is_purchased && state.level >= def.required_level)
-        end)
+        end),
+      "projection_params" => %{
+        "fill_rate" => Incrementalist.Game.Features.Progress.Bar.get_progress_bar_fill_rate(state, now)
+      }
     }
   end
 

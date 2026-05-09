@@ -1,7 +1,7 @@
 import type { GameChannel } from "../../net/game-channel";
 import type { ServerResult } from "../../net/protocol";
-import { progressClaimReward } from "../../net/commands";
-import { triggerProgressBarCollectionEffect } from "./render";
+import { progressClaimReward, progressSetIdleMode } from "../../net/commands";
+import { triggerProgressBarCollectionEffect, getIdleModeToggleRect } from "./render";
 import { getViewModel, shouldSendClaimIn, beginAsyncClaimResolution, setPendingClaimIntent } from "./view-model";
 
 let claimResolutionInFlight = false;
@@ -42,6 +42,33 @@ export function claimRewardOnAnyInput(
   triggerProgressBarCollectionEffect(canvas);
   beginAsyncClaimResolution();
   void resolveClaimAsync(channel, runCommand);
+}
+
+export function handleProgressClick(
+  channel: GameChannel,
+  canvas: HTMLCanvasElement,
+  clickPoint: { x: number; y: number },
+  runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>,
+  onNavigateToShop: (itemId: string) => void
+): boolean {
+  const toggleRect = getIdleModeToggleRect(canvas);
+  if (
+    clickPoint.x >= toggleRect.x &&
+    clickPoint.x <= toggleRect.x + toggleRect.width &&
+    clickPoint.y >= toggleRect.y &&
+    clickPoint.y <= toggleRect.y + toggleRect.height
+  ) {
+    const vm = getViewModel();
+    if (vm.idleModePurchased) {
+      void runCommand(() => progressSetIdleMode(channel, !vm.idleMode));
+      return true;
+    } else {
+      onNavigateToShop("idle_mode");
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function resolveClaimAsync(

@@ -65,6 +65,9 @@ export type GameSnapshot = {
       bonus_time_purchased: boolean;
     };
     shop: ShopItemDefinition[];
+    projection_params: {
+      fill_rate: number;
+    };
   };
   notices: NoticeState;
   save_slot: SaveSlotSummary;
@@ -141,6 +144,14 @@ export type ShopPurchaseResult = {
   cores?: BigNum;
 };
 
+export type ProgressSetIdleModeResult = {
+  type: "progress.set_idle_mode.result";
+  status: "ok";
+  command_id: number;
+  idle_mode: boolean;
+  fill_rate: number;
+};
+
 export type NoticeSeeResult = {
   type: "notice.see.result";
   status: "ok";
@@ -181,6 +192,7 @@ export type AckableCommandResult =
   | ProgressClaimRewardResult
   | AreaSelectResult
   | ShopPurchaseResult
+  | ProgressSetIdleModeResult
   | NoticeSeeResult
   | NoticeAckResult
   | CommandErrorResult;
@@ -229,6 +241,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "progress.claim_reward.result" ||
     result.type === "area.select.result" ||
     result.type === "shop.purchase.result" ||
+    result.type === "progress.set_idle_mode.result" ||
     result.type === "notice.see.result" ||
     result.type === "notice.ack.result" ||
     result.type === "command.error"

@@ -35,6 +35,10 @@ export function drawShopPanel(
       height: itemHeight
     };
 
-    drawShopItemCard(ctx, itemRect, { item, canAfford: item.canAfford });
+    drawShopItemCard(ctx, itemRect, { 
+      item, 
+      canAfford: item.canAfford,
+      isHighlighted: item.isHighlighted
+    });
   });
 }

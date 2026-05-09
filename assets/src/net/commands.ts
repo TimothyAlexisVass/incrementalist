@@ -7,6 +7,7 @@ import type {
   SaveSlotSwitchResult,
   ProgressClaimInResult,
   ProgressClaimRewardResult,
+  ProgressSetIdleModeResult,
   AreaSelectResult,
   ShopPurchaseResult,
   NoticeSeeResult,
@@ -36,6 +37,10 @@ export function progressClaimIn(channel: GameChannel) {
 
 export function progressClaimReward(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<ProgressClaimRewardResult | CommandErrorResult>>("progress.claim_reward");
+}
+
+export function progressSetIdleMode(channel: GameChannel, enabled: boolean) {
+  return channel.pushCommand<CommandPushResult<ProgressSetIdleModeResult | CommandErrorResult>>("progress.set_idle_mode", { enabled });
 }
 
 export function selectArea(channel: GameChannel, areaKey: string) {

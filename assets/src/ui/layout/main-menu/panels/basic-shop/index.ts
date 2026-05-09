@@ -1,5 +1,5 @@
 import { InteractionState } from '../../../../managers/interactions';
-import { ServerState } from '../../../../../net/snapshots';
+import { clearShopHighlight, ServerState } from '../../../../../net/snapshots';
 import { Rect } from '../../../../components/tab-menu/tab-menu';
 import { getShopViewModel } from './view-model';
 import { drawShopPanel } from './render';
@@ -18,7 +18,7 @@ export function renderBasicShopTab(
   const viewModel = getShopViewModel(state);
   
   // 1. Handle interactions first (might mutate input.consumed)
-  handleShopInteractions(input, rect, viewModel, actions);
+  handleShopInteractions(input, rect, viewModel, actions, () => clearShopHighlight(state));
   
   // 2. Draw the panel
   drawShopPanel(ctx, rect, viewModel);

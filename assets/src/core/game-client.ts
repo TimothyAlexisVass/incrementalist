@@ -24,6 +24,7 @@ import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
   claimRewardOnAnyInput,
+  handleProgressClick,
   getPendingClaimPopupPoint,
   clearPendingClaimPopupPoint
 } from "../features/progress-bar/interactions";
@@ -382,9 +383,22 @@ export class GameClient {
 
     renderFloatingTexts(this.ctx, this.floatingTexts);
 
+    // 2. Handle specific UI element clicks before general activity collection.
+    if (input.clicked && input.pointer && this.channel) {
+      if (handleProgressClick(
+        this.channel, 
+        this.canvas, 
+        input.pointer, 
+        (cmd) => this.runCommand(cmd),
+        (itemId) => this.openShopAndHighlight(itemId)
+      )) {
+        input.consumed = true;
+      }
+    }
+
     // Any activity collects the progress bar if it's ready. input.consumed is
     // intentionally NOT set here so nothing else is blocked.
-    if (activity && this.channel) {
+    if (activity && this.channel && !input.consumed) {
       claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
     }
 
@@ -412,6 +426,12 @@ export class GameClient {
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);
     this.ui.render(this.ctx, this.canvas, input, this.store.state);
+  }
+
+  private openShopAndHighlight(itemId: string) {
+    this.store.state.uiHints.highlightedShopItemId = itemId;
+    this.mainMenu.setTab("shop");
+    this.ui.overlays.open(this.mainMenu);
   }
 }
 

@@ -6,6 +6,9 @@ export type ServerState = {
   slots: SaveSlotSummary[];
   status: string;
   statusTone: "ok" | "error" | "";
+  uiHints: {
+    highlightedShopItemId: string | null;
+  };
 };
 
 export function createServerState(): ServerState {
@@ -13,7 +16,10 @@ export function createServerState(): ServerState {
     snapshot: null,
     slots: [],
     status: "Connecting...",
-    statusTone: ""
+    statusTone: "",
+    uiHints: {
+      highlightedShopItemId: null
+    }
   };
 }
 
@@ -46,6 +52,12 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   if (result.type === "shop.purchase.result") {
     applyAuthoritativeData(state, result);
+  }
+
+  if (result.type === "progress.set_idle_mode.result") {
+    if (state.snapshot) {
+      state.snapshot.state.idle_mode = result.idle_mode;
+    }
   }
 
   if (result.type === "notice.see.result" || result.type === "notice.ack.result") {
@@ -97,6 +109,19 @@ export function applyAuthoritativeData(
     if (item) {
       item.is_purchased = true;
       item.can_purchase = false;
+
+      // Authoritatively update feature flags based on the purchased item ID
+      switch (data.item_id) {
+        case "idle_mode":
+          state.snapshot.state.features.idle_mode_purchased = true;
+          break;
+        case "sisu_generator":
+          state.snapshot.state.features.sisu_generator_purchased = true;
+          break;
+        case "bonus_time":
+          state.snapshot.state.features.bonus_time_purchased = true;
+          break;
+      }
     }
   }
 }
@@ -148,4 +173,8 @@ function statusForResult(result: ServerResult): string {
   if (result.type === "save_slot.reset.result") return "Save file reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";
   return "Ready";
+}
+
+export function clearShopHighlight(state: ServerState) {
+  state.uiHints.highlightedShopItemId = null;
 }

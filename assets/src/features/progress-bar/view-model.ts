@@ -1,12 +1,7 @@
 import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult, ServerResult } from "../../net/protocol";
 import { BigNum, toNumber, ZERO } from "../../core/bignum";
 import {
-  BASE_IDLE_MODE_OFF_FILL_RATE,
-  BASE_IDLE_MODE_ON_FILL_RATE,
-  LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER,
-  NEW_PLAYER_BONUS_FILL_BONUS,
-  NEW_PLAYER_BONUS_FILL_MULTIPLIER,
-  NEW_PLAYER_BONUS_WINDOW_MS
+  BAR_RESET_LERP_SPEED,
 } from "../../config";
 import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./claim-effects";
 import { FloatingText } from "../../render/effects";
@@ -24,6 +19,8 @@ export type ProgressViewModel = {
   canClaimInMs: number | null;
   nextVerifyAtMs: number;
   pendingClaimIntent: boolean;
+  fillRate: number;
+  idleModePurchased: boolean;
 };
 
 let currentViewModel: ProgressViewModel = {
@@ -36,7 +33,9 @@ let currentViewModel: ProgressViewModel = {
   idleMode: false,
   canClaimInMs: null,
   nextVerifyAtMs: 0,
-  pendingClaimIntent: false
+  pendingClaimIntent: false,
+  fillRate: 0,
+  idleModePurchased: false
 };
 
 export function updateProjectedFill(deltaTimeMs: number) {
@@ -90,6 +89,8 @@ export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.canClaimInMs = null;
   currentViewModel.nextVerifyAtMs = 0;
   currentViewModel.pendingClaimIntent = false;
+  currentViewModel.fillRate = snapshot.state.projection_params.fill_rate;
+  currentViewModel.idleModePurchased = snapshot.state.features.idle_mode_purchased;
 }
 
 export function handleClaimInResult(result: ProgressClaimInResult) {
@@ -189,6 +190,26 @@ export function applyProgressResult(
 
   if (result.type === "command.error" && result.reason === "claim_not_ready") {
     handleClaimNotReadyError(result.can_claim_in ?? null);
+    return;
+  }
+
+  if (result.type === "progress.set_idle_mode.result") {
+    currentViewModel.idleMode = result.idle_mode;
+    currentViewModel.fillRate = result.fill_rate;
+
+    // Recalculate canClaimInMs based on new fill rate if we are projecting
+    if (currentViewModel.state === "projecting" && currentViewModel.canClaimInMs !== null) {
+      const remainingFill = 100 - currentViewModel.projectedFill;
+      currentViewModel.canClaimInMs = (remainingFill * 1000) / currentViewModel.fillRate;
+      setCycleDurationMs((100 * 1000) / currentViewModel.fillRate);
+    }
+    return;
+  }
+
+  if (result.type === "shop.purchase.result") {
+    if (result.item_id === "idle_mode") {
+      currentViewModel.idleModePurchased = true;
+    }
   }
 }
 
@@ -215,28 +236,6 @@ export function hasPendingClaimIntent() {
   return currentViewModel.pendingClaimIntent;
 }
 
-function getProgressBarFillRate(viewModel: ProgressViewModel, nowMs: number) {
-  const sisuMultiplier = Math.max(1, toNumber(viewModel.sisu));
-  const baseRate = (
-    viewModel.idleMode ? BASE_IDLE_MODE_ON_FILL_RATE : BASE_IDLE_MODE_OFF_FILL_RATE
-  ) * sisuMultiplier;
-
-  if (viewModel.idleMode) {
-    return baseRate;
-  }
-
-  const gameAgeMs = nowMs - viewModel.firstPlayedAtMs;
-
-  if (gameAgeMs < NEW_PLAYER_BONUS_WINDOW_MS) {
-    return (baseRate * NEW_PLAYER_BONUS_FILL_MULTIPLIER) + NEW_PLAYER_BONUS_FILL_BONUS;
-  }
-
-  if (viewModel.level < 35) {
-    return baseRate * LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER;
-  }
-
-  return baseRate;
-}
 
 function parseTimestamp(value: string | null | undefined, serverTime: string | null | undefined) {
   if (!value) return conservativeFallbackFirstPlayedAt(serverTime);
@@ -252,7 +251,8 @@ function conservativeFallbackFirstPlayedAt(serverTime: string | null | undefined
   const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : Date.now();
   // If the field is missing (for example stale cached snapshots), avoid
   // inventing fresh-account bonus locally and let server verification lead.
-  return safeNow - NEW_PLAYER_BONUS_WINDOW_MS;
+  // We use a large enough number to ensure no bonus is applied if we were still calculating it.
+  return safeNow - (30 * 24 * 60 * 60 * 1000); 
 }
 
 const DEFAULT_CYCLE_DURATION_MS = 10_000;
@@ -266,8 +266,8 @@ function setCycleDurationMs(value: number) {
   cycleDurationMs = Math.max(1, Math.floor(value));
 }
 
-function getCycleDurationMsFromRate(nowMs: number) {
-  const rate = getProgressBarFillRate(currentViewModel, nowMs);
+function getCycleDurationMsFromRate(_nowMs: number) {
+  const rate = currentViewModel.fillRate;
   if (rate <= 0) return DEFAULT_CYCLE_DURATION_MS;
   return Math.max(1, Math.floor((100 * 1000) / rate));
 }

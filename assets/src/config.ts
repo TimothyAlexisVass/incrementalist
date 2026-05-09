@@ -3,12 +3,6 @@ export const SAVE_KEY_PREFIX = 'aitg_save_';
 export const GLOBAL_OPTIONS_KEY = 'aitg_global';
 export const MAX_SAVEFILES = 4;
 
-export const NEW_PLAYER_BONUS_WINDOW_MS = 25_000;
-export const NEW_PLAYER_BONUS_FILL_MULTIPLIER = 2.5;
-export const NEW_PLAYER_BONUS_FILL_BONUS = 20;
-export const LATE_NEW_PLAYER_BONUS_FILL_MULTIPLIER = 7.25;
-export const BASE_IDLE_MODE_OFF_FILL_RATE = 0.8;
-export const BASE_IDLE_MODE_ON_FILL_RATE = 0.24;
 export const BAR_RESET_LERP_SPEED = 7;
 export const BAR_FULL_PULSE_SPEED = 0.3;
 export const BAR_COLLECTION_GLOW_FADE_MULTIPLIER = 5;

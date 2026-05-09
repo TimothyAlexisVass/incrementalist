@@ -62,4 +62,14 @@ defmodule Incrementalist.Game.Constants do
       }
     ]
   end
+
+  # Progress Bar Constants
+  def progress_bar_max_fill, do: 100.0
+  def progress_bar_new_player_bonus_window_ms, do: 25_000
+  def progress_bar_new_player_bonus_fill_multiplier, do: 2.5
+  def progress_bar_new_player_bonus_fill_bonus, do: 20.0
+  def progress_bar_late_new_player_bonus_fill_multiplier, do: 7.25
+  def progress_bar_base_idle_mode_off_fill_rate, do: 0.8
+  def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
+  def progress_bar_sisu_min_multiplier, do: 1.0
 end

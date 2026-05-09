@@ -131,6 +131,29 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result(reason, command), active_slot.id}
         end
 
+      "progress.set_idle_mode" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, enabled} <- fetch_boolean(command.intent, "enabled"),
+             {:ok, next_state} <- Bar.set_idle_mode(active_slot.state, enabled) do
+          updated_slot =
+            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+
+          Repo.update!(updated_slot)
+
+          {"succeeded",
+           %{
+             "type" => "progress.set_idle_mode.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "idle_mode" => enabled,
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
       "shop.purchase" ->
         active_slot = active_slot(player, now)
 
@@ -316,6 +339,13 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_parent_id(%{"parent_id" => id}) when is_binary(id), do: {:ok, id}
   defp fetch_parent_id(%{parent_id: id}) when is_binary(id), do: {:ok, id}
   defp fetch_parent_id(_intent), do: {:error, "parent_id_required"}
+
+  defp fetch_boolean(intent, key) do
+    case Map.get(intent, key) do
+      val when is_boolean(val) -> {:ok, val}
+      _ -> {:error, "#{key}_boolean_required"}
+    end
+  end
 
   defp normalize_slot_index(slot_index)
        when is_integer(slot_index) do
