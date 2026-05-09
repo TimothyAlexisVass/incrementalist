@@ -110,7 +110,8 @@ export function drawShopItemCard(
       drawButton(ctx, btnRect, 'Purchase', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
-        showNotice: noticeSystem.hasLeafNotice(`shop:${item.id}`)
+        showNotice: noticeSystem.hasLeafNotice(`shop:${item.id}`),
+        showNoticePing: true
       });
     }
   }

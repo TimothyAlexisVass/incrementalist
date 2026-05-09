@@ -159,7 +159,8 @@ function renderTipPanel(
 
   const buttonClicked = doButton(ctx, input, buttonRect, buttonLabel, {
     font: BOTTOM_HUD_BUTTON_FONT,
-    showNotice: noticeSystem.hasLeafNotice(leafId)
+    showNotice: noticeSystem.hasLeafNotice(leafId),
+    showNoticePing: true
   });
 
   if (buttonClicked && channel && runCommand && noticeSystem.hasLeafNotice(leafId)) {

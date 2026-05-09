@@ -14,6 +14,61 @@ export interface ButtonOptions {
   textX?: number;
   textY?: number;
   showNotice?: boolean;
+  showNoticePing?: boolean;
+}
+
+const TWO_PI = Math.PI * 2;
+const NOTICE_PING_INTERVAL_MS = 10_000;
+const NOTICE_PING_DURATION_MS = 1_000;
+const NOTICE_PING_MAX_RADIUS_PX = 100;
+const NOTICE_PING_COLOR = '#00ff00';
+
+function getNowMs() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+
+  return Date.now();
+}
+
+function getNoticePingProgress(x: number, y: number, radius: number) {
+  const phaseOffset = Math.abs(Math.round((x * 31) + (y * 17) + (radius * 13))) % NOTICE_PING_INTERVAL_MS;
+  const elapsed = (getNowMs() + phaseOffset) % NOTICE_PING_INTERVAL_MS;
+
+  if (elapsed >= NOTICE_PING_DURATION_MS) {
+    return 0;
+  }
+
+  return elapsed / NOTICE_PING_DURATION_MS;
+}
+
+function drawNoticePing(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+  const progress = getNoticePingProgress(x, y, radius);
+
+  if (progress <= 0) {
+    return;
+  }
+
+  const ringRadius = Math.max(radius, progress * NOTICE_PING_MAX_RADIUS_PX);
+  const fade = Math.pow(1 - progress, 1.5);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.beginPath();
+  ctx.arc(x, y, ringRadius, 0, TWO_PI);
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = `rgba(0, 255, 0, ${0.22 * fade})`;
+  ctx.shadowColor = NOTICE_PING_COLOR;
+  ctx.shadowBlur = 24 * fade;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, ringRadius, 0, TWO_PI);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(0, 255, 0, ${0.75 * fade})`;
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function drawButton(
@@ -59,22 +114,34 @@ export function drawButton(
   ctx.fillText(label, textX, actualTextY);
   
   if (options.showNotice) {
-    drawNoticeDot(ctx, rect.x + rect.width - 2, rect.y + 2);
+    drawNoticeDot(ctx, rect.x + rect.width - 2, rect.y + 2, 4, options.showNoticePing ?? false);
   }
 
   ctx.restore();
 }
 
-export function drawNoticeDot(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number = 4) {
+export function drawNoticeDot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number = 4,
+  animated: boolean = true
+) {
+  if (animated) {
+    drawNoticePing(ctx, x, y, radius);
+  }
+
   ctx.save();
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = '#00ff00'; // Pure green for the dot
+  ctx.fillStyle = NOTICE_PING_COLOR;
   ctx.fill();
   
   // Subtle outer glow
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = NOTICE_PING_COLOR;
   ctx.shadowBlur = 4;
-  ctx.shadowColor = '#00ff00';
+  ctx.shadowColor = NOTICE_PING_COLOR;
   ctx.stroke();
   
   ctx.restore();
@@ -108,4 +175,3 @@ export function doButton(
 
   return clicked;
 }
-
