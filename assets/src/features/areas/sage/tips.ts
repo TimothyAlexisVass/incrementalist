@@ -16,7 +16,8 @@ export const SAGE_TIPS: Record<number, SageTip> = {
   2: {
     text: [
       "You can unlock new capabilities in the shop. Go now and unlock Idle mode.",
-      "Right now, idling will reduce your reward speed, but you will be able to upgrade this skill in the future."
+      "When you idle, the progress bar rewards will be collected automatically, but at a reduced speed.",
+      "However, you will be able to upgrade your idling in the future as you get stronger."
     ],
     confirmation: "I Do Like Earnings"
   },
