@@ -45,6 +45,7 @@ import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-mo
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
 const usernameKey = "incrementalist.playerUsername";
+const tokenKey = "incrementalist.playerToken";
 
 export class GameClient {
   private readonly store: Store<ServerState>;
@@ -68,8 +69,9 @@ export class GameClient {
   async boot() {
     // ... (rest of boot stays the same until start())
     const username = window.localStorage.getItem(usernameKey);
+    const token = window.localStorage.getItem(tokenKey);
     this.snapshotCache = new SnapshotCache(username);
-    this.channel = new GameChannel(username, this.snapshotCache.cachedSlotIndexes());
+    this.channel = new GameChannel(username, token, this.snapshotCache.cachedSlotIndexes());
 
     // Initialize Save Slot Actions
     this.mainMenu.setActions({
@@ -118,6 +120,9 @@ export class GameClient {
 
     this.channel.onBootResult = async (result) => {
       window.localStorage.setItem(usernameKey, result.username);
+      if (result.token) {
+        window.localStorage.setItem(tokenKey, result.token);
+      }
       this.snapshotCache = new SnapshotCache(result.username);
 
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
