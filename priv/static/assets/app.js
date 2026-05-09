@@ -3082,7 +3082,8 @@
     4: [
       "I can sense an immense power dormant in you. You are now ready to unlock some of that potential.",
       "We are going to have to release your inner nature gradually.",
-      "Sisu is a Finnish concept meaning deep inner strength, grit, and determination. It is the ability to keep going through difficulty, not through loud force, but through quiet endurance, resilience, and willpower."
+      "Sisu is a Finnish concept meaning deep inner strength, grit, and determination.",
+      "It is the ability to keep going through difficulty, not through loud force, but through quiet endurance, resilience, and willpower."
     ],
     10: [
       "Before we release you fully into the Incrementiverse, we are going to have to improve your luck. Go to the Cloverfield and search for the seven leaf clover."
