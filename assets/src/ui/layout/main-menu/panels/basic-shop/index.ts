@@ -5,7 +5,7 @@ import { getShopViewModel } from './view-model';
 import { drawShopPanel } from './render';
 import { handleShopInteractions, ShopActions } from './interactions';
 
-export { ShopActions };
+export type { ShopActions };
 
 export function renderBasicShopTab(
   ctx: CanvasRenderingContext2D,

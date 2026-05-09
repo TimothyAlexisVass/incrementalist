@@ -52,18 +52,6 @@ export class ResetConfirmationModal implements Modal {
     const cancelRect = { x: modalX + 40, y: btnY, width: btnWidth, height: btnHeight };
     this.okRect = { x: modalX + modalWidth - 40 - btnWidth, y: btnY, width: btnWidth, height: btnHeight };
 
-    // Cancel Button
-    if (drawButton(ctx, cancelRect, 'Cancel', {
-        active: pointInRect(input.pointer, cancelRect),
-        activeSurface: COLORS.button.secondary.surface,
-        inactiveSurface: COLORS.button.secondary.surface,
-        activeBorder: COLORS.button.secondary.border,
-        inactiveBorder: COLORS.button.secondary.border,
-        textColor: COLORS.button.secondary.text
-    })) {
-      // Logic for clicking handled in input processing or here?
-      // Since doButton handles input.consumed, I'll use it in a moment.
-    }
     
     // We'll use doButton for Cancel to handle the click properly
     // but the OK button is custom.

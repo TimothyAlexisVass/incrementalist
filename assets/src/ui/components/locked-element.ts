@@ -46,7 +46,7 @@ export function drawLockedElement(
   ctx.restore();
 
   // Handle tooltip for criteria
-  if (criteria && pointInRect(input.pointer, rect)) {
+  if (criteria && input.pointer && pointInRect(input.pointer, rect)) {
     drawTooltip(ctx, canvas, input.pointer, criteria);
   }
 }

@@ -1,8 +1,8 @@
 import { COLORS } from '../colors';
 
 type AnyRecord = Record<string, any>;
-type Rgb = [number, number, number];
-type ColorInput = Rgb | readonly [number, number, number] | string;
+export type Rgb = [number, number, number];
+export type ColorInput = Rgb | readonly [number, number, number] | string;
 type ParticleOptions = {
   x: number;
   y: number;
@@ -497,7 +497,11 @@ export function updateWebGLEffects(deltaTime: number) {
   particles.length = writeIndex;
 }
 
-export function renderWebGLEffects(options: AnyRecord = {}) {
+export interface RenderWebGLOptions {
+  visible?: boolean;
+}
+
+export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
   if (!WEBGL_EFFECTS.ready) return;
 
   const gl = WEBGL_EFFECTS.gl;
@@ -505,7 +509,7 @@ export function renderWebGLEffects(options: AnyRecord = {}) {
   const uniforms = WEBGL_EFFECTS.uniforms;
   const visible = options.visible !== false;
 
-  if (!gl || !uniforms?.resolution) {
+  if (!gl || !uniforms?.resolution || !WEBGL_EFFECTS.canvas) {
     return;
   }
 
@@ -557,7 +561,17 @@ export function renderWebGLEffects(options: AnyRecord = {}) {
   gl.drawArrays(gl.POINTS, 0, drawCount);
 }
 
-export function updateGpuProgressLiquidBubbles(deltaTime: number, options: AnyRecord = {}) {
+export interface LiquidBubbleOptions {
+  barX?: number;
+  barY?: number;
+  barWidth?: number;
+  barHeight?: number;
+  fillHeight?: number;
+  fillRatio?: number;
+  fillY?: number;
+}
+
+export function updateGpuProgressLiquidBubbles(deltaTime: number, options: LiquidBubbleOptions = {}) {
   if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.bubbleProgram) {
     return false;
   }
@@ -621,7 +635,18 @@ export function updateGpuProgressLiquidBubbles(deltaTime: number, options: AnyRe
   return true;
 }
 
-export function setGpuProgressBarGlow(options: AnyRecord = {}) {
+export interface ProgressBarGlowOptions {
+  active?: boolean;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  intensity?: number;
+  color?: ColorInput;
+}
+
+export function setGpuProgressBarGlow(options: ProgressBarGlowOptions = {}) {
   if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.glowProgram) {
     return false;
   }
@@ -645,7 +670,12 @@ export function setGpuProgressBarGlow(options: AnyRecord = {}) {
   return true;
 }
 
-export function spawnGpuClickBurst(x: number, y: number, options: AnyRecord = {}) {
+export interface GpuClickBurstOptions {
+  count?: number;
+  colors?: readonly ColorInput[];
+}
+
+export function spawnGpuClickBurst(x: number, y: number, options: GpuClickBurstOptions = {}) {
   if (!WEBGL_EFFECTS.ready) {
     return false;
   }
@@ -682,7 +712,7 @@ export function spawnGpuProgressCompletionBurst(
   barY: number,
   barWidth: number,
   barHeight: number,
-  colors: any[],
+  colors: readonly ColorInput[],
   options: AnyRecord = {}
 ) {
   if (!WEBGL_EFFECTS.ready) {
@@ -747,7 +777,7 @@ export function spawnGpuProgressCollectionLaserBurst(
   barY: number,
   barWidth: number,
   barHeight: number,
-  colors: any[]
+  colors: readonly ColorInput[]
 ) {
   if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.laserRectProgram) {
     return false;
@@ -789,6 +819,7 @@ function renderLiquidBubbles(gl: WebGLRenderingContext) {
     !WEBGL_EFFECTS.bubbleProgram ||
     !bubbleUniforms?.resolution ||
     !clipRect ||
+    !WEBGL_EFFECTS.canvas ||
     bubbles.length === 0 ||
     clipRect.width <= 0 ||
     clipRect.height <= 0
@@ -847,8 +878,14 @@ function renderProgressBarGlow(gl: WebGLRenderingContext) {
     !glowUniforms.color ||
     !glowUniforms.intensity ||
     !glowUniforms.radius ||
+    !WEBGL_EFFECTS.canvas ||
     glowAttributes?.position == null ||
-    !glow ||
+    !glow
+  ) {
+    return;
+  }
+
+  if (
     glow.width <= 0 ||
     glow.height <= 0 ||
     glow.intensity <= 0
@@ -923,6 +960,7 @@ function renderLaserBursts(gl: WebGLRenderingContext) {
   if (
     !WEBGL_EFFECTS.laserRectProgram ||
     !laserRectUniforms?.resolution ||
+    !WEBGL_EFFECTS.canvas ||
     laserBursts.length === 0
   ) {
     return;

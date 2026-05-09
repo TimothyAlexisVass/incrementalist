@@ -18,7 +18,7 @@ export class Notices {
    * A parent shows a dot if any of its children are "new" 
    * (unlocked at a level higher than the last time this parent was acknowledged).
    */
-  public hasParentNotice(parentId: string, type: 'shop_item' | 'area_unlock'): boolean {
+  public hasParentNotice(parentId: string, type: 'shop_item' | 'area_unlock' | 'quest' | 'achievement'): boolean {
     if (!this.snapshot) return false;
     const lastAckLevel = this.snapshot.notices.last_ack_level[parentId] ?? 0;
     

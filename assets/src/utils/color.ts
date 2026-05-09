@@ -1,6 +1,6 @@
 import { clampNumber, lerp } from './math';
 
-export function lerpColor(c1: number[], c2: number[], t: number): number[] {
+export function lerpColor(c1: number[] | readonly number[], c2: number[] | readonly number[], t: number): [number, number, number] {
   return [
     Math.floor(lerp(c1[0], c2[0], t)),
     Math.floor(lerp(c1[1], c2[1], t)),
@@ -8,9 +8,9 @@ export function lerpColor(c1: number[], c2: number[], t: number): number[] {
   ];
 }
 
-export function hexToRgbArray(color: string | number[]): number[] {
+export function hexToRgbArray(color: string | number[] | readonly number[]): [number, number, number] {
   if (Array.isArray(color)) {
-    return color.slice(0, 3);
+    return [color[0], color[1], color[2]];
   }
 
   if (typeof color !== 'string') {
@@ -34,10 +34,10 @@ export function hexToRgbArray(color: string | number[]): number[] {
   ];
 }
 
-export function rgbArrayToCss(rgb: number[]): string {
+export function rgbArrayToCss(rgb: number[] | readonly number[]): string {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
 }
 
-export function rgbaArrayToCss(rgb: number[], alpha: number): string {
+export function rgbaArrayToCss(rgb: number[] | readonly number[], alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${clampNumber(alpha, 0, 1)})`;
 }

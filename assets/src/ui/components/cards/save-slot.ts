@@ -14,7 +14,7 @@ import {
 import { InteractionState } from '../../managers/interactions';
 import { doButton } from '../button';
 import { Rect } from '../tab-menu/tab-menu';
-import type { SaveSlotSummary } from '../../net/protocol';
+import type { SaveSlotSummary } from '../../../net/protocol';
 
 export interface SaveSlotActions {
   onSwitch: (index: number) => void;

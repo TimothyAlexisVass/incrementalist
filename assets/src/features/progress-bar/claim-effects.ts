@@ -3,7 +3,12 @@ import { DISPLAY_AREA_HEIGHT, DISPLAY_AREA_WIDTH, DISPLAY_AREA_X, DISPLAY_AREA_Y
 import { formatSignedNumber, clampNumber, parseFontSizePx } from "../../utils";
 import { getProgressBarLayout } from "./render";
 import { computeLevelUps } from "../../ui/layout/top-hud/progression";
-import { spawnFloatingText, spawnRewardPopup } from "../../render/effects";
+import {
+  spawnFloatingText,
+  type FloatingText,
+  type FloatingTextOptions,
+  spawnRewardPopup
+} from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
 import { BigNum, ZERO, sub, compare } from "../../core/bignum";
 
@@ -32,7 +37,7 @@ const POPUP_OFFSET = Object.freeze({
 });
 
 export function spawnProgressClaimRewardEffects(
-  floatingTexts: unknown[],
+  floatingTexts: FloatingText[],
   canvas: HTMLCanvasElement,
   textMeasureContext: CanvasRenderingContext2D,
   currentAmounts: ResourceAmounts,
@@ -187,14 +192,14 @@ function measureTextWidth(textMeasureContext: CanvasRenderingContext2D, text: st
   return width;
 }
 
-function getAvailableNoticeGroupIndexes(floatingTexts: any[], type: string, count: number) {
+function getAvailableNoticeGroupIndexes(floatingTexts: FloatingText[], type: string, count: number) {
   const occupiedIndexes = new Set<number>();
 
   for (const floatingText of floatingTexts) {
     if (
       floatingText.type === type &&
       floatingText.stackGroupId !== null &&
-      Number.isFinite(floatingText.stackIndex)
+      floatingText.stackIndex !== null
     ) {
       occupiedIndexes.add(floatingText.stackIndex);
     }
@@ -214,7 +219,7 @@ function getAvailableNoticeGroupIndexes(floatingTexts: any[], type: string, coun
   return indexes;
 }
 
-function spawnLevelUpEffects(floatingTexts: unknown[], canvas: HTMLCanvasElement, levelUps: ReturnType<typeof computeLevelUps>) {
+function spawnLevelUpEffects(floatingTexts: FloatingText[], canvas: HTMLCanvasElement, levelUps: ReturnType<typeof computeLevelUps>) {
   if (levelUps.length === 0) return;
 
   const popupLifeMs = 5000; // ACHIEVEMENT_ANNOUNCEMENT_LIFE_MS
@@ -231,11 +236,11 @@ function spawnLevelUpEffects(floatingTexts: unknown[], canvas: HTMLCanvasElement
     const groupIndex = groupIndexes[i];
     nextLevelUpNoticeGroupId += 1;
 
-    const popupOptions = {
+    const popupOptions: FloatingTextOptions = {
       lifeMs: popupLifeMs,
       riseSpeed: popupRiseSpeed,
       font: REWARD_POPUP_FONT,
-      textAlign: "left",
+      textAlign: "left" as CanvasTextAlign,
       type: "level_up",
       stackGroupId: groupId,
       stackIndex: groupIndex

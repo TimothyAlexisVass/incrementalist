@@ -8,10 +8,11 @@ import {
   selectArea,
   shopPurchase,
   noticeSee,
-  noticeAck
+  noticeAck,
+  listSaveSlots
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
-import { isAckableCommandResult, type AckableCommandResult, type ServerResult } from "../net/protocol";
+import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
 import { applyResult, createServerState, type ServerState } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
 import {
@@ -29,7 +30,11 @@ import {
 import { renderProgressBar } from "../features/progress-bar/render";
 import { renderAreaBackground, renderAreaSpecifics } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
-import { createFloatingTextState, renderFloatingTexts, updateFloatingTexts } from "../render/effects";
+import { 
+  createFloatingTextState, 
+  renderFloatingTexts, 
+  updateFloatingTexts, 
+} from "../render/effects";
 import type { ResourceAmounts } from "../features/progress-bar/claim-effects";
 import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-model";
 import { renderTopHUD } from "../ui/layout/top-hud/render";
@@ -90,7 +95,7 @@ export class GameClient {
           () => {
             if (!this.channel) return;
             this.ui.modals.open(new LoadingModal('Resetting save slot...'));
-            this.runCommand(() => resetSaveSlot(this.channel!, index)).then(() => {
+            this.runCommand(() => resetSaveSlot(this.channel!)).then(() => {
               this.ui.modals.close();
               this.ui.overlays.close();
             });
@@ -278,8 +283,8 @@ export class GameClient {
       return;
     }
 
-    if ("snapshot" in result && result.snapshot) {
-      this.snapshotCache!.save(result.snapshot);
+    if ("snapshot" in result && result.snapshot && typeof result.snapshot === 'object' && 'type' in result.snapshot) {
+      this.snapshotCache!.save(result.snapshot as GameSnapshot);
     }
   }
 
@@ -366,7 +371,7 @@ export class GameClient {
     const amounts = this.snapshotAmounts();
     if (amounts) {
       updateHudViewModel(dt, amounts);
-      renderTopHUD(this.ctx, this.canvas);
+      renderTopHUD(this.ctx, this.canvas, dt);
     }
 
     updateFloatingTexts(this.floatingTexts, dt);
@@ -418,6 +423,3 @@ function clearsCommandQueue(result: AckableCommandResult) {
   return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
 }
 
-function listSaveSlots(channel: GameChannel): Promise<ServerResult> {
-    return channel.push("save_slot.list", {});
-}

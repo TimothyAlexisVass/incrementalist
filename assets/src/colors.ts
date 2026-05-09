@@ -55,8 +55,11 @@ export const COLORS = Object.freeze({
   },
   panel: {
     bg: '#16213e',
+    border: '#3a5273',
+    highlight: 'rgba(255, 255, 255, 0.12)',
     textPrimary: '#FFFFFF',
     textSecondary: '#A0AEC0',
+    textDisabled: '#718096',
     coins: '#FFD700',
     shards: '#FF8C1A',
     cores: '#FF4D4D',
@@ -112,7 +115,7 @@ export const COLORS = Object.freeze({
     cores: '#FF4D4D',
     textPrimary: '#FFFFFF'
   }
-});
+} as const);
 
 const CSS_COLOR_VARIABLES = Object.freeze({
   '--app-bg-color': COLORS.app.background,

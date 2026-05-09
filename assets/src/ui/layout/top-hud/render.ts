@@ -10,7 +10,7 @@ import {
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT, BOTTOM_HUD_HEIGHT
 } from "../../../config";
 import { formatNumberRatio } from "../../../utils";
-import { compare, ZERO, toNumber } from "../../../core/bignum";
+import { BigNum, compare, ZERO, toNumber } from "../../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../../render/currency-icons";

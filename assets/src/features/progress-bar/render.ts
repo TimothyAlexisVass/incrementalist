@@ -12,7 +12,8 @@ import { formatPercent, clampNumber, drawLockedElement, lerpColor, rgbArrayToCss
 import {
   setGpuProgressBarGlow,
   spawnGpuProgressCollectionLaserBurst,
-  spawnGpuProgressCompletionBurst
+  spawnGpuProgressCompletionBurst,
+  ColorInput
 } from '../../render/webgl-effects';
 import { getViewModel } from './view-model';
 
@@ -69,23 +70,23 @@ const MAX_PROGRESS_COMPLETION_PARTICLES = 512;
 const MAX_PROGRESS_LIQUID_BUBBLES = 58;
 const LIQUID_SURFACE_WAVE_HEIGHT = 2.2;
 
-const COMPLETION_BURST_COLORS = Object.freeze([
+const COMPLETION_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillStart,
   COLORS.bar.progress.fillMid,
   COLORS.bar.progress.fillEnd,
-  [255, 255, 255],
-  [142, 246, 255]
+  [255, 255, 255] as const,
+  [142, 246, 255] as const
 ]);
 
-const COLLECTION_LASER_BURST_COLORS = Object.freeze([
+const COLLECTION_LASER_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillEnd,
-  [255, 255, 255],
+  [255, 255, 255] as const,
   COLORS.bar.progress.fillMid,
-  [142, 246, 255],
+  [142, 246, 255] as const,
   COLORS.bar.progress.fillStart
 ]);
 
-export function triggerProgressBarCollectionEffect(canvas = null) {
+export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | null = null) {
   PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
   PROGRESS_VISUAL_STATE.collectionGlowStartedAt = getNowMs();
 
@@ -704,7 +705,7 @@ function spawnProgressCompletionBurst(barX: number, barY: number, barWidth: numb
     const angle = outwardAngle + (Math.random() - 0.5) * 0.95;
     const speed = 90 + Math.random() * 250;
     const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
-    const colorCss = rgbArrayToCss(color);
+    const colorCss = typeof color === 'string' ? color : rgbArrayToCss(color);
 
     PROGRESS_VISUAL_STATE.completionParticles.push({
       x: originX,
@@ -724,7 +725,7 @@ function spawnProgressCompletionBurst(barX: number, barY: number, barWidth: numb
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
     const speed = 150 + Math.random() * 260;
     const color = COMPLETION_BURST_COLORS[Math.floor(Math.random() * COMPLETION_BURST_COLORS.length)];
-    const colorCss = rgbArrayToCss(color);
+    const colorCss = typeof color === 'string' ? color : rgbArrayToCss(color);
 
     PROGRESS_VISUAL_STATE.completionParticles.push({
       x: barX + Math.random() * barWidth,

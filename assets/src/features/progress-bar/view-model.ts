@@ -9,6 +9,7 @@ import {
   NEW_PLAYER_BONUS_WINDOW_MS
 } from "../../config";
 import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./claim-effects";
+import { FloatingText } from "../../render/effects";
 
 export type ProgressState = "projecting" | "awaiting_server_confirmation" | "confirmed_collectible";
 
@@ -149,7 +150,7 @@ export function handleClaimNotReadyError(canClaimInMs: number | null = null) {
 }
 
 export type EffectContext = {
-  floatingTexts: unknown[];
+  floatingTexts: FloatingText[];
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   popupPoint: { x: number; y: number } | null;

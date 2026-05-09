@@ -29,17 +29,87 @@ const MAX_FLOATING_TEXTS = 72;
 const TEXT_SPRITE_PADDING = 14;
 const MAX_TEXT_SPRITE_CACHE = 96;
 const REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
-const textSpriteCache = new Map();
+const textSpriteCache = new Map<string, TextSprite>();
 
-export function createFloatingTextState() {
+export interface FloatingText {
+  text: string;
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  color: string;
+  alpha: number;
+  elapsedMs: number;
+  type: string;
+  targetX: number;
+  targetY: number;
+  holdMs: number;
+  flyMs: number;
+  riseSpeed: number;
+  holdRiseSpeed: number;
+  lifeMs: number;
+  font: string;
+  textAlign: CanvasTextAlign;
+  scale: number;
+  minRenderSizePx: number;
+  stackGroupId: number | null;
+  stackIndex: number | null;
+  spriteKey?: string;
+  sprite?: TextSprite;
+}
+
+export interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  drag: number;
+  radius: number;
+  lineWidth: number;
+  color: string;
+  elapsedMs: number;
+  lifeMs: number;
+}
+
+export interface TextSprite {
+  canvas: HTMLCanvasElement | OffscreenCanvas;
+  textWidth: number;
+  anchorY: number;
+}
+
+export function createFloatingTextState(): FloatingText[] {
   return [];
 }
 
-export function createParticleState() {
+export function createParticleState(): Particle[] {
   return [];
 }
 
-export function spawnFloatingText(floatingTexts, text, x, y, color, options = {}) {
+export interface FloatingTextOptions {
+  type?: string;
+  targetX?: number;
+  targetY?: number;
+  holdMs?: number;
+  flyMs?: number;
+  riseSpeed?: number;
+  holdRiseSpeed?: number;
+  lifeMs?: number;
+  font?: string;
+  textAlign?: CanvasTextAlign;
+  scale?: number;
+  minRenderSizePx?: number;
+  stackGroupId?: number | null;
+  stackIndex?: number | null;
+}
+
+export function spawnFloatingText(
+  floatingTexts: FloatingText[],
+  text: string | number,
+  x: number,
+  y: number,
+  color: string,
+  options: FloatingTextOptions = {}
+) {
   if (!Array.isArray(floatingTexts)) return;
 
   floatingTexts.push({
@@ -72,7 +142,17 @@ export function spawnFloatingText(floatingTexts, text, x, y, color, options = {}
   }
 }
 
-export function spawnClickParticleBurst(particles, x, y, options = {}) {
+export interface ClickParticleBurstOptions {
+  count?: number;
+  colors?: readonly string[];
+}
+
+export function spawnClickParticleBurst(
+  particles: Particle[],
+  x: number,
+  y: number,
+  options: ClickParticleBurstOptions = {}
+) {
   if (!Array.isArray(particles)) return;
 
   const count = options.count ?? Math.floor(8 + Math.random() * 7);
@@ -103,7 +183,7 @@ export function spawnClickParticleBurst(particles, x, y, options = {}) {
   }
 }
 
-export function getHudRewardTargets(canvas) {
+export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   const canvasWidth = canvas?.width ?? CANVAS_WIDTH;
 
   return {
@@ -117,7 +197,15 @@ export function getHudRewardTargets(canvas) {
   };
 }
 
-export function spawnRewardPopup(floatingTexts, canvas, text, x, y, color, targetKey) {
+export function spawnRewardPopup(
+  floatingTexts: FloatingText[],
+  canvas: HTMLCanvasElement | null,
+  text: string | number,
+  x: number,
+  y: number,
+  color: string,
+  targetKey: 'exp' | 'coins' | 'shards' | 'cores'
+) {
   const targets = getHudRewardTargets(canvas);
   const target = targets[targetKey] || targets.coins;
 
@@ -134,7 +222,7 @@ export function spawnRewardPopup(floatingTexts, canvas, text, x, y, color, targe
   });
 }
 
-export function updateFloatingTexts(floatingTexts, deltaTime) {
+export function updateFloatingTexts(floatingTexts: FloatingText[], deltaTime: number) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
 
   const deltaSeconds = deltaTime / 1000;
@@ -160,7 +248,7 @@ export function updateFloatingTexts(floatingTexts, deltaTime) {
   floatingTexts.length = writeIndex;
 }
 
-export function updateParticles(particles, deltaTime) {
+export function updateParticles(particles: Particle[], deltaTime: number) {
   if (!Array.isArray(particles)) return;
 
   const deltaSeconds = deltaTime / 1000;
@@ -182,7 +270,7 @@ export function updateParticles(particles, deltaTime) {
   }
 }
 
-export function renderParticles(ctx, particles) {
+export function renderParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
   if (!Array.isArray(particles) || particles.length === 0) return;
 
   ctx.save();
@@ -217,7 +305,7 @@ export function renderParticles(ctx, particles) {
   ctx.restore();
 }
 
-export function renderFloatingTexts(ctx, floatingTexts) {
+export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts: FloatingText[]) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
 
   ctx.save();
@@ -243,7 +331,7 @@ export function renderFloatingTexts(ctx, floatingTexts) {
   ctx.restore();
 }
 
-function getTextSprite(ctx, ft) {
+function getTextSprite(ctx: CanvasRenderingContext2D, ft: FloatingText): TextSprite {
   const key = `${ft.text}\u0000${ft.font}\u0000${ft.color}`;
 
   if (ft.spriteKey === key && ft.sprite) {
@@ -262,7 +350,9 @@ function getTextSprite(ctx, ft) {
 
   if (textSpriteCache.size > MAX_TEXT_SPRITE_CACHE) {
     const oldestKey = textSpriteCache.keys().next().value;
-    textSpriteCache.delete(oldestKey);
+    if (oldestKey !== undefined) {
+      textSpriteCache.delete(oldestKey);
+    }
   }
 
   ft.spriteKey = key;
@@ -270,7 +360,7 @@ function getTextSprite(ctx, ft) {
   return sprite;
 }
 
-function createTextSprite(ctx, text, font, color) {
+function createTextSprite(ctx: CanvasRenderingContext2D, text: string, font: string, color: string): TextSprite {
   ctx.save();
   ctx.font = font;
   const metrics = ctx.measureText(text);
@@ -284,6 +374,9 @@ function createTextSprite(ctx, text, font, color) {
   const height = Math.max(1, ascent + descent + TEXT_SPRITE_PADDING * 2);
   const canvas = createSpriteCanvas(width, height);
   const spriteCtx = canvas.getContext('2d');
+  if (!spriteCtx) {
+    throw new Error('Failed to get 2d context for text sprite');
+  }
   const textX = TEXT_SPRITE_PADDING;
   const textY = TEXT_SPRITE_PADDING + ascent;
 
@@ -319,7 +412,7 @@ function createTextSprite(ctx, text, font, color) {
   };
 }
 
-function createSpriteCanvas(width, height) {
+function createSpriteCanvas(width: number, height: number): HTMLCanvasElement | OffscreenCanvas {
   if (typeof OffscreenCanvas === 'function') {
     return new OffscreenCanvas(width, height);
   }
@@ -330,7 +423,7 @@ function createSpriteCanvas(width, height) {
   return canvas;
 }
 
-function getSpriteAnchorX(sprite, textAlign) {
+function getSpriteAnchorX(sprite: TextSprite, textAlign: CanvasTextAlign): number {
   switch (textAlign) {
     case 'center':
       return TEXT_SPRITE_PADDING + sprite.textWidth / 2;
@@ -344,7 +437,7 @@ function getSpriteAnchorX(sprite, textAlign) {
   }
 }
 
-function getFloatingTextRenderScale(ft, sprite) {
+function getFloatingTextRenderScale(ft: FloatingText, sprite: TextSprite): number {
   const requestedScale = Number.isFinite(ft.scale) ? Math.max(0, ft.scale) : 1;
   const minRenderSizePx = Number.isFinite(ft.minRenderSizePx)
     ? Math.max(0, ft.minRenderSizePx)
@@ -365,7 +458,7 @@ function getFloatingTextRenderScale(ft, sprite) {
 
 
 
-function updateRewardPopup(ft) {
+function updateRewardPopup(ft: FloatingText) {
   const holdElapsed = Math.min(ft.elapsedMs, ft.holdMs);
   const holdDistance = ft.holdRiseSpeed * (holdElapsed / 1000);
   const holdY = ft.startY - holdDistance;
@@ -388,7 +481,7 @@ function updateRewardPopup(ft) {
   ft.scale = Math.max(0, 1 - flyProgress);
 }
 
-function shouldRemoveFloatingText(ft) {
+function shouldRemoveFloatingText(ft: FloatingText) {
   if (ft.type === 'reward') {
     return ft.elapsedMs >= ft.holdMs + ft.flyMs;
   }

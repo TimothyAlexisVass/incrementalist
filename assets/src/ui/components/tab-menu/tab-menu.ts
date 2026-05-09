@@ -22,7 +22,7 @@ export interface TabDefinition {
   hotkey?: string;
   renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
-  noticeType?: 'shop_item' | 'area_unlock';
+  noticeType?: 'shop_item' | 'area_unlock' | 'quest' | 'achievement';
   noticeParentId?: string;
 }
 
