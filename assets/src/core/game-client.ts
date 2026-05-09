@@ -380,7 +380,8 @@ export class GameClient {
 
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
-    renderBottomHUD(this.ctx, this.canvas, input, () => {
+    const isMainMenuOpen = this.uiManager.overlayManager.isActive(this.mainMenu);
+    renderBottomHUD(this.ctx, this.canvas, input, isMainMenuOpen, () => {
       const isOpening = !this.uiManager.overlayManager.isActive(this.mainMenu);
       this.uiManager.overlayManager.toggle(this.mainMenu);
       
@@ -394,11 +395,6 @@ export class GameClient {
         // Clear area unlock notice
         if (noticeSystem.hasLeafNotice(`area:${areaKey}`)) {
           this.runCommand(() => noticeSee(this.channel!, `area:${areaKey}`, ['area_dropdown', 'menu_button']));
-        }
-        
-        // Special case: clicking Sage area also clears sage tips notice
-        if (areaKey === 'sage' && noticeSystem.hasSageNotice()) {
-          this.runCommand(() => noticeAck(this.channel!, 'area_dropdown'));
         }
       }
     });

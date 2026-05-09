@@ -9,6 +9,7 @@ export function renderBottomHUD(
   ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
+  isMainMenuOpen: boolean,
   onMenuClick: () => void,
   onAreaSelect?: (areaKey: string) => void
 ) {
@@ -27,7 +28,7 @@ export function renderBottomHUD(
   const buttonY = canvas.height - buttonHeight - paddingBottom;
 
   if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
-    showNotice: noticeSystem.hasMenuNotice()
+    showNotice: !isMainMenuOpen && noticeSystem.hasMenuNotice()
   })) {
     onMenuClick();
   }

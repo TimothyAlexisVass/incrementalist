@@ -18,7 +18,7 @@ export class NoticeSystem {
    * A parent shows a dot if any of its children are "new" 
    * (unlocked at a level higher than the last time this parent was acknowledged).
    */
-  public hasParentNotice(parentId: string, type: 'shop_item' | 'area_unlock' | 'sage_tip'): boolean {
+  public hasParentNotice(parentId: string, type: 'shop_item' | 'area_unlock'): boolean {
     if (!this.snapshot) return false;
     const lastAckLevel = this.snapshot.notices.last_ack_level[parentId] ?? 0;
     
@@ -37,21 +37,26 @@ export class NoticeSystem {
       );
     }
 
-    if (type === 'sage_tip') {
-      const tips = Object.keys(SAGE_TIPS).map(Number).filter(l => l <= this.snapshot!.state.level);
-      const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
-      return maxTipLevel > lastAckLevel;
-    }
-
     return false;
   }
 
   public hasAreaNotice(): boolean {
-    return this.hasParentNotice('area_dropdown', 'area_unlock') || this.hasSageNotice();
+    if (!this.snapshot) return false;
+
+    const currentArea = this.snapshot.state.area;
+    const lastAckLevel = this.snapshot.notices.last_ack_level['area_dropdown'] ?? 0;
+
+    return this.snapshot.state.areas.some(area =>
+      area.key !== currentArea &&
+      !area.is_locked &&
+      area.unlock_level > lastAckLevel
+    );
   }
 
   public hasSageNotice(): boolean {
-    return this.hasParentNotice('area_dropdown', 'sage_tip');
+    if (!this.snapshot) return false;
+
+    return this.getUnlockedSageTipLevels().some((level) => this.hasLeafNotice(`sage_tip:${level}`));
   }
 
   /**
@@ -60,6 +65,7 @@ export class NoticeSystem {
   public hasMenuNotice(): boolean {
     if (!this.snapshot) return false;
     const lastAckLevel = this.snapshot.notices.last_ack_level['menu_button'] ?? 0;
+    const currentArea = this.snapshot.state.area;
     
     // New Shop Items
     const hasNewShop = this.snapshot.state.shop.some(i => 
@@ -69,18 +75,23 @@ export class NoticeSystem {
     
     // New Areas
     const hasNewArea = this.snapshot.state.areas.some(a => 
+      a.key !== currentArea &&
       !a.is_locked && a.unlock_level > lastAckLevel
     );
     if (hasNewArea) return true;
 
-    // New Sage Tips
-    const tips = Object.keys(SAGE_TIPS).map(Number).filter(l => l <= this.snapshot.state.level);
-    const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
-    if (maxTipLevel > lastAckLevel) return true;
-
     // Add Quest/Achievement checks here later...
     
     return false;
+  }
+
+  private getUnlockedSageTipLevels(): number[] {
+    if (!this.snapshot) return [];
+
+    return Object.keys(SAGE_TIPS)
+      .map(Number)
+      .filter((level) => level <= this.snapshot!.state.level)
+      .sort((a, b) => a - b);
   }
 }
 

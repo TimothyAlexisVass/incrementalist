@@ -177,6 +177,19 @@ defmodule Incrementalist.Game.CommandsTest do
     assert locked["reason"] == "area_locked"
   end
 
+  test "notice.see can dismiss a sage tip leaf independently" do
+    player = create_player()
+
+    result = Commands.enqueue(player.id, "notice.see", intent(0, %{"leaf_id" => "sage_tip:1"}), @now)
+
+    assert result["type"] == "notice.see.result"
+    assert result["leaf_id"] == "sage_tip:1"
+
+    slot = SaveSlots.get_slot!(player.id, 0)
+    assert "sage_tip:1" in slot.notices.seen_leaf_ids
+    assert slot.notices.last_ack_level == %{}
+  end
+
   test "stored results replay without re-executing command rules" do
     player = create_player()
 

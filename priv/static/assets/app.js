@@ -3109,29 +3109,47 @@
 
   // src/features/areas/sage/tips.ts
   var SAGE_TIPS = {
-    1: [
-      "Your journey to become the Incrementalist begins now.",
-      "A journey around the globe begins with one step.",
-      "Collect your first reward.",
-      "You collect rewards by performing any kind of action when the progress-bar is full."
-    ],
-    2: [
-      "You can unlock new capabilities in the shop. Go now and unlock Idle mode.",
-      "Right now, idling will reduce your reward speed, but you will be able to upgrade this skill in the future."
-    ],
-    4: [
-      "I can sense an immense power dormant in you. You are now ready to unlock some of that potential.",
-      "We are going to have to release your inner nature gradually.",
-      "Sisu is a Finnish concept meaning deep inner strength, grit, and determination.",
-      "It is the ability to keep going through difficulty, not through loud force, but through quiet endurance, resilience, and willpower."
-    ],
-    10: [
-      "Before we release you fully into the Incrementiverse, we are going to have to improve your luck. Go to the Cloverfield and search for the seven leaf clover."
-    ],
-    15: [
-      "You have collected many resources on your journey. It is time to trade them.",
-      "Go to the Market to trade your goods and acquire new capabilities."
-    ]
+    1: {
+      text: [
+        "Your journey to become the Incrementalist begins now.",
+        "A journey around the globe begins with one step.",
+        "Collect your first reward.",
+        "You collect rewards by performing any kind of action when the progress-bar is full."
+      ],
+      confirmation: "Yes Master"
+    },
+    2: {
+      text: [
+        "You can unlock new capabilities in the shop. Go now and unlock Idle mode.",
+        "Right now, idling will reduce your reward speed, but you will be able to upgrade this skill in the future."
+      ],
+      confirmation: "I Do Like Earnings"
+    },
+    4: {
+      text: [
+        "I can sense an immense power dormant in you. You are now ready to unlock some of that potential.",
+        "We are going to have to release your inner nature gradually.",
+        "Sisu is a Finnish concept meaning deep inner strength, grit, and determination.",
+        "It is the ability to keep going through difficulty, not through loud force, but through quiet endurance, resilience, and willpower."
+      ],
+      confirmation: "I've got the power!"
+    },
+    10: {
+      text: [
+        "Before we release you fully into the Incrementiverse, we are going to have to improve your luck.",
+        "You are now free to leave the temple, find the Cloverfield and seek the seven leaf clover."
+      ],
+      confirmation: "Lucky number 7!"
+    },
+    15: {
+      text: [
+        "You have collected many resources on your journey.",
+        "It is now time to learn how to profit from trade.",
+        "Go to the Market to trade your goods and acquire new capabilities.",
+        "Fortuna favet audacibus!"
+      ],
+      confirmation: "Audentes Fortuna iuvat!"
+    }
   };
 
   // src/ui/notice-system.ts
@@ -3164,18 +3182,19 @@
           (area) => !area.is_locked && area.unlock_level > lastAckLevel
         );
       }
-      if (type === "sage_tip") {
-        const tips = Object.keys(SAGE_TIPS).map(Number).filter((l) => l <= this.snapshot.state.level);
-        const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
-        return maxTipLevel > lastAckLevel;
-      }
       return false;
     }
     hasAreaNotice() {
-      return this.hasParentNotice("area_dropdown", "area_unlock") || this.hasSageNotice();
+      if (!this.snapshot) return false;
+      const currentArea = this.snapshot.state.area;
+      const lastAckLevel = this.snapshot.notices.last_ack_level["area_dropdown"] ?? 0;
+      return this.snapshot.state.areas.some(
+        (area) => area.key !== currentArea && !area.is_locked && area.unlock_level > lastAckLevel
+      );
     }
     hasSageNotice() {
-      return this.hasParentNotice("area_dropdown", "sage_tip");
+      if (!this.snapshot) return false;
+      return this.getUnlockedSageTipLevels().some((level) => this.hasLeafNotice(`sage_tip:${level}`));
     }
     /**
      * Special case for the Menu button which aggregates multiple types.
@@ -3183,60 +3202,110 @@
     hasMenuNotice() {
       if (!this.snapshot) return false;
       const lastAckLevel = this.snapshot.notices.last_ack_level["menu_button"] ?? 0;
+      const currentArea = this.snapshot.state.area;
       const hasNewShop = this.snapshot.state.shop.some(
         (i) => !i.is_purchased && i.can_purchase && i.required_level > lastAckLevel
       );
       if (hasNewShop) return true;
       const hasNewArea = this.snapshot.state.areas.some(
-        (a) => !a.is_locked && a.unlock_level > lastAckLevel
+        (a) => a.key !== currentArea && !a.is_locked && a.unlock_level > lastAckLevel
       );
       if (hasNewArea) return true;
-      const tips = Object.keys(SAGE_TIPS).map(Number).filter((l) => l <= this.snapshot.state.level);
-      const maxTipLevel = tips.length > 0 ? Math.max(...tips) : 0;
-      if (maxTipLevel > lastAckLevel) return true;
       return false;
+    }
+    getUnlockedSageTipLevels() {
+      if (!this.snapshot) return [];
+      return Object.keys(SAGE_TIPS).map(Number).filter((level) => level <= this.snapshot.state.level).sort((a, b) => a - b);
     }
   };
   var noticeSystem = new NoticeSystem();
 
   // src/features/areas/sage/render.ts
   var LETTERS_PER_SECOND = 40;
+  var PANEL_PADDING = 16;
+  var PANEL_GAP = 12;
+  var LINE_HEIGHT = 20;
+  var BUTTON_HEIGHT = 30;
+  var BUTTON_MIN_WIDTH = 88;
+  var BUTTON_INNER_PADDING = 14;
+  var tipRevealStarts = /* @__PURE__ */ new Map();
   function renderSageArea(ctx2, canvas2, input, level, channel2, runCommand2) {
-    const model = getAreaViewModel().sage;
-    const tips = SAGE_TIPS[level];
-    if (!tips) {
-      model.lastLevelForTip = level;
+    const visibleTipLevels = getVisibleTipLevels(level);
+    const visibleLevelSet = new Set(visibleTipLevels);
+    for (const tipLevel of Array.from(tipRevealStarts.keys())) {
+      if (!visibleLevelSet.has(tipLevel)) {
+        tipRevealStarts.delete(tipLevel);
+      }
+    }
+    if (visibleTipLevels.length === 0) {
       return;
     }
     const now = performance.now();
-    if (model.lastLevelForTip !== level) {
-      model.lastLevelForTip = level;
-      model.tipStartTime = now;
-      model.tipText = tips.join("\n");
-    }
-    const elapsedSeconds = (now - model.tipStartTime) / 1e3;
-    const lettersToShow = Math.floor(elapsedSeconds * LETTERS_PER_SECOND);
-    const fullText = `The Sage: ${model.tipText}`;
-    const visibleText = fullText.substring(0, lettersToShow + 10);
+    const bottomHudY = canvas2.height - BOTTOM_HUD_HEIGHT;
+    const maxBoxWidth = DISPLAY_AREA_WIDTH - 40;
     ctx2.save();
     ctx2.font = SMALL_TEXT_FONT;
-    const lines = visibleText.split("\n");
-    const fullLines = fullText.split("\n");
-    let maxLineWidth = 0;
-    for (const line of fullLines) {
-      const width = ctx2.measureText(line).width;
-      if (width > maxLineWidth) {
-        maxLineWidth = width;
+    const tipsToRender = visibleTipLevels.map((tipLevel) => {
+      const tip = SAGE_TIPS[tipLevel];
+      const leafId = tipLeafId(tipLevel);
+      const buttonLabel = tip.confirmation || "Alright";
+      const fullLines = tip.text;
+      const maxLineWidth = fullLines.reduce((maxWidth, line) => {
+        const lineWidth = ctx2.measureText(line).width;
+        return Math.max(maxWidth, lineWidth);
+      }, 0);
+      ctx2.font = BOTTOM_HUD_BUTTON_FONT;
+      const buttonWidth = Math.max(
+        BUTTON_MIN_WIDTH,
+        Math.ceil(ctx2.measureText(buttonLabel).width + BUTTON_INNER_PADDING * 2)
+      );
+      ctx2.font = SMALL_TEXT_FONT;
+      const boxWidth = Math.min(
+        Math.max(maxLineWidth + PANEL_PADDING * 2, buttonWidth + PANEL_PADDING * 2),
+        maxBoxWidth
+      );
+      const boxHeight = fullLines.length * LINE_HEIGHT + PANEL_PADDING * 2;
+      if (!tipRevealStarts.has(tipLevel)) {
+        tipRevealStarts.set(tipLevel, now);
       }
+      const revealStart = tipRevealStarts.get(tipLevel) ?? now;
+      const elapsedSeconds = (now - revealStart) / 1e3;
+      const lettersToShow = Math.floor(elapsedSeconds * LETTERS_PER_SECOND);
+      const visibleText = fullLines.join("\n").substring(0, lettersToShow);
+      const visibleLines = visibleText.length > 0 ? visibleText.split("\n") : [];
+      return {
+        leafId,
+        buttonLabel,
+        boxX: DISPLAY_AREA_X,
+        boxY: DISPLAY_AREA_Y,
+        boxWidth,
+        boxHeight,
+        visibleLines,
+        buttonRect: { x: 0, y: 0, width: buttonWidth, height: BUTTON_HEIGHT }
+      };
+    });
+    const totalHeight = tipsToRender.reduce((sum, tip, index) => {
+      return sum + tip.boxHeight + (index > 0 ? PANEL_GAP : 0);
+    }, 0);
+    const topBoundary = DISPLAY_AREA_Y + 10;
+    const bottomAnchor = bottomHudY - 30;
+    let currentY = Math.max(topBoundary, bottomAnchor - totalHeight);
+    for (const tip of tipsToRender) {
+      tip.boxX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH - tip.boxWidth) / 2;
+      tip.boxY = currentY;
+      tip.buttonRect = {
+        x: tip.boxX + tip.boxWidth - tip.buttonRect.width + 8,
+        y: tip.boxY - 8,
+        width: tip.buttonRect.width,
+        height: tip.buttonRect.height
+      };
+      renderTipPanel(ctx2, input, tip, channel2, runCommand2);
+      currentY += tip.boxHeight + PANEL_GAP;
     }
-    const lineHeight = 20;
-    const padding = 16;
-    const boxWidth = Math.min(maxLineWidth + padding * 2, DISPLAY_AREA_WIDTH - 40);
-    const boxHeight = fullLines.length * lineHeight + padding * 2;
-    const bottomHudY = canvas2.height - BOTTOM_HUD_HEIGHT;
-    const boxX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH - boxWidth) / 2;
-    let boxY = bottomHudY - 30 - boxHeight;
-    boxY = Math.max(DISPLAY_AREA_Y + 10, Math.min(boxY, DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - boxHeight - 10));
+    ctx2.restore();
+  }
+  function renderTipPanel(ctx2, input, tip, channel2, runCommand2) {
+    const { boxX, boxY, boxWidth, boxHeight, visibleLines, buttonLabel, buttonRect, leafId } = tip;
     ctx2.fillStyle = COLORS.panel.bg;
     ctx2.fillRect(boxX, boxY, boxWidth, boxHeight);
     ctx2.strokeStyle = COLORS.panel.border;
@@ -3245,16 +3314,24 @@
     ctx2.fillStyle = COLORS.panel.textPrimary;
     ctx2.textAlign = "left";
     ctx2.textBaseline = "top";
-    for (let i = 0; i < lines.length; i++) {
-      ctx2.fillText(lines[i], boxX + padding, boxY + padding + i * lineHeight);
+    ctx2.font = SMALL_TEXT_FONT;
+    for (let i = 0; i < visibleLines.length; i += 1) {
+      ctx2.fillText(visibleLines[i], boxX + PANEL_PADDING, boxY + PANEL_PADDING + i * LINE_HEIGHT);
     }
-    if (pointInRect(input.pointer, { x: boxX, y: boxY, width: boxWidth, height: boxHeight }) && input.clicked && !input.consumed) {
-      if (channel2 && runCommand2 && noticeSystem.hasSageNotice()) {
-        runCommand2(() => noticeAck(channel2, "area_dropdown"));
-        input.consumed = true;
-      }
+    const buttonClicked = doButton(ctx2, input, buttonRect, buttonLabel, {
+      font: BOTTOM_HUD_BUTTON_FONT,
+      showNotice: noticeSystem.hasLeafNotice(leafId)
+    });
+    if (buttonClicked && channel2 && runCommand2 && noticeSystem.hasLeafNotice(leafId)) {
+      runCommand2(() => noticeSee(channel2, leafId));
+      input.consumed = true;
     }
-    ctx2.restore();
+  }
+  function getVisibleTipLevels(level) {
+    return Object.keys(SAGE_TIPS).map(Number).filter((tipLevel) => tipLevel <= level && noticeSystem.hasLeafNotice(tipLeafId(tipLevel))).sort((a, b) => a - b);
+  }
+  function tipLeafId(level) {
+    return `sage_tip:${level}`;
   }
 
   // src/ui/components/tooltip.ts
@@ -3424,7 +3501,7 @@
               ctx2.textBaseline = "middle";
               ctx2.textBaseline = "middle";
               ctx2.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
-              const hasNotice = noticeSystem.hasLeafNotice(`area:${area.key}`) || area.key === "sage" && noticeSystem.hasSageNotice();
+              const hasNotice = !area.is_locked && (noticeSystem.hasLeafNotice(`area:${area.key}`) || area.key === "sage" && noticeSystem.hasSageNotice());
               if (hasNotice) {
                 drawNoticeDot(ctx2, itemRect.x + itemRect.width - 10, itemRect.y + 10);
               }
@@ -3860,7 +3937,7 @@
   }
 
   // src/ui/layout/bottom-hud/render.ts
-  function renderBottomHUD(ctx2, canvas2, input, onMenuClick, onAreaSelect) {
+  function renderBottomHUD(ctx2, canvas2, input, isMainMenuOpen, onMenuClick, onAreaSelect) {
     ctx2.save();
     ctx2.fillStyle = COLORS.panel.bg;
     ctx2.fillRect(0, canvas2.height - BOTTOM_HUD_HEIGHT, canvas2.width, BOTTOM_HUD_HEIGHT);
@@ -3871,7 +3948,7 @@
     const buttonX = canvas2.width - buttonWidth - paddingRight;
     const buttonY = canvas2.height - buttonHeight - paddingBottom;
     if (doButton(ctx2, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, "Menu [ESC]", {
-      showNotice: noticeSystem.hasMenuNotice()
+      showNotice: !isMainMenuOpen && noticeSystem.hasMenuNotice()
     })) {
       onMenuClick();
     }
@@ -4133,7 +4210,7 @@
           inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
           textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
           font,
-          showNotice: tab.noticeType && tab.noticeParentId ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType) : false
+          showNotice: !isActive && tab.noticeType && tab.noticeParentId ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType) : false
         });
         if (clicked) {
           this.activeTabId = tab.id;
@@ -4855,7 +4932,8 @@
       if (activity && this.channel) {
         claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
       }
-      renderBottomHUD(this.ctx, this.canvas, input, () => {
+      const isMainMenuOpen = this.uiManager.overlayManager.isActive(this.mainMenu);
+      renderBottomHUD(this.ctx, this.canvas, input, isMainMenuOpen, () => {
         const isOpening = !this.uiManager.overlayManager.isActive(this.mainMenu);
         this.uiManager.overlayManager.toggle(this.mainMenu);
         if (isOpening && this.channel && noticeSystem.hasMenuNotice()) {
@@ -4866,9 +4944,6 @@
           this.runCommand(() => selectArea(this.channel, areaKey));
           if (noticeSystem.hasLeafNotice(`area:${areaKey}`)) {
             this.runCommand(() => noticeSee(this.channel, `area:${areaKey}`, ["area_dropdown", "menu_button"]));
-          }
-          if (areaKey === "sage" && noticeSystem.hasSageNotice()) {
-            this.runCommand(() => noticeAck(this.channel, "area_dropdown"));
           }
         }
       });

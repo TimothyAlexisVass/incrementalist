@@ -120,8 +120,11 @@ export function renderAreaDropdown(
             ctx.textBaseline = 'middle';
             ctx.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
 
-            // Show dot if new area or new sage tip
-            const hasNotice = noticeSystem.hasLeafNotice(`area:${area.key}`) || (area.key === 'sage' && noticeSystem.hasSageNotice());
+            // Locked areas cannot be acted on, so they should not advertise notices.
+            const hasNotice =
+              !area.is_locked &&
+              (noticeSystem.hasLeafNotice(`area:${area.key}`) ||
+                (area.key === 'sage' && noticeSystem.hasSageNotice()));
             if (hasNotice) {
               drawNoticeDot(ctx, itemRect.x + itemRect.width - 10, itemRect.y + 10);
             }

@@ -22,7 +22,7 @@ export interface TabDefinition {
   hotkey?: string;
   renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
-  noticeType?: 'shop_item' | 'area_unlock' | 'sage_tip';
+  noticeType?: 'shop_item' | 'area_unlock';
   noticeParentId?: string;
 }
 
@@ -216,7 +216,10 @@ export class TabMenu {
         inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
         textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
         font: font,
-        showNotice: tab.noticeType && tab.noticeParentId ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType) : false
+        showNotice:
+          !isActive && tab.noticeType && tab.noticeParentId
+            ? noticeSystem.hasParentNotice(tab.noticeParentId, tab.noticeType)
+            : false
       });
 
       if (clicked) {
