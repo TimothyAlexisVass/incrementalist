@@ -228,7 +228,15 @@ defmodule Incrementalist.Game.CommandExecutor do
     with {:ok, slot_index} <- fetch_slot_index(command.intent) do
       # Switching is a command because the current active slot is server truth.
       # The previous slot is saved before the active pointer moves.
-      target_had_state = SaveSlots.get_slot!(player.id, slot_index).state != nil
+
+      # We check if the target slot had state before switching, since switch_player_to_slot
+      # initializes the state if it was missing. We do this efficiently by fetching all slots
+      # which might be slightly redundant with the fetch inside switch_player_to_slot, but
+      # avoid a direct `get_slot!` query. Actually, we could just do `get_slots` here.
+      slots = SaveSlots.get_slots(player.id)
+      target_slot_initial = Enum.find(slots, &(&1.slot_index == slot_index))
+      target_had_state = target_slot_initial && target_slot_initial.state != nil
+
       use_cached_snapshot = target_had_state and cached_snapshot_hint?(command.intent)
       target_slot = SaveSlots.switch_player_to_slot(player, slot_index, now)
       clear_commands_after_save_boundary!(player.id, command.sequence, now)

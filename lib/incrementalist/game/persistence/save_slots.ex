@@ -134,15 +134,19 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
       raise ArgumentError, "Invalid slot_index: #{slot_index}"
     end
 
-    current_slot = get_slot!(player.id, player.active_save_slot)
+    slots = get_slots(player.id)
+    current_slot = Enum.find(slots, &(&1.slot_index == player.active_save_slot))
+    target_slot_initial = Enum.find(slots, &(&1.slot_index == slot_index))
+
+    if is_nil(current_slot) or is_nil(target_slot_initial) do
+      raise Ecto.NoResultsError, queryable: SaveSlot
+    end
+
     # Switching slots is also an autosave boundary for the outgoing active file.
     # The target can be empty, but the old slot must be durable first.
     _current_slot = autosave(current_slot, now)
 
-    target_slot =
-      player.id
-      |> get_slot!(slot_index)
-      |> initialize_if_empty(now)
+    target_slot = initialize_if_empty(target_slot_initial, now)
 
     player
     |> Player.changeset(%{active_save_slot: slot_index, last_seen_at: now})
