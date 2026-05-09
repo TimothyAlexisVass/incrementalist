@@ -4774,6 +4774,11 @@
       }
     }
     cacheSnapshotFromResult(result) {
+      if (!this.store.state.snapshot) return;
+      if (result.type === "progress.claim_reward.result" || result.type === "area.select.result" || result.type === "shop.purchase.result" || result.type === "notice.see.result" || result.type === "notice.ack.result" || result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+        this.snapshotCache.save(this.store.state.snapshot);
+        return;
+      }
       if ("snapshot" in result && result.snapshot) {
         this.snapshotCache.save(result.snapshot);
       }
