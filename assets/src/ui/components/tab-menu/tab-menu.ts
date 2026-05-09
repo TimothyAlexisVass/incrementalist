@@ -46,8 +46,8 @@ export class TabMenu {
     if (tabs.length === 0) {
       throw new Error("TabMenu must have at least one tab.");
     }
-    this.activeTabId = initialTabId && tabs.some(t => t.id === initialTabId) 
-      ? initialTabId 
+    this.activeTabId = initialTabId && tabs.some(t => t.id === initialTabId)
+      ? initialTabId
       : tabs[0].id;
   }
 
@@ -69,9 +69,9 @@ export class TabMenu {
   }
 
   public render(
-    ctx: CanvasRenderingContext2D, 
-    canvas: HTMLCanvasElement, 
-    input: InteractionState, 
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    input: InteractionState,
     state: ServerState,
     containerRect: Rect,
     channel?: GameChannel,
@@ -93,7 +93,7 @@ export class TabMenu {
       return ctx.measureText(label).width;
     });
     const maxTextWidth = Math.max(...textWidths);
-    
+
     let contentRect: Rect;
     const tabRects: Rect[] = [];
 
@@ -154,7 +154,7 @@ export class TabMenu {
       // vertical layout
       const uniformTabWidth = maxTextWidth + tabPadding * 2;
       const totalHeight = (tabHeight * this.tabs.length) + (gap * (this.tabs.length - 1));
-      
+
       let startX = containerRect.x;
       if (position === 'top-right' || position === 'bottom-right') {
         startX = containerRect.x + containerRect.width - uniformTabWidth;
@@ -205,7 +205,7 @@ export class TabMenu {
 
       let label = tab.label;
       if (tab.hotkey) {
-        label += ` (${tab.hotkey})`;
+        label += ` [${tab.hotkey}]`;
       }
 
       const clicked = doButton(ctx, input, rect, label, {
