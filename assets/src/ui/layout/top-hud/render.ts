@@ -57,7 +57,7 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   const now = getNowMs();
 
   const queued = getAndClearQueuedLevelUps();
-  for (let i = 0; i < queued; i++) {
+  if (queued > 0) {
     spawnExpBarLevelUpBurst(model);
   }
 
@@ -171,7 +171,7 @@ function renderExpBarCollectionGlow(ctx: CanvasRenderingContext2D, collectionPul
 }
 
 function spawnExpBarLevelUpBurst(model: ReturnType<typeof getHudViewModel>) {
-  spawnGpuProgressCompletionBurst(
+  if (spawnGpuProgressCompletionBurst(
     TOP_HUD_EXP_BAR_X,
     TOP_HUD_EXP_BAR_Y,
     TOP_HUD_EXP_BAR_WIDTH,
@@ -182,7 +182,9 @@ function spawnExpBarLevelUpBurst(model: ReturnType<typeof getHudViewModel>) {
       gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
       lifeMultiplier: EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
     }
-  );
+  )) {
+    return;
+  }
 
   const centerX = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
   const centerY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT / 2;

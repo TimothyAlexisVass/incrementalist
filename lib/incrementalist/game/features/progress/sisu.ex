@@ -45,10 +45,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
   def tier_ids, do: Map.keys(@refill_tiers)
 
   def upgrade_cost(level) do
-    case Levels.upgrade_cost(level) do
-      nil -> nil
-      value -> BigNum.from_number(value)
-    end
+    Levels.upgrade_cost(level)
   end
 
   def can_purchase_upgrade(%State{} = state) do

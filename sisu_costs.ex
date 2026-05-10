@@ -1,9 +1,3 @@
-defmodule Incrementalist.Game.Features.Progress.Sisu.Levels do
-  @moduledoc false
-
-  @base_max 2.0
-  @per_level 0.5
-
   @upgrade_costs [
     %BigNum{m: 0.0, e: 0},
     %BigNum{m: 2.5, e: 3},
@@ -1775,15 +1769,5 @@ defmodule Incrementalist.Game.Features.Progress.Sisu.Levels do
     %BigNum{m: 3.25, e: 299},
     %BigNum{m: 4.5, e: 299},
     %BigNum{m: 6.5, e: 299},
+    %BigNum{m: 9.5, e: 299},
   ]
-
-  def base_max, do: @base_max
-  def per_level, do: @per_level
-  def max_upgrade_level, do: length(@upgrade_costs) - 1
-
-  def upgrade_cost(level) when is_integer(level) and level >= 0 do
-    Enum.at(@upgrade_costs, level)
-  end
-
-  def upgrade_cost(_level), do: nil
-end

@@ -6,7 +6,7 @@ import {
   SISU_METER_FONT,
   SISU_UPGRADE_BUTTON_FONT
 } from "../../config";
-import { fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
+import { compare, fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
 import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
 import { sisuRefill, sisuUpgradeMax } from "../../net/commands";
 import type { ServerResult } from "../../net/protocol";
@@ -21,13 +21,15 @@ import type { GameChannel } from "../../net/game-channel";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getViewModel } from "../progress-bar/view-model";
 
+import { UPGRADE_COSTS } from "./levels";
+
 type Rect = { x: number; y: number; width: number; height: number };
 
 type TierId = "blue" | "yellow" | "purple";
 
 const SISU_BASE_MAX = 2;
 const SISU_MIN_MULTIPLIER = 1;
-const SISU_MAX_UPGRADE_LEVEL = 1770;
+const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
 const SISU_REFILL_TIERS: Record<TierId, { id: TierId; label: string; colorKey: "blue" | "yellow" | "purple"; multiplier: number }> = {
   blue: { id: "blue", label: "Blue", colorKey: "blue", multiplier: 1.0 },
   yellow: { id: "yellow", label: "Yellow", colorKey: "yellow", multiplier: 1.5 },
@@ -302,7 +304,7 @@ function handleClick(input: InteractionState, rect: Rect | null): boolean {
   return true;
 }
 
-function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix: string | null, cost: number) {
+function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix: string | null, cost: BigNum) {
   const textY = rect.y + 23;
   const iconSize = 18;
   const iconGap = 4;
@@ -494,11 +496,11 @@ function getUpgradeButtonState(shards: BigNum, currentLevel: number): {
   disabled: boolean;
   label: string;
   prefix: string | null;
-  cost: number | null;
+  cost: BigNum | null;
 } {
-  const cost = getMaxSisuUpgradeCost(currentLevel + 1);
+  const cost = UPGRADE_COSTS[currentLevel + 1];
 
-  if (currentLevel >= SISU_MAX_UPGRADE_LEVEL) {
+  if (currentLevel >= SISU_MAX_UPGRADE_LEVEL || !cost) {
     return {
       disabled: true,
       label: "MAX",
@@ -507,16 +509,7 @@ function getUpgradeButtonState(shards: BigNum, currentLevel: number): {
     };
   }
 
-  if (!Number.isFinite(cost) || cost <= 0) {
-    return {
-      disabled: true,
-      label: "Upgrade",
-      prefix: null,
-      cost: null
-    };
-  }
-
-  if (toNumber(shards) < cost) {
+  if (compare(shards, cost) < 0) {
     return {
       disabled: true,
       label: "",
@@ -533,23 +526,4 @@ function getUpgradeButtonState(shards: BigNum, currentLevel: number): {
   };
 }
 
-function getMaxSisuUpgradeCost(level: number): number {
-  if (level <= 0) {
-    return 0;
-  }
 
-  if (level > SISU_MAX_UPGRADE_LEVEL) {
-    return NaN;
-  }
-
-  if (level <= 12) {
-    const exponentShift = Math.floor((level - 1) / 3);
-    const earlyMultipliers = [1, 2, 4];
-    return 2.5e3 * earlyMultipliers[(level - 1) % 3] * (10 ** exponentShift);
-  }
-
-  const offset = level - 13;
-  const exponent = 7 + Math.floor(offset / 6);
-  const lateMantissas = [1.5, 2.25, 3.25, 4.5, 6.5, 9.5];
-  return lateMantissas[offset % 6] * (10 ** exponent);
-}
