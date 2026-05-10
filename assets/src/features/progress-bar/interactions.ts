@@ -97,9 +97,29 @@ async function resolveClaimAsync(
   claimResolutionInFlight = true;
 
   try {
-    await runCommand(() => progressClaimReward(channel));
+    let reward = await runCommand(() => progressClaimReward(channel));
+
+    while (
+      reward &&
+      reward.type === "command.error" &&
+      reward.reason === "claim_not_ready"
+    ) {
+      const retryDelayMs =
+        typeof reward.can_claim_in === "number" && reward.can_claim_in > 0
+          ? reward.can_claim_in
+          : 20;
+
+      await sleep(retryDelayMs);
+      reward = await runCommand(() => progressClaimReward(channel));
+    }
   } finally {
     setPendingClaimIntent(false);
     claimResolutionInFlight = false;
   }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, Math.max(0, ms));
+  });
 }
