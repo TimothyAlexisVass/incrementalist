@@ -24,6 +24,7 @@ import { createSisuGeneratorModal, renderSisuControl, type SisuControlLayout } f
 import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
+  claimRewardInIdleMode,
   claimRewardOnAnyInput,
   handleProgressClick,
   getPendingClaimPopupPoint,
@@ -357,6 +358,14 @@ export class GameClient {
     if (this.channel && handleProgressLoop(this.channel)) {
       const channel = this.channel;
       this.runCommand(() => progressClaimIn(channel));
+    }
+
+    if (this.channel) {
+      claimRewardInIdleMode(
+        this.channel,
+        this.canvas,
+        (cmd) => this.runCommand(cmd)
+      );
     }
 
     // Render the core 2D progress bar UI (fill ratio and text)

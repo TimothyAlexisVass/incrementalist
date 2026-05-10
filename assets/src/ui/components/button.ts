@@ -13,6 +13,7 @@ export interface ButtonOptions {
   textAlign?: CanvasTextAlign;
   textX?: number;
   textY?: number;
+  padding?: number;
   showNotice?: boolean;
   showNoticePing?: boolean;
 }
@@ -22,6 +23,7 @@ const NOTICE_PING_INTERVAL_MS = 10_000;
 const NOTICE_PING_DURATION_MS = 1_000;
 const NOTICE_PING_MAX_RADIUS_PX = 100;
 const NOTICE_PING_COLOR = '#00ff00';
+const BUTTON_PADDING_PX = 3;
 
 function getNowMs() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -94,25 +96,31 @@ export function drawButton(
     font = BUTTON_DEFAULT_FONT,
     textAlign = 'center',
     textX = rect.x + (rect.width / 2),
-    textY = rect.y + 19
+    textY = rect.y + (rect.height / 2),
+    padding = BUTTON_PADDING_PX
   } = options;
 
+  const paddedRect = {
+    x: rect.x - padding,
+    y: rect.y - padding,
+    width: rect.width + (padding * 2),
+    height: rect.height + (padding * 2)
+  };
+
   ctx.fillStyle = active ? activeSurface : inactiveSurface;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fillRect(paddedRect.x, paddedRect.y, paddedRect.width, paddedRect.height);
 
   ctx.strokeStyle = active ? activeBorder : inactiveBorder;
   ctx.lineWidth = lineWidth;
-  ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.strokeRect(paddedRect.x, paddedRect.y, paddedRect.width, paddedRect.height);
 
   ctx.fillStyle = textColor;
   ctx.font = font;
   ctx.textAlign = textAlign;
   ctx.textBaseline = 'middle';
-  
-  // Use explicitly provided textY, or default to exact middle of the rect
-  const actualTextY = options.textY !== undefined ? options.textY : rect.y + (rect.height / 2) + 1;
-  ctx.fillText(label, textX, actualTextY);
-  
+
+  ctx.fillText(label, textX, textY);
+
   if (options.showNotice) {
     drawNoticeDot(ctx, rect.x + rect.width - 2, rect.y + 2, 4, options.showNoticePing ?? false);
   }
@@ -156,8 +164,16 @@ export function doButton(
   label: string,
   options: ButtonOptions = {}
 ): boolean {
-  const isHovered = pointInRect(input.pointer, rect);
-  const startedInside = pointInRect(input.pressStartPointer, rect);
+  const padding = options.padding ?? BUTTON_PADDING_PX;
+  const hitRect = {
+    x: rect.x - padding,
+    y: rect.y - padding,
+    width: rect.width + (padding * 2),
+    height: rect.height + (padding * 2)
+  };
+
+  const isHovered = pointInRect(input.pointer, hitRect);
+  const startedInside = pointInRect(input.pressStartPointer, hitRect);
   let clicked = false;
 
   if (isHovered && startedInside && input.clicked && !input.consumed) {

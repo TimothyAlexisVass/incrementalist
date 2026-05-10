@@ -12,8 +12,13 @@ export const COLORS = Object.freeze({
     border: '#5b6f93',
     progress: {
       fillStart: [255, 107, 107], // #FF6B6B
-      fillMid: [255, 230, 109], // #FFE66D
-      fillEnd: [78, 205, 196]   // #4ECDC4
+      fillMid: [255, 230, 109],   // #FFE66D
+      fillEnd: [78, 205, 196],    // #4ECDC4
+      idle: {
+        fillStart: [38, 58, 103], // #263A67
+        fillMid: [82, 97, 163],   // #5261A3
+        fillEnd: [108, 188, 144]  // #6CBC90
+      }
     },
     exp: {
       fillStart: '#934caf',
@@ -50,7 +55,7 @@ export const COLORS = Object.freeze({
     },
     toggle: {
       on: '#4CAF50',
-      off: '#777'
+      off: '#2c1d6e'
     }
   },
   panel: {

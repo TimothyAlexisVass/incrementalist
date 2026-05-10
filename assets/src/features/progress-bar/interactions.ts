@@ -1,7 +1,7 @@
 import type { GameChannel } from "../../net/game-channel";
 import type { ServerResult } from "../../net/protocol";
 import { progressClaimReward, progressSetIdleMode } from "../../net/commands";
-import { triggerProgressBarCollectionEffect, getIdleModeToggleRect } from "./render";
+import { triggerProgressBarCollectionEffect, getIdleModeToggleRect, getProgressBarLayout } from "./render";
 import { getViewModel, shouldSendClaimIn, beginAsyncClaimResolution, setPendingClaimIntent } from "./view-model";
 
 let claimResolutionInFlight = false;
@@ -39,6 +39,24 @@ export function claimRewardOnAnyInput(
   if (!tryClaimReward(channel)) return;
 
   pendingClaimPopupPoint = clickPoint;
+  triggerProgressBarCollectionEffect(canvas);
+  beginAsyncClaimResolution();
+  void resolveClaimAsync(channel, runCommand);
+}
+
+export function claimRewardInIdleMode(
+  channel: GameChannel,
+  canvas: HTMLCanvasElement,
+  runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>
+) {
+  const vm = getViewModel();
+  if (!vm.idleMode || !tryClaimReward(channel)) return;
+
+  const layout = getProgressBarLayout(canvas);
+  pendingClaimPopupPoint = {
+    x: layout.x + layout.width / 2,
+    y: layout.y + layout.height / 2
+  };
   triggerProgressBarCollectionEffect(canvas);
   beginAsyncClaimResolution();
   void resolveClaimAsync(channel, runCommand);

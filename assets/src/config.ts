@@ -40,7 +40,7 @@ export const SISU_UPGRADE_BUTTON_FONT = 'bold 13px Arial';
 
 // Progress bar fonts
 export const PROGRESS_PERCENT_FONT = 'bold 16px Arial';
-export const IDLE_TOGGLE_FONT = 'bold 11px Arial';
+export const IDLE_TOGGLE_FONT = 'bold 14px Arial';
 
 // Shop fonts
 export const SHOP_ITEM_NAME_FONT = 'bold 20px Arial';

@@ -1,5 +1,6 @@
 defmodule Incrementalist.Game.Features.Progress.BarTest do
   use ExUnit.Case, async: true
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.State
   alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Game.Features.Progress.Sisu
@@ -54,8 +55,12 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
     end
 
     test "returns idle rate when idle_mode is true", %{now: now} do
+      first_played = DateTime.add(now, -30_000, :millisecond) |> DateTime.to_iso8601()
+
       state = %State{
         idle_mode: true,
+        first_played_at: first_played,
+        level: 35,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
           current: BigNum.from_number(2.0),
@@ -65,8 +70,31 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
         }
       }
 
-      # @base_idle_mode_on_fill_rate * sisu = 0.24 * 2.0 = 0.48
-      assert Bar.get_progress_bar_fill_rate(state, now) == 0.48
+      idle_base = Constants.progress_bar_base_idle_mode_on_fill_rate()
+      assert Bar.get_progress_bar_fill_rate(state, now) == idle_base * 2.0
+    end
+
+    test "applies new player bonus mechanics while idle", %{now: now} do
+      first_played = DateTime.add(now, -10_000, :millisecond) |> DateTime.to_iso8601()
+
+      state = %State{
+        idle_mode: true,
+        first_played_at: first_played,
+        progress_bar: %State.ProgressBar{},
+        sisu: %State.Sisu{
+          current: BigNum.from_number(1.0),
+          max_basic: BigNum.from_number(2.0),
+          max_upgrade_level: 0,
+          cycle_decay: 3.5
+        }
+      }
+
+      idle_base = Constants.progress_bar_base_idle_mode_on_fill_rate()
+      expected =
+        idle_base * Constants.progress_bar_new_player_bonus_fill_multiplier() +
+          Constants.progress_bar_new_player_bonus_fill_bonus()
+
+      assert Bar.get_progress_bar_fill_rate(state, now) == expected
     end
 
     test "applies new player bonus when game age < 25_000ms", %{now: now} do
@@ -269,6 +297,51 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       {_projected, can_claim_in} = Bar.ensure_can_claim_at(state, now)
       expected_ms = Sisu.claim_milliseconds(state, now)
       assert can_claim_in == expected_ms
+    end
+  end
+
+  describe "claim_reward/2" do
+    test "applies identical reward mechanics in idle and active modes" do
+      state_base = %State{
+        level: 42,
+        exp: BigNum.zero(),
+        coins: BigNum.zero(),
+        shards: BigNum.zero(),
+        cores: BigNum.zero(),
+        progress_bar: %State.ProgressBar{
+          reward_multiplier: 1.0
+        },
+        sisu: %State.Sisu{
+          current: BigNum.from_number(3.0),
+          max_basic: BigNum.from_number(3.0),
+          max_upgrade_level: 0,
+          cycle_decay: 3.5
+        }
+      }
+
+      active_state = %{state_base | idle_mode: false}
+      idle_state = %{state_base | idle_mode: true}
+
+      # Same deterministic random stream for both code paths.
+      random_values = [0.41, 0.67, 0.03, 0.005]
+
+      deterministic_random =
+        fn ->
+          [next | rest] = Process.get(:bar_test_rng, random_values)
+          Process.put(:bar_test_rng, rest)
+          next
+        end
+
+      Process.put(:bar_test_rng, random_values)
+      active_result = Bar.claim_reward(active_state, deterministic_random)
+
+      Process.put(:bar_test_rng, random_values)
+      idle_result = Bar.claim_reward(idle_state, deterministic_random)
+
+      assert active_result.exp == idle_result.exp
+      assert active_result.coins == idle_result.coins
+      assert active_result.shards == idle_result.shards
+      assert active_result.cores == idle_result.cores
     end
   end
 end

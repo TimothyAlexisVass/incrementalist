@@ -165,6 +165,21 @@ export function handleClaimNotReadyError(canClaimInMs: number | null = null) {
   currentViewModel.nextVerifyAtMs = Date.now() + delay;
 }
 
+function applyFillRateToProjectedCountdown() {
+  if (currentViewModel.state !== "projecting" || currentViewModel.canClaimInMs === null) {
+    return;
+  }
+
+  const rate = currentViewModel.fillRate;
+  if (!(rate > 0)) {
+    return;
+  }
+
+  const remainingFill = Math.max(0, 100 - currentViewModel.projectedFill);
+  currentViewModel.canClaimInMs = (remainingFill * 1000) / rate;
+  setCycleDurationMs((100 * 1000) / rate);
+}
+
 export type EffectContext = {
   floatingTexts: FloatingText[];
   canvas: HTMLCanvasElement;
@@ -219,13 +234,7 @@ export function applyProgressResult(
     currentViewModel.idleMode = result.idle_mode;
     currentViewModel.fillRate = result.fill_rate;
     currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
-
-    // Recalculate canClaimInMs based on new fill rate if we are projecting
-    if (currentViewModel.state === "projecting" && currentViewModel.canClaimInMs !== null) {
-      const remainingFill = 100 - currentViewModel.projectedFill;
-      currentViewModel.canClaimInMs = (remainingFill * 1000) / currentViewModel.fillRate;
-      setCycleDurationMs((100 * 1000) / currentViewModel.fillRate);
-    }
+    applyFillRateToProjectedCountdown();
     return;
   }
 
@@ -238,6 +247,7 @@ export function applyProgressResult(
       currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
       if (typeof result.fill_rate === "number") {
         currentViewModel.fillRate = result.fill_rate;
+        applyFillRateToProjectedCountdown();
       }
     }
   }
@@ -246,6 +256,7 @@ export function applyProgressResult(
     currentViewModel.sisu = result.sisu.current;
     currentViewModel.canClaimAt = result.can_claim_at;
     currentViewModel.fillRate = result.fill_rate;
+    applyFillRateToProjectedCountdown();
   }
 }
 

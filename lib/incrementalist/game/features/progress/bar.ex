@@ -22,36 +22,32 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         Constants.progress_bar_base_idle_mode_off_fill_rate()
       end
 
-    if idle_mode do
-      base_rate
-    else
-      first_played_at_ms =
-        case state.first_played_at do
-          nil ->
-            Time.to_unix_ms(now)
+    first_played_at_ms =
+      case state.first_played_at do
+        nil ->
+          Time.to_unix_ms(now)
 
-          iso_str ->
-            case Time.from_iso8601(iso_str) do
-              {:ok, dt} -> Time.to_unix_ms(dt)
-              _ -> Time.to_unix_ms(now)
-            end
-        end
-
-      now_ms = Time.to_unix_ms(now)
-      game_age_ms = now_ms - first_played_at_ms
-      level = state.level || 1
-
-      cond do
-        game_age_ms < Constants.progress_bar_new_player_bonus_window_ms() ->
-          base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier() +
-            Constants.progress_bar_new_player_bonus_fill_bonus()
-
-        level < 35 ->
-          base_rate * Constants.progress_bar_late_new_player_bonus_fill_multiplier()
-
-        true ->
-          base_rate
+        iso_str ->
+          case Time.from_iso8601(iso_str) do
+            {:ok, dt} -> Time.to_unix_ms(dt)
+            _ -> Time.to_unix_ms(now)
+          end
       end
+
+    now_ms = Time.to_unix_ms(now)
+    game_age_ms = now_ms - first_played_at_ms
+    level = state.level || 1
+
+    cond do
+      game_age_ms < Constants.progress_bar_new_player_bonus_window_ms() ->
+        base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier() +
+          Constants.progress_bar_new_player_bonus_fill_bonus()
+
+      level < 35 ->
+        base_rate * Constants.progress_bar_late_new_player_bonus_fill_multiplier()
+
+      true ->
+        base_rate
     end
   end
 
@@ -93,7 +89,6 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     current_sisu = state.sisu.current || BigNum.one()
     sisu = current_sisu |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
     level = state.level || 1
-    idle_mode = state.idle_mode || false
     reward_multiplier = state.progress_bar.reward_multiplier || 1.0
 
     level_pow = :math.pow(level, 0.7)
@@ -115,21 +110,14 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         variance = 0.8 + random_fn.() * 0.4
         coin = BigNum.from_number(trunc(35 * sisu * level_pow * reward_multiplier * variance))
 
-        idle_mult = if idle_mode, do: 1, else: 2
-
         shard =
           BigNum.from_number(
-            trunc(BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0) * idle_mult)
+            trunc(BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0) * 2)
           )
 
-        core =
-          if not idle_mode do
-            c1 = if random_fn.() < 0.1, do: 1, else: 0
-            c2 = if random_fn.() < 0.01, do: 10, else: 0
-            BigNum.from_number(c1 + c2)
-          else
-            BigNum.zero()
-          end
+        c1 = if random_fn.() < 0.1, do: 1, else: 0
+        c2 = if random_fn.() < 0.01, do: 10, else: 0
+        core = BigNum.from_number(c1 + c2)
 
         {exp, coin, shard, core}
       end

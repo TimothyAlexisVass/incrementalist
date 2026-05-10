@@ -128,6 +128,8 @@ export function renderProgressBar(
   const deltaTime = getProgressVisualDelta(now);
   const fillValue = clampNumber(Number(state?.projectedFill) || 0, 0, 100);
   const fillRatio = fillValue / 100;
+  const idleMode = state.idleMode;
+  const progressPalette = getProgressPalette(idleMode);
   const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
   const displayedFillValue = displayedFillRatio * 100;
   const isFull = state?.state === "confirmed_collectible";
@@ -159,8 +161,8 @@ export function renderProgressBar(
     ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1)
     : 0;
   const glowColor = hasCollectionGlow
-    ? COLORS.bar.progress.fillEnd
-    : getProgressColorArray(displayedFillRatio * 100);
+    ? progressPalette.fillEnd
+    : getProgressColorArray(displayedFillRatio * 100, idleMode);
   const gpuGlowFillY = hasCollectionGlow ? barY : fillY;
   const gpuGlowFillHeight = hasCollectionGlow ? barHeight : fillHeight;
   const gpuFillCharge = Math.pow(displayedFillRatio, 0.85);
@@ -183,9 +185,31 @@ export function renderProgressBar(
     intensity: hasCollectionGlow ? gpuCollectionIntensity : gpuBaseIntensity
   });
 
-  renderLiquidProgressFill(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, displayedFillRatio, now);
+  renderLiquidProgressFill(
+    ctx,
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    fillY,
+    fillHeight,
+    displayedFillRatio,
+    now,
+    idleMode
+  );
 
-  renderProgressGlow(ctx, barX, barY, barWidth, barHeight, displayedFillRatio, isFull, now, collectionPulse);
+  renderProgressGlow(
+    ctx,
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    displayedFillRatio,
+    isFull,
+    now,
+    idleMode,
+    collectionPulse
+  );
 
   if (isFull) {
     renderRisingEnergy(ctx, barX, barY, barWidth, barHeight, now);
@@ -194,7 +218,7 @@ export function renderProgressBar(
   ctx.save();
   if (isFull) {
     const pulse = getFullPulse(now);
-    ctx.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22 * pulse);
+    ctx.shadowColor = rgbaArrayToCss(progressPalette.fillEnd, 0.22 * pulse);
     ctx.shadowBlur = 2 + 2 * pulse;
   }
   ctx.strokeStyle = COLORS.bar.border;
@@ -207,7 +231,7 @@ export function renderProgressBar(
   const progressPercent = Math.floor(displayedFillValue);
 
   ctx.save();
-  ctx.fillStyle = getProgressColor(progressPercent);
+  ctx.fillStyle = getProgressColor(progressPercent, idleMode);
   ctx.font = PROGRESS_PERCENT_FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -219,7 +243,7 @@ export function renderProgressBar(
     ctx.save();
     ctx.font = IDLE_TOGGLE_FONT;
     ctx.fillStyle = rgbaArrayToCss([255, 255, 255], 0.78 + 0.22 * pulse);
-    ctx.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.22);
+    ctx.shadowColor = rgbaArrayToCss(progressPalette.fillEnd, 0.22);
     ctx.shadowBlur = 2;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -237,10 +261,15 @@ export function renderProgressBar(
 
 
 
-function getProgressColorArray(percent: number): Rgb {
-  const start = COLORS.bar.progress.fillStart;
-  const mid = COLORS.bar.progress.fillMid;
-  const end = COLORS.bar.progress.fillEnd;
+function getProgressPalette(idleMode: boolean) {
+  return idleMode ? COLORS.bar.progress.idle : COLORS.bar.progress;
+}
+
+function getProgressColorArray(percent: number, idleMode = false): Rgb {
+  const palette = getProgressPalette(idleMode);
+  const start = palette.fillStart;
+  const mid = palette.fillMid;
+  const end = palette.fillEnd;
   const clampedPercent = clampNumber(percent, 0, 100);
 
   let color: Rgb;
@@ -256,8 +285,8 @@ function getProgressColorArray(percent: number): Rgb {
   return color;
 }
 
-function getProgressColor(percent: number): string {
-  const color = getProgressColorArray(percent);
+function getProgressColor(percent: number, idleMode = false): string {
+  const color = getProgressColorArray(percent, idleMode);
   return `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 }
 
@@ -332,7 +361,8 @@ function renderLiquidProgressFill(
   fillY: number,
   fillHeight: number,
   fillRatio: number,
-  now: number
+  now: number,
+  idleMode: boolean
 ) {
   if (fillHeight <= 0) return;
 
@@ -345,10 +375,11 @@ function renderLiquidProgressFill(
   traceLiquidPath(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
   ctx.clip();
 
+  const progressPalette = getProgressPalette(idleMode);
   const progressGradient = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
-  progressGradient.addColorStop(0, rgbArrayToCss(COLORS.bar.progress.fillEnd));
-  progressGradient.addColorStop(0.5, rgbArrayToCss(COLORS.bar.progress.fillMid));
-  progressGradient.addColorStop(1, rgbArrayToCss(COLORS.bar.progress.fillStart));
+  progressGradient.addColorStop(0, rgbArrayToCss(progressPalette.fillEnd));
+  progressGradient.addColorStop(0.5, rgbArrayToCss(progressPalette.fillMid));
+  progressGradient.addColorStop(1, rgbArrayToCss(progressPalette.fillStart));
   ctx.fillStyle = progressGradient;
   ctx.fillRect(barX, barY, barWidth, barHeight);
 
@@ -357,7 +388,18 @@ function renderLiquidProgressFill(
   }
   ctx.restore();
 
-  renderLiquidSurfaceHighlight(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
+  renderLiquidSurfaceHighlight(
+    ctx,
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    fillY,
+    fillHeight,
+    fillRatio,
+    now,
+    idleMode
+  );
   ctx.restore();
 }
 
@@ -571,7 +613,8 @@ function renderLiquidSurfaceHighlight(
   fillY: number,
   fillHeight: number,
   fillRatio: number,
-  now: number
+  now: number,
+  idleMode: boolean
 ) {
   const waveHeight = getLiquidWaveHeight(fillHeight, fillRatio, barHeight);
   const surfaceGlow = clampNumber(0.22 + fillRatio * 0.34, 0, 0.5);
@@ -596,7 +639,7 @@ function renderLiquidSurfaceHighlight(
 
   ctx.strokeStyle = rgbaArrayToCss([255, 255, 255], surfaceGlow);
   ctx.lineWidth = 1.5;
-  ctx.shadowColor = rgbaArrayToCss(COLORS.bar.progress.fillEnd, 0.18);
+  ctx.shadowColor = rgbaArrayToCss(getProgressPalette(idleMode).fillEnd, 0.18);
   ctx.shadowBlur = 1 + waveHeight * 0.4;
   ctx.stroke();
   ctx.restore();
@@ -611,6 +654,7 @@ function renderProgressGlow(
   fillRatio: number,
   isFull: boolean,
   now: number,
+  idleMode: boolean,
   collectionPulse = 0
 ) {
   if (fillRatio <= 0 && collectionPulse <= 0) return;
@@ -620,8 +664,8 @@ function renderProgressGlow(
     ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1)
     : 0;
   const glowColor = collectionPulse > 0
-    ? COLORS.bar.progress.fillEnd
-    : getProgressColorArray(fillRatio * 100);
+    ? getProgressPalette(idleMode).fillEnd
+    : getProgressColorArray(fillRatio * 100, idleMode);
   const charge = Math.pow(fillRatio, 0.85);
   const pulse = isFull ? getFullPulse(now) : 1;
   const baseGlowPower = charge * pulse;
@@ -856,7 +900,7 @@ export function renderIdleModeToggle(
     inactiveBorder: COLORS.button.border.inactive,
     textColor: COLORS.button.text,
     font: IDLE_TOGGLE_FONT,
-    textY: toggleRect.y + 14
+    textY: toggleRect.y + 11
   });
 
   if (!state.features?.idleModePurchased) {
