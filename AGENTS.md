@@ -6,6 +6,9 @@ The game is under development and has not been deployed.
 IT IS FORBIDDEN TO ADD BACKWARDS COMPATIBILITY!
 RESET on conflict/breaking instead of adding compatibilty shims, versioning, etc...
 
+NO FEATURE MAY EVER BLOCK PROGRESS BAR REWARD COLLECTION.
+PROGRESS BAR REWARD COLLECTION MUST NEVER SWALLOW, CONSUME, OR BLOCK CLICKS INTENDED FOR OTHER UI INTERACTIONS.
+
 Edits of .ts files have to pass tsc --noEmit checks.
 
 ## Migration Hygiene

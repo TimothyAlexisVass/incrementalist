@@ -419,9 +419,10 @@ export class GameClient {
       }
     }
 
-    // Any activity collects the progress bar if it's ready. input.consumed is
-    // intentionally NOT set here so nothing else is blocked.
-    if (!modalOpen && activity && this.channel && !input.consumed) {
+    // Any activity collects the progress bar if it's ready, even with a modal
+    // open or after another UI element consumed the click.
+    // This collection path must never block or swallow the original interaction.
+    if (activity && this.channel) {
       claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
     }
 
