@@ -8,6 +8,7 @@ defmodule Incrementalist.Game.Constants do
 
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
+
   def area_defs do
     [
       %{
@@ -72,4 +73,5 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_off_fill_rate, do: 0.8
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
+  def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
 end

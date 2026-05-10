@@ -79,27 +79,9 @@ async function resolveClaimAsync(
   claimResolutionInFlight = true;
 
   try {
-    // Claim first once local projection reaches ACT!.
-    // If server says "not ready", hold at 0% and retry after can_claim_in.
-    let reward = await runCommand(() => progressClaimReward(channel));
-    while (
-      reward &&
-      reward.type === "command.error" &&
-      reward.reason === "claim_not_ready" &&
-      typeof reward.can_claim_in === "number" &&
-      reward.can_claim_in > 0
-    ) {
-      await sleep(reward.can_claim_in);
-      reward = await runCommand(() => progressClaimReward(channel));
-    }
+    await runCommand(() => progressClaimReward(channel));
   } finally {
     setPendingClaimIntent(false);
     claimResolutionInFlight = false;
   }
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, Math.max(0, ms));
-  });
 }

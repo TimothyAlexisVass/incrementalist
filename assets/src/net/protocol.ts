@@ -29,6 +29,18 @@ export type ShopItemDefinition = {
   can_purchase: boolean;
 };
 
+export type SisuState = {
+  current: BigNum;
+  max_basic: BigNum;
+  max_upgrade_level: number;
+  cycle_decay: number;
+};
+
+export type ProjectionParams = {
+  fill_rate: number;
+  can_claim_at: string | null;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -53,10 +65,10 @@ export type GameSnapshot = {
     idle_mode: boolean;
     first_played_at: string | null;
     progress_bar: {
-      sisu: BigNum;
       reward_multiplier: number;
       rewards_claimed: number;
     };
+    sisu: SisuState;
     areas: AreaDefinition[];
     features: {
       idle_mode_purchased: boolean;
@@ -65,9 +77,7 @@ export type GameSnapshot = {
       bonus_time_purchased: boolean;
     };
     shop: ShopItemDefinition[];
-    projection_params: {
-      fill_rate: number;
-    };
+    projection_params: ProjectionParams;
   };
   notices: NoticeState;
   save_slot: SaveSlotSummary;
@@ -114,6 +124,9 @@ export type ProgressClaimInResult = {
   status: "ok";
   command_id: number;
   can_claim_in: number;
+  sisu: SisuState;
+  can_claim_at: string | null;
+  fill_rate: number;
 };
 
 export type ProgressClaimRewardResult = {
@@ -125,6 +138,27 @@ export type ProgressClaimRewardResult = {
   level: number;
   shards: BigNum;
   cores: BigNum;
+  sisu: SisuState;
+};
+
+export type SisuRefillResult = {
+  type: "sisu.refill.result";
+  status: "ok";
+  command_id: number;
+  tier_id: string;
+  sisu: SisuState;
+  can_claim_at: string | null;
+  fill_rate: number;
+};
+
+export type SisuUpgradeMaxResult = {
+  type: "sisu.upgrade_max.result";
+  status: "ok";
+  command_id: number;
+  sisu: SisuState;
+  shards: BigNum;
+  can_claim_at: string | null;
+  fill_rate: number;
 };
 
 export type AreaSelectResult = {
@@ -142,6 +176,9 @@ export type ShopPurchaseResult = {
   coins?: BigNum;
   shards?: BigNum;
   cores?: BigNum;
+  sisu?: SisuState;
+  can_claim_at?: string | null;
+  fill_rate?: number;
 };
 
 export type ProgressSetIdleModeResult = {
@@ -150,6 +187,7 @@ export type ProgressSetIdleModeResult = {
   command_id: number;
   idle_mode: boolean;
   fill_rate: number;
+  can_claim_at: string | null;
 };
 
 export type NoticeSeeResult = {
@@ -172,7 +210,14 @@ export type CommandErrorReason =
   | "invalid_slot_index"
   | "claim_not_ready"
   | "area_locked"
-  | "unknown_area";
+  | "unknown_area"
+  | "tier_id_required"
+  | "unknown_tier"
+  | "sisu_generator_not_purchased"
+  | "sisu_max_upgrade_reached"
+  | "insufficient_shards"
+  | "sisu_already_higher"
+  | "upgrade_cost_missing";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -181,6 +226,8 @@ export type CommandErrorResult = {
   reason: CommandErrorReason;
   active_save_slot?: number;
   can_claim_in?: number;
+  sisu?: SisuState;
+  can_claim_at?: string | null;
 };
 
 export type AckableCommandResult =
@@ -190,6 +237,8 @@ export type AckableCommandResult =
   | SaveSlotResetResult
   | ProgressClaimInResult
   | ProgressClaimRewardResult
+  | SisuRefillResult
+  | SisuUpgradeMaxResult
   | AreaSelectResult
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
@@ -239,6 +288,8 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "save_slot.reset.result" ||
     result.type === "progress.claim_in.result" ||
     result.type === "progress.claim_reward.result" ||
+    result.type === "sisu.refill.result" ||
+    result.type === "sisu.upgrade_max.result" ||
     result.type === "area.select.result" ||
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||

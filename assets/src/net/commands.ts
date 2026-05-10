@@ -8,6 +8,8 @@ import type {
   ProgressClaimInResult,
   ProgressClaimRewardResult,
   ProgressSetIdleModeResult,
+  SisuRefillResult,
+  SisuUpgradeMaxResult,
   AreaSelectResult,
   ShopPurchaseResult,
   NoticeSeeResult,
@@ -41,6 +43,14 @@ export function progressClaimReward(channel: GameChannel) {
 
 export function progressSetIdleMode(channel: GameChannel, enabled: boolean) {
   return channel.pushCommand<CommandPushResult<ProgressSetIdleModeResult | CommandErrorResult>>("progress.set_idle_mode", { enabled });
+}
+
+export function sisuRefill(channel: GameChannel, tierId: string) {
+  return channel.pushCommand<CommandPushResult<SisuRefillResult | CommandErrorResult>>("sisu.refill", { tier_id: tierId });
+}
+
+export function sisuUpgradeMax(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<SisuUpgradeMaxResult | CommandErrorResult>>("sisu.upgrade_max");
 }
 
 export function selectArea(channel: GameChannel, areaKey: string) {

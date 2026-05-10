@@ -1,4 +1,13 @@
-import type { GameSnapshot, SaveSlotSummary, ServerResult, AreaSelectResult, NoticeSeeResult, NoticeAckResult } from "./protocol";
+import type {
+  GameSnapshot,
+  SaveSlotSummary,
+  ServerResult,
+  AreaSelectResult,
+  NoticeSeeResult,
+  NoticeAckResult,
+  SisuState
+} from "./protocol";
+import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
 
 export type ServerState = {
@@ -46,18 +55,25 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyAuthoritativeData(state, result);
   }
 
+  if (result.type === "progress.claim_in.result" || result.type === "progress.set_idle_mode.result") {
+    applyProjectionData(state, result);
+  }
+
+  if (result.type === "command.error" && result.reason === "claim_not_ready") {
+    applyProjectionData(state, result);
+  }
+
   if (result.type === "area.select.result") {
     applyAreaResult(state, result);
   }
 
-  if (result.type === "shop.purchase.result") {
+  if (result.type === "shop.purchase.result" || result.type === "sisu.refill.result" || result.type === "sisu.upgrade_max.result") {
     applyAuthoritativeData(state, result);
+    applyProjectionData(state, result);
   }
 
-  if (result.type === "progress.set_idle_mode.result") {
-    if (state.snapshot) {
-      state.snapshot.state.idle_mode = result.idle_mode;
-    }
+  if (result.type === "progress.set_idle_mode.result" && state.snapshot) {
+    state.snapshot.state.idle_mode = result.idle_mode;
   }
 
   if (result.type === "notice.see.result" || result.type === "notice.ack.result") {
@@ -68,8 +84,6 @@ export function applyResult(state: ServerState, result: ServerResult): void {
   state.status = statusForResult(result);
 }
 
-import type { BigNum } from "../core/bignum";
-
 export function applyAuthoritativeData(
   state: ServerState,
   data: {
@@ -79,6 +93,7 @@ export function applyAuthoritativeData(
     shards?: BigNum;
     cores?: BigNum;
     item_id?: string;
+    sisu?: SisuState;
   }
 ) {
   if (!state.snapshot) return;
@@ -103,6 +118,7 @@ export function applyAuthoritativeData(
 
   if (data.shards !== undefined) state.snapshot.state.shards = data.shards;
   if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
+  if (data.sisu !== undefined) state.snapshot.state.sisu = data.sisu;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -123,6 +139,29 @@ export function applyAuthoritativeData(
           break;
       }
     }
+  }
+}
+
+export function applyProjectionData(
+  state: ServerState,
+  data: {
+    fill_rate?: number;
+    can_claim_at?: string | null;
+    sisu?: SisuState;
+  }
+) {
+  if (!state.snapshot) return;
+
+  if (data.fill_rate !== undefined) {
+    state.snapshot.state.projection_params.fill_rate = data.fill_rate;
+  }
+
+  if (data.can_claim_at !== undefined) {
+    state.snapshot.state.projection_params.can_claim_at = data.can_claim_at;
+  }
+
+  if (data.sisu !== undefined) {
+    state.snapshot.state.sisu = data.sisu;
   }
 }
 

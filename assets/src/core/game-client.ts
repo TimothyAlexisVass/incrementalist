@@ -20,6 +20,7 @@ import {
   getStateFromSnapshot,
   applyProgressResult
 } from "../features/progress-bar/view-model";
+import { createSisuGeneratorModal, renderSisuControl, type SisuControlLayout } from "../features/sisu/render";
 import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
@@ -44,7 +45,7 @@ import { Store } from "./store";
 import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
-import { Interactions, InteractionState } from "../ui/managers/interactions";
+import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
 import { notices } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 
@@ -62,6 +63,7 @@ export class GameClient {
   public readonly ui = new UserInterface();
   private readonly mainMenu = new MainMenu();
   private readonly interactions: Interactions;
+  private sisuControlLayout: SisuControlLayout | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -364,6 +366,9 @@ export class GameClient {
     renderAreaBackground(this.ctx, this.canvas);
     
     renderProgressBar(this.ctx, this.canvas);
+    this.sisuControlLayout = this.store.state.snapshot
+      ? renderSisuControl(this.ctx, this.canvas, this.store.state)
+      : null;
     
     if (this.store.state.snapshot) {
       renderAreaSpecifics(this.ctx, this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
@@ -384,7 +389,9 @@ export class GameClient {
     renderFloatingTexts(this.ctx, this.floatingTexts);
 
     // 2. Handle specific UI element clicks before general activity collection.
-    if (input.clicked && input.pointer && this.channel) {
+    const modalOpen = this.ui.modals.isOpen();
+
+    if (!modalOpen && input.clicked && input.pointer && this.channel) {
       if (handleProgressClick(
         this.channel, 
         this.canvas, 
@@ -396,9 +403,25 @@ export class GameClient {
       }
     }
 
+    if (!modalOpen && input.clicked && input.pointer && this.sisuControlLayout && pointInRect(input.pointer, this.sisuControlLayout.controlRect)) {
+      input.consumed = true;
+      if (this.store.state.snapshot?.state.features.sisu_generator_purchased && this.channel) {
+        this.ui.modals.open(
+          createSisuGeneratorModal(
+            () => this.store.state,
+            this.channel,
+            (cmd) => this.runCommand(cmd),
+            () => this.ui.modals.close()
+          )
+        );
+      } else {
+        this.openShopAndHighlight("sisu_generator");
+      }
+    }
+
     // Any activity collects the progress bar if it's ready. input.consumed is
     // intentionally NOT set here so nothing else is blocked.
-    if (activity && this.channel && !input.consumed) {
+    if (!modalOpen && activity && this.channel && !input.consumed) {
       claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
     }
 
@@ -442,4 +465,3 @@ export class GameClient {
 function clearsCommandQueue(result: AckableCommandResult) {
   return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
 }
-

@@ -10,7 +10,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlot, SaveSlots}
   alias Incrementalist.Game.{Snapshots, Time}
-  alias Incrementalist.Game.Features.Progress.Bar
+  alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -49,7 +49,10 @@ defmodule Incrementalist.Game.CommandExecutor do
          %{
            "type" => "progress.claim_in.result",
            "command_id" => command.command_id,
-           "can_claim_in" => can_claim_in
+           "can_claim_in" => can_claim_in,
+           "sisu" => next_state.sisu,
+           "can_claim_at" => next_state.can_claim_at,
+           "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
          }, active_slot.id}
 
       "progress.claim_reward" ->
@@ -62,6 +65,7 @@ defmodule Incrementalist.Game.CommandExecutor do
             scheduled_state
             |> Bar.claim_reward()
             |> Incrementalist.Game.Rewards.apply_level_ups()
+            |> Sisu.advance_cycle(now)
             |> Bar.finalize_claim(now)
 
           updated_slot =
@@ -77,7 +81,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "exp" => new_state.exp,
              "level" => new_state.level,
              "shards" => new_state.shards,
-             "cores" => new_state.cores
+             "cores" => new_state.cores,
+             "sisu" => new_state.sisu
            }, active_slot.id}
         else
           {"failed",
@@ -86,7 +91,9 @@ defmodule Incrementalist.Game.CommandExecutor do
              "status" => "error",
              "command_id" => command.command_id,
              "reason" => "claim_not_ready",
-             "can_claim_in" => can_claim_in
+             "can_claim_in" => can_claim_in,
+             "sisu" => scheduled_state.sisu,
+             "can_claim_at" => scheduled_state.can_claim_at
            }, active_slot.id}
         end
 
@@ -113,7 +120,8 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, area_key} <- fetch_area_key(command.intent),
-             {:ok, next_state} <- Incrementalist.Game.Features.Areas.select_area(active_slot.state, area_key) do
+             {:ok, next_state} <-
+               Incrementalist.Game.Features.Areas.select_area(active_slot.state, area_key) do
           updated_slot =
             SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
 
@@ -128,7 +136,10 @@ defmodule Incrementalist.Game.CommandExecutor do
            }, active_slot.id}
         else
           {:error, reason} ->
-            {"failed", error_result(reason, command), active_slot.id}
+            {"failed",
+             error_result(reason, command, %{
+               "can_claim_at" => active_slot.state.can_claim_at
+             }), active_slot.id}
         end
 
       "progress.set_idle_mode" ->
@@ -147,6 +158,59 @@ defmodule Incrementalist.Game.CommandExecutor do
              "status" => "ok",
              "command_id" => command.command_id,
              "idle_mode" => enabled,
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
+             "can_claim_at" => next_state.can_claim_at
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed",
+             error_result(reason, command, %{
+               "can_claim_at" => active_slot.state.can_claim_at
+             }), active_slot.id}
+        end
+
+      "sisu.refill" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, tier_id} <- fetch_tier_id(command.intent),
+             {:ok, next_state} <- Sisu.refill(active_slot.state, tier_id, now) do
+          updated_slot =
+            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+
+          Repo.update!(updated_slot)
+
+          {"succeeded",
+           %{
+             "type" => "sisu.refill.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "tier_id" => tier_id,
+             "sisu" => next_state.sisu,
+             "can_claim_at" => next_state.can_claim_at,
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
+      "sisu.upgrade_max" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, next_state} <- Sisu.upgrade_max(active_slot.state, now) do
+          updated_slot =
+            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+
+          Repo.update!(updated_slot)
+
+          {"succeeded",
+           %{
+             "type" => "sisu.upgrade_max.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "sisu" => next_state.sisu,
+             "shards" => next_state.shards,
+             "can_claim_at" => next_state.can_claim_at,
              "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
            }, active_slot.id}
         else
@@ -158,7 +222,15 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, item_id} <- fetch_item_id(command.intent),
-             {:ok, next_state} <- Incrementalist.Game.Features.Shop.purchase(active_slot.state, item_id) do
+             {:ok, next_state} <-
+               Incrementalist.Game.Features.Shop.purchase(active_slot.state, item_id) do
+          next_state =
+            if item_id == "sisu_generator" do
+              Sisu.initialize_generator(next_state, now)
+            else
+              next_state
+            end
+
           updated_slot =
             SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
 
@@ -172,7 +244,10 @@ defmodule Incrementalist.Game.CommandExecutor do
              "item_id" => item_id,
              "coins" => next_state.coins,
              "shards" => next_state.shards,
-             "cores" => next_state.cores
+             "cores" => next_state.cores,
+             "sisu" => next_state.sisu,
+             "can_claim_at" => next_state.can_claim_at,
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
            }, active_slot.id}
         else
           {:error, reason} ->
@@ -183,10 +258,17 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, leaf_id} <- fetch_leaf_id(command.intent) do
-          parent_ids = Map.get(command.intent, "parent_ids", []) || Map.get(command.intent, :parent_ids, [])
+          parent_ids =
+            Map.get(command.intent, "parent_ids", []) || Map.get(command.intent, :parent_ids, [])
 
           # 1. Mark leaf as seen
-          next_notices = Incrementalist.Game.Notices.see(active_slot.notices, leaf_id, active_slot.state.level, now)
+          next_notices =
+            Incrementalist.Game.Notices.see(
+              active_slot.notices,
+              leaf_id,
+              active_slot.state.level,
+              now
+            )
 
           # 2. Acknowledge parents (bubbling clear)
           next_notices =
@@ -327,10 +409,24 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_area_key(%{"area" => area}) when is_binary(area), do: {:ok, area}
   defp fetch_area_key(%{area: area}) when is_binary(area), do: {:ok, area}
   defp fetch_area_key(_intent), do: {:error, "area_required"}
-  
+
   defp fetch_item_id(%{"item_id" => item_id}) when is_binary(item_id), do: {:ok, item_id}
   defp fetch_item_id(%{item_id: item_id}) when is_binary(item_id), do: {:ok, item_id}
   defp fetch_item_id(_intent), do: {:error, "item_id_required"}
+
+  defp fetch_tier_id(%{"tier_id" => tier_id}) when is_binary(tier_id),
+    do: validate_tier_id(tier_id)
+
+  defp fetch_tier_id(%{tier_id: tier_id}) when is_binary(tier_id), do: validate_tier_id(tier_id)
+  defp fetch_tier_id(_intent), do: {:error, "tier_id_required"}
+
+  defp validate_tier_id(tier_id) do
+    if Sisu.tier?(tier_id) do
+      {:ok, tier_id}
+    else
+      {:error, "unknown_tier"}
+    end
+  end
 
   defp fetch_leaf_id(%{"leaf_id" => id}) when is_binary(id), do: {:ok, id}
   defp fetch_leaf_id(%{leaf_id: id}) when is_binary(id), do: {:ok, id}

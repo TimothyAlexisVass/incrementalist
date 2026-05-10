@@ -11,6 +11,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   import Ecto.Query
 
   alias Incrementalist.Game.{Constants, Snapshots, State, Time, Notices}
+  alias Incrementalist.Game.Features.Progress.Sisu
   alias Incrementalist.Game.Persistence.{Player, SaveSlot}
   alias Incrementalist.Repo
 
@@ -109,9 +110,18 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   def initialize_if_empty(%SaveSlot{} = save_slot, _now), do: save_slot
 
   def autosave(%SaveSlot{} = save_slot, now \\ Time.now()) do
+    projected_state =
+      if save_slot.state do
+        save_slot.state
+        |> Sisu.project_state(now)
+        |> State.touch_saved_at(now)
+      else
+        nil
+      end
+
     save_slot
     |> SaveSlot.changeset(%{
-      state: State.touch_saved_at(save_slot.state, now),
+      state: projected_state,
       notices: save_slot.notices,
       last_saved_at: now
     })

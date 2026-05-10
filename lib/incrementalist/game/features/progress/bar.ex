@@ -1,8 +1,8 @@
 defmodule Incrementalist.Game.Features.Progress.Bar do
-  alias Incrementalist.Game.Time
-  alias Incrementalist.Game.State
-
   alias Incrementalist.Game.Constants
+  alias Incrementalist.Game.Features.Progress.Sisu
+  alias Incrementalist.Game.State
+  alias Incrementalist.Game.Time
 
   def set_idle_mode(%State{} = state, enabled) do
     if state.features.idle_mode_purchased do
@@ -12,17 +12,14 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     end
   end
 
-  def get_progress_bar_fill_rate(%State{} = state, now) do
-    progress_bar = state.progress_bar
-    sisu_bn = if progress_bar, do: progress_bar.sisu, else: BigNum.one()
-    sisu = sisu_bn |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
+  def base_progress_bar_fill_rate(%State{} = state, now) do
     idle_mode = state.idle_mode || false
 
     base_rate =
       if idle_mode do
-        Constants.progress_bar_base_idle_mode_on_fill_rate() * sisu
+        Constants.progress_bar_base_idle_mode_on_fill_rate()
       else
-        Constants.progress_bar_base_idle_mode_off_fill_rate() * sisu
+        Constants.progress_bar_base_idle_mode_off_fill_rate()
       end
 
     if idle_mode do
@@ -30,7 +27,9 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     else
       first_played_at_ms =
         case state.first_played_at do
-          nil -> Time.to_unix_ms(now)
+          nil ->
+            Time.to_unix_ms(now)
+
           iso_str ->
             case Time.from_iso8601(iso_str) do
               {:ok, dt} -> Time.to_unix_ms(dt)
@@ -40,12 +39,12 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
       now_ms = Time.to_unix_ms(now)
       game_age_ms = now_ms - first_played_at_ms
-
       level = state.level || 1
 
       cond do
         game_age_ms < Constants.progress_bar_new_player_bonus_window_ms() ->
-          (base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier()) + Constants.progress_bar_new_player_bonus_fill_bonus()
+          base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier() +
+            Constants.progress_bar_new_player_bonus_fill_bonus()
 
         level < 35 ->
           base_rate * Constants.progress_bar_late_new_player_bonus_fill_multiplier()
@@ -56,45 +55,46 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     end
   end
 
-  def ensure_can_claim_at(%State{} = state, now) do
-    rate = get_progress_bar_fill_rate(state, now)
-    ms_required = if rate > 0, do: trunc(Constants.progress_bar_max_fill() * 1000 / rate), else: 0
-
-    can_claim_at_iso = state.can_claim_at
-    {state, can_claim_at_ms} =
-      case parse_iso_ms(can_claim_at_iso) do
-        {:ok, claim_at_ms} ->
-          {state, claim_at_ms}
-
-        :error ->
-          claim_at = Time.iso8601(DateTime.add(now, ms_required, :millisecond))
-          {%{state | can_claim_at: claim_at}, Time.to_unix_ms(DateTime.add(now, ms_required, :millisecond))}
-      end
-
-    now_ms = Time.to_unix_ms(now)
-    {state, max(0, can_claim_at_ms - now_ms)}
+  def get_progress_bar_fill_rate(%State{} = state, now) do
+    base_progress_bar_fill_rate(state, now) * sisu_multiplier(state)
   end
 
+  def ensure_can_claim_at(%State{} = state, now) do
+    projected = Sisu.project_state(state, now)
+    now_ms = Time.to_unix_ms(now)
+
+    case parse_iso_ms(state.can_claim_at) do
+      can_claim_at_ms when is_integer(can_claim_at_ms) ->
+        anchored = Map.put(projected, :can_claim_at, state.can_claim_at)
+
+        {anchored, max(0, can_claim_at_ms - now_ms)}
+
+      _ ->
+        ms_required = Sisu.claim_milliseconds(projected, now)
+        claim_at = Time.iso8601(DateTime.add(now, ms_required, :millisecond))
+        {%{projected | can_claim_at: claim_at}, ms_required}
+    end
+  end
 
   def finalize_claim(%State{} = state, now) do
     progress_bar = state.progress_bar || %State.ProgressBar{}
     rewards_claimed = (progress_bar.rewards_claimed || 0) + 1
     updated_progress_bar = %{progress_bar | rewards_claimed: rewards_claimed}
 
-    %{state |
-      progress_bar: updated_progress_bar,
-      last_claimed_at: Time.iso8601(now),
-      can_claim_at: nil
+    %{
+      state
+      | progress_bar: updated_progress_bar,
+        last_claimed_at: Time.iso8601(now),
+        can_claim_at: nil
     }
   end
 
   def claim_reward(%State{} = state, random_fn \\ &rand/0) do
-    progress_bar = state.progress_bar || %State.ProgressBar{}
-    sisu_bn = progress_bar.sisu || BigNum.one()
-    sisu = sisu_bn |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
+    current_sisu = state.sisu.current || BigNum.one()
+    sisu = current_sisu |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
     level = state.level || 1
     idle_mode = state.idle_mode || false
-    reward_multiplier = progress_bar.reward_multiplier || 1.0
+    reward_multiplier = state.progress_bar.reward_multiplier || 1.0
 
     level_pow = :math.pow(level, 0.7)
 
@@ -107,7 +107,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
     {exp_gain, coin_gain, shard_gain, core_gain} =
       if level == 1 do
-        {BigNum.from_number(4), BigNum.from_number(500), BigNum.from_number(100), BigNum.from_number(20)}
+        {BigNum.from_number(4), BigNum.from_number(500), BigNum.from_number(100),
+         BigNum.from_number(20)}
       else
         exp = BigNum.from_number(trunc(exp_base * sisu * level_pow * reward_multiplier))
 
@@ -115,7 +116,11 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         coin = BigNum.from_number(trunc(35 * sisu * level_pow * reward_multiplier * variance))
 
         idle_mult = if idle_mode, do: 1, else: 2
-        shard = BigNum.from_number(trunc((BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0)) * idle_mult))
+
+        shard =
+          BigNum.from_number(
+            trunc(BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0) * idle_mult)
+          )
 
         core =
           if not idle_mode do
@@ -129,25 +134,34 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         {exp, coin, shard, core}
       end
 
-    %{state |
-      exp: BigNum.add(state.exp || BigNum.zero(), exp_gain),
-      coins: BigNum.add(state.coins || BigNum.zero(), coin_gain),
-      shards: BigNum.add(state.shards || BigNum.zero(), shard_gain),
-      cores: BigNum.add(state.cores || BigNum.zero(), core_gain)
+    %{
+      state
+      | exp: BigNum.add(state.exp || BigNum.zero(), exp_gain),
+        coins: BigNum.add(state.coins || BigNum.zero(), coin_gain),
+        shards: BigNum.add(state.shards || BigNum.zero(), shard_gain),
+        cores: BigNum.add(state.cores || BigNum.zero(), core_gain)
     }
   end
 
-
-  defp rand() do
-    :rand.uniform()
+  defp sisu_multiplier(%State{} = state) do
+    state.sisu.current
+    |> case do
+      %BigNum{} = current -> BigNum.to_float(current)
+      _ -> 1.0
+    end
+    |> max(Constants.progress_bar_sisu_min_multiplier())
   end
 
   defp parse_iso_ms(iso) when is_binary(iso) do
     case Time.from_iso8601(iso) do
-      {:ok, dt} -> {:ok, Time.to_unix_ms(dt)}
-      _ -> :error
+      {:ok, dt} -> Time.to_unix_ms(dt)
+      _ -> nil
     end
   end
 
-  defp parse_iso_ms(_), do: :error
+  defp parse_iso_ms(_), do: nil
+
+  defp rand() do
+    :rand.uniform()
+  end
 end

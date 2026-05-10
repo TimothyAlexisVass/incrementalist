@@ -20,15 +20,12 @@ defmodule Incrementalist.Game.State do
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      embeds_one :sisu, BigNum, on_replace: :update
       field :reward_multiplier, :float, default: 1.0
       field :rewards_claimed, :integer, default: 0
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      schema
-      |> cast(attrs, [:reward_multiplier, :rewards_claimed])
-      |> cast_embed(:sisu)
+      cast(schema, attrs, [:reward_multiplier, :rewards_claimed])
     end
   end
 
@@ -64,15 +61,16 @@ defmodule Incrementalist.Game.State do
     @derive Jason.Encoder
     embedded_schema do
       embeds_one :current, BigNum, on_replace: :update
-      embeds_one :max, BigNum, on_replace: :update
-      field :level, :integer, default: 1
+      embeds_one :max_basic, BigNum, on_replace: :update
+      field :max_upgrade_level, :integer, default: 0
+      field :cycle_decay, :float, default: 3.5
+      field :projected_at, :string
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      schema
-      |> cast(attrs, [:level])
+      cast(schema, attrs, [:max_upgrade_level, :cycle_decay, :projected_at])
       |> cast_embed(:current)
-      |> cast_embed(:max)
+      |> cast_embed(:max_basic)
     end
   end
 
@@ -82,7 +80,7 @@ defmodule Incrementalist.Game.State do
     field :version, :integer, default: @current_version
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
-    
+
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
     embeds_one :coins, BigNum, on_replace: :update
@@ -174,7 +172,6 @@ defmodule Incrementalist.Game.State do
     end
   end
 
-
   def new(now \\ Time.now()) do
     timestamp = Time.iso8601(now)
 
@@ -193,7 +190,6 @@ defmodule Incrementalist.Game.State do
       can_claim_at: nil,
       saved_at: timestamp,
       progress_bar: %ProgressBar{
-        sisu: BigNum.one(),
         reward_multiplier: 1.0,
         rewards_claimed: 0
       },
@@ -205,8 +201,11 @@ defmodule Incrementalist.Game.State do
       },
       sisu: %Sisu{
         current: BigNum.one(),
-        max: BigNum.one(),
-        level: 1
+        max_basic:
+          BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max()),
+        max_upgrade_level: 0,
+        cycle_decay: 3.5,
+        projected_at: timestamp
       }
     }
   end
@@ -220,54 +219,82 @@ defmodule Incrementalist.Game.State do
   def visible_state(nil, now), do: visible_state(new(now), now)
 
   def visible_state(%__MODULE__{} = state, now) do
+    projected_state = Incrementalist.Game.Features.Progress.Sisu.project_state(state, now)
+
     %{
-      "area" => state.area || "sage",
-      "level" => state.level || 1,
-      "exp" => state.exp || BigNum.zero(),
-      "required_exp" => state.required_exp || BigNum.from_number(20),
-      "coins" => state.coins || BigNum.zero(),
-      "shards" => state.shards || BigNum.zero(),
-      "cores" => state.cores || BigNum.zero(),
-      "idle_mode" => state.idle_mode || false,
-      "first_played_at" => state.first_played_at,
-      "saved_at" => state.saved_at,
+      "area" => projected_state.area || "sage",
+      "level" => projected_state.level || 1,
+      "exp" => projected_state.exp || BigNum.zero(),
+      "required_exp" => projected_state.required_exp || BigNum.from_number(20),
+      "coins" => projected_state.coins || BigNum.zero(),
+      "shards" => projected_state.shards || BigNum.zero(),
+      "cores" => projected_state.cores || BigNum.zero(),
+      "idle_mode" => projected_state.idle_mode || false,
+      "first_played_at" => projected_state.first_played_at,
+      "saved_at" => projected_state.saved_at,
       "progress_bar" => %{
-        "sisu" => if(state.progress_bar, do: state.progress_bar.sisu, else: BigNum.one()),
         "reward_multiplier" =>
-          if(state.progress_bar, do: state.progress_bar.reward_multiplier, else: 1.0),
+          if(projected_state.progress_bar,
+            do: projected_state.progress_bar.reward_multiplier,
+            else: 1.0
+          ),
         "rewards_claimed" =>
-          if(state.progress_bar, do: state.progress_bar.rewards_claimed, else: 0)
+          if(projected_state.progress_bar,
+            do: projected_state.progress_bar.rewards_claimed,
+            else: 0
+          )
+      },
+      "sisu" => %{
+        "current" =>
+          if(projected_state.sisu,
+            do: projected_state.sisu.current || BigNum.one(),
+            else: BigNum.one()
+          ),
+        "max_basic" =>
+          if(
+            projected_state.sisu && projected_state.sisu.max_basic,
+            do: projected_state.sisu.max_basic,
+            else: BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max())
+          ),
+        "max_upgrade_level" =>
+          if(projected_state.sisu, do: projected_state.sisu.max_upgrade_level || 0, else: 0),
+        "cycle_decay" =>
+          if(projected_state.sisu, do: projected_state.sisu.cycle_decay || 3.5, else: 3.5)
       },
       "areas" =>
-        Enum.map(Incrementalist.Game.Constants.area_defs(), fn def ->
-          Map.put(def, :is_locked, (state.level || 1) < def.unlock_level)
+        Enum.map(Incrementalist.Game.Constants.area_defs(), fn area_def ->
+          Map.put(area_def, :is_locked, (projected_state.level || 1) < area_def.unlock_level)
         end),
       "features" => %{
-        "idle_mode_purchased" => state.features.idle_mode_purchased,
-        "world_map_unlocked" => state.features.world_map_unlocked,
-        "sisu_generator_purchased" => state.features.sisu_generator_purchased,
-        "bonus_time_purchased" => state.features.bonus_time_purchased
+        "idle_mode_purchased" => projected_state.features.idle_mode_purchased,
+        "world_map_unlocked" => projected_state.features.world_map_unlocked,
+        "sisu_generator_purchased" => projected_state.features.sisu_generator_purchased,
+        "bonus_time_purchased" => projected_state.features.bonus_time_purchased
       },
       "shop" =>
         Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
           is_purchased =
             case def.id do
-              "idle_mode" -> state.features.idle_mode_purchased
-              "sisu_generator" -> state.features.sisu_generator_purchased
-              "bonus_time" -> state.features.bonus_time_purchased
+              "idle_mode" -> projected_state.features.idle_mode_purchased
+              "sisu_generator" -> projected_state.features.sisu_generator_purchased
+              "bonus_time" -> projected_state.features.bonus_time_purchased
               _ -> false
             end
 
           def
           |> Map.put(:is_purchased, is_purchased)
-          |> Map.put(:can_purchase, !is_purchased && state.level >= def.required_level)
+          |> Map.put(:can_purchase, !is_purchased && projected_state.level >= def.required_level)
         end),
       "projection_params" => %{
-        "fill_rate" => Incrementalist.Game.Features.Progress.Bar.get_progress_bar_fill_rate(state, now)
+        "fill_rate" =>
+          Incrementalist.Game.Features.Progress.Bar.get_progress_bar_fill_rate(
+            projected_state,
+            now
+          ),
+        "can_claim_at" => projected_state.can_claim_at
       }
     }
   end
-
 
   def summary(slot, active_slot_index) do
     state = slot.state

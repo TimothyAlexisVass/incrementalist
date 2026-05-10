@@ -17,6 +17,7 @@ export type ProgressViewModel = {
   firstPlayedAtMs: number;
   idleMode: boolean;
   canClaimInMs: number | null;
+  canClaimAt: string | null;
   nextVerifyAtMs: number;
   pendingClaimIntent: boolean;
   fillRate: number;
@@ -32,6 +33,7 @@ let currentViewModel: ProgressViewModel = {
   firstPlayedAtMs: 0,
   idleMode: false,
   canClaimInMs: null,
+  canClaimAt: null,
   nextVerifyAtMs: 0,
   pendingClaimIntent: false,
   fillRate: 0,
@@ -81,12 +83,13 @@ export function updateProjectedFill(deltaTimeMs: number) {
 export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.state = "awaiting_server_confirmation";
   currentViewModel.projectedFill = 0;
-  currentViewModel.sisu = snapshot.state.progress_bar.sisu;
+  currentViewModel.sisu = snapshot.state.sisu.current;
   currentViewModel.rewardMultiplier = snapshot.state.progress_bar.reward_multiplier;
   currentViewModel.level = snapshot.state.level;
   currentViewModel.firstPlayedAtMs = parseTimestamp(snapshot.state.first_played_at, snapshot.server_time);
   currentViewModel.idleMode = snapshot.state.idle_mode;
   currentViewModel.canClaimInMs = null;
+  currentViewModel.canClaimAt = snapshot.state.projection_params.can_claim_at;
   currentViewModel.nextVerifyAtMs = 0;
   currentViewModel.pendingClaimIntent = false;
   currentViewModel.fillRate = snapshot.state.projection_params.fill_rate;
@@ -94,9 +97,13 @@ export function getStateFromSnapshot(snapshot: GameSnapshot) {
 }
 
 export function handleClaimInResult(result: ProgressClaimInResult) {
+  currentViewModel.sisu = result.sisu.current;
+
   if (result.can_claim_in <= 100) {
     currentViewModel.state = "confirmed_collectible";
     currentViewModel.canClaimInMs = 0;
+    currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
+    currentViewModel.fillRate = result.fill_rate;
     currentViewModel.projectedFill = 100;
     currentViewModel.nextVerifyAtMs = 0;
   } else {
@@ -109,6 +116,8 @@ export function handleClaimInResult(result: ProgressClaimInResult) {
       currentViewModel.canClaimInMs = cycleDurationMs;
       currentViewModel.state = "projecting";
       currentViewModel.projectedFill = 0;
+      currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
+      currentViewModel.fillRate = result.fill_rate;
       currentViewModel.nextVerifyAtMs = 0;
       return;
     }
@@ -116,6 +125,8 @@ export function handleClaimInResult(result: ProgressClaimInResult) {
     // Boundary verification says "not yet": wait locally until the returned
     // server time window elapses, then re-verify.
     currentViewModel.canClaimInMs = result.can_claim_in;
+    currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
+    currentViewModel.fillRate = result.fill_rate;
     setCycleDurationMs(Math.max(duration, currentViewModel.canClaimInMs));
     currentViewModel.state = "awaiting_server_confirmation";
     currentViewModel.nextVerifyAtMs = Date.now() + result.can_claim_in;
@@ -127,6 +138,7 @@ export function handleClaimRewardResult() {
   currentViewModel.state = "awaiting_server_confirmation";
   currentViewModel.projectedFill = 0;
   currentViewModel.canClaimInMs = null;
+  currentViewModel.canClaimAt = null;
   currentViewModel.nextVerifyAtMs = 0;
   currentViewModel.pendingClaimIntent = false;
 }
@@ -135,8 +147,10 @@ export function beginAsyncClaimResolution() {
   currentViewModel.state = "awaiting_server_confirmation";
   currentViewModel.projectedFill = 0;
   currentViewModel.canClaimInMs = null;
-  // Pause normal verify loop while async claim resolution is running.
-  currentViewModel.nextVerifyAtMs = Number.MAX_SAFE_INTEGER;
+  currentViewModel.canClaimAt = null;
+  // `pendingClaimIntent` already gates `shouldSendClaimIn`.
+  // Keeping nextVerifyAt finite prevents a stuck loop if a reward command is queued.
+  currentViewModel.nextVerifyAtMs = Date.now();
   currentViewModel.pendingClaimIntent = true;
 }
 
@@ -146,6 +160,7 @@ export function handleClaimNotReadyError(canClaimInMs: number | null = null) {
   // authoritative reward readiness from the server.
   currentViewModel.projectedFill = 0;
   currentViewModel.canClaimInMs = null;
+  currentViewModel.canClaimAt = null;
   const delay = canClaimInMs && canClaimInMs > 0 ? canClaimInMs : 110;
   currentViewModel.nextVerifyAtMs = Date.now() + delay;
 }
@@ -173,6 +188,7 @@ export function applyProgressResult(
   }
 
   if (result.type === "progress.claim_reward.result") {
+    currentViewModel.sisu = result.sisu.current;
     handleClaimRewardResult();
 
     if (effects && previousAmounts) {
@@ -189,6 +205,12 @@ export function applyProgressResult(
   }
 
   if (result.type === "command.error" && result.reason === "claim_not_ready") {
+    if (result.sisu) {
+      currentViewModel.sisu = result.sisu.current;
+    }
+    if (result.can_claim_at !== undefined) {
+      currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
+    }
     handleClaimNotReadyError(result.can_claim_in ?? null);
     return;
   }
@@ -196,6 +218,7 @@ export function applyProgressResult(
   if (result.type === "progress.set_idle_mode.result") {
     currentViewModel.idleMode = result.idle_mode;
     currentViewModel.fillRate = result.fill_rate;
+    currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
 
     // Recalculate canClaimInMs based on new fill rate if we are projecting
     if (currentViewModel.state === "projecting" && currentViewModel.canClaimInMs !== null) {
@@ -210,6 +233,19 @@ export function applyProgressResult(
     if (result.item_id === "idle_mode") {
       currentViewModel.idleModePurchased = true;
     }
+    if (result.item_id === "sisu_generator" && result.sisu) {
+      currentViewModel.sisu = result.sisu.current;
+      currentViewModel.canClaimAt = result.can_claim_at ?? currentViewModel.canClaimAt;
+      if (typeof result.fill_rate === "number") {
+        currentViewModel.fillRate = result.fill_rate;
+      }
+    }
+  }
+
+  if (result.type === "sisu.refill.result" || result.type === "sisu.upgrade_max.result") {
+    currentViewModel.sisu = result.sisu.current;
+    currentViewModel.canClaimAt = result.can_claim_at;
+    currentViewModel.fillRate = result.fill_rate;
   }
 }
 
@@ -230,6 +266,16 @@ export function shouldSendClaimIn(nowMs: number) {
 
 export function setPendingClaimIntent(value: boolean) {
   currentViewModel.pendingClaimIntent = value;
+
+  if (
+    !value &&
+    currentViewModel.state === "awaiting_server_confirmation" &&
+    currentViewModel.canClaimInMs === null &&
+    currentViewModel.nextVerifyAtMs > Date.now() + 5_000
+  ) {
+    // Recover from stale sentinel timestamps and force a fresh server probe.
+    currentViewModel.nextVerifyAtMs = Date.now();
+  }
 }
 
 export function hasPendingClaimIntent() {

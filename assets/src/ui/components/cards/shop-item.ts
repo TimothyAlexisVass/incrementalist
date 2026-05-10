@@ -1,5 +1,4 @@
 import { COLORS } from '../../../colors';
-import { rgbaArrayToCss } from '../../../utils';
 import {
   SHOP_ITEM_NAME_FONT,
   SHOP_ITEM_DESC_FONT,
@@ -53,7 +52,7 @@ export function drawShopItemCard(
   ctx.lineWidth = isHighlighted ? 4 : 2;
   
   if (isHighlighted) {
-    ctx.shadowColor = rgbaArrayToCss(COLORS.overlay.statusUnlocked, 0.5);
+    ctx.shadowColor = COLORS.overlay.statusUnlocked;
     ctx.shadowBlur = 15;
   }
   

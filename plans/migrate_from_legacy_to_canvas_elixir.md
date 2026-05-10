@@ -292,7 +292,17 @@ Deliverable: idle mode changes fill pacing and updates the HUD smoothly.
 
 - Port Sisu state, refill tiers, max upgrade costs, and decay to Elixir.
 - Use lazy time advancement for Sisu decay.
+- Sisu decay only advances while the progress bar is filling.
+- Use a closed-form geometric projection per round rather than a per-second simulation loop.
+- Server-provided projection data should include `can_claim_at` and `boost_at_round_end`.
+- Rename `boost_at_round_end` to `sisu_at_claim`.
+- `sisu_at_claim` is the exact projected multiplier at the moment of `can_claim_at`.
+- Recompute those projection values immediately after any Sisu change.
+- Expose Sisu as a dedicated top-level snapshot object.
 - Implement `sisu.refill` and `sisu.upgrade_max`.
+- Keep the legacy Sisu Generator modal for refill and upgrade actions.
+- `sisu.refill` and `sisu.upgrade_max` return narrow command results.
+- Those results include the full `sisu` object plus `can_claim_at` and `sisu_at_claim`.
 - Frontend renders Sisu meter and refill controls from snapshots.
 
 Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
