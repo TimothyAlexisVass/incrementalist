@@ -6,60 +6,39 @@ import {
   SISU_METER_FONT,
   SISU_UPGRADE_BUTTON_FONT
 } from "../../config";
-import { compare, fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
-import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
-import { sisuRefill, sisuUpgradeMax } from "../../net/commands";
+import type { BigNum } from "../../core/bignum";
+import type { GameChannel } from "../../net/game-channel";
 import type { ServerResult } from "../../net/protocol";
 import type { ServerState } from "../../net/snapshots";
+import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
 import { drawButton } from "../../ui/components/button";
 import type { InteractionState } from "../../ui/managers/interactions";
-import { pointInRect } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
-import { clampNumber, drawLockedElement, hexToRgbArray, lerp, lerpColor, rgbArrayToCss } from "../../utils";
-import { formatCountRatio, formatMultiplierDelta, formatNumber, formatSisuMultiplier } from "../../utils/format";
-import type { GameChannel } from "../../net/game-channel";
+import { clampNumber, drawLockedElement, rgbArrayToCss } from "../../utils";
+import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
-import { getViewModel } from "../progress-bar/view-model";
 
-import { UPGRADE_COSTS } from "./levels";
-
-type Rect = { x: number; y: number; width: number; height: number };
-
-type TierId = "blue" | "yellow" | "purple";
-
-const SISU_BASE_MAX = 2;
-const SISU_MIN_MULTIPLIER = 1;
-const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
-const SISU_REFILL_TIERS: Record<TierId, { id: TierId; label: string; colorKey: "blue" | "yellow" | "purple"; multiplier: number }> = {
-  blue: { id: "blue", label: "Blue", colorKey: "blue", multiplier: 1.0 },
-  yellow: { id: "yellow", label: "Yellow", colorKey: "yellow", multiplier: 1.5 },
-  purple: { id: "purple", label: "Purple", colorKey: "purple", multiplier: 2.5 }
-};
-
-const SISU_VISUAL_STATE = {
-  displayCurrent: SISU_MIN_MULTIPLIER,
-  displayCycleDecay: 0,
-  initialized: false,
-  lastTimestampMs: 0
-};
+import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
+import {
+  formatDecay,
+  getSisuControlRect,
+  getSisuMeterColorArray,
+  getSisuTierTarget,
+  getUpgradeButtonState,
+  SISU_BASE_MAX,
+  SISU_MAX_UPGRADE_LEVEL,
+  SISU_MIN_MULTIPLIER,
+  SISU_REFILL_TIERS,
+  toFiniteBigNumNumber,
+  updateSisuVisualProjection,
+  type Rect
+} from "./view-model";
 
 export type SisuControlLayout = {
   controlRect: Rect;
 };
 
-export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
-  const progressBar = getProgressBarLayout(canvas);
-  const barRadius = 35;
-  const centerX = progressBar.x + progressBar.width / 2;
-  const centerY = progressBar.y + progressBar.height + 100;
-
-  return {
-    x: centerX - barRadius,
-    y: centerY - barRadius,
-    width: barRadius * 2,
-    height: barRadius + 42
-  };
-}
+export { getSisuControlRect };
 
 export function renderSisuControl(
   ctx: CanvasRenderingContext2D,
@@ -69,11 +48,9 @@ export function renderSisuControl(
   const snapshot = state.snapshot;
   if (!snapshot) return null;
 
-  const sisu = snapshot.state.sisu;
-  const current = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(sisu?.current, SISU_MIN_MULTIPLIER));
-  const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(sisu?.max_basic, SISU_BASE_MAX));
+  const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
   const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
-  const purpleMax = maxBasic * SISU_REFILL_TIERS.purple.multiplier;
+  const purpleMax = getSisuTierTarget(maxBasic, "purple");
   const isUnlocked = Boolean(snapshot.state.features.sisu_generator_purchased);
 
   const barRadius = 35;
@@ -115,9 +92,9 @@ export function renderSisuControl(
     ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 20);
 
     const iconY = centerY + 35;
-    drawSisuHudIcon(ctx, centerX - 18, iconY, SISU_REFILL_TIERS.blue.colorKey);
-    drawSisuHudIcon(ctx, centerX, iconY, SISU_REFILL_TIERS.yellow.colorKey);
-    drawSisuHudIcon(ctx, centerX + 18, iconY, SISU_REFILL_TIERS.purple.colorKey);
+    drawSisuHudIcon(ctx, centerX - 18, iconY, "blue");
+    drawSisuHudIcon(ctx, centerX, iconY, "yellow");
+    drawSisuHudIcon(ctx, centerX + 18, iconY, "purple");
   };
 
   if (!isUnlocked) {
@@ -139,7 +116,7 @@ export function createSisuGeneratorModal(
 }
 
 class SisuGeneratorModalImpl implements Modal {
-  private readonly refillRects: Array<{ tier: TierId; rect: Rect }> = [];
+  private readonly refillRects: SisuRefillHitRect[] = [];
   private modalRect: Rect | null = null;
   private closeRect: Rect | null = null;
   private upgradeRect: Rect | null = null;
@@ -206,25 +183,25 @@ class SisuGeneratorModalImpl implements Modal {
     ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, modalX + modalWidth / 2, modalY + 116);
 
     this.refillRects.length = 0;
-    const tierValues = Object.values(SISU_REFILL_TIERS);
     const refillWidth = 132;
     const refillHeight = 88;
     const refillGap = 22;
-    const totalRefillWidth = (refillWidth * tierValues.length) + (refillGap * (tierValues.length - 1));
+    const totalRefillWidth =
+      refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
     const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
     const refillY = modalY + 144;
 
-    for (let index = 0; index < tierValues.length; index += 1) {
-      const tier = tierValues[index];
+    for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
+      const tier = SISU_REFILL_TIERS[index];
       const target = getSisuTierTarget(maxBasic, tier.id);
       const rect = {
-        x: refillStartX + (index * (refillWidth + refillGap)),
+        x: refillStartX + index * (refillWidth + refillGap),
         y: refillY,
         width: refillWidth,
         height: refillHeight
       };
       this.refillRects.push({ tier: tier.id, rect });
-      drawSisuRefillControl(ctx, rect, tier, target, currentSisu);
+      drawSisuRefillControl(ctx, rect, tier.label, tier.colorKey, target, currentSisu);
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
@@ -262,46 +239,22 @@ class SisuGeneratorModalImpl implements Modal {
 
     ctx.restore();
 
-    if (handleClick(input, this.closeRect)) {
-      this.onClose();
-      return;
-    }
-
-    if (this.modalRect && input.clicked && !input.consumed && input.pointer && !pointInRect(input.pointer, this.modalRect)) {
-      input.consumed = true;
-      this.onClose();
-      return;
-    }
-
-    if (this.upgradeRect && !upgradeState.disabled && handleClick(input, this.upgradeRect)) {
-      void this.runCommand(() => sisuUpgradeMax(this.channel));
-      return;
-    }
-
-    for (const refillRect of this.refillRects) {
-      if (handleClick(input, refillRect.rect)) {
-        void this.runCommand(() => sisuRefill(this.channel, refillRect.tier));
-        return;
-      }
-    }
+    handleSisuModalInteractions(
+      input,
+      this.modalRect,
+      this.closeRect,
+      this.upgradeRect,
+      !upgradeState.disabled,
+      this.refillRects,
+      this.channel,
+      this.runCommand,
+      this.onClose
+    );
   }
 
   tick(_dt: number, _input: InteractionState) {
     // Reactive-only modal.
   }
-}
-
-function handleClick(input: InteractionState, rect: Rect | null): boolean {
-  if (!rect || !input.clicked || input.consumed || !input.pointer) {
-    return false;
-  }
-
-  if (!pointInRect(input.pointer, rect)) {
-    return false;
-  }
-
-  input.consumed = true;
-  return true;
 }
 
 function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix: string | null, cost: BigNum) {
@@ -323,7 +276,7 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
   });
   const rightWidth = rightText ? ctx.measureText(rightText).width : 0;
   const totalWidth = leftWidth + amountWidth + rightWidth;
-  let currentX = rect.x + (rect.width / 2) - (totalWidth / 2);
+  let currentX = rect.x + rect.width / 2 - totalWidth / 2;
 
   ctx.fillStyle = textColor;
   ctx.textAlign = "left";
@@ -368,12 +321,13 @@ function drawSisuHudIcon(
 function drawSisuRefillControl(
   ctx: CanvasRenderingContext2D,
   rect: Rect,
-  tier: { label: string; colorKey: "blue" | "yellow" | "purple" },
+  label: string,
+  colorKey: "blue" | "yellow" | "purple",
   target: number,
   currentSisu: number
 ) {
   const canRefill = currentSisu < target;
-  const tierColor = COLORS.sisu[tier.colorKey];
+  const tierColor = COLORS.sisu[colorKey];
 
   ctx.fillStyle = canRefill ? COLORS.button.surface.active : COLORS.button.secondary.surface;
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -395,135 +349,7 @@ function drawSisuRefillControl(
   ctx.font = SISU_METER_FONT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(tier.label, circleX, rect.y + 57);
+  ctx.fillText(label, circleX, rect.y + 57);
   ctx.font = SISU_DECAY_FONT;
   ctx.fillText(formatSisuMultiplier(target), circleX, rect.y + 76);
 }
-
-function getSisuTierTarget(maxBasic: number, tierId: TierId): number {
-  const tier = SISU_REFILL_TIERS[tierId];
-  return Math.round(maxBasic * tier.multiplier * 100) / 100;
-}
-
-function getSisuMeterColorArray(sisuValue: number, maxBasic: number): [number, number, number] {
-  const blueMax = Math.max(1, maxBasic);
-  const yellowMax = blueMax * SISU_REFILL_TIERS.yellow.multiplier;
-  const purpleMax = blueMax * SISU_REFILL_TIERS.purple.multiplier;
-  const sisu = clampNumber(sisuValue, 0, purpleMax);
-
-  const darkBlue = hexToRgbArray(COLORS.sisu.darkBlue);
-  const blue = hexToRgbArray(COLORS.sisu.blue);
-  const yellow = hexToRgbArray(COLORS.sisu.yellow);
-  const purple = hexToRgbArray(COLORS.sisu.purple);
-
-  if (sisu <= blueMax) {
-    return lerpColor(darkBlue, blue, blueMax > 0 ? sisu / blueMax : 0);
-  }
-
-  if (sisu <= yellowMax) {
-    return lerpColor(blue, yellow, (sisu - blueMax) / Math.max(1, yellowMax - blueMax));
-  }
-
-  return lerpColor(yellow, purple, (sisu - yellowMax) / Math.max(1, purpleMax - yellowMax));
-}
-
-function toFiniteBigNumNumber(value: BigNum | undefined | null, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = toNumber(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function updateSisuVisualProjection(snapshot: NonNullable<ServerState["snapshot"]>) {
-  const nowMs = getNowMs();
-  const lastMs = SISU_VISUAL_STATE.lastTimestampMs || nowMs;
-  SISU_VISUAL_STATE.lastTimestampMs = nowMs;
-  const dtSeconds = Math.max(0, nowMs - lastMs) / 1000;
-
-  const vm = getViewModel();
-  const progressRatio = clampNumber((vm.projectedFill || 0) / 100, 0, 1);
-
-  const baseCurrent = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(snapshot.state.sisu.current, SISU_MIN_MULTIPLIER));
-  const baseCycleDecay = Math.max(0, Number(snapshot.state.sisu.cycle_decay) || 0);
-  const boundedCycleDecay = clampNumber(baseCycleDecay, 0, 100);
-  const nextFactor = fromNumber(1.0 - boundedCycleDecay / 100);
-  const nextSisu = mul(snapshot.state.sisu.current, nextFactor);
-  const targetAtClaim = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(nextSisu, baseCurrent));
-  const cycleDecayAtClaim = Math.max(0, baseCycleDecay * 0.98);
-
-  const projectedCurrent = lerp(baseCurrent, targetAtClaim, progressRatio);
-  const projectedCycleDecay = lerp(baseCycleDecay, cycleDecayAtClaim, progressRatio);
-
-  if (!SISU_VISUAL_STATE.initialized) {
-    SISU_VISUAL_STATE.displayCurrent = projectedCurrent;
-    SISU_VISUAL_STATE.displayCycleDecay = projectedCycleDecay;
-    SISU_VISUAL_STATE.initialized = true;
-  }
-
-  const meterSpeed = projectedCurrent >= SISU_VISUAL_STATE.displayCurrent ? 10 : 2;
-  const meterT = clampNumber(1 - Math.exp(-meterSpeed * dtSeconds), 0, 1);
-  const decayT = clampNumber(1 - Math.exp(-8 * dtSeconds), 0, 1);
-
-  SISU_VISUAL_STATE.displayCurrent = Math.max(
-    SISU_MIN_MULTIPLIER,
-    lerp(SISU_VISUAL_STATE.displayCurrent, projectedCurrent, meterT)
-  );
-  SISU_VISUAL_STATE.displayCycleDecay = Math.max(
-    0,
-    lerp(SISU_VISUAL_STATE.displayCycleDecay, projectedCycleDecay, decayT)
-  );
-
-  return {
-    displayCurrent: SISU_VISUAL_STATE.displayCurrent,
-    displayCycleDecay: SISU_VISUAL_STATE.displayCycleDecay
-  };
-}
-
-function getNowMs() {
-  if (typeof performance !== "undefined" && typeof performance.now === "function") {
-    return performance.now();
-  }
-
-  return Date.now();
-}
-
-function formatDecay(value: number | null | undefined): string {
-  const parsed = Number(value);
-  const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-  return (Math.round(safe * 100) / 100).toFixed(2);
-}
-
-function getUpgradeButtonState(shards: BigNum, currentLevel: number): {
-  disabled: boolean;
-  label: string;
-  prefix: string | null;
-  cost: BigNum | null;
-} {
-  const cost = UPGRADE_COSTS[currentLevel + 1];
-
-  if (currentLevel >= SISU_MAX_UPGRADE_LEVEL || !cost) {
-    return {
-      disabled: true,
-      label: "MAX",
-      prefix: null,
-      cost: null
-    };
-  }
-
-  if (compare(shards, cost) < 0) {
-    return {
-      disabled: true,
-      label: "",
-      prefix: null,
-      cost
-    };
-  }
-
-  return {
-    disabled: false,
-    label: "",
-    prefix: formatMultiplierDelta(0.5),
-    cost
-  };
-}
-
-
