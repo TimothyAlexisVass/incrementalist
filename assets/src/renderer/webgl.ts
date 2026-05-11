@@ -22,14 +22,43 @@ export interface DrawTextOptions {
   align?: CanvasTextAlign;
   baseline?: CanvasTextBaseline;
   alpha?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+}
+
+export interface MeasureTextOptions {
+  text: string;
+  font?: string;
+}
+
+export interface DrawImageOptions {
+  image: TexImageSource;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  alpha?: number;
 }
 
 interface TextSprite {
   texture: WebGLTexture;
   width: number;
   height: number;
-  offsetX: number;
-  offsetY: number;
+  baselineY: number;
+}
+
+interface TextSpriteStyle {
+  color: string;
+  strokeColor: string;
+  strokeWidth: number;
+  shadowColor: string;
+  shadowBlur: number;
+  shadowOffsetX: number;
+  shadowOffsetY: number;
 }
 
 const DEFAULT_FONT = "bold 16px Arial";
@@ -104,6 +133,7 @@ export class WebGLRenderer {
   private readonly textMeasureCanvas: HTMLCanvasElement;
   private readonly textMeasureCtx: CanvasRenderingContext2D;
   private readonly textCache = new Map<string, TextSprite>();
+  private readonly imageCache = new WeakMap<object, WebGLTexture>();
 
   constructor(options: WebGLRendererOptions) {
     this.canvas = options.canvas;
@@ -197,6 +227,65 @@ export class WebGLRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  drawCircle(x: number, y: number, radius: number, color: RGBA) {
+    const diameter = Math.max(0, radius * 2);
+    if (diameter <= 0) return;
+    this.drawRect({
+      x: x - radius,
+      y: y - radius,
+      width: diameter,
+      height: diameter,
+      color
+    });
+  }
+
+  drawImage(options: DrawImageOptions) {
+    const gl = this.gl;
+    const { image, x, y, width, height } = options;
+    const alpha = clamp01(options.alpha ?? 1);
+    if (width <= 0 || height <= 0 || !isRenderableImage(image)) return;
+
+    const texture = this.getOrCreateImageTexture(image);
+    if (!texture) return;
+
+    const x2 = x + width;
+    const y2 = y + height;
+    const positions = new Float32Array([
+      x, y,
+      x2, y,
+      x, y2,
+      x, y2,
+      x2, y,
+      x2, y2
+    ]);
+    const texcoords = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+      0, 1,
+      1, 0,
+      1, 1
+    ]);
+
+    gl.useProgram(this.textProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.textPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.textPositionLocation);
+    gl.vertexAttribPointer(this.textPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.textTexcoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.textTexcoordLocation);
+    gl.vertexAttribPointer(this.textTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform2f(this.textResolutionLocation, this.canvas.width, this.canvas.height);
+    gl.uniform1f(this.textAlphaLocation, alpha);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(this.textTextureLocation, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
   drawText(options: DrawTextOptions) {
     const gl = this.gl;
     const text = options.text;
@@ -204,16 +293,30 @@ export class WebGLRenderer {
 
     const font = options.font || DEFAULT_FONT;
     const color = options.color || DEFAULT_TEXT_COLOR;
+    const strokeColor = options.strokeColor || "transparent";
+    const strokeWidth = Math.max(0, Number(options.strokeWidth) || 0);
+    const shadowColor = options.shadowColor || "transparent";
+    const shadowBlur = Math.max(0, Number(options.shadowBlur) || 0);
+    const shadowOffsetX = Number(options.shadowOffsetX) || 0;
+    const shadowOffsetY = Number(options.shadowOffsetY) || 0;
     const align = options.align || "left";
     const baseline = options.baseline || "alphabetic";
     const alpha = clamp01(options.alpha ?? 1);
 
-    const sprite = this.getOrCreateTextSprite(text, font, color);
+    const sprite = this.getOrCreateTextSprite(text, font, {
+      color,
+      strokeColor,
+      strokeWidth,
+      shadowColor,
+      shadowBlur,
+      shadowOffsetX,
+      shadowOffsetY
+    });
     const anchorX = computeAnchorX(sprite.width, align);
-    const anchorY = computeAnchorY(sprite.height, baseline);
+    const anchorY = computeAnchorY(sprite, baseline);
 
-    const x = options.x - anchorX + sprite.offsetX;
-    const y = options.y - anchorY + sprite.offsetY;
+    const x = options.x - anchorX;
+    const y = options.y - anchorY;
     const x2 = x + sprite.width;
     const y2 = y + sprite.height;
 
@@ -257,6 +360,13 @@ export class WebGLRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  measureTextWidth(options: MeasureTextOptions) {
+    const text = String(options.text ?? "");
+    const font = options.font || DEFAULT_FONT;
+    this.textMeasureCtx.font = font;
+    return this.textMeasureCtx.measureText(text).width;
+  }
+
   clearTextCache() {
     const gl = this.gl;
     for (const sprite of this.textCache.values()) {
@@ -275,14 +385,24 @@ export class WebGLRenderer {
     gl.deleteProgram(this.textProgram);
   }
 
-  private getOrCreateTextSprite(text: string, font: string, color: string) {
-    const key = `${text}\u0000${font}\u0000${color}`;
+  private getOrCreateTextSprite(text: string, font: string, style: TextSpriteStyle) {
+    const key = [
+      text,
+      font,
+      style.color,
+      style.strokeColor,
+      style.strokeWidth,
+      style.shadowColor,
+      style.shadowBlur,
+      style.shadowOffsetX,
+      style.shadowOffsetY
+    ].join("\u0000");
     const cached = this.textCache.get(key);
     if (cached) {
       return cached;
     }
 
-    const sprite = this.createTextSprite(text, font, color);
+    const sprite = this.createTextSprite(text, font, style);
 
     if (this.textCache.size >= MAX_TEXT_CACHE_SIZE) {
       const firstKey = this.textCache.keys().next().value;
@@ -299,7 +419,7 @@ export class WebGLRenderer {
     return sprite;
   }
 
-  private createTextSprite(text: string, font: string, color: string): TextSprite {
+  private createTextSprite(text: string, font: string, style: TextSpriteStyle): TextSprite {
     const gl = this.gl;
     const measure = this.textMeasureCtx;
     measure.font = font;
@@ -310,8 +430,13 @@ export class WebGLRenderer {
     const fontSize = parseFontSizePx(font);
     const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
     const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
-    const width = Math.max(1, Math.ceil(metrics.width + 2));
-    const height = Math.max(1, Math.ceil(ascent + descent + 2));
+    const strokePad = Math.ceil(style.strokeWidth);
+    const shadowPadX = Math.ceil(Math.abs(style.shadowOffsetX) + style.shadowBlur);
+    const shadowPadY = Math.ceil(Math.abs(style.shadowOffsetY) + style.shadowBlur);
+    const padX = 1 + strokePad + shadowPadX;
+    const padY = 1 + strokePad + shadowPadY;
+    const width = Math.max(1, Math.ceil(metrics.width + padX * 2));
+    const height = Math.max(1, Math.ceil(ascent + descent + padY * 2));
 
     const textCanvas = document.createElement("canvas");
     textCanvas.width = width;
@@ -326,8 +451,20 @@ export class WebGLRenderer {
     textCtx.font = font;
     textCtx.textAlign = "left";
     textCtx.textBaseline = "alphabetic";
-    textCtx.fillStyle = color;
-    textCtx.fillText(text, 1, 1 + ascent);
+    const textX = padX;
+    const textY = padY + ascent;
+    textCtx.shadowColor = style.shadowColor;
+    textCtx.shadowBlur = style.shadowBlur;
+    textCtx.shadowOffsetX = style.shadowOffsetX;
+    textCtx.shadowOffsetY = style.shadowOffsetY;
+    if (style.strokeWidth > 0 && style.strokeColor !== "transparent") {
+      textCtx.lineJoin = "round";
+      textCtx.lineWidth = style.strokeWidth;
+      textCtx.strokeStyle = style.strokeColor;
+      textCtx.strokeText(text, textX, textY);
+    }
+    textCtx.fillStyle = style.color;
+    textCtx.fillText(text, textX, textY);
 
     const texture = gl.createTexture();
     if (!texture) {
@@ -346,14 +483,42 @@ export class WebGLRenderer {
       texture,
       width,
       height,
-      offsetX: 0,
-      offsetY: -ascent
+      baselineY: textY
     };
+  }
+
+  private getOrCreateImageTexture(image: TexImageSource) {
+    const key = image as object;
+    const cached = this.imageCache.get(key);
+    if (cached) return cached;
+
+    const texture = this.gl.createTexture();
+    if (!texture) return null;
+
+    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+    this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
+    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    this.imageCache.set(key, texture);
+    return texture;
   }
 }
 
 export function createWebGLRenderer(options: WebGLRendererOptions) {
   return new WebGLRenderer(options);
+}
+
+let activeWebGLRenderer: WebGLRenderer | null = null;
+
+export function setActiveWebGLRenderer(renderer: WebGLRenderer | null) {
+  activeWebGLRenderer = renderer;
+}
+
+export function getActiveWebGLRenderer() {
+  return activeWebGLRenderer;
 }
 
 function mustCreateProgram(gl: WebGLRenderingContext, vertexSource: string, fragmentSource: string) {
@@ -429,9 +594,29 @@ function computeAnchorX(width: number, align: CanvasTextAlign) {
   return 0;
 }
 
-function computeAnchorY(height: number, baseline: CanvasTextBaseline) {
-  if (baseline === "middle") return height / 2;
-  if (baseline === "bottom" || baseline === "ideographic") return height;
+function computeAnchorY(sprite: TextSprite, baseline: CanvasTextBaseline) {
+  if (baseline === "alphabetic") return sprite.baselineY;
+  if (baseline === "middle") return sprite.height / 2;
+  if (baseline === "bottom" || baseline === "ideographic") return sprite.height;
   if (baseline === "top" || baseline === "hanging") return 0;
-  return height;
+  return sprite.baselineY;
+}
+
+function isRenderableImage(image: TexImageSource): image is TexImageSource {
+  if (typeof HTMLImageElement !== "undefined" && image instanceof HTMLImageElement) {
+    return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+  }
+  if (typeof HTMLCanvasElement !== "undefined" && image instanceof HTMLCanvasElement) {
+    return image.width > 0 && image.height > 0;
+  }
+  if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
+    return image.width > 0 && image.height > 0;
+  }
+  if (typeof OffscreenCanvas !== "undefined" && image instanceof OffscreenCanvas) {
+    return image.width > 0 && image.height > 0;
+  }
+  if (typeof HTMLVideoElement !== "undefined" && image instanceof HTMLVideoElement) {
+    return image.videoWidth > 0 && image.videoHeight > 0;
+  }
+  return false;
 }

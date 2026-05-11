@@ -15,6 +15,7 @@ import {
 } from '../config';
 import { COLORS } from '../colors';
 import { parseFontSizePx } from '../utils';
+import { getActiveWebGLRenderer } from '../renderer/webgl';
 
 const TWO_PI = Math.PI * 2;
 const CLICK_BURST_COLORS = Object.freeze([
@@ -26,10 +27,7 @@ const CLICK_BURST_COLORS = Object.freeze([
 ]);
 const MAX_CLICK_PARTICLES = 120;
 const MAX_FLOATING_TEXTS = 72;
-const TEXT_SPRITE_PADDING = 14;
-const MAX_TEXT_SPRITE_CACHE = 96;
 const REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
-const textSpriteCache = new Map<string, TextSprite>();
 
 export interface FloatingText {
   text: string;
@@ -54,8 +52,6 @@ export interface FloatingText {
   minRenderSizePx: number;
   stackGroupId: number | null;
   stackIndex: number | null;
-  spriteKey?: string;
-  sprite?: TextSprite;
 }
 
 export interface Particle {
@@ -69,12 +65,6 @@ export interface Particle {
   color: string;
   elapsedMs: number;
   lifeMs: number;
-}
-
-export interface TextSprite {
-  canvas: HTMLCanvasElement | OffscreenCanvas;
-  textWidth: number;
-  anchorY: number;
 }
 
 export function createFloatingTextState(): FloatingText[] {
@@ -307,137 +297,73 @@ export function renderParticles(ctx: CanvasRenderingContext2D, particles: Partic
 
 export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts: FloatingText[]) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
-
-  ctx.save();
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
 
   for (let i = 0; i < floatingTexts.length; i += 1) {
     const ft = floatingTexts[i];
     if (ft.alpha <= 0) continue;
-
-    const sprite = getTextSprite(ctx, ft);
-    const scale = getFloatingTextRenderScale(ft, sprite);
+    const scale = getFloatingTextRenderScale(ft);
     if (scale <= 0) continue;
 
-    ctx.globalAlpha = ft.alpha;
-    ctx.drawImage(
-      sprite.canvas,
-      ft.x - getSpriteAnchorX(sprite, ft.textAlign) * scale,
-      ft.y - sprite.anchorY * scale,
-      sprite.canvas.width * scale,
-      sprite.canvas.height * scale
-    );
-  }
+    // Layer order (outer -> inner) is built back-to-front:
+    // 1) white outer outline + shadow
+    // 2) black inner outline
+    // 3) colored fill text
+    renderer.drawText({
+      text: ft.text,
+      x: ft.x,
+      y: ft.y,
+      font: ft.font,
+      color: 'rgba(0, 0, 0, 0)',
+      align: ft.textAlign,
+      baseline: 'alphabetic',
+      alpha: ft.alpha,
+      strokeColor: '#ffffff',
+      strokeWidth: 8,
+      shadowColor: 'rgba(0, 0, 0, 0.6)',
+      shadowBlur: 4,
+      shadowOffsetX: 2,
+      shadowOffsetY: 2
+    });
 
-  ctx.restore();
-}
+    renderer.drawText({
+      text: ft.text,
+      x: ft.x,
+      y: ft.y,
+      font: ft.font,
+      color: 'rgba(0, 0, 0, 0)',
+      align: ft.textAlign,
+      baseline: 'alphabetic',
+      alpha: ft.alpha,
+      strokeColor: 'rgba(0, 0, 0, 0.8)',
+      strokeWidth: 3,
+      shadowColor: 'transparent',
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0
+    });
 
-function getTextSprite(ctx: CanvasRenderingContext2D, ft: FloatingText): TextSprite {
-  const key = `${ft.text}\u0000${ft.font}\u0000${ft.color}`;
-
-  if (ft.spriteKey === key && ft.sprite) {
-    return ft.sprite;
-  }
-
-  const cachedSprite = textSpriteCache.get(key);
-  if (cachedSprite) {
-    ft.spriteKey = key;
-    ft.sprite = cachedSprite;
-    return cachedSprite;
-  }
-
-  const sprite = createTextSprite(ctx, ft.text, ft.font, ft.color);
-  textSpriteCache.set(key, sprite);
-
-  if (textSpriteCache.size > MAX_TEXT_SPRITE_CACHE) {
-    const oldestKey = textSpriteCache.keys().next().value;
-    if (oldestKey !== undefined) {
-      textSpriteCache.delete(oldestKey);
-    }
-  }
-
-  ft.spriteKey = key;
-  ft.sprite = sprite;
-  return sprite;
-}
-
-function createTextSprite(ctx: CanvasRenderingContext2D, text: string, font: string, color: string): TextSprite {
-  ctx.save();
-  ctx.font = font;
-  const metrics = ctx.measureText(text);
-  ctx.restore();
-
-  const fontSize = parseFontSizePx(font);
-  const textWidth = Math.ceil(metrics.width);
-  const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
-  const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
-  const width = Math.max(1, textWidth + TEXT_SPRITE_PADDING * 2);
-  const height = Math.max(1, ascent + descent + TEXT_SPRITE_PADDING * 2);
-  const canvas = createSpriteCanvas(width, height);
-  const spriteCtx = canvas.getContext('2d');
-  if (!spriteCtx) {
-    throw new Error('Failed to get 2d context for text sprite');
-  }
-  const textX = TEXT_SPRITE_PADDING;
-  const textY = TEXT_SPRITE_PADDING + ascent;
-
-  spriteCtx.font = font;
-  spriteCtx.textAlign = 'left';
-  spriteCtx.textBaseline = 'alphabetic';
-  spriteCtx.lineJoin = 'round';
-  spriteCtx.lineWidth = 7;
-  spriteCtx.strokeStyle = '#ffffff';
-  spriteCtx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-  spriteCtx.shadowBlur = 5;
-  spriteCtx.shadowOffsetX = 2;
-  spriteCtx.shadowOffsetY = 2;
-  spriteCtx.strokeText(text, textX, textY);
-
-  spriteCtx.shadowColor = 'transparent';
-  spriteCtx.shadowBlur = 0;
-  spriteCtx.shadowOffsetX = 0;
-  spriteCtx.shadowOffsetY = 0;
-  spriteCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-  spriteCtx.fillText(text, textX - 1, textY);
-  spriteCtx.fillText(text, textX + 1, textY);
-  spriteCtx.fillText(text, textX, textY - 1);
-  spriteCtx.fillText(text, textX, textY + 1);
-
-  spriteCtx.fillStyle = color;
-  spriteCtx.fillText(text, textX, textY);
-
-  return {
-    canvas,
-    textWidth,
-    anchorY: textY
-  };
-}
-
-function createSpriteCanvas(width: number, height: number): HTMLCanvasElement | OffscreenCanvas {
-  if (typeof OffscreenCanvas === 'function') {
-    return new OffscreenCanvas(width, height);
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
-
-function getSpriteAnchorX(sprite: TextSprite, textAlign: CanvasTextAlign): number {
-  switch (textAlign) {
-    case 'center':
-      return TEXT_SPRITE_PADDING + sprite.textWidth / 2;
-    case 'right':
-    case 'end':
-      return TEXT_SPRITE_PADDING + sprite.textWidth;
-    case 'left':
-    case 'start':
-    default:
-      return TEXT_SPRITE_PADDING;
+    renderer.drawText({
+      text: ft.text,
+      x: ft.x,
+      y: ft.y,
+      font: ft.font,
+      color: ft.color,
+      align: ft.textAlign,
+      baseline: 'alphabetic',
+      alpha: ft.alpha,
+      strokeColor: 'transparent',
+      strokeWidth: 0,
+      shadowColor: 'transparent',
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0
+    });
   }
 }
 
-function getFloatingTextRenderScale(ft: FloatingText, sprite: TextSprite): number {
+function getFloatingTextRenderScale(ft: FloatingText): number {
   const requestedScale = Number.isFinite(ft.scale) ? Math.max(0, ft.scale) : 1;
   const minRenderSizePx = Number.isFinite(ft.minRenderSizePx)
     ? Math.max(0, ft.minRenderSizePx)
@@ -446,14 +372,8 @@ function getFloatingTextRenderScale(ft: FloatingText, sprite: TextSprite): numbe
   if (minRenderSizePx <= 0) {
     return requestedScale;
   }
-
-  const largestSpriteDimension = Math.max(
-    sprite?.canvas?.width ?? 0,
-    sprite?.canvas?.height ?? 0,
-    1
-  );
-
-  return Math.max(requestedScale, minRenderSizePx / largestSpriteDimension);
+  const fontSize = parseFontSizePx(ft.font, 16);
+  return Math.max(requestedScale, minRenderSizePx / Math.max(1, fontSize));
 }
 
 

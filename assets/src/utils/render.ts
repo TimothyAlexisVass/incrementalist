@@ -1,5 +1,5 @@
 import { clampNumber } from './math';
-import { drawNoticeDot } from '../ui/components/button';
+import { getActiveWebGLRenderer } from '../renderer/webgl';
 
 export const LOCKED_ELEMENT_OPACITY = 0.1;
 
@@ -24,12 +24,12 @@ export interface LockedDrawOptions {
 }
 
 export function drawLockedElement(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   rect: Rect,
   drawElement: () => void,
   options: LockedDrawOptions = {}
 ): void {
-  if (!ctx || !rect || typeof drawElement !== 'function') {
+  if (!rect || typeof drawElement !== 'function') {
     return;
   }
 
@@ -37,22 +37,22 @@ export function drawLockedElement(
     ? clampNumber(Number(options.opacity), 0, 1)
     : LOCKED_ELEMENT_OPACITY;
 
-  ctx.save();
-  ctx.globalAlpha = opacity;
+  void opacity;
   drawElement();
-  ctx.restore();
 
-  drawLockedText(ctx, rect, options);
+  drawLockedText(_ctx, rect, options);
 }
 
 export function drawLockedText(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   rect: Rect,
   options: LockedDrawOptions = {}
 ): void {
-  if (!ctx || !rect) {
+  if (!rect) {
     return;
   }
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
 
   const {
     label = 'LOCKED',
@@ -66,39 +66,28 @@ export function drawLockedText(
     showNoticePing = false
   } = options;
 
-  ctx.save();
-  ctx.globalAlpha = 1;
-  ctx.font = font;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
-
   if (outlineWidth > 0) {
-    ctx.strokeStyle = outlineColor;
-    ctx.lineWidth = outlineWidth;
-    ctx.strokeText(label, textX, textY);
+    renderer.drawText({ text: label, x: textX - 1, y: textY, font, color: outlineColor, align: 'center', baseline: 'middle' });
+    renderer.drawText({ text: label, x: textX + 1, y: textY, font, color: outlineColor, align: 'center', baseline: 'middle' });
+    renderer.drawText({ text: label, x: textX, y: textY - 1, font, color: outlineColor, align: 'center', baseline: 'middle' });
+    renderer.drawText({ text: label, x: textX, y: textY + 1, font, color: outlineColor, align: 'center', baseline: 'middle' });
   }
-
-  ctx.fillStyle = textColor;
-  ctx.fillText(label, textX, textY);
+  renderer.drawText({ text: label, x: textX, y: textY, font, color: textColor, align: 'center', baseline: 'middle' });
 
   if (showNotice) {
-    const textMetrics = ctx.measureText(label);
+    const textWidth = renderer.measureTextWidth({ text: label, font });
     const fallbackAscent = estimateFontAscent(font);
-    const textTop = textY - (textMetrics.actualBoundingBoxAscent || fallbackAscent);
-    const textRight =
-      textX +
-      (textMetrics.actualBoundingBoxRight > 0
-        ? textMetrics.actualBoundingBoxRight
-        : textMetrics.width / 2);
+    const textTop = textY - fallbackAscent;
+    const textRight = textX + textWidth / 2;
 
     const noticeRadius = 4;
     const noticeX = textRight + noticeRadius + 2;
     const noticeY = textTop + noticeRadius - 8;
-    drawNoticeDot(ctx, noticeX, noticeY, noticeRadius, showNoticePing);
+    renderer.drawCircle(noticeX, noticeY, noticeRadius, [1, 0.32, 0.32, 1]);
+    if (showNoticePing) {
+      renderer.drawCircle(noticeX, noticeY, noticeRadius + 3, [1, 0.32, 0.32, 0.2]);
+    }
   }
-
-  ctx.restore();
 }
 
 function estimateFontAscent(font: string): number {

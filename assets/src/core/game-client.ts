@@ -52,6 +52,7 @@ import {
   notices
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
+import { getActiveWebGLRenderer } from "../renderer/webgl";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
 // instant, but server command results remain the only source of durable truth.
@@ -379,6 +380,8 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private tick(dt: number) {
+    getActiveWebGLRenderer()?.beginFrame([0, 0, 0, 0]);
+
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
 

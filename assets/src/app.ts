@@ -1,6 +1,7 @@
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./config";
 import { initWebGLEffectsLayer, resizeWebGLEffectsLayer } from "./render/webgl-effects";
 import { GameClient } from "./core/game-client";
+import { createWebGLRenderer, setActiveWebGLRenderer } from "./renderer/webgl";
 
 const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
 const incrementalistCanvas = requiredElement<HTMLCanvasElement>("#incrementalist");
@@ -19,6 +20,11 @@ if (!incrementalistGlContext) throw new Error("Game shell is missing required in
 const incrementalistGl = incrementalistGlContext;
 incrementalistGl.clearColor(0, 0, 0, 0);
 incrementalistGl.clear(incrementalistGl.COLOR_BUFFER_BIT);
+const incrementalistRenderer = createWebGLRenderer({
+  canvas: incrementalistCanvas,
+  gl: incrementalistGl
+});
+setActiveWebGLRenderer(incrementalistRenderer);
 
 // Initialize canvas sizes and the WebGL effects layer.
 resizeGameCanvases();
@@ -36,7 +42,7 @@ function resizeGameCanvases() {
   if (canvas.height !== CANVAS_HEIGHT) canvas.height = CANVAS_HEIGHT;
   if (incrementalistCanvas.width !== canvas.width) incrementalistCanvas.width = canvas.width;
   if (incrementalistCanvas.height !== canvas.height) incrementalistCanvas.height = canvas.height;
-  incrementalistGl.viewport(0, 0, incrementalistCanvas.width, incrementalistCanvas.height);
+  incrementalistRenderer.resize(incrementalistCanvas.width, incrementalistCanvas.height);
   if (effectsCanvas.width !== canvas.width) effectsCanvas.width = canvas.width;
   if (effectsCanvas.height !== canvas.height) effectsCanvas.height = canvas.height;
   resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
