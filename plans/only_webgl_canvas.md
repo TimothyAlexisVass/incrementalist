@@ -6,6 +6,9 @@
 - Migrate rendering where it already lives (existing `render.ts` and UI render files).
 - Remove old 2D draw paths as each file is migrated.
 - No migration-history naming leftovers.
+- Treat phase boundaries as hard gates: do not execute behavior assigned to a later phase.
+- Until Phase 6, effects must continue rendering to `#effects-canvas`.
+- Only the 2d canvas is to be migrated to the new webgl canvas, webgl effects remain exactly where they are.
 
 ## Migration shape
 - Add `#incrementalist` as the destination canvas first.
@@ -35,12 +38,16 @@ Acceptance:
 4. `assets/src/core/game-client.ts`
 - Thread `#incrementalist` context/state into existing render calls.
 - Keep existing 2D draw path only for files not migrated yet.
+- Do not activate `#incrementalist` as the effects output in this phase.
+- Any new routing parameters must default to existing behavior (`#effects-canvas`) unless explicitly enabled in a later phase.
 
 5. `assets/src/render/webgl-effects.ts`
 - Keep current effects behavior, but ensure compatibility with eventual merge into `#incrementalist`.
+- Compatibility work is prep only: no runtime switch of target canvas in this phase.
 
 Acceptance:
 - Frame loop runs with incremental routing support and no behavior regressions.
+- Visual output parity with pre-Phase-2 behavior: effects still appear on `#effects-canvas`.
 
 ## Phase 3: Add a dedicated WebGL renderer
 - `assets/src/renderer/webgl.ts`
@@ -122,3 +129,10 @@ Acceptance:
   - progress bar reward collection never blocks/swallow clicks
   - HUD/menu/modal/overlay behavior unchanged
   - hit testing and pointer behavior unchanged
+
+## Phase Boundary Enforcement (Required)
+- Before merging a phase, confirm no code path executes behavior assigned to later phases.
+- For Phase 2 specifically, reject any change that:
+  - Initializes effects on `#incrementalist`.
+  - Renders effects to `#incrementalist`.
+  - Removes or bypasses `#effects-canvas`.
