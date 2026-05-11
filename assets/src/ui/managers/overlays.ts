@@ -1,5 +1,6 @@
 import { ServerState } from '../../net/snapshots';
 import { InteractionState } from './interactions';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export interface Overlay {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void): void;
@@ -39,6 +40,7 @@ export class Overlays {
 
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     if (!this.activeOverlay) return;
+    if (!getActiveWebGLRenderer()) return;
 
     // Overlays can optionally draw their own backdrop, but typically they do.
     // For now we assume the overlay handles its own background/backdrop.

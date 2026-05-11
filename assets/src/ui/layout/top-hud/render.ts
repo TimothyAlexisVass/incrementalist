@@ -1,27 +1,19 @@
 import { COLORS } from "../../../colors";
 import {
-  BAR_COLLECTION_GLOW_FADE_MULTIPLIER,
-  BAR_FULL_PULSE_SPEED,
   TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT,
   TOP_HUD_LEVEL_X, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y,
-  TOP_HUD_CURRENCY_ICON_SIZE, TOP_HUD_CURRENCY_ICON_Y,
-  TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_CORES_ICON_RIGHT,
+  TOP_HUD_CURRENCY_ICON_SIZE,
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
-  TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT, BOTTOM_HUD_HEIGHT
+  TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
 } from "../../../config";
 import { formatNumberRatio } from "../../../utils";
-import { BigNum, compare, ZERO, toNumber } from "../../../core/bignum";
+import { BigNum, toNumber } from "../../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 
-const TWO_PI = Math.PI * 2;
-const EXP_BAR_FULL_PULSE_MAX = 1.6;
-const EXP_BAR_COLLECTION_GLOW_FADE_MS = (Math.PI * 165) / (
-  BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER
-);
 const MAX_EXP_BAR_LEVEL_UP_PARTICLES = 228;
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
 const EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER = 2;
@@ -32,32 +24,10 @@ const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
   COLORS.rewards.expGain
 ]);
 
-function getNowMs() {
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    return performance.now();
-  }
-  return Date.now();
-}
-
-function rgbaHexToCss(color: string | readonly [number, number, number], alpha: number) {
-  if (Array.isArray(color)) {
-    return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${Math.min(Math.max(alpha, 0), 1)})`;
-  }
-  const hex = String(color || '').trim().replace(/^#/, '');
-  const expanded = hex.length === 3 ? hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2] : hex;
-  const value = Number.parseInt(expanded, 16);
-  if (!Number.isFinite(value)) return `rgba(255, 255, 255, ${Math.min(Math.max(alpha, 0), 1)})`;
-  const red = (value >> 16) & 255;
-  const green = (value >> 8) & 255;
-  const blue = value & 255;
-  return `rgba(${red}, ${green}, ${blue}, ${Math.min(Math.max(alpha, 0), 1)})`;
-}
-
 export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, dtMs: number) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
   const model = getHudViewModel();
-  const now = getNowMs();
 
   const queued = getAndClearQueuedLevelUps();
   if (queued > 0) {
@@ -65,17 +35,6 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
   }
 
   updateExpBarLevelUpParticles(model, dtMs);
-
-  const startedAt = model.collectionGlowStartedAt;
-  let collectionPulse = 0;
-  if (startedAt > 0) {
-    const progress = Math.min(Math.max((now - startedAt) / EXP_BAR_COLLECTION_GLOW_FADE_MS, 0), 1);
-    if (progress >= 1) {
-      model.collectionGlowStartedAt = 0;
-    } else {
-      collectionPulse = EXP_BAR_FULL_PULSE_MAX * Math.cos(progress * Math.PI * 0.5);
-    }
-  }
 
   renderer.drawRect({
     x: 0,
@@ -131,9 +90,9 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
 
 function renderHudCurrencies(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
   const model = getHudViewModel();
-  drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
-  drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
-  drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+  drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_COUNTER_RIGHT);
+  drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_COUNTER_RIGHT);
+  drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_COUNTER_RIGHT);
 }
 
 function cssToRgba(color: string): [number, number, number, number] {
@@ -144,7 +103,7 @@ function cssToRgba(color: string): [number, number, number, number] {
   return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }
 
-function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, iconRight: number, counterRight: number) {
+function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, counterRight: number) {
   drawCurrencyAmount(
     ctx,
     label.toLowerCase(),
@@ -160,45 +119,6 @@ function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, 
       iconPosition: 'right'
     }
   );
-}
-
-function renderExpBarCollectionGlow(ctx: CanvasRenderingContext2D, collectionPulse: number) {
-  if (collectionPulse <= 0) return;
-
-  const glowPower = collectionPulse;
-  const collectionFade = Math.min(1, Math.max(0, collectionPulse / EXP_BAR_FULL_PULSE_MAX));
-  const glowAlpha = Math.min(
-    0.62,
-    collectionFade * 0.16 + glowPower * 0.36 + collectionFade * 0.18
-  );
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.shadowColor = rgbaHexToCss(COLORS.bar.exp.fillEnd, 0.8 * collectionFade);
-  ctx.shadowBlur = 8 + 34 * glowPower;
-  ctx.strokeStyle = rgbaHexToCss(COLORS.bar.exp.fillEnd, glowAlpha);
-  ctx.lineWidth = 1 + collectionFade + 4 * glowPower;
-  ctx.strokeRect(
-    TOP_HUD_EXP_BAR_X + 0.5,
-    TOP_HUD_EXP_BAR_Y + 0.5,
-    TOP_HUD_EXP_BAR_WIDTH - 1,
-    TOP_HUD_EXP_BAR_HEIGHT - 1
-  );
-
-  if (collectionPulse > 0) {
-    ctx.shadowColor = `rgba(255, 255, 255, ${0.7 * collectionFade})`;
-    ctx.shadowBlur = 24 + 22 * collectionFade;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * collectionFade})`;
-    ctx.lineWidth = 0.5 + 3.5 * collectionFade;
-    ctx.strokeRect(
-      TOP_HUD_EXP_BAR_X - 1,
-      TOP_HUD_EXP_BAR_Y - 1,
-      TOP_HUD_EXP_BAR_WIDTH + 2,
-      TOP_HUD_EXP_BAR_HEIGHT + 2
-    );
-  }
-
-  ctx.restore();
 }
 
 function spawnExpBarLevelUpBurst(model: ReturnType<typeof getHudViewModel>) {
@@ -291,41 +211,4 @@ function updateExpBarLevelUpParticles(model: ReturnType<typeof getHudViewModel>,
   }
 
   particles.length = writeIndex;
-}
-
-function renderExpBarLevelUpParticles(ctx: CanvasRenderingContext2D, model: ReturnType<typeof getHudViewModel>) {
-  const particles = model.particles;
-  if (particles.length === 0) return;
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineCap = 'round';
-
-  for (let i = 0; i < particles.length; i += 1) {
-    const particle = particles[i];
-    const lifeProgress = particle.elapsedMs / particle.lifeMs;
-    const alpha = Math.pow(Math.max(0, 1 - lifeProgress), 1.35);
-    const tailScale = 0.018 + (1 - lifeProgress) * 0.024;
-
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = particle.color;
-    ctx.fillStyle = particle.color;
-    ctx.shadowColor = particle.color;
-    ctx.shadowBlur = 11 * alpha;
-    ctx.lineWidth = particle.lineWidth;
-
-    ctx.beginPath();
-    ctx.moveTo(particle.x, particle.y);
-    ctx.lineTo(
-      particle.x - particle.vx * tailScale,
-      particle.y - particle.vy * tailScale
-    );
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.radius * (0.7 + alpha * 0.4), 0, TWO_PI);
-    ctx.fill();
-  }
-
-  ctx.restore();
 }

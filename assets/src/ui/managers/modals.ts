@@ -1,5 +1,6 @@
 import { COLORS } from '../../colors';
 import { InteractionState } from './interactions';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export interface Modal {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState): void;
@@ -24,9 +25,16 @@ export class Modals {
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
     if (!this.activeModal) return;
 
-    // Draw backdrop
-    ctx.fillStyle = COLORS.overlay.backdrop;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const renderer = getActiveWebGLRenderer();
+    if (!renderer) return;
+
+    renderer.drawRect({
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height,
+      color: cssToRgba(COLORS.overlay.backdrop)
+    });
 
     this.activeModal.render(ctx, canvas, input);
   }
@@ -36,4 +44,12 @@ export class Modals {
       this.activeModal.tick(dt, input);
     }
   }
+}
+
+function cssToRgba(color: string): [number, number, number, number] {
+  const hex = String(color || "").trim().replace(/^#/, "");
+  const expanded = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
+  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }

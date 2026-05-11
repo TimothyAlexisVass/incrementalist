@@ -2,12 +2,15 @@ import { Modals } from './modals';
 import { Overlays } from './overlays';
 import { InteractionState } from './interactions';
 import { ServerState } from '../../net/snapshots';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export class UserInterface {
   public readonly modals = new Modals();
   public readonly overlays = new Overlays();
 
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
+    if (!getActiveWebGLRenderer()) return;
+
     // Render order: Overlays first, Modals on top. 
     // Modals block input to lower layers.
     if (this.modals.isOpen()) {
@@ -23,4 +26,3 @@ export class UserInterface {
     this.modals.tick(dt, input);
   }
 }
-

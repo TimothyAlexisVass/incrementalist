@@ -4,6 +4,7 @@ import { doButton } from '../../components/button';
 import { InteractionState } from '../../managers/interactions';
 import { renderAreaDropdown } from '../../../features/areas/render';
 import { GameChannel } from "../../../net/game-channel";
+import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import {
   NOTICE_PARENT_MENU_MAIN,
   notices
@@ -19,11 +20,16 @@ export function renderBottomHUD(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
-  ctx.save();
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
 
-  // Draw background for bottom HUD
-  ctx.fillStyle = COLORS.panel.bg;
-  ctx.fillRect(0, canvas.height - BOTTOM_HUD_HEIGHT, canvas.width, BOTTOM_HUD_HEIGHT);
+  renderer.drawRect({
+    x: 0,
+    y: canvas.height - BOTTOM_HUD_HEIGHT,
+    width: canvas.width,
+    height: BOTTOM_HUD_HEIGHT,
+    color: cssToRgba(COLORS.panel.bg)
+  });
 
   const buttonWidth = 120;
   const buttonHeight = 34;
@@ -43,6 +49,12 @@ export function renderBottomHUD(
   renderAreaDropdown(ctx, canvas, input, (areaKey) => {
     if (onAreaSelect) onAreaSelect(areaKey);
   }, channel, runCommand);
+}
 
-  ctx.restore();
+function cssToRgba(color: string): [number, number, number, number] {
+  const hex = String(color || "").trim().replace(/^#/, "");
+  const expanded = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
+  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }

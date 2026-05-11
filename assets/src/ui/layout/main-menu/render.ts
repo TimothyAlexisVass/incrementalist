@@ -12,6 +12,7 @@ import {
 import { getTabMenu, setSaveSlotActions, setShopActions, getNetwork } from './view-model';
 import { ShopActions } from './panels/basic-shop/index';
 import { handleMainMenuInteractions } from './interactions';
+import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 export class MainMenu implements Overlay {
   public setActions(actions: SaveSlotActions) {
@@ -31,7 +32,10 @@ export class MainMenu implements Overlay {
   }
 
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void) {
-    ctx.save();
+    const renderer = getActiveWebGLRenderer();
+    if (!renderer) {
+      return;
+    }
 
     const x = DISPLAY_AREA_X;
     const y = TOP_HUD_HEIGHT;
@@ -39,10 +43,13 @@ export class MainMenu implements Overlay {
     const height = canvas.height - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
     const shellRect = { x, y, width, height };
 
-    ctx.fillStyle = COLORS.panel.bg;
-    ctx.fillRect(x, y, width, height);
-    
-    ctx.restore();
+    renderer.drawRect({
+      x,
+      y,
+      width,
+      height,
+      color: cssToRgba(COLORS.panel.bg)
+    });
 
     // Render TabMenu
     // We give it a slightly inset rect so it's not flush with the very edges
@@ -62,4 +69,12 @@ export class MainMenu implements Overlay {
   tick(dt: number) {
     getTabMenu().tick(dt);
   }
+}
+
+function cssToRgba(color: string): [number, number, number, number] {
+  const hex = String(color || "").trim().replace(/^#/, "");
+  const expanded = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
+  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }
