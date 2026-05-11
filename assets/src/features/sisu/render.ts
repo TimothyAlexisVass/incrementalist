@@ -57,7 +57,7 @@ export function renderSisuControl(
   const barRadius = 35;
   const progressBar = getProgressBarLayout(canvas);
   const centerX = progressBar.x + progressBar.width / 2;
-  const centerY = progressBar.y + progressBar.height + 100;
+  const centerY = progressBar.y + progressBar.height + 110;
   const controlRect = getSisuControlRect(canvas);
 
   const drawSisuControl = () => {
@@ -91,11 +91,6 @@ export function renderSisuControl(
     ctx.fillStyle = COLORS.sisu.decay;
     ctx.font = SISU_DECAY_FONT;
     ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 20);
-
-    const iconY = centerY + 35;
-    drawSisuHudIcon(ctx, centerX - 18, iconY, "blue");
-    drawSisuHudIcon(ctx, centerX, iconY, "yellow");
-    drawSisuHudIcon(ctx, centerX + 18, iconY, "purple");
   };
 
   if (!isUnlocked) {

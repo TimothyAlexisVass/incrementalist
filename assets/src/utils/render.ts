@@ -94,7 +94,7 @@ export function drawLockedText(
 
     const noticeRadius = 4;
     const noticeX = textRight + noticeRadius + 2;
-    const noticeY = textTop + noticeRadius - 1;
+    const noticeY = textTop + noticeRadius - 8;
     drawNoticeDot(ctx, noticeX, noticeY, noticeRadius, showNoticePing);
   }
 

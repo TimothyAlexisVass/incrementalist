@@ -122,7 +122,7 @@ export function drawButton(
   ctx.fillText(label, textX, textY);
 
   if (options.showNotice) {
-    drawNoticeDot(ctx, rect.x + rect.width - 2, rect.y + 2, 4, options.showNoticePing ?? false);
+    drawNoticeDot(ctx, rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
   }
 
   ctx.restore();

@@ -31,6 +31,7 @@ export const SAGE_TIPS: Record<number, SageTip> = {
   },
   10: {
     text: [
+      "Harvest season has come!",
       "Before we release you fully into the Incrementiverse, we are going to have to improve your luck.",
       "You are now free to leave the temple, find the Cloverfield and seek the seven leaf clover."
     ],

@@ -3,7 +3,7 @@ import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT
 import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
-import { doButton, drawNoticeDot } from "../../ui/components/button";
+import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import {
   NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
@@ -13,6 +13,7 @@ import {
 import { GameChannel } from "../../net/game-channel";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
+const GO_TO_AREA_BUTTON_PADDING = 3;
 
 function getAreaBackgroundImage(areaKey: string) {
   if (!areaBackgroundImages.has(areaKey)) {
@@ -85,9 +86,15 @@ export function renderAreaDropdown(
     const availableAreas = model.availableAreas.filter(a => a.key !== model.currentArea);
     if (availableAreas.length > 0) {
       const itemHeight = 34;
-      const menuWidth = buttonWidth;
-      const menuHeight = availableAreas.length * itemHeight;
-      const menuRect = { x: buttonX, y: buttonY - menuHeight, width: menuWidth, height: menuHeight };
+      const menuWidth = buttonWidth + GO_TO_AREA_BUTTON_PADDING * 2;
+      const paddedItemHeight = itemHeight + GO_TO_AREA_BUTTON_PADDING * 2;
+      const menuHeight = availableAreas.length * paddedItemHeight + 9;
+      const menuRect = {
+        x: buttonX - GO_TO_AREA_BUTTON_PADDING,
+        y: buttonY - menuHeight,
+        width: menuWidth,
+        height: menuHeight
+      };
 
       const isHoveringMenu = pointInRect(input.pointer, menuRect);
       if (!isHoveringButton && !isHoveringMenu) {
@@ -101,37 +108,29 @@ export function renderAreaDropdown(
           runCommand
         );
 
-        // Render menu background
         ctx.save();
-        ctx.fillStyle = COLORS.panel.bg;
-        ctx.fillRect(menuRect.x, menuRect.y, menuRect.width, menuRect.height);
-        ctx.strokeStyle = COLORS.panel.border;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(menuRect.x + 0.5, menuRect.y + 0.5, menuRect.width - 1, menuRect.height - 1);
 
         availableAreas.forEach((area, i) => {
-          const itemRect = { 
-            x: menuRect.x, 
-            y: menuRect.y + i * itemHeight, 
-            width: menuWidth, 
-            height: itemHeight 
+          const itemRect = {
+            x: menuRect.x,
+            y: menuRect.y + i * paddedItemHeight,
+            width: menuRect.width,
+            height: paddedItemHeight
           };
           
           const isHovered = pointInRect(input.pointer, itemRect);
           
           const renderItem = () => {
-            // Draw item background if hovered (only if not locked, or we can show hover anyway)
-            if (isHovered && !area.is_locked) {
-              ctx.fillStyle = COLORS.panel.highlight;
-              ctx.fillRect(itemRect.x, itemRect.y, itemRect.width, itemRect.height);
-            }
-
-            ctx.fillStyle = area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary;
-            ctx.font = BOTTOM_HUD_BUTTON_FONT;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
+            drawButton(ctx, itemRect, area.is_locked ? "" : area.name, {
+              active: isHovered,
+              padding: 0,
+              font: BOTTOM_HUD_BUTTON_FONT,
+              activeSurface: COLORS.button.surface.active,
+              inactiveSurface: COLORS.panel.bg,
+              activeBorder: COLORS.panel.border,
+              inactiveBorder: COLORS.panel.border,
+              textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary
+            });
 
             // Locked areas cannot be acted on, so they should not advertise notices.
             const leafId = `leaf.area.${area.key}.go_button`;
@@ -143,14 +142,19 @@ export function renderAreaDropdown(
           };
 
           if (area.is_locked) {
-            drawLockedElement(ctx, canvas, input, itemRect, renderItem, {
+            // Keep the same full-size row visuals as unlocked items, then
+            // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
+            renderItem();
+            drawLockedElement(ctx, canvas, input, itemRect, () => {}, {
+              opacity: 0,
               criteria: `Requires Level ${area.unlock_level}`
             });
           } else {
             renderItem();
           }
 
-          if (isHovered && input.clicked && !area.is_locked) {
+          const startedInside = pointInRect(input.pressStartPointer, itemRect);
+          if (isHovered && startedInside && input.clicked && !area.is_locked) {
             notices.reportLeafClicked(`leaf.area.${area.key}.go_button`, channel, runCommand);
             onSelect(area.key);
             isDropdownOpen = false;

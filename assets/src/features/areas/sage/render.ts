@@ -15,11 +15,15 @@ import { doButton } from '../../../ui/components/button';
 
 const LETTERS_PER_SECOND = 40;
 const PANEL_PADDING = 16;
+const PANEL_TOP_PADDING = 11;
 const PANEL_GAP = 12;
 const LINE_HEIGHT = 20;
 const BUTTON_HEIGHT = 30;
 const BUTTON_MIN_WIDTH = 88;
 const BUTTON_INNER_PADDING = 14;
+const SAGE_HEADER_TEXT = 'The Sage:';
+const SAGE_HEADER_FONT = 'bold 14px Arial';
+const SAGE_HEADER_MARGIN_BOTTOM = 5;
 
 const tipRevealStarts = new Map<number, number>();
 
@@ -71,6 +75,9 @@ export function renderSageArea(
       const lineWidth = ctx.measureText(line).width;
       return Math.max(maxWidth, lineWidth);
     }, 0);
+    ctx.font = SAGE_HEADER_FONT;
+    const headerWidth = ctx.measureText(SAGE_HEADER_TEXT).width;
+    ctx.font = SMALL_TEXT_FONT;
 
     ctx.font = BOTTOM_HUD_BUTTON_FONT;
     const buttonWidth = Math.max(
@@ -80,10 +87,15 @@ export function renderSageArea(
     ctx.font = SMALL_TEXT_FONT;
 
     const boxWidth = Math.min(
-      Math.max(maxLineWidth + PANEL_PADDING * 2, buttonWidth + PANEL_PADDING * 2),
+      Math.max(Math.max(maxLineWidth, headerWidth) + PANEL_PADDING * 2, buttonWidth + PANEL_PADDING * 2),
       maxBoxWidth
     );
-    const boxHeight = (fullLines.length * LINE_HEIGHT) + PANEL_PADDING * 2;
+    const boxHeight =
+      PANEL_TOP_PADDING +
+      LINE_HEIGHT +
+      SAGE_HEADER_MARGIN_BOTTOM +
+      (fullLines.length * LINE_HEIGHT) +
+      PANEL_PADDING;
 
     if (!tipRevealStarts.has(tipLevel)) {
       tipRevealStarts.set(tipLevel, now);
@@ -150,10 +162,18 @@ function renderTipPanel(
   ctx.fillStyle = COLORS.panel.textPrimary;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+  ctx.font = SAGE_HEADER_FONT;
+  ctx.fillText(SAGE_HEADER_TEXT, boxX + PANEL_PADDING, boxY + PANEL_TOP_PADDING);
+
   ctx.font = SMALL_TEXT_FONT;
+  const bodyStartY = boxY + PANEL_TOP_PADDING + LINE_HEIGHT + SAGE_HEADER_MARGIN_BOTTOM;
 
   for (let i = 0; i < visibleLines.length; i += 1) {
-    ctx.fillText(visibleLines[i], boxX + PANEL_PADDING, boxY + PANEL_PADDING + (i * LINE_HEIGHT));
+    ctx.fillText(
+      visibleLines[i],
+      boxX + PANEL_PADDING,
+      bodyStartY + (i * LINE_HEIGHT)
+    );
   }
 
   const buttonClicked = doButton(ctx, input, buttonRect, buttonLabel, {

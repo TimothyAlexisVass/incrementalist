@@ -867,7 +867,7 @@ function renderProgressCompletionParticles(ctx: CanvasRenderingContext2D) {
 
 export function getProgressBarLayout(canvas: HTMLCanvasElement) {
   const baseHeight = canvas.height - 120;
-  const barHeight = baseHeight * 0.72;
+  const barHeight = baseHeight * 0.70;
 
   return {
     x: canvas.width - 92,
@@ -881,7 +881,7 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
   const barLayout = getProgressBarLayout(canvas);
   return {
     x: barLayout.x + barLayout.width / 2 - 30,
-    y: barLayout.y + barLayout.height + 25,
+    y: barLayout.y + barLayout.height + 29,
     width: 60,
     height: 20
   };
