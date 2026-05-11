@@ -1,4 +1,5 @@
 import { TINY_TEXT_FONT } from '../../config';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
 
 export interface TooltipOptions {
@@ -15,13 +16,14 @@ export interface TooltipOptions {
 }
 
 export function drawTooltip(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   anchorPoint: { x: number; y: number },
   content: string | string[],
   options: TooltipOptions = {}
 ) {
-  if (!ctx || !canvas || !anchorPoint) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer || !canvas || !anchorPoint) {
     return null;
   }
 
@@ -43,11 +45,8 @@ export function drawTooltip(
     margin = 8
   } = options;
 
-  ctx.save();
-  ctx.font = font;
-
   const contentWidth = lines.reduce((widest, line) => {
-    return Math.max(widest, ctx.measureText(line).width);
+    return Math.max(widest, renderer.measureTextWidth({ text: line, font }));
   }, 0);
   const width = Math.ceil(contentWidth + paddingX * 2);
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
@@ -71,21 +70,26 @@ export function drawTooltip(
     y = canvas.height - margin - height;
   }
 
-  ctx.fillStyle = backgroundColor;
-  ctx.fillRect(x, y, width, height);
+  renderer.drawRect({
+    x,
+    y,
+    width,
+    height,
+    color: cssToRgba(backgroundColor)
+  });
+  drawRectOutline(renderer, x, y, width, height, 1, cssToRgba(borderColor));
 
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
-
-  ctx.fillStyle = textColor;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
   for (let i = 0; i < lines.length; i += 1) {
-    ctx.fillText(lines[i], x + paddingX, y + paddingY + (i * lineHeight));
+    renderer.drawText({
+      text: lines[i],
+      x: x + paddingX,
+      y: y + paddingY + (i * lineHeight),
+      font,
+      color: textColor,
+      align: 'left',
+      baseline: 'top'
+    });
   }
-
-  ctx.restore();
 
   return { x, y, width, height };
 }
@@ -98,4 +102,59 @@ function normalizeTooltipLines(content: string | string[]): string[] {
   return sourceLines
     .map((line) => String(line ?? '').trim())
     .filter((line) => line.length > 0);
+}
+
+function drawRectOutline(
+  renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  lineWidth: number,
+  color: [number, number, number, number]
+) {
+  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  renderer.drawRect({ x, y, width, height: stroke, color });
+  renderer.drawRect({ x, y: y + height - stroke, width, height: stroke, color });
+  renderer.drawRect({ x, y, width: stroke, height, color });
+  renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
+}
+
+function cssToRgba(color: string): [number, number, number, number] {
+  const normalized = String(color || '').trim().toLowerCase();
+  const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const raw = hexMatch[1];
+    const hex = raw.length === 3
+      ? `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
+      : raw;
+    const value = Number.parseInt(hex, 16);
+    return [
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255,
+      1
+    ];
+  }
+
+  const rgbaMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
+  if (rgbaMatch) {
+    const parts = rgbaMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3) {
+      const alpha = parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
+      return [
+        clamp01(parts[0] / 255),
+        clamp01(parts[1] / 255),
+        clamp01(parts[2] / 255),
+        clamp01(alpha)
+      ];
+    }
+  }
+
+  return [1, 1, 1, 1];
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }

@@ -1,10 +1,15 @@
 # Single-Canvas Plan (`#incrementalist`) Without New Renderer Architecture
 
+## CRITICAL!!!!
+- Offscreen workaround rendering is forbidden: do not introduce temporary offscreen canvas/surface composition paths as a migration shortcut!!!!
+- Offscreen workaround rendering is forbidden: do not introduce temporary offscreen canvas/surface composition paths as a migration shortcut!!!!
+
 ## Rules for this plan
 - Final state: one canvas only, `#incrementalist`.
 - Do not introduce a new centralized renderer architecture.
 - Migrate rendering where it already lives (existing `render.ts` and UI render files).
 - Remove old 2D draw paths as each file is migrated.
+- Offscreen workaround rendering is forbidden: do not introduce temporary offscreen canvas/surface composition paths as a migration shortcut.
 - No migration-history naming leftovers.
 - Treat phase boundaries as hard gates: do not execute behavior assigned to a later phase.
 - Until Phase 6, effects must continue rendering to `#effects-canvas`.
@@ -136,3 +141,6 @@ Acceptance:
   - Initializes effects on `#incrementalist`.
   - Renders effects to `#incrementalist`.
   - Removes or bypasses `#effects-canvas`.
+
+## Final notice
+- Offscreen workaround rendering is forbidden: do not introduce temporary offscreen canvas/surface composition paths as a migration shortcut!!!

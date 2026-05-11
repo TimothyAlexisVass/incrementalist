@@ -1,5 +1,6 @@
 import { COLORS } from '../../colors';
 import { BUTTON_DEFAULT_FONT } from '../../config';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export interface ButtonOptions {
   active?: boolean;
@@ -24,6 +25,7 @@ const NOTICE_PING_DURATION_MS = 1_000;
 const NOTICE_PING_MAX_RADIUS_PX = 100;
 const NOTICE_PING_COLOR = '#00ff00';
 const BUTTON_PADDING_PX = 3;
+const ZERO_ALPHA_RGBA: readonly [number, number, number, number] = [0, 0, 0, 0];
 
 function getNowMs() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -44,7 +46,12 @@ function getNoticePingProgress(x: number, y: number, radius: number) {
   return elapsed / NOTICE_PING_DURATION_MS;
 }
 
-function drawNoticePing(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) {
+function drawNoticePing(x: number, y: number, radius: number) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) {
+    return;
+  }
+
   const progress = getNoticePingProgress(x, y, radius);
 
   if (progress <= 0) {
@@ -53,37 +60,27 @@ function drawNoticePing(ctx: CanvasRenderingContext2D, x: number, y: number, rad
 
   const ringRadius = Math.max(radius, progress * NOTICE_PING_MAX_RADIUS_PX);
   const fade = Math.pow(1 - progress, 1.5);
+  const ringRect = {
+    x: x - ringRadius,
+    y: y - ringRadius,
+    width: ringRadius * 2,
+    height: ringRadius * 2
+  };
 
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.beginPath();
-  ctx.arc(x, y, ringRadius, 0, TWO_PI);
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = `rgba(0, 255, 0, ${0.22 * fade})`;
-  ctx.shadowColor = NOTICE_PING_COLOR;
-  ctx.shadowBlur = 24 * fade;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(x, y, ringRadius, 0, TWO_PI);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = `rgba(0, 255, 0, ${0.75 * fade})`;
-  ctx.shadowBlur = 0;
-  ctx.stroke();
-  ctx.restore();
+  drawRectOutline(renderer, ringRect, 7, [0, 1, 0, 0.22 * fade]);
+  drawRectOutline(renderer, ringRect, 2, [0, 1, 0, 0.75 * fade]);
 }
 
 export function drawButton(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; width: number; height: number },
   label: string,
   options: ButtonOptions = {}
 ) {
-  if (!ctx || !rect) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer || !rect) {
     return;
   }
-
-  ctx.save();
 
   const {
     active = false,
@@ -107,52 +104,67 @@ export function drawButton(
     height: rect.height + (padding * 2)
   };
 
-  ctx.fillStyle = active ? activeSurface : inactiveSurface;
-  ctx.fillRect(paddedRect.x, paddedRect.y, paddedRect.width, paddedRect.height);
-
-  ctx.strokeStyle = active ? activeBorder : inactiveBorder;
-  ctx.lineWidth = lineWidth;
-  ctx.strokeRect(paddedRect.x, paddedRect.y, paddedRect.width, paddedRect.height);
-
-  ctx.fillStyle = textColor;
-  ctx.font = font;
-  ctx.textAlign = textAlign;
-  ctx.textBaseline = 'middle';
-
-  ctx.fillText(label, textX, textY);
+  renderer.drawRect({
+    x: paddedRect.x,
+    y: paddedRect.y,
+    width: paddedRect.width,
+    height: paddedRect.height,
+    color: cssToRgba(active ? activeSurface : inactiveSurface)
+  });
+  drawRectOutline(renderer, paddedRect, lineWidth, cssToRgba(active ? activeBorder : inactiveBorder));
+  renderer.drawText({
+    text: label,
+    x: textX,
+    y: textY,
+    font,
+    color: textColor,
+    align: textAlign,
+    baseline: 'middle'
+  });
 
   if (options.showNotice) {
-    drawNoticeDot(ctx, rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
+    drawNoticeDot(_ctx, rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
   }
-
-  ctx.restore();
 }
 
 export function drawNoticeDot(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number = 4,
   animated: boolean = true
 ) {
-  if (animated) {
-    drawNoticePing(ctx, x, y, radius);
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) {
+    return;
   }
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = NOTICE_PING_COLOR;
-  ctx.fill();
-  
-  // Subtle outer glow
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = NOTICE_PING_COLOR;
-  ctx.shadowBlur = 4;
-  ctx.shadowColor = NOTICE_PING_COLOR;
-  ctx.stroke();
-  
-  ctx.restore();
+  if (animated) {
+    drawNoticePing(x, y, radius);
+  }
+
+  const dotRect = {
+    x: x - radius,
+    y: y - radius,
+    width: radius * 2,
+    height: radius * 2
+  };
+  renderer.drawRect({
+    x: dotRect.x,
+    y: dotRect.y,
+    width: dotRect.width,
+    height: dotRect.height,
+    color: cssToRgba(NOTICE_PING_COLOR)
+  });
+  drawRectOutline(renderer, dotRect, 1, cssToRgba(NOTICE_PING_COLOR, 0.95));
+  const glowPad = Math.max(1, Math.round(radius * 0.8));
+  renderer.drawRect({
+    x: dotRect.x - glowPad,
+    y: dotRect.y - glowPad,
+    width: dotRect.width + glowPad * 2,
+    height: dotRect.height + glowPad * 2,
+    color: cssToRgba(NOTICE_PING_COLOR, 0.12)
+  });
 }
 
 import { InteractionState, pointInRect } from '../managers/interactions';
@@ -190,4 +202,59 @@ export function doButton(
   drawButton(ctx, rect, label, options);
 
   return clicked;
+}
+
+function drawRectOutline(
+  renderer: ReturnType<typeof getActiveWebGLRenderer>,
+  rect: { x: number; y: number; width: number; height: number },
+  lineWidth: number,
+  color: readonly [number, number, number, number]
+) {
+  if (!renderer) return;
+  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  renderer.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: stroke, color });
+  renderer.drawRect({ x: rect.x, y: rect.y + rect.height - stroke, width: rect.width, height: stroke, color });
+  renderer.drawRect({ x: rect.x, y: rect.y, width: stroke, height: rect.height, color });
+  renderer.drawRect({ x: rect.x + rect.width - stroke, y: rect.y, width: stroke, height: rect.height, color });
+}
+
+function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number, number] {
+  const normalized = String(color || '').trim().toLowerCase();
+  if (!normalized) return [...ZERO_ALPHA_RGBA] as [number, number, number, number];
+
+  const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const raw = hexMatch[1];
+    const hex = raw.length === 3
+      ? `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
+      : raw;
+    const value = Number.parseInt(hex, 16);
+    return [
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255,
+      clamp01(alphaMultiplier)
+    ];
+  }
+
+  const rgbaMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
+  if (rgbaMatch) {
+    const parts = rgbaMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3) {
+      const alpha = parts.length >= 4 ? clamp01(parts[3]) : 1;
+      return [
+        clamp01(parts[0] / 255),
+        clamp01(parts[1] / 255),
+        clamp01(parts[2] / 255),
+        clamp01(alpha * alphaMultiplier)
+      ];
+    }
+  }
+
+  return [1, 1, 1, clamp01(alphaMultiplier)];
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }

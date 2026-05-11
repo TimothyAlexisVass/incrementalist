@@ -4,6 +4,7 @@ import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { notices } from '../../managers/notices';
 import { GameChannel } from '../../../net/game-channel';
+import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 export type TabMenuLayout = 'horizontal' | 'vertical';
 export type TabMenuPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -76,6 +77,11 @@ export class TabMenu {
     channel?: GameChannel,
     runCommand?: (cmd: () => Promise<any>) => void
   ) {
+    const renderer = getActiveWebGLRenderer();
+    if (!renderer) {
+      return;
+    }
+
     const layout = this.config.layout || 'horizontal';
     const position = this.config.position || 'top-left';
     const tabHeight = this.config.tabHeight || 30;
@@ -83,13 +89,10 @@ export class TabMenu {
     const gap = this.config.gap || 4;
     const font = this.config.font || 'bold 14px Arial';
 
-    ctx.save();
-    ctx.font = font;
-
     // Calculate text widths including optional hotkeys
     const textWidths = this.tabs.map(t => {
       const label = t.hotkey ? `${t.label} (${t.hotkey})` : t.label;
-      return ctx.measureText(label).width;
+      return renderer.measureTextWidth({ text: label, font });
     });
     const maxTextWidth = Math.max(...textWidths);
 
@@ -194,8 +197,6 @@ export class TabMenu {
       }
     }
 
-    ctx.restore();
-
     // Render Tab Buttons
     for (let i = 0; i < this.tabs.length; i++) {
       const tab = this.tabs[i];
@@ -245,9 +246,7 @@ export class TabMenu {
         );
       }
 
-      ctx.save();
       activeTab.renderContent(ctx, canvas, input, state, contentRect);
-      ctx.restore();
     }
   }
 }

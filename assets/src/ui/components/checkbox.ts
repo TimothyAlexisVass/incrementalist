@@ -1,4 +1,5 @@
 import { COLORS } from '../../colors';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export interface CheckboxOptions {
   trackColor?: string;
@@ -8,14 +9,15 @@ export interface CheckboxOptions {
 }
 
 export function drawCheckbox(
-  ctx: CanvasRenderingContext2D,
+  _ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   size: number,
   checked: boolean,
   options: CheckboxOptions = {}
 ) {
-  if (!ctx) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) {
     return;
   }
 
@@ -26,28 +28,28 @@ export function drawCheckbox(
     lineWidth = 2
   } = options;
 
-  ctx.fillStyle = trackColor;
-  ctx.fillRect(x, y, size, size);
-
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = lineWidth;
-  ctx.strokeRect(x, y, size, size);
+  renderer.drawRect({
+    x,
+    y,
+    width: size,
+    height: size,
+    color: hexToRgba(trackColor)
+  });
+  drawRectOutline(renderer, x, y, size, size, lineWidth, hexToRgba(borderColor));
 
   if (!checked) {
     return;
   }
 
-  ctx.save();
-  ctx.strokeStyle = checkmarkColor;
-  ctx.lineWidth = 2.25;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x + (size * 0.2), y + (size * 0.55));
-  ctx.lineTo(x + (size * 0.43), y + (size * 0.78));
-  ctx.lineTo(x + (size * 0.82), y + (size * 0.24));
-  ctx.stroke();
-  ctx.restore();
+  renderer.drawText({
+    text: '✓',
+    x: x + size / 2,
+    y: y + size / 2,
+    font: `bold ${Math.max(12, Math.floor(size * 0.8))}px Arial`,
+    color: checkmarkColor,
+    align: 'center',
+    baseline: 'middle'
+  });
 }
 
 import { InteractionState, pointInRect } from '../managers/interactions';
@@ -80,3 +82,29 @@ export function doCheckbox(
   return toggled;
 }
 
+function drawRectOutline(
+  renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  lineWidth: number,
+  color: [number, number, number, number]
+) {
+  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  renderer.drawRect({ x, y, width, height: stroke, color });
+  renderer.drawRect({ x, y: y + height - stroke, width, height: stroke, color });
+  renderer.drawRect({ x, y, width: stroke, height, color });
+  renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
+}
+
+function hexToRgba(color: string): [number, number, number, number] {
+  const normalized = String(color || '').trim();
+  const match = normalized.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return [1, 1, 1, 1];
+  const value = match[1];
+  const r = parseInt(value.slice(0, 2), 16) / 255;
+  const g = parseInt(value.slice(2, 4), 16) / 255;
+  const b = parseInt(value.slice(4, 6), 16) / 255;
+  return [r, g, b, 1];
+}

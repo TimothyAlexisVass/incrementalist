@@ -15,6 +15,7 @@ import { InteractionState } from '../../managers/interactions';
 import { doButton } from '../button';
 import { Rect } from '../tab-menu/tab-menu';
 import type { SaveSlotSummary } from '../../../net/protocol';
+import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 export interface SaveSlotActions {
   onSwitch: (index: number) => void;
@@ -28,51 +29,86 @@ export function drawSaveSlotCard(
   slot: SaveSlotSummary,
   actions: SaveSlotActions
 ) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) {
+    return;
+  }
+
   const isCurrent = slot.is_current;
   
-  // Background
-  ctx.fillStyle = isCurrent ? COLORS.button.surface.active : COLORS.button.surface.inactive;
-  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-  
-  // Border
-  ctx.strokeStyle = isCurrent ? COLORS.button.border.active : COLORS.button.border.inactive;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-
-  // Label (File X)
-  ctx.fillStyle = COLORS.button.text;
-  ctx.font = SAVE_FILE_LABEL_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(formatFileLabel(slot.file_index), rect.x + rect.width / 2, rect.y + 20);
+  renderer.drawRect({
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+    color: cssToRgba(isCurrent ? COLORS.button.surface.active : COLORS.button.surface.inactive)
+  });
+  drawRectOutline(
+    renderer,
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+    2,
+    cssToRgba(isCurrent ? COLORS.button.border.active : COLORS.button.border.inactive)
+  );
+  renderer.drawText({
+    text: formatFileLabel(slot.file_index),
+    x: rect.x + rect.width / 2,
+    y: rect.y + 20,
+    font: SAVE_FILE_LABEL_FONT,
+    color: COLORS.button.text,
+    align: 'center',
+    baseline: 'top'
+  });
 
   // Stats
-  ctx.font = SAVE_FILE_INFO_FONT;
   const statsY = rect.y + 60;
   const lineGap = 24;
-  
-  ctx.fillText(slot.has_data ? formatLevel(slot.level) : 'Empty Slot', rect.x + rect.width / 2, statsY);
-  ctx.fillText(
-    slot.has_data ? `Rewards Claimed: ${formatNumber(slot.rewards_claimed)}` : 'Rewards Claimed: 0',
-    rect.x + rect.width / 2,
-    statsY + lineGap
-  );
+  renderer.drawText({
+    text: slot.has_data ? formatLevel(slot.level) : 'Empty Slot',
+    x: rect.x + rect.width / 2,
+    y: statsY,
+    font: SAVE_FILE_INFO_FONT,
+    color: COLORS.button.text,
+    align: 'center',
+    baseline: 'top'
+  });
+  renderer.drawText({
+    text: slot.has_data ? `Rewards Claimed: ${formatNumber(slot.rewards_claimed)}` : 'Rewards Claimed: 0',
+    x: rect.x + rect.width / 2,
+    y: statsY + lineGap,
+    font: SAVE_FILE_INFO_FONT,
+    color: COLORS.button.text,
+    align: 'center',
+    baseline: 'top'
+  });
   
   // Convert ISO string or timestamp to displayable time
   const savedAtVal = slot.saved_at ? new Date(slot.saved_at).getTime() : 0;
-  ctx.fillText(
-    slot.has_data ? `Saved: ${formatTimestamp(savedAtVal)}` : 'Saved: Never',
-    rect.x + rect.width / 2,
-    statsY + lineGap * 2
-  );
+  renderer.drawText({
+    text: slot.has_data ? `Saved: ${formatTimestamp(savedAtVal)}` : 'Saved: Never',
+    x: rect.x + rect.width / 2,
+    y: statsY + lineGap * 2,
+    font: SAVE_FILE_INFO_FONT,
+    color: COLORS.button.text,
+    align: 'center',
+    baseline: 'top'
+  });
 
   // Status / Switch Action
-  ctx.fillStyle = isCurrent ? COLORS.overlay.statusUnlocked : COLORS.button.text;
-  ctx.font = SAVE_FILE_STATUS_FONT;
   const statusY = rect.y + rect.height - 25;
   
   if (isCurrent) {
-    ctx.fillText('Active File', rect.x + rect.width / 2, statusY);
+    renderer.drawText({
+      text: 'Active File',
+      x: rect.x + rect.width / 2,
+      y: statusY,
+      font: SAVE_FILE_STATUS_FONT,
+      color: COLORS.overlay.statusUnlocked,
+      align: 'center',
+      baseline: 'top'
+    });
   } else {
     // Switch Button
     const btnWidth = 140;
@@ -116,4 +152,31 @@ export function drawSaveSlotCard(
         actions.onReset(slot.slot_index);
     }
   }
+}
+
+function drawRectOutline(
+  renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  lineWidth: number,
+  color: [number, number, number, number]
+) {
+  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  renderer.drawRect({ x, y, width, height: stroke, color });
+  renderer.drawRect({ x, y: y + height - stroke, width, height: stroke, color });
+  renderer.drawRect({ x, y, width: stroke, height, color });
+  renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
+}
+
+function cssToRgba(color: string): [number, number, number, number] {
+  const normalized = String(color || '').trim();
+  const match = normalized.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return [1, 1, 1, 1];
+  const value = match[1];
+  const r = parseInt(value.slice(0, 2), 16) / 255;
+  const g = parseInt(value.slice(2, 4), 16) / 255;
+  const b = parseInt(value.slice(4, 6), 16) / 255;
+  return [r, g, b, 1];
 }

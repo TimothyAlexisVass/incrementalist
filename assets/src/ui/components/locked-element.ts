@@ -1,4 +1,5 @@
 import { COLORS } from "../../colors";
+import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { InteractionState, pointInRect } from "../managers/interactions";
 import { drawTooltip } from "./tooltip";
 
@@ -16,37 +17,47 @@ export function drawLockedElement(
   drawElement: () => void,
   options: LockedElementOptions = {}
 ) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) {
+    return;
+  }
+
   const {
     label = "LOCKED",
     opacity = 0.1,
     criteria
   } = options;
 
-  ctx.save();
-  ctx.globalAlpha = opacity;
   drawElement();
-  ctx.restore();
+  renderer.drawRect({
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
+    color: [0, 0, 0, clamp01((1 - opacity) * 0.55)]
+  });
 
-  // Draw LOCKED text overlay
-  ctx.save();
-  ctx.font = "bold 12px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  
   const textX = rect.x + rect.width / 2;
   const textY = rect.y + rect.height / 2;
 
-  // Outline for readability
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
-  ctx.lineWidth = 3;
-  ctx.strokeText(label, textX, textY);
+  renderer.drawText({
+    text: label,
+    x: textX,
+    y: textY,
+    font: "bold 12px Arial",
+    color: COLORS.panel.textPrimary,
+    align: "center",
+    baseline: "middle",
+    strokeColor: "rgba(0, 0, 0, 0.8)",
+    strokeWidth: 3
+  });
 
-  ctx.fillStyle = COLORS.panel.textPrimary;
-  ctx.fillText(label, textX, textY);
-  ctx.restore();
-
-  // Handle tooltip for criteria
   if (criteria && input.pointer && pointInRect(input.pointer, rect)) {
     drawTooltip(ctx, canvas, input.pointer, criteria);
   }
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
