@@ -9,7 +9,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
   alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlot, SaveSlots}
-  alias Incrementalist.Game.{Notices, Snapshots, Time}
+  alias Incrementalist.Game.{Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Repo
   import Ecto.Query
@@ -53,15 +53,16 @@ defmodule Incrementalist.Game.CommandExecutor do
         end
 
         {"succeeded",
-         %{
-           "type" => "progress.claim_in.result",
-           "command_id" => command.command_id,
-           "can_claim_in" => can_claim_in,
-           "sisu" => next_state.sisu,
-           "can_claim_at" => next_state.can_claim_at,
-           "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-           "notices" => Notices.payload(next_notices)
-         }, active_slot.id}
+         Map.merge(
+           %{
+             "type" => "progress.claim_in.result",
+             "command_id" => command.command_id,
+             "can_claim_in" => can_claim_in,
+             "sisu" => next_state.sisu,
+             "notices" => Notices.payload(next_notices)
+           },
+           State.projection_params(next_state, now)
+         ), active_slot.id}
 
       "progress.claim_reward" ->
         active_slot = active_slot(player, now)
@@ -176,7 +177,9 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, enabled} <- fetch_boolean(command.intent, "enabled"),
-             {:ok, next_state} <- Bar.set_idle_mode(active_slot.state, enabled) do
+             {:ok, intermediate_state} <- Bar.set_idle_mode(active_slot.state, enabled) do
+          {next_state, _can_claim_in} = Bar.ensure_can_claim_at(intermediate_state, now)
+
           next_notices =
             Notices.refresh_for_state_transition(
               active_slot.notices || Notices.new(active_slot.state),
@@ -193,15 +196,16 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
           {"succeeded",
-           %{
-             "type" => "progress.set_idle_mode.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "idle_mode" => enabled,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-             "can_claim_at" => next_state.can_claim_at,
-             "notices" => Notices.payload(next_notices)
-           }, active_slot.id}
+           Map.merge(
+             %{
+               "type" => "progress.set_idle_mode.result",
+               "status" => "ok",
+               "command_id" => command.command_id,
+               "idle_mode" => enabled,
+               "notices" => Notices.payload(next_notices)
+             },
+             State.projection_params(next_state, now)
+           ), active_slot.id}
         else
           {:error, reason} ->
             {"failed",
@@ -231,16 +235,17 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
           {"succeeded",
-           %{
-             "type" => "sisu.refill.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "tier_id" => tier_id,
-             "sisu" => next_state.sisu,
-             "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-             "notices" => Notices.payload(next_notices)
-           }, active_slot.id}
+           Map.merge(
+             %{
+               "type" => "sisu.refill.result",
+               "status" => "ok",
+               "command_id" => command.command_id,
+               "tier_id" => tier_id,
+               "sisu" => next_state.sisu,
+               "notices" => Notices.payload(next_notices)
+             },
+             State.projection_params(next_state, now)
+           ), active_slot.id}
         else
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
@@ -266,16 +271,17 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
           {"succeeded",
-           %{
-             "type" => "sisu.upgrade_max.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "sisu" => next_state.sisu,
-             "shards" => next_state.shards,
-             "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-             "notices" => Notices.payload(next_notices)
-           }, active_slot.id}
+           Map.merge(
+             %{
+               "type" => "sisu.upgrade_max.result",
+               "status" => "ok",
+               "command_id" => command.command_id,
+               "sisu" => next_state.sisu,
+               "shards" => next_state.shards,
+               "notices" => Notices.payload(next_notices)
+             },
+             State.projection_params(next_state, now)
+           ), active_slot.id}
         else
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
@@ -285,14 +291,16 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, item_id} <- fetch_item_id(command.intent),
-             {:ok, next_state} <-
+             {:ok, intermediate_state} <-
                Incrementalist.Game.Features.Shop.purchase(active_slot.state, item_id) do
-          next_state =
+          intermediate_state =
             if item_id == "sisu_generator" do
-              Sisu.initialize_generator(next_state, now)
+              Sisu.initialize_generator(intermediate_state, now)
             else
-              next_state
+              intermediate_state
             end
+
+          {next_state, _can_claim_in} = Bar.ensure_can_claim_at(intermediate_state, now)
 
           next_notices =
             Notices.refresh_for_state_transition(
@@ -310,19 +318,20 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
           {"succeeded",
-           %{
-             "type" => "shop.purchase.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "item_id" => item_id,
-             "coins" => next_state.coins,
-             "shards" => next_state.shards,
-             "cores" => next_state.cores,
-             "sisu" => next_state.sisu,
-             "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-             "notices" => Notices.payload(next_notices)
-           }, active_slot.id}
+           Map.merge(
+             %{
+               "type" => "shop.purchase.result",
+               "status" => "ok",
+               "command_id" => command.command_id,
+               "item_id" => item_id,
+               "coins" => next_state.coins,
+               "shards" => next_state.shards,
+               "cores" => next_state.cores,
+               "sisu" => next_state.sisu,
+               "notices" => Notices.payload(next_notices)
+             },
+             State.projection_params(next_state, now)
+           ), active_slot.id}
         else
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}

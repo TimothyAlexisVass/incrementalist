@@ -91,8 +91,11 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     boot = %{
       "type" => "game.boot",
       "username" => state.player.username,
+      "server_time" => Time.iso8601(now),
       "active_save_slot" => active_slot.slot_index,
       "save_slot" => Incrementalist.Game.State.summary(active_slot, active_slot.slot_index),
+      "idle_mode" => active_slot.state.idle_mode || false,
+      "projection_params" => Incrementalist.Game.State.projection_params(active_slot.state, now),
       "snapshot" => snapshot,
       "pending_result" => pending_result(state, nil)
     }

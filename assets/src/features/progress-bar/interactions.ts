@@ -4,6 +4,8 @@ import { progressClaimReward, progressSetIdleMode } from "../../net/commands";
 import { triggerProgressBarCollectionEffect, getIdleModeToggleRect, getProgressBarLayout } from "./render";
 import { getViewModel, shouldSendClaimIn, beginAsyncClaimResolution, setPendingClaimIntent } from "./view-model";
 
+import { getServerNow } from "../../core/time";
+
 let claimResolutionInFlight = false;
 let pendingClaimPopupPoint: { x: number; y: number } | null = null;
 
@@ -17,7 +19,7 @@ export function clearPendingClaimPopupPoint() {
 
 export function handleProgressLoop(channel: GameChannel): boolean {
   void channel;
-  return shouldSendClaimIn(Date.now());
+  return shouldSendClaimIn(getServerNow());
 }
 
 export function tryClaimReward(channel: GameChannel): boolean {

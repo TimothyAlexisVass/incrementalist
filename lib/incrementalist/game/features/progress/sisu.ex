@@ -94,7 +94,8 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
     projected = project_state(state, now)
     tier = tier(tier_id)
     target = tier_target_for_level(projected, tier.id)
-    current = current_sisu(projected, now)
+    # Use target_current if available, otherwise current
+    current = projected.sisu.target_current || current_sisu(projected, now)
     effective_max = max_effective_from_state(projected)
 
     if BigNum.compare(current, BigNum.from_number(target)) >= 0 do
@@ -104,11 +105,11 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
       updated_sisu =
         projected.sisu
-        |> Map.put(:current, next_sisu)
-        |> Map.put(:cycle_decay, tier.cycle_decay)
+        |> Map.put(:target_current, next_sisu)
+        |> Map.put(:target_cycle_decay, tier.cycle_decay)
         |> Map.put(:projected_at, Time.iso8601(now))
 
-      {:ok, project_projection(%{projected | sisu: updated_sisu}, now)}
+      {:ok, %{projected | sisu: updated_sisu}}
     end
   end
 
@@ -137,12 +138,11 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
   def advance_cycle(%State{} = state, now) do
     if state.sisu do
-      {next_sisu, next_cycle_decay} = next_cycle_values(state)
-
+      # Move targets to current state for the new cycle
       updated_sisu =
         state.sisu
-        |> Map.put(:current, next_sisu)
-        |> Map.put(:cycle_decay, next_cycle_decay)
+        |> Map.put(:current, state.sisu.target_current || state.sisu.current)
+        |> Map.put(:cycle_decay, state.sisu.target_cycle_decay || state.sisu.cycle_decay)
         |> Map.put(:projected_at, Time.iso8601(now))
 
       project_projection(%{state | sisu: updated_sisu}, now)
@@ -164,7 +164,22 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
   def project_projection(%State{} = state, now) do
     if state.sisu do
-      %{state | can_claim_at: can_claim_at(state, now)}
+      # If targets are not set, calculate default decay targets
+      {default_target_sisu, default_target_decay} = next_cycle_values(state)
+
+      updated_sisu =
+        state.sisu
+        |> Map.put(:target_current, state.sisu.target_current || default_target_sisu)
+        |> Map.put(:target_cycle_decay, state.sisu.target_cycle_decay || default_target_decay)
+
+      case state.can_claim_at do
+        nil ->
+          claim_at = can_claim_at(state, now)
+          %{state | sisu: updated_sisu, can_claim_at: claim_at, cycle_started_at: Time.iso8601(now)}
+
+        _existing ->
+          %{state | sisu: updated_sisu}
+      end
     else
       state
     end

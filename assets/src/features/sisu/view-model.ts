@@ -4,6 +4,7 @@ import { clampNumber, hexToRgbArray, lerp, lerpColor } from "../../utils";
 import { formatMultiplierDelta } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getViewModel as getProgressBarViewModel } from "../progress-bar/view-model";
+import { getServerNow } from "../../core/time";
 
 import { UPGRADE_COSTS } from "./levels";
 import { COLORS } from "../../colors";
@@ -138,7 +139,7 @@ function getNowMs() {
     return performance.now();
   }
 
-  return Date.now();
+  return getServerNow();
 }
 
 export function formatDecay(value: number | null | undefined): string {

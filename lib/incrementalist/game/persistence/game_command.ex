@@ -31,15 +31,15 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     field :intent, :map, default: %{}
     field :status, :string, default: "queued"
     field :result, :map
-    field :queued_at, :utc_datetime
-    field :processed_at, :utc_datetime
-    field :acked_at, :utc_datetime
+    field :queued_at, :utc_datetime_usec
+    field :processed_at, :utc_datetime_usec
+    field :acked_at, :utc_datetime_usec
     field :replay_count, :integer, default: 0
 
     belongs_to :player, Player
     belongs_to :save_slot, SaveSlot
 
-    timestamps(type: :utc_datetime)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(game_command, attrs) do

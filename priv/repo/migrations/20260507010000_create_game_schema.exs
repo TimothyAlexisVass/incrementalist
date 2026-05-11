@@ -6,9 +6,9 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       add(:username, :string, null: false)
       add(:email, :string)
       add(:active_save_slot, :integer, null: false, default: 0)
-      add(:last_seen_at, :utc_datetime, null: false)
+      add(:last_seen_at, :utc_datetime_usec, null: false)
 
-      timestamps(type: :utc_datetime)
+      timestamps(type: :utc_datetime_usec)
     end
 
     create(unique_index(:players, [:username]))
@@ -18,9 +18,9 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       add(:slot_index, :integer, null: false)
       add(:state, :map)
       add(:notices, :map)
-      add(:last_saved_at, :utc_datetime)
+      add(:last_saved_at, :utc_datetime_usec)
 
-      timestamps(type: :utc_datetime)
+      timestamps(type: :utc_datetime_usec)
     end
 
     create(unique_index(:save_slots, [:player_id, :slot_index]))
@@ -40,12 +40,12 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       add(:intent, :map, null: false, default: %{})
       add(:status, :string, null: false, default: "queued")
       add(:result, :map)
-      add(:queued_at, :utc_datetime, null: false)
-      add(:processed_at, :utc_datetime)
-      add(:acked_at, :utc_datetime)
+      add(:queued_at, :utc_datetime_usec, null: false)
+      add(:processed_at, :utc_datetime_usec)
+      add(:acked_at, :utc_datetime_usec)
       add(:replay_count, :integer, null: false, default: 0)
 
-      timestamps(type: :utc_datetime)
+      timestamps(type: :utc_datetime_usec)
     end
 
     create(unique_index(:game_commands, [:player_id, :sequence]))

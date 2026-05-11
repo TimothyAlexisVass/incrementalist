@@ -6,7 +6,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
 
   def set_idle_mode(%State{} = state, enabled) do
     if state.features.idle_mode_purchased do
-      {:ok, %{state | idle_mode: enabled}}
+      # Reset the bar on mode change as per user requirement
+      {:ok, %{state | idle_mode: enabled, can_claim_at: nil, cycle_started_at: nil}}
     else
       {:error, "idle_mode_not_purchased"}
     end
@@ -59,16 +60,16 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     projected = Sisu.project_state(state, now)
     now_ms = Time.to_unix_ms(now)
 
-    case parse_iso_ms(state.can_claim_at) do
+    case parse_iso_ms(projected.can_claim_at) do
       can_claim_at_ms when is_integer(can_claim_at_ms) ->
-        anchored = Map.put(projected, :can_claim_at, state.can_claim_at)
-
-        {anchored, max(0, can_claim_at_ms - now_ms)}
+        {projected, max(0, can_claim_at_ms - now_ms)}
 
       _ ->
+        # This branch should theoretically not be reached now that project_state initializes it,
+        # but we keep it for safety.
         ms_required = Sisu.claim_milliseconds(projected, now)
         claim_at = Time.iso8601(DateTime.add(now, ms_required, :millisecond))
-        {%{projected | can_claim_at: claim_at}, ms_required}
+        {%{projected | can_claim_at: claim_at, cycle_started_at: Time.iso8601(now)}, ms_required}
     end
   end
 
@@ -81,6 +82,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
       state
       | progress_bar: updated_progress_bar,
         last_claimed_at: Time.iso8601(now),
+        cycle_started_at: nil,
         can_claim_at: nil
     }
   end

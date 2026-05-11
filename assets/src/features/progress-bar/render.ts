@@ -17,6 +17,7 @@ import {
   ColorInput
 } from '../../render/webgl-effects';
 import { getViewModel } from './view-model';
+import { getServerNow } from '../../core/time';
 
 type Rgb = [number, number, number];
 type LiquidBubble = {
@@ -298,7 +299,7 @@ function getNowMs(): number {
     return performance.now();
   }
 
-  return Date.now();
+  return getServerNow();
 }
 
 function getProgressVisualDelta(now: number): number {

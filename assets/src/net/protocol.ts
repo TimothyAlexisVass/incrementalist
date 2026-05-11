@@ -37,8 +37,12 @@ export type SisuState = {
 };
 
 export type ProjectionParams = {
-  fill_rate: number;
+  current_fill: number;
   can_claim_at: string | null;
+  current_sisu: BigNum;
+  current_sisu_decay: number;
+  sisu_at_claim: BigNum;
+  sisu_decay_at_claim: number;
 };
 
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
@@ -124,10 +128,8 @@ export type ProgressClaimInResult = {
   command_id: number;
   can_claim_in: number;
   sisu: SisuState;
-  can_claim_at: string | null;
-  fill_rate: number;
   notices: NoticeState;
-};
+} & ProjectionParams;
 
 export type ProgressClaimRewardResult = {
   type: "progress.claim_reward.result";
@@ -148,10 +150,8 @@ export type SisuRefillResult = {
   command_id: number;
   tier_id: string;
   sisu: SisuState;
-  can_claim_at: string | null;
-  fill_rate: number;
   notices: NoticeState;
-};
+} & ProjectionParams;
 
 export type SisuUpgradeMaxResult = {
   type: "sisu.upgrade_max.result";
@@ -159,10 +159,8 @@ export type SisuUpgradeMaxResult = {
   command_id: number;
   sisu: SisuState;
   shards: BigNum;
-  can_claim_at: string | null;
-  fill_rate: number;
   notices: NoticeState;
-};
+} & ProjectionParams;
 
 export type AreaSelectResult = {
   type: "area.select.result";
@@ -181,20 +179,16 @@ export type ShopPurchaseResult = {
   shards?: BigNum;
   cores?: BigNum;
   sisu?: SisuState;
-  can_claim_at?: string | null;
-  fill_rate?: number;
   notices: NoticeState;
-};
+} & Partial<ProjectionParams>;
 
 export type ProgressSetIdleModeResult = {
   type: "progress.set_idle_mode.result";
   status: "ok";
   command_id: number;
   idle_mode: boolean;
-  fill_rate: number;
-  can_claim_at: string | null;
   notices: NoticeState;
-};
+} & ProjectionParams;
 
 export type NoticeEventKind = "child_shown" | "child_clicked";
 
@@ -279,8 +273,11 @@ export type BootResult = {
   type: "game.boot";
   username: string;
   token?: string;
+  server_time: string;
   active_save_slot: number;
   save_slot: SaveSlotSummary;
+  idle_mode: boolean;
+  projection_params: ProjectionParams;
   snapshot?: GameSnapshot | null;
   pending_result?: AckableCommandResult | null;
 };

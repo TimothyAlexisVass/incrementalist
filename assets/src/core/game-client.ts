@@ -41,6 +41,7 @@ import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-
 import { renderTopHUD } from "../ui/layout/top-hud/render";
 import { renderBottomHUD } from "../ui/layout/bottom-hud/render";
 import { Store } from "./store";
+import { synchronize } from "./time";
 import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
@@ -138,8 +139,14 @@ export class GameClient {
       }
       this.snapshotCache = new SnapshotCache(result.username);
 
+      synchronize(result.server_time);
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
+
       if (this.store.state.snapshot) {
+        // Ensure the bar projection is up to date even if the snapshot was cached
+        this.store.state.snapshot.state.projection_params = result.projection_params;
+        this.store.state.snapshot.state.idle_mode = result.idle_mode;
+
         notices.setSnapshot(this.store.state.snapshot);
         updateAreaViewModel(this.store.state.snapshot.state);
       }
@@ -281,6 +288,10 @@ export class GameClient {
     // Without this, reloads can resurrect an older cached projection until the
     // next full snapshot arrives.
     if (result.type === "progress.claim_reward.result" ||
+        result.type === "progress.set_idle_mode.result" ||
+        result.type === "progress.claim_in.result" ||
+        result.type === "sisu.refill.result" ||
+        result.type === "sisu.upgrade_max.result" ||
         result.type === "area.select.result" ||
         result.type === "shop.purchase.result" ||
         result.type === "notice.event.result" ||

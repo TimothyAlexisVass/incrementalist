@@ -18,9 +18,9 @@ defmodule Incrementalist.Game.Persistence.Player do
     field :email, :string
     field :active_save_slot, :integer, default: 0
     field :username, :string
-    field :last_seen_at, :utc_datetime
+    field :last_seen_at, :utc_datetime_usec
 
-    timestamps(type: :utc_datetime)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(player, attrs) do

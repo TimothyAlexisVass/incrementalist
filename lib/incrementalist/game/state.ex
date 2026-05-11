@@ -62,15 +62,18 @@ defmodule Incrementalist.Game.State do
     embedded_schema do
       embeds_one :current, BigNum, on_replace: :update
       embeds_one :max_basic, BigNum, on_replace: :update
+      embeds_one :target_current, BigNum, on_replace: :update
+      field :target_cycle_decay, :float
       field :max_upgrade_level, :integer, default: 0
       field :cycle_decay, :float, default: 3.5
       field :projected_at, :string
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      cast(schema, attrs, [:max_upgrade_level, :cycle_decay, :projected_at])
+      cast(schema, attrs, [:max_upgrade_level, :cycle_decay, :projected_at, :target_cycle_decay])
       |> cast_embed(:current)
       |> cast_embed(:max_basic)
+      |> cast_embed(:target_current)
     end
   end
 
@@ -90,6 +93,7 @@ defmodule Incrementalist.Game.State do
     field :idle_mode, :boolean, default: false
     field :first_played_at, :string
     field :last_claimed_at, :string
+    field :cycle_started_at, :string
     field :can_claim_at, :string
     field :saved_at, :string
 
@@ -109,6 +113,7 @@ defmodule Incrementalist.Game.State do
       :idle_mode,
       :first_played_at,
       :last_claimed_at,
+      :cycle_started_at,
       :can_claim_at,
       :saved_at
     ])
@@ -187,6 +192,7 @@ defmodule Incrementalist.Game.State do
       idle_mode: false,
       first_played_at: timestamp,
       last_claimed_at: timestamp,
+      cycle_started_at: timestamp,
       can_claim_at: nil,
       saved_at: timestamp,
       progress_bar: %ProgressBar{
@@ -203,6 +209,8 @@ defmodule Incrementalist.Game.State do
         current: BigNum.one(),
         max_basic:
           BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max()),
+        target_current: BigNum.one(),
+        target_cycle_decay: 3.5,
         max_upgrade_level: 0,
         cycle_decay: 3.5,
         projected_at: timestamp
@@ -285,16 +293,44 @@ defmodule Incrementalist.Game.State do
           |> Map.put(:is_purchased, is_purchased)
           |> Map.put(:can_purchase, !is_purchased && projected_state.level >= def.required_level)
         end),
-      "projection_params" => %{
-        "fill_rate" =>
-          Incrementalist.Game.Features.Progress.Bar.get_progress_bar_fill_rate(
-            projected_state,
-            now
-          ),
-        "can_claim_at" => projected_state.can_claim_at
-      }
+      "projection_params" =>
+        projection_params(projected_state, now)
     }
   end
+
+  def projection_params(state, now) do
+    can_claim_at = state.can_claim_at
+    cycle_started_at = state.cycle_started_at
+
+    current_fill =
+      case {parse_iso_ms(cycle_started_at), parse_iso_ms(can_claim_at)} do
+        {start_ms, end_ms} when is_integer(start_ms) and is_integer(end_ms) and end_ms > start_ms ->
+          now_ms = Time.to_unix_ms(now)
+          progress = (now_ms - start_ms) / (end_ms - start_ms)
+          min(1.0, max(0.0, progress)) * 100.0
+
+        _ ->
+          0.0
+      end
+
+    %{
+      "current_fill" => current_fill,
+      "can_claim_at" => can_claim_at,
+      "current_sisu" => state.sisu.current,
+      "current_sisu_decay" => state.sisu.cycle_decay,
+      "sisu_at_claim" => state.sisu.target_current,
+      "sisu_decay_at_claim" => state.sisu.target_cycle_decay
+    }
+  end
+
+  defp parse_iso_ms(iso) when is_binary(iso) do
+    case Time.from_iso8601(iso) do
+      {:ok, dt} -> Time.to_unix_ms(dt)
+      _ -> nil
+    end
+  end
+
+  defp parse_iso_ms(_), do: nil
 
   def summary(slot, active_slot_index) do
     state = slot.state

@@ -20,11 +20,11 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     field :slot_index, :integer
     embeds_one :state, State, on_replace: :update
     embeds_one :notices, Notices, on_replace: :update
-    field :last_saved_at, :utc_datetime
+    field :last_saved_at, :utc_datetime_usec
 
     belongs_to :player, Player
 
-    timestamps(type: :utc_datetime)
+    timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(save_slot, attrs) do

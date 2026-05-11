@@ -1,4 +1,7 @@
 # Critical
+All date/time calculations must be done in UTC.
+The client MUST synchronize its local clock with the server-provided `server_time` to account for drift and time zone differences; do not use raw `Date.now()` for authoritative countdowns or projections.
+
 If a repo convention or principle is missing here, ask about it and suggest where to add it.
 NEVER STAGE CHANGES UNLESS EXPLICITLY ORDERED TO DO SO.
 

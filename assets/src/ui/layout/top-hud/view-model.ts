@@ -1,5 +1,6 @@
 import { lerp } from "../../../utils";
 import { BigNum, ZERO } from "../../../core/bignum";
+import { getServerNow } from "../../../core/time";
 
 export type HudViewModel = {
   displayedExp: BigNum;
@@ -47,7 +48,7 @@ export function updateHudViewModel(dtMs: number, authoritative: {
     
     state.displayedLevel = authoritative.level;
     state.displayedExp = authoritative.exp;
-    state.collectionGlowStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    state.collectionGlowStartedAt = typeof performance !== 'undefined' ? performance.now() : getServerNow();
   }
 
   // Simple instant sync for now to avoid complex BigNum lerping in UI.

@@ -9,6 +9,7 @@ import type {
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
+import { synchronize } from "../core/time";
 
 export type ServerState = {
   snapshot: GameSnapshot | null;
@@ -37,6 +38,12 @@ export function createServerState(): ServerState {
 // force the server to resend a full snapshot just to update UI status.
 export function applyResult(state: ServerState, result: ServerResult): void {
   const snapshot = snapshotFromResult(result);
+
+  if ("server_time" in result && typeof result.server_time === "string") {
+    synchronize(result.server_time);
+  } else if (snapshot) {
+    synchronize(snapshot.server_time);
+  }
 
   if (snapshot) {
     state.snapshot = snapshot;
@@ -149,19 +156,39 @@ export function applyAuthoritativeData(
 export function applyProjectionData(
   state: ServerState,
   data: {
-    fill_rate?: number;
+    current_fill?: number;
     can_claim_at?: string | null;
+    current_sisu?: BigNum;
+    current_sisu_decay?: number;
+    sisu_at_claim?: BigNum;
+    sisu_decay_at_claim?: number;
     sisu?: SisuState;
   }
 ) {
   if (!state.snapshot) return;
 
-  if (data.fill_rate !== undefined) {
-    state.snapshot.state.projection_params.fill_rate = data.fill_rate;
+  if (data.current_fill !== undefined) {
+    state.snapshot.state.projection_params.current_fill = data.current_fill;
   }
 
   if (data.can_claim_at !== undefined) {
     state.snapshot.state.projection_params.can_claim_at = data.can_claim_at;
+  }
+
+  if (data.current_sisu !== undefined) {
+    state.snapshot.state.projection_params.current_sisu = data.current_sisu;
+  }
+
+  if (data.current_sisu_decay !== undefined) {
+    state.snapshot.state.projection_params.current_sisu_decay = data.current_sisu_decay;
+  }
+
+  if (data.sisu_at_claim !== undefined) {
+    state.snapshot.state.projection_params.sisu_at_claim = data.sisu_at_claim;
+  }
+
+  if (data.sisu_decay_at_claim !== undefined) {
+    state.snapshot.state.projection_params.sisu_decay_at_claim = data.sisu_decay_at_claim;
   }
 
   if (data.sisu !== undefined) {
