@@ -61,7 +61,7 @@ export function drawLockedText(
     outlineColor = '#000000',
     outlineWidth = 3,
     textX = rect.x + (rect.width / 2),
-    textY = rect.y + (rect.height / 2),
+    textY = rect.y + (rect.height / 2) + 1,
     showNotice = false,
     showNoticePing = false
   } = options;

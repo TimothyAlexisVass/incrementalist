@@ -48,7 +48,7 @@ export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
     x: centerX - barRadius,
     y: centerY - barRadius,
     width: barRadius * 2,
-    height: barRadius + 42
+    height: barRadius + 34
   };
 }
 
