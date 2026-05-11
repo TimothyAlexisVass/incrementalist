@@ -881,7 +881,7 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
   const barLayout = getProgressBarLayout(canvas);
   return {
     x: barLayout.x + barLayout.width / 2 - 30,
-    y: barLayout.y + barLayout.height + 29,
+    y: barLayout.y + barLayout.height + 40,
     width: 60,
     height: 20
   };
