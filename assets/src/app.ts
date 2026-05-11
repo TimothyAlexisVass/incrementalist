@@ -3,9 +3,22 @@ import { initWebGLEffectsLayer, resizeWebGLEffectsLayer } from "./render/webgl-e
 import { GameClient } from "./core/game-client";
 
 const canvas = requiredElement<HTMLCanvasElement>("#game-canvas");
+const incrementalistCanvas = requiredElement<HTMLCanvasElement>("#incrementalist");
 const effectsCanvas = requiredElement<HTMLCanvasElement>("#effects-canvas");
 const ctx = canvas.getContext("2d");
 if (!ctx) throw new Error("Game shell is missing required 2d context");
+const incrementalistGlContext = incrementalistCanvas.getContext("webgl", {
+  alpha: true,
+  antialias: false,
+  depth: false,
+  premultipliedAlpha: false,
+  preserveDrawingBuffer: false,
+  stencil: false
+});
+if (!incrementalistGlContext) throw new Error("Game shell is missing required incrementalist WebGL context");
+const incrementalistGl = incrementalistGlContext;
+incrementalistGl.clearColor(0, 0, 0, 0);
+incrementalistGl.clear(incrementalistGl.COLOR_BUFFER_BIT);
 
 // Initialize canvas sizes and the WebGL effects layer.
 resizeGameCanvases();
@@ -21,6 +34,9 @@ app.boot().catch(() => {
 function resizeGameCanvases() {
   if (canvas.width !== CANVAS_WIDTH) canvas.width = CANVAS_WIDTH;
   if (canvas.height !== CANVAS_HEIGHT) canvas.height = CANVAS_HEIGHT;
+  if (incrementalistCanvas.width !== canvas.width) incrementalistCanvas.width = canvas.width;
+  if (incrementalistCanvas.height !== canvas.height) incrementalistCanvas.height = canvas.height;
+  incrementalistGl.viewport(0, 0, incrementalistCanvas.width, incrementalistCanvas.height);
   if (effectsCanvas.width !== canvas.width) effectsCanvas.width = canvas.width;
   if (effectsCanvas.height !== canvas.height) effectsCanvas.height = canvas.height;
   resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);

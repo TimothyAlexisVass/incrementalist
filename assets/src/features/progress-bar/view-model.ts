@@ -1,4 +1,4 @@
-import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult, ServerResult } from "../../net/protocol";
+import type { GameSnapshot, ProgressClaimInResult, ProgressClaimRewardResult, ProjectionParams, ServerResult } from "../../net/protocol";
 import { type BigNum, toNumber, ZERO, fromNumber } from "../../core/bignum";
 import {
   BAR_RESET_LERP_SPEED,
@@ -312,4 +312,3 @@ function conservativeFallbackFirstPlayedAt(serverTime: string | null | undefined
   const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : getServerNow();
   return safeNow - (30 * 24 * 60 * 60 * 1000); 
 }
-

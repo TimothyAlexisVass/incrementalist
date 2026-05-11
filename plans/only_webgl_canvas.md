@@ -42,7 +42,11 @@ Acceptance:
 Acceptance:
 - Frame loop runs with incremental routing support and no behavior regressions.
 
-## Phase 3: Migrate files one by one to `#incrementalist`
+## Phase 3: Add a dedicated WebGL renderer
+- `assets/src/renderer/webgl.ts`
+- For things like drawText etc...
+
+## Phase 4: Migrate files one by one to `#incrementalist`
 For each file listed below:
 - Replace current Canvas2D draw operations with direct drawing on `#incrementalist` pipeline/context.
 - Keep layout/hit areas/behavior identical.
@@ -83,7 +87,7 @@ Acceptance per file:
 - Module renders through `#incrementalist`.
 - No dual render path remains for that module.
 
-## Phase 4: Remove old 2D gameplay canvas
+## Phase 5: Remove old 2D gameplay canvas
 29. `assets/src/core/game-client.ts`
 - Remove remaining `CanvasRenderingContext2D` gameplay draw dependencies.
 
@@ -96,7 +100,7 @@ Acceptance per file:
 Acceptance:
 - Gameplay/UI render path no longer depends on 2D canvas.
 
-## Phase 5: Collapse effects into `#incrementalist` and end with one canvas
+## Phase 6: Collapse effects into `#incrementalist` and end with one canvas
 32. `assets/src/render/webgl-effects.ts`
 - Move effects draw execution onto `#incrementalist` context.
 - Remove separate effects-canvas assumptions.
