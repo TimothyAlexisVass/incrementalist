@@ -57,7 +57,7 @@ export function renderSisuControl(
   const barRadius = 35;
   const progressBar = getProgressBarLayout(canvas);
   const centerX = progressBar.x + progressBar.width / 2;
-  const centerY = progressBar.y + progressBar.height + 110;
+  const centerY = progressBar.y + progressBar.height + 120;
   const controlRect = getSisuControlRect(canvas);
 
   const drawSisuControl = () => {

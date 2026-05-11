@@ -42,7 +42,7 @@ export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
   const progressBar = getProgressBarLayout(canvas);
   const barRadius = 35;
   const centerX = progressBar.x + progressBar.width / 2;
-  const centerY = progressBar.y + progressBar.height + 100;
+  const centerY = progressBar.y + progressBar.height + 120;
 
   return {
     x: centerX - barRadius,
