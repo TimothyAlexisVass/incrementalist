@@ -15,7 +15,7 @@ import { drawButton } from "../../ui/components/button";
 import { notices } from "../../ui/managers/notices";
 import type { InteractionState } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
-import { clampNumber, drawLockedElement, rgbArrayToCss } from "../../utils";
+import { clampNumber, drawLockedElement } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
 
@@ -23,7 +23,6 @@ import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interacti
 import {
   formatDecay,
   getSisuControlRect,
-  getSisuMeterColorArray,
   getSisuTierTarget,
   getUpgradeButtonState,
   SISU_BASE_MAX,
@@ -51,6 +50,8 @@ export function renderSisuControl(
 
   const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
   const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
+  const blueMax = getSisuTierTarget(maxBasic, "blue");
+  const yellowMax = getSisuTierTarget(maxBasic, "yellow");
   const purpleMax = getSisuTierTarget(maxBasic, "purple");
   const isUnlocked = Boolean(snapshot.state.features.sisu_generator_purchased);
 
@@ -59,25 +60,53 @@ export function renderSisuControl(
   const centerX = progressBar.x + progressBar.width / 2;
   const centerY = progressBar.y + progressBar.height + 120;
   const controlRect = getSisuControlRect(canvas);
+  const startAngle = -Math.PI / 2;
+  const fullCircle = Math.PI * 2;
+
+  const getTierFillRatio = (value: number, tierMin: number, tierMax: number) => {
+    if (tierMax <= tierMin) {
+      return value >= tierMax ? 1 : 0;
+    }
+
+    return clampNumber((value - tierMin) / (tierMax - tierMin), 0, 1);
+  };
 
   const drawSisuControl = () => {
     ctx.beginPath();
-    ctx.arc(centerX, centerY, barRadius, Math.PI, 0, false);
+    ctx.arc(centerX, centerY, barRadius, 0, Math.PI * 2, false);
     ctx.strokeStyle = COLORS.bar.border;
     ctx.lineWidth = 14;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(centerX, centerY, barRadius, Math.PI, 0, false);
+    ctx.arc(centerX, centerY, barRadius, 0, Math.PI * 2, false);
     ctx.strokeStyle = COLORS.bar.track;
     ctx.lineWidth = 12;
     ctx.stroke();
 
-    const fillRatio = clampNumber(displayCurrent / purpleMax, 0, 1);
-    if (fillRatio > 0) {
+    const blueFillRatio = getTierFillRatio(displayCurrent, SISU_MIN_MULTIPLIER, blueMax);
+    if (blueFillRatio > 0) {
       ctx.beginPath();
-      ctx.arc(centerX, centerY, barRadius, Math.PI, Math.PI + Math.PI * fillRatio, false);
-      ctx.strokeStyle = rgbArrayToCss(getSisuMeterColorArray(displayCurrent, maxBasic));
+      ctx.arc(centerX, centerY, barRadius, startAngle, startAngle + fullCircle * blueFillRatio, false);
+      ctx.strokeStyle = COLORS.sisu.blue;
+      ctx.lineWidth = 10;
+      ctx.stroke();
+    }
+
+    const yellowFillRatio = getTierFillRatio(displayCurrent, blueMax, yellowMax);
+    if (yellowFillRatio > 0) {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, barRadius, startAngle, startAngle + fullCircle * yellowFillRatio, false);
+      ctx.strokeStyle = COLORS.sisu.yellow;
+      ctx.lineWidth = 10;
+      ctx.stroke();
+    }
+
+    const purpleFillRatio = getTierFillRatio(displayCurrent, yellowMax, purpleMax);
+    if (purpleFillRatio > 0) {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, barRadius, startAngle, startAngle + fullCircle * purpleFillRatio, false);
+      ctx.strokeStyle = COLORS.sisu.purple;
       ctx.lineWidth = 10;
       ctx.stroke();
     }
@@ -86,11 +115,11 @@ export function renderSisuControl(
     ctx.font = SISU_MAX_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(formatSisuMultiplier(displayCurrent), centerX, centerY + 5);
+    ctx.fillText(formatSisuMultiplier(displayCurrent), centerX, centerY - 3);
 
     ctx.fillStyle = COLORS.sisu.decay;
     ctx.font = SISU_DECAY_FONT;
-    ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 20);
+    ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 12);
   };
 
   if (!isUnlocked) {
