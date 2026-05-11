@@ -12,6 +12,7 @@ import { GameChannel } from '../../../net/game-channel';
 import { notices } from '../../../ui/managers/notices';
 import { COLORS } from '../../../colors';
 import { doButton } from '../../../ui/components/button';
+import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 const LETTERS_PER_SECOND = 40;
 const PANEL_PADDING = 16;
@@ -46,6 +47,7 @@ export function renderSageArea(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
+  const renderer = getActiveWebGLRenderer();
   const visibleTipLevels = getVisibleTipLevels(level);
   const visibleLevelSet = new Set(visibleTipLevels);
 
@@ -137,7 +139,7 @@ export function renderSageArea(
       height: tip.buttonRect.height
     };
 
-    renderTipPanel(ctx, input, tip, channel, runCommand);
+    renderTipPanel(ctx, input, tip, channel, runCommand, renderer);
     currentY += tip.boxHeight + PANEL_GAP;
   }
 
@@ -149,31 +151,71 @@ function renderTipPanel(
   input: InteractionState,
   tip: SageTipRender,
   channel?: GameChannel,
-  runCommand?: (cmd: () => Promise<any>) => void
+  runCommand?: (cmd: () => Promise<any>) => void,
+  renderer = getActiveWebGLRenderer()
 ) {
+  if (!renderer) return;
   const { boxX, boxY, boxWidth, boxHeight, visibleLines, buttonLabel, buttonRect, leafId } = tip;
 
-  ctx.fillStyle = COLORS.panel.bg;
-  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-  ctx.strokeStyle = COLORS.panel.border;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(boxX + 0.5, boxY + 0.5, boxWidth - 1, boxHeight - 1);
+  renderer.drawRect({
+    x: boxX,
+    y: boxY,
+    width: boxWidth,
+    height: boxHeight,
+    color: hexToRgba(COLORS.panel.bg)
+  });
+  renderer.drawRect({
+    x: boxX + 0.5,
+    y: boxY + 0.5,
+    width: boxWidth - 1,
+    height: 1,
+    color: hexToRgba(COLORS.panel.border)
+  });
+  renderer.drawRect({
+    x: boxX + 0.5,
+    y: boxY + boxHeight - 1.5,
+    width: boxWidth - 1,
+    height: 1,
+    color: hexToRgba(COLORS.panel.border)
+  });
+  renderer.drawRect({
+    x: boxX + 0.5,
+    y: boxY + 0.5,
+    width: 1,
+    height: boxHeight - 1,
+    color: hexToRgba(COLORS.panel.border)
+  });
+  renderer.drawRect({
+    x: boxX + boxWidth - 1.5,
+    y: boxY + 0.5,
+    width: 1,
+    height: boxHeight - 1,
+    color: hexToRgba(COLORS.panel.border)
+  });
+  renderer.drawText({
+    text: SAGE_HEADER_TEXT,
+    x: boxX + PANEL_PADDING,
+    y: boxY + PANEL_TOP_PADDING,
+    font: SAGE_HEADER_FONT,
+    color: COLORS.panel.textPrimary,
+    align: 'left',
+    baseline: 'top'
+  });
 
-  ctx.fillStyle = COLORS.panel.textPrimary;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.font = SAGE_HEADER_FONT;
-  ctx.fillText(SAGE_HEADER_TEXT, boxX + PANEL_PADDING, boxY + PANEL_TOP_PADDING);
-
-  ctx.font = SMALL_TEXT_FONT;
   const bodyStartY = boxY + PANEL_TOP_PADDING + LINE_HEIGHT + SAGE_HEADER_MARGIN_BOTTOM;
 
   for (let i = 0; i < visibleLines.length; i += 1) {
-    ctx.fillText(
-      visibleLines[i],
-      boxX + PANEL_PADDING,
-      bodyStartY + (i * LINE_HEIGHT)
-    );
+    const x = boxX + PANEL_PADDING;
+    const y = bodyStartY + (i * LINE_HEIGHT);
+    renderer.drawText({
+      text: visibleLines[i],
+      x,
+      y,
+      font: SMALL_TEXT_FONT,
+      color: COLORS.panel.textPrimary,
+      align: 'left',
+      baseline: 'top'
+    });
   }
 
   const buttonClicked = doButton(ctx, input, buttonRect, buttonLabel, {
@@ -188,6 +230,17 @@ function renderTipPanel(
     notices.reportLeafClicked(leafId, channel, runCommand);
     input.consumed = true;
   }
+}
+
+function hexToRgba(hex: string): [number, number, number, number] {
+  const normalized = String(hex || "").trim();
+  const match = normalized.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return [0, 0, 0, 1];
+  const value = match[1];
+  const r = parseInt(value.slice(0, 2), 16) / 255;
+  const g = parseInt(value.slice(2, 4), 16) / 255;
+  const b = parseInt(value.slice(4, 6), 16) / 255;
+  return [r, g, b, 1];
 }
 
 function getVisibleTipLevels(level: number): number[] {

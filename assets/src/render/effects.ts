@@ -305,6 +305,8 @@ export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts
     if (ft.alpha <= 0) continue;
     const scale = getFloatingTextRenderScale(ft);
     if (scale <= 0) continue;
+    const drawX = Math.round(ft.x);
+    const drawY = Math.round(ft.y);
 
     // Layer order (outer -> inner) is built back-to-front:
     // 1) white outer outline + shadow
@@ -312,8 +314,8 @@ export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts
     // 3) colored fill text
     renderer.drawText({
       text: ft.text,
-      x: ft.x,
-      y: ft.y,
+      x: drawX,
+      y: drawY,
       font: ft.font,
       color: 'rgba(0, 0, 0, 0)',
       align: ft.textAlign,
@@ -329,8 +331,8 @@ export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts
 
     renderer.drawText({
       text: ft.text,
-      x: ft.x,
-      y: ft.y,
+      x: drawX,
+      y: drawY,
       font: ft.font,
       color: 'rgba(0, 0, 0, 0)',
       align: ft.textAlign,
@@ -346,8 +348,8 @@ export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts
 
     renderer.drawText({
       text: ft.text,
-      x: ft.x,
-      y: ft.y,
+      x: drawX,
+      y: drawY,
       font: ft.font,
       color: ft.color,
       align: ft.textAlign,

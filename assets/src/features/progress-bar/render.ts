@@ -18,6 +18,7 @@ import {
 } from '../../render/webgl-effects';
 import { getViewModel } from './view-model';
 import { getServerNow } from '../../core/time';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 type Rgb = [number, number, number];
 type LiquidBubble = {
@@ -87,6 +88,8 @@ const COLLECTION_LASER_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   [142, 246, 255] as const,
   COLORS.bar.progress.fillStart
 ]);
+let progressSurface: HTMLCanvasElement | null = null;
+let progressSurfaceCtx: CanvasRenderingContext2D | null = null;
 
 export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | null = null) {
   PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
@@ -116,7 +119,27 @@ export function renderProgressBar(
   ctx: CanvasRenderingContext2D | null,
   canvas: HTMLCanvasElement | null
 ) {
-  if (!ctx || !canvas) return;
+  if (!canvas) return;
+  const renderer = getActiveWebGLRenderer();
+  const target = renderer ? getProgressSurfaceContext(canvas) : ctx;
+  if (!target) return;
+  renderProgressBarToContext(target, canvas);
+
+  if (renderer && progressSurface) {
+    renderer.drawImage({
+      image: progressSurface,
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height
+    });
+  }
+}
+
+function renderProgressBarToContext(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement
+) {
   const state = getViewModel();
 
   const {
@@ -916,4 +939,20 @@ export function renderIdleModeToggle(
 
   drawToggle();
   return toggleRect;
+}
+
+function getProgressSurfaceContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  if (!progressSurface) {
+    progressSurface = document.createElement('canvas');
+  }
+  if (progressSurface.width !== canvas.width) progressSurface.width = canvas.width;
+  if (progressSurface.height !== canvas.height) progressSurface.height = canvas.height;
+  if (!progressSurfaceCtx) {
+    progressSurfaceCtx = progressSurface.getContext('2d');
+  }
+  if (!progressSurfaceCtx) {
+    return null;
+  }
+  progressSurfaceCtx.clearRect(0, 0, progressSurface.width, progressSurface.height);
+  return progressSurfaceCtx;
 }

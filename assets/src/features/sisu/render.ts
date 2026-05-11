@@ -18,6 +18,7 @@ import type { Modal } from "../../ui/managers/modals";
 import { clampNumber, drawLockedElement } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
+import { getActiveWebGLRenderer } from "../../renderer/webgl";
 
 import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
 import {
@@ -39,8 +40,31 @@ export type SisuControlLayout = {
 };
 
 export { getSisuControlRect };
+let sisuSurface: HTMLCanvasElement | null = null;
+let sisuSurfaceCtx: CanvasRenderingContext2D | null = null;
 
 export function renderSisuControl(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  state: ServerState
+): SisuControlLayout | null {
+  const renderer = getActiveWebGLRenderer();
+  const target = renderer ? getSisuSurfaceContext(canvas) : ctx;
+  if (!target) return null;
+  const layout = renderSisuControlToContext(target, canvas, state);
+  if (renderer && sisuSurface) {
+    renderer.drawImage({
+      image: sisuSurface,
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height
+    });
+  }
+  return layout;
+}
+
+function renderSisuControlToContext(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   state: ServerState
@@ -158,6 +182,9 @@ class SisuGeneratorModalImpl implements Modal {
   ) {}
 
   render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
+    const renderer = getActiveWebGLRenderer();
+    const drawCtx = renderer ? getSisuSurfaceContext(canvas) : ctx;
+    if (!drawCtx) return;
     const snapshot = this.getState().snapshot;
     if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
       this.onClose();
@@ -183,33 +210,33 @@ class SisuGeneratorModalImpl implements Modal {
       height: 28
     };
 
-    ctx.save();
-    ctx.fillStyle = COLORS.panel.bg;
-    ctx.fillRect(this.modalRect.x, this.modalRect.y, this.modalRect.width, this.modalRect.height);
-    ctx.strokeStyle = COLORS.overlay.panelBorder;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(this.modalRect.x, this.modalRect.y, this.modalRect.width, this.modalRect.height);
+    drawCtx.save();
+    drawCtx.fillStyle = COLORS.panel.bg;
+    drawCtx.fillRect(this.modalRect.x, this.modalRect.y, this.modalRect.width, this.modalRect.height);
+    drawCtx.strokeStyle = COLORS.overlay.panelBorder;
+    drawCtx.lineWidth = 2;
+    drawCtx.strokeRect(this.modalRect.x, this.modalRect.y, this.modalRect.width, this.modalRect.height);
 
-    ctx.fillStyle = COLORS.overlay.titleText;
-    ctx.font = "bold 20px Arial";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Sisu Generator", modalX + 24, modalY + 36);
+    drawCtx.fillStyle = COLORS.overlay.titleText;
+    drawCtx.font = "bold 20px Arial";
+    drawCtx.textAlign = "left";
+    drawCtx.textBaseline = "middle";
+    drawCtx.fillText("Sisu Generator", modalX + 24, modalY + 36);
 
-    drawButton(ctx, this.closeRect, "Close", { active: false });
+    drawButton(drawCtx, this.closeRect, "Close", { active: false });
 
     const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
 
-    ctx.fillStyle = COLORS.sisu.blue;
-    ctx.font = SISU_CURRENT_FONT;
-    ctx.textAlign = "center";
-    ctx.fillText(formatSisuMultiplier(currentSisu), modalX + modalWidth / 2, modalY + 88);
+    drawCtx.fillStyle = COLORS.sisu.blue;
+    drawCtx.font = SISU_CURRENT_FONT;
+    drawCtx.textAlign = "center";
+    drawCtx.fillText(formatSisuMultiplier(currentSisu), modalX + modalWidth / 2, modalY + 88);
 
-    ctx.fillStyle = COLORS.sisu.decay;
-    ctx.font = SISU_MAX_FONT;
-    ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, modalX + modalWidth / 2, modalY + 116);
+    drawCtx.fillStyle = COLORS.sisu.decay;
+    drawCtx.font = SISU_MAX_FONT;
+    drawCtx.fillText(`-${formatDecay(displayCycleDecay)}%`, modalX + modalWidth / 2, modalY + 116);
 
     this.refillRects.length = 0;
     const refillWidth = 132;
@@ -230,14 +257,14 @@ class SisuGeneratorModalImpl implements Modal {
         height: refillHeight
       };
       this.refillRects.push({ tier: tier.id, rect });
-      drawSisuRefillControl(ctx, rect, tier.label, tier.colorKey, target, currentSisu);
+      drawSisuRefillControl(drawCtx, rect, tier.label, tier.colorKey, target, currentSisu);
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
-    ctx.fillStyle = COLORS.hud.textPrimary;
-    ctx.font = SISU_MAX_FONT;
-    ctx.textAlign = "left";
-    ctx.fillText(
+    drawCtx.fillStyle = COLORS.hud.textPrimary;
+    drawCtx.font = SISU_MAX_FONT;
+    drawCtx.textAlign = "left";
+    drawCtx.fillText(
       `Max Sisu: ${formatSisuMultiplier(maxBasic)} (Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`,
       modalX + 38,
       modalY + 272
@@ -251,7 +278,7 @@ class SisuGeneratorModalImpl implements Modal {
     };
 
     const upgradeState = getUpgradeButtonState(snapshot.state.shards, maxUpgradeLevel);
-    drawButton(ctx, this.upgradeRect, upgradeState.label, {
+    drawButton(drawCtx, this.upgradeRect, upgradeState.label, {
       active: false,
       activeSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
       inactiveSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
@@ -262,11 +289,22 @@ class SisuGeneratorModalImpl implements Modal {
       textY: this.upgradeRect.y + 23
     });
 
-    if (upgradeState.cost !== null) {
-      drawUpgradeCostLabel(ctx, this.upgradeRect, upgradeState.prefix, upgradeState.cost);
-    }
+    const pendingUpgradeCost = upgradeState.cost;
+    const pendingUpgradePrefix = upgradeState.prefix;
 
-    ctx.restore();
+    drawCtx.restore();
+    if (renderer && sisuSurface) {
+      renderer.drawImage({
+        image: sisuSurface,
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height
+      });
+    }
+    if (pendingUpgradeCost !== null) {
+      drawUpgradeCostLabel(drawCtx, this.upgradeRect, pendingUpgradePrefix, pendingUpgradeCost);
+    }
 
     handleSisuModalInteractions(
       input,
@@ -286,7 +324,22 @@ class SisuGeneratorModalImpl implements Modal {
   }
 }
 
+function getSisuSurfaceContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  if (!sisuSurface) {
+    sisuSurface = document.createElement("canvas");
+  }
+  if (sisuSurface.width !== canvas.width) sisuSurface.width = canvas.width;
+  if (sisuSurface.height !== canvas.height) sisuSurface.height = canvas.height;
+  if (!sisuSurfaceCtx) {
+    sisuSurfaceCtx = sisuSurface.getContext("2d");
+  }
+  if (!sisuSurfaceCtx) return null;
+  sisuSurfaceCtx.clearRect(0, 0, sisuSurface.width, sisuSurface.height);
+  return sisuSurfaceCtx;
+}
+
 function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix: string | null, cost: BigNum) {
+  const renderer = getActiveWebGLRenderer();
   const textY = rect.y + 23;
   const iconSize = 18;
   const iconGap = 4;
@@ -295,22 +348,42 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
   const leftText = prefix ? `${prefix} (` : "";
   const rightText = prefix ? ")" : "";
 
-  ctx.save();
-  ctx.font = SISU_UPGRADE_BUTTON_FONT;
-
-  const leftWidth = leftText ? ctx.measureText(leftText).width : 0;
+  const leftWidth = leftText
+    ? (renderer
+      ? renderer.measureTextWidth({ text: leftText, font: SISU_UPGRADE_BUTTON_FONT })
+      : ctx.measureText(leftText).width)
+    : 0;
   const amountWidth = measureCurrencyAmount(ctx, cost, iconSize, {
     font: SISU_UPGRADE_BUTTON_FONT,
     iconGap
   });
-  const rightWidth = rightText ? ctx.measureText(rightText).width : 0;
+  const rightWidth = rightText
+    ? (renderer
+      ? renderer.measureTextWidth({ text: rightText, font: SISU_UPGRADE_BUTTON_FONT })
+      : ctx.measureText(rightText).width)
+    : 0;
   const totalWidth = leftWidth + amountWidth + rightWidth;
   let currentX = rect.x + rect.width / 2 - totalWidth / 2;
 
-  ctx.fillStyle = textColor;
-  ctx.textAlign = "left";
   if (leftText) {
-    ctx.fillText(leftText, currentX, textY);
+    if (renderer) {
+      renderer.drawText({
+        text: leftText,
+        x: currentX,
+        y: textY,
+        font: SISU_UPGRADE_BUTTON_FONT,
+        color: textColor,
+        align: "left",
+        baseline: "alphabetic"
+      });
+    } else {
+      ctx.save();
+      ctx.font = SISU_UPGRADE_BUTTON_FONT;
+      ctx.fillStyle = textColor;
+      ctx.textAlign = "left";
+      ctx.fillText(leftText, currentX, textY);
+      ctx.restore();
+    }
     currentX += leftWidth;
   }
 
@@ -324,12 +397,25 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
   currentX += amountWidth;
 
   if (rightText) {
-    ctx.fillStyle = textColor;
-    ctx.textAlign = "left";
-    ctx.fillText(rightText, currentX, textY);
+    if (renderer) {
+      renderer.drawText({
+        text: rightText,
+        x: currentX,
+        y: textY,
+        font: SISU_UPGRADE_BUTTON_FONT,
+        color: textColor,
+        align: "left",
+        baseline: "alphabetic"
+      });
+    } else {
+      ctx.save();
+      ctx.font = SISU_UPGRADE_BUTTON_FONT;
+      ctx.fillStyle = textColor;
+      ctx.textAlign = "left";
+      ctx.fillText(rightText, currentX, textY);
+      ctx.restore();
+    }
   }
-
-  ctx.restore();
 }
 
 function drawSisuHudIcon(

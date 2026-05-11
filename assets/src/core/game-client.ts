@@ -1,4 +1,3 @@
-import { COLORS } from "../colors";
 import { GameChannel } from "../net/game-channel";
 import { 
   ackAppliedResult, 
@@ -402,10 +401,6 @@ export class GameClient {
       );
     }
 
-    // Render the core 2D progress bar UI (fill ratio and text)
-    this.ctx.fillStyle = COLORS.game.background;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    
     renderAreaBackground(this.ctx, this.canvas);
     
     renderProgressBar(this.ctx, this.canvas);

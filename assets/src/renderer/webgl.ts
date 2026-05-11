@@ -48,6 +48,10 @@ interface TextSprite {
   texture: WebGLTexture;
   width: number;
   height: number;
+  textX: number;
+  textWidth: number;
+  ascent: number;
+  descent: number;
   baselineY: number;
 }
 
@@ -312,7 +316,7 @@ export class WebGLRenderer {
       shadowOffsetX,
       shadowOffsetY
     });
-    const anchorX = computeAnchorX(sprite.width, align);
+    const anchorX = computeAnchorX(sprite, align);
     const anchorY = computeAnchorY(sprite, baseline);
 
     const x = options.x - anchorX;
@@ -483,6 +487,10 @@ export class WebGLRenderer {
       texture,
       width,
       height,
+      textX,
+      textWidth: Math.max(0, metrics.width),
+      ascent,
+      descent,
       baselineY: textY
     };
   }
@@ -490,19 +498,21 @@ export class WebGLRenderer {
   private getOrCreateImageTexture(image: TexImageSource) {
     const key = image as object;
     const cached = this.imageCache.get(key);
-    if (cached) return cached;
-
-    const texture = this.gl.createTexture();
+    const texture = cached ?? this.gl.createTexture();
     if (!texture) return null;
 
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
     this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-    this.imageCache.set(key, texture);
+
+    if (!cached) {
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+      this.imageCache.set(key, texture);
+    }
+
     return texture;
   }
 }
@@ -588,17 +598,19 @@ function parseFontSizePx(font: string, fallback = 16) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function computeAnchorX(width: number, align: CanvasTextAlign) {
-  if (align === "center") return width / 2;
-  if (align === "right" || align === "end") return width;
-  return 0;
+function computeAnchorX(sprite: TextSprite, align: CanvasTextAlign) {
+  if (align === "center") return sprite.textX + sprite.textWidth / 2;
+  if (align === "right" || align === "end") return sprite.textX + sprite.textWidth;
+  return sprite.textX;
 }
 
 function computeAnchorY(sprite: TextSprite, baseline: CanvasTextBaseline) {
   if (baseline === "alphabetic") return sprite.baselineY;
-  if (baseline === "middle") return sprite.height / 2;
-  if (baseline === "bottom" || baseline === "ideographic") return sprite.height;
-  if (baseline === "top" || baseline === "hanging") return 0;
+  const textTop = sprite.baselineY - sprite.ascent;
+  const textBottom = sprite.baselineY + sprite.descent;
+  if (baseline === "middle") return textTop + (textBottom - textTop) / 2;
+  if (baseline === "bottom" || baseline === "ideographic") return textBottom;
+  if (baseline === "top" || baseline === "hanging") return textTop;
   return sprite.baselineY;
 }
 

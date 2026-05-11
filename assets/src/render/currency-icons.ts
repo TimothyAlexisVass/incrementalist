@@ -40,6 +40,7 @@ export function drawCurrencyIcon(_ctx: CanvasRenderingContext2D, currencyKey: st
 
 export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: number | BigNum, iconSize: number, options: any = {}) {
   const renderer = getActiveWebGLRenderer();
+  if (!renderer) return 0;
   const {
     font = ctx?.font || 'bold 16px Arial',
     iconGap = 5,
@@ -48,9 +49,7 @@ export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: num
   const resolvedIconSize = resolveIconSize(iconSize);
   const amountText = formatter(amount);
 
-  const textWidth = renderer
-    ? renderer.measureTextWidth({ text: amountText, font })
-    : approximateTextWidth(amountText, font);
+  const textWidth = renderer.measureTextWidth({ text: amountText, font });
 
   return resolvedIconSize + iconGap + textWidth;
 }
@@ -81,19 +80,9 @@ export function drawCurrencyAmount(
 
   const resolvedIconSize = resolveIconSize(iconSize);
   const amountText = formatter(amount);
-  let amountWidth = renderer.measureTextWidth({ text: amountText, font });
-  let ascent = getFontPixelSize(font) * 0.75;
-  let descent = getFontPixelSize(font) * 0.25;
-  if (ctx) {
-    ctx.save();
-    ctx.font = font;
-    const amountMetrics = ctx.measureText(amountText);
-    amountWidth = amountMetrics.width;
-    const fallbackFontSize = getFontPixelSize(font);
-    ascent = amountMetrics.actualBoundingBoxAscent || fallbackFontSize * 0.75;
-    descent = amountMetrics.actualBoundingBoxDescent || fallbackFontSize * 0.25;
-    ctx.restore();
-  }
+  const amountWidth = renderer.measureTextWidth({ text: amountText, font });
+  const ascent = getFontPixelSize(font) * 0.75;
+  const descent = getFontPixelSize(font) * 0.25;
   const width = resolvedIconSize + iconGap + amountWidth;
 
   let startX = x;
@@ -153,12 +142,6 @@ function resolveIconSize(iconSize: number) {
 function getFontPixelSize(font: string) {
   const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
   return match ? Number(match[1]) : 16;
-}
-
-function approximateTextWidth(text: string, font: string) {
-  const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
-  const px = match ? Number(match[1]) : 16;
-  return String(text).length * px * 0.56;
 }
 
 function downsampleImage(image: HTMLImageElement | HTMLCanvasElement, targetSize: number) {

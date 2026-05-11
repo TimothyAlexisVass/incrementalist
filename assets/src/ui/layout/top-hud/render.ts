@@ -15,6 +15,7 @@ import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
+import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 
 const TWO_PI = Math.PI * 2;
 const EXP_BAR_FULL_PULSE_MAX = 1.6;
@@ -53,6 +54,8 @@ function rgbaHexToCss(color: string | readonly [number, number, number], alpha: 
 }
 
 export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, dtMs: number) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
   const model = getHudViewModel();
   const now = getNowMs();
 
@@ -74,43 +77,71 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
     }
   }
 
-  ctx.fillStyle = COLORS.panel.bg;
-  ctx.fillRect(0, 0, canvas.width, TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 16);
+  renderer.drawRect({
+    x: 0,
+    y: 0,
+    width: canvas.width,
+    height: TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 16,
+    color: cssToRgba(COLORS.panel.bg)
+  });
 
-  ctx.fillStyle = COLORS.bar.track;
-  ctx.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
+  renderer.drawRect({
+    x: TOP_HUD_EXP_BAR_X,
+    y: TOP_HUD_EXP_BAR_Y,
+    width: TOP_HUD_EXP_BAR_WIDTH,
+    height: TOP_HUD_EXP_BAR_HEIGHT,
+    color: cssToRgba(COLORS.bar.track)
+  });
 
   const requiredExp = getRequiredExp(model.displayedLevel);
   const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
 
-  const gradient = ctx.createLinearGradient(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_Y);
-  gradient.addColorStop(0, COLORS.bar.exp.fillStart);
-  gradient.addColorStop(1, COLORS.bar.exp.fillEnd);
+  renderer.drawRect({
+    x: TOP_HUD_EXP_BAR_X,
+    y: TOP_HUD_EXP_BAR_Y,
+    width: TOP_HUD_EXP_BAR_WIDTH * fillRatio,
+    height: TOP_HUD_EXP_BAR_HEIGHT,
+    color: cssToRgba(COLORS.bar.exp.fillStart)
+  });
+  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y, width: TOP_HUD_EXP_BAR_WIDTH, height: 2, color: cssToRgba(COLORS.bar.border) });
+  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT - 2, width: TOP_HUD_EXP_BAR_WIDTH, height: 2, color: cssToRgba(COLORS.bar.border) });
+  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
+  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH - 2, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
 
-  ctx.fillStyle = gradient;
-  ctx.fillRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH * fillRatio, TOP_HUD_EXP_BAR_HEIGHT);
+  renderer.drawText({
+    text: `${formatNumberRatio(model.displayedExp, requiredExp)} EXP`,
+    x: TOP_HUD_EXP_COUNTER_X,
+    y: TOP_HUD_EXP_COUNTER_Y,
+    font: TOP_HUD_EXP_FONT,
+    color: COLORS.panel.textPrimary,
+    align: 'center',
+    baseline: 'alphabetic'
+  });
+  renderer.drawText({
+    text: String(model.displayedLevel),
+    x: TOP_HUD_LEVEL_X,
+    y: 34,
+    font: TOP_HUD_LEVEL_FONT,
+    color: COLORS.panel.textPrimary,
+    align: 'left',
+    baseline: 'alphabetic'
+  });
+  renderHudCurrencies(ctx, canvas);
+}
 
-  ctx.strokeStyle = COLORS.bar.border;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT);
-
-  renderExpBarCollectionGlow(ctx, collectionPulse);
-  renderExpBarLevelUpParticles(ctx, model);
-
-  ctx.fillStyle = COLORS.panel.textPrimary;
-  ctx.font = TOP_HUD_EXP_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(`${formatNumberRatio(model.displayedExp, requiredExp)} EXP`, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y);
-
-  ctx.fillStyle = COLORS.panel.textPrimary;
-  ctx.font = TOP_HUD_LEVEL_FONT;
-  ctx.textAlign = 'left';
-  ctx.fillText(String(model.displayedLevel), TOP_HUD_LEVEL_X, 34);
-
+function renderHudCurrencies(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  const model = getHudViewModel();
   drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_ICON_RIGHT, TOP_HUD_COINS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_ICON_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT);
   drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_ICON_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT);
+}
+
+function cssToRgba(color: string): [number, number, number, number] {
+  const hex = String(color || '').trim().replace(/^#/, '');
+  const expanded = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
+  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }
 
 function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, iconRight: number, counterRight: number) {
