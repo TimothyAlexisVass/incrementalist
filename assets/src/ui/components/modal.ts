@@ -24,7 +24,6 @@ export interface ModalLayout {
 }
 
 export function renderConfirmationModal(
-  ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   modalState: ModalState
 ): ModalLayout | null {
@@ -105,7 +104,7 @@ export function renderConfirmationModal(
 
   // Cancel button (only drawn if showCancel is true)
   if (modalState.showCancel !== false) {
-    drawButton(ctx, cancelRect, 'Cancel', {
+    drawButton(cancelRect, 'Cancel', {
       active: false,
       activeSurface: COLORS.button.secondary.surface,
       inactiveSurface: COLORS.button.secondary.surface,
@@ -116,7 +115,7 @@ export function renderConfirmationModal(
   }
 
   // OK button
-  drawButton(ctx, okRect, 'OK', {
+  drawButton(okRect, 'OK', {
     active: false,
     activeSurface: COLORS.button.surface.active,
     inactiveSurface: COLORS.button.surface.inactive,

@@ -24,7 +24,7 @@ const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
   COLORS.rewards.expGain
 ]);
 
-export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, dtMs: number) {
+export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
   const model = getHudViewModel();
@@ -85,14 +85,14 @@ export function renderTopHUD(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEl
     align: 'left',
     baseline: 'alphabetic'
   });
-  renderHudCurrencies(ctx, canvas);
+  renderHudCurrencies(canvas);
 }
 
-function renderHudCurrencies(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+function renderHudCurrencies(canvas: HTMLCanvasElement) {
   const model = getHudViewModel();
-  drawCurrency(ctx, canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_COUNTER_RIGHT);
-  drawCurrency(ctx, canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_COUNTER_RIGHT);
-  drawCurrency(ctx, canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_COUNTER_RIGHT);
+  drawCurrency(canvas, "Coins", model.displayedCoins, COLORS.panel.coins, TOP_HUD_COINS_COUNTER_RIGHT);
+  drawCurrency(canvas, "Shards", model.displayedShards, COLORS.panel.shards, TOP_HUD_SHARDS_COUNTER_RIGHT);
+  drawCurrency(canvas, "Cores", model.displayedCores, COLORS.panel.cores, TOP_HUD_CORES_COUNTER_RIGHT);
 }
 
 function cssToRgba(color: string): [number, number, number, number] {
@@ -103,9 +103,8 @@ function cssToRgba(color: string): [number, number, number, number] {
   return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
 }
 
-function drawCurrency(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, counterRight: number) {
+function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, counterRight: number) {
   drawCurrencyAmount(
-    ctx,
     label.toLowerCase(),
     amount,
     canvas.width - counterRight,

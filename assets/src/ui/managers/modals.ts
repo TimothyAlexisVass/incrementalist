@@ -3,7 +3,7 @@ import { InteractionState } from './interactions';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
 export interface Modal {
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState): void;
+  render(canvas: HTMLCanvasElement, input: InteractionState): void;
   tick(dt: number, input: InteractionState): void;
 }
 
@@ -22,7 +22,7 @@ export class Modals {
     return this.activeModal !== null;
   }
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
+  render(canvas: HTMLCanvasElement, input: InteractionState) {
     if (!this.activeModal) return;
 
     const renderer = getActiveWebGLRenderer();
@@ -36,7 +36,7 @@ export class Modals {
       color: cssToRgba(COLORS.overlay.backdrop)
     });
 
-    this.activeModal.render(ctx, canvas, input);
+    this.activeModal.render(canvas, input);
   }
 
   tick(dt: number, input: InteractionState) {
@@ -46,10 +46,43 @@ export class Modals {
   }
 }
 
-function cssToRgba(color: string): [number, number, number, number] {
-  const hex = String(color || "").trim().replace(/^#/, "");
-  const expanded = hex.length === 3 ? `${hex[0]}${hex[0]}${hex[1]}${hex[1]}${hex[2]}${hex[2]}` : hex;
-  const parsed = Number.parseInt(expanded, 16);
-  if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
-  return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
+function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number, number] {
+  const normalized = String(color || '').trim().toLowerCase();
+  if (!normalized) return [0, 0, 0, 0];
+
+  const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    const raw = hexMatch[1];
+    const hex = raw.length === 3
+      ? `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
+      : raw;
+    const value = Number.parseInt(hex, 16);
+    return [
+      ((value >> 16) & 255) / 255,
+      ((value >> 8) & 255) / 255,
+      (value & 255) / 255,
+      clamp01(alphaMultiplier)
+    ];
+  }
+
+  const rgbaMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
+  if (rgbaMatch) {
+    const parts = rgbaMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3) {
+      const alpha = parts.length >= 4 ? clamp01(parts[3]) : 1;
+      return [
+        clamp01(parts[0] / 255),
+        clamp01(parts[1] / 255),
+        clamp01(parts[2] / 255),
+        clamp01(alpha * alphaMultiplier)
+      ];
+    }
+  }
+
+  return [1, 1, 1, clamp01(alphaMultiplier)];
+}
+
+function clamp01(value: number) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }

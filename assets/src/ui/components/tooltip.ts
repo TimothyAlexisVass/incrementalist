@@ -16,7 +16,6 @@ export interface TooltipOptions {
 }
 
 export function drawTooltip(
-  _ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   anchorPoint: { x: number; y: number },
   content: string | string[],

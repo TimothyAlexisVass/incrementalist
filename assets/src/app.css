@@ -24,7 +24,6 @@ body {
   isolation: isolate;
 }
 
-#game-canvas,
 #incrementalist,
 #effects-canvas {
   position: absolute;

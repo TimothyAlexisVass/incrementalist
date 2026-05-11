@@ -197,7 +197,6 @@ function applyProjectionData(result: Partial<ProjectionParams>) {
 export type EffectContext = {
   floatingTexts: FloatingText[];
   canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
   popupPoint: { x: number; y: number } | null;
 };
 
@@ -217,7 +216,7 @@ export function applyProgressResult(
     handleClaimRewardResult();
 
     if (effects && previousAmounts) {
-      spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, effects.ctx, previousAmounts, {
+      spawnProgressClaimRewardEffects(effects.floatingTexts, effects.canvas, previousAmounts, {
         exp: result.exp,
         level: result.level,
         coins: result.coins,

@@ -117,6 +117,14 @@ Acceptance:
 - Move effects draw execution onto `#incrementalist` context.
 - Remove separate effects-canvas assumptions.
 
+CRUCIAL DETAIL!
+Notice how the effects canvas currently draws with mix-blend-mode screen!
+When the (current) effects drawn onto the #incrementalist canvas, that must happen with the WebGL equivalent of mix-blend-mode screen!
+#effects-canvas {
+  background: transparent;
+  mix-blend-mode: screen;
+}
+
 33. `assets/src/app.ts`
 - Stop initializing `#effects-canvas`.
 

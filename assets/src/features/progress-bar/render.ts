@@ -8,7 +8,8 @@ import {
 } from '../../config';
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components/button';
-import { formatPercent, clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { formatPercent, clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
 import {
   setGpuProgressBarGlow,
@@ -17,6 +18,7 @@ import {
   ColorInput
 } from '../../render/webgl-effects';
 import { getViewModel } from './view-model';
+import { InteractionState } from '../../ui/managers/interactions';
 import { getServerNow } from '../../core/time';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
@@ -116,14 +118,14 @@ export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | n
 }
 
 export function renderProgressBar(
-  ctx: CanvasRenderingContext2D | null,
-  canvas: HTMLCanvasElement | null
+  canvas: HTMLCanvasElement | null,
+  input: InteractionState
 ) {
   if (!canvas) return;
   const renderer = getActiveWebGLRenderer();
-  const target = renderer ? getProgressSurfaceContext(canvas) : ctx;
+  const target = renderer ? getProgressSurfaceContext(canvas) : null;
   if (!target) return;
-  renderProgressBarToContext(target, canvas);
+  renderProgressBarToContext(target, canvas, input);
 
   if (renderer && progressSurface) {
     renderer.drawImage({
@@ -138,7 +140,8 @@ export function renderProgressBar(
 
 function renderProgressBarToContext(
   ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement
+  canvas: HTMLCanvasElement,
+  input: InteractionState
 ) {
   const state = getViewModel();
 
@@ -276,7 +279,7 @@ function renderProgressBarToContext(
     ctx.restore();
   }
 
-  renderIdleModeToggle(ctx, canvas, {
+  renderIdleModeToggle(canvas, input, {
     idleMode: state.idleMode,
     features: {
       idleModePurchased: state.idleModePurchased
@@ -912,12 +915,12 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
 }
 
 export function renderIdleModeToggle(
-  ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
+  input: InteractionState,
   state: { idleMode: boolean; features?: { idleModePurchased?: boolean } }
 ) {
   const toggleRect = getIdleModeToggleRect(canvas);
-  const drawToggle = () => drawButton(ctx, toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
+  const drawToggle = () => drawButton(toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
     active: false,
     activeSurface: state.idleMode ? COLORS.button.toggle.off : COLORS.button.toggle.on,
     inactiveSurface: state.idleMode ? COLORS.button.toggle.off : COLORS.button.toggle.on,
@@ -929,10 +932,9 @@ export function renderIdleModeToggle(
   });
 
   if (!state.features?.idleModePurchased) {
-    drawLockedElement(ctx, toggleRect, drawToggle, {
-      font: IDLE_TOGGLE_FONT,
-      showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
-      showNoticePing: true
+    drawLockedElement(canvas, input, toggleRect, drawToggle, {
+      opacity: 0.1,
+      criteria: "Requires Level 5"
     });
     return null;
   }

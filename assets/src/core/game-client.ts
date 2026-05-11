@@ -70,8 +70,7 @@ export class GameClient {
   private sisuControlLayout: SisuControlLayout | null = null;
 
   constructor(
-    private readonly canvas: HTMLCanvasElement,
-    private readonly ctx: CanvasRenderingContext2D
+    private readonly canvas: HTMLCanvasElement
   ) {
     this.store = new Store(createServerState());
     this.gameLoop = new GameLoop((dt) => this.tick(dt));
@@ -310,7 +309,6 @@ export class GameClient {
     applyProgressResult(result, previousAmounts, {
       floatingTexts: this.floatingTexts,
       canvas: this.canvas,
-      ctx: this.ctx,
       popupPoint: getPendingClaimPopupPoint()
     });
     clearPendingClaimPopupPoint();
@@ -401,11 +399,11 @@ export class GameClient {
       );
     }
 
-    renderAreaBackground(this.ctx, this.canvas);
+    renderAreaBackground(this.canvas);
     
-    renderProgressBar(this.ctx, this.canvas);
+    renderProgressBar(this.canvas, input);
     this.sisuControlLayout = this.store.state.snapshot
-      ? renderSisuControl(this.ctx, this.canvas, this.store.state)
+      ? renderSisuControl(this.canvas, input, this.store.state)
       : null;
 
     if (this.store.state.snapshot && !this.store.state.snapshot.state.features.idle_mode_purchased) {
@@ -427,13 +425,13 @@ export class GameClient {
     }
     
     if (this.store.state.snapshot) {
-      renderAreaSpecifics(this.ctx, this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
+      renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
     }
 
     const amounts = this.snapshotAmounts();
     if (amounts) {
       updateHudViewModel(dt, amounts);
-      renderTopHUD(this.ctx, this.canvas, dt);
+      renderTopHUD(this.canvas, dt);
     }
 
     updateFloatingTexts(this.floatingTexts, dt);
@@ -442,7 +440,7 @@ export class GameClient {
     updateWebGLEffects(dt);
     renderWebGLEffects();
 
-    renderFloatingTexts(this.ctx, this.floatingTexts);
+    renderFloatingTexts(this.floatingTexts);
 
     // 2. Handle specific UI element clicks before general activity collection.
     const modalOpen = this.ui.modals.isOpen();
@@ -485,7 +483,7 @@ export class GameClient {
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
     const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
-    renderBottomHUD(this.ctx, this.canvas, input, isMainMenuOpen, () => {
+    renderBottomHUD(this.canvas, input, isMainMenuOpen, () => {
       const isOpening = !this.ui.overlays.isActive(this.mainMenu);
       this.ui.overlays.toggle(this.mainMenu);
 
@@ -506,7 +504,7 @@ export class GameClient {
 
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);
-    this.ui.render(this.ctx, this.canvas, input, this.store.state);
+    this.ui.render(this.canvas, input, this.store.state);
   }
 
   private openShopAndHighlight(itemId: string) {

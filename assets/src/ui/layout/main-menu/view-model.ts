@@ -7,6 +7,7 @@ import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { GameChannel } from '../../../net/game-channel';
+import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import {
   NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
   NOTICE_LEAF_TAB_QUEST_BUTTON,
@@ -22,12 +23,18 @@ let runCommand: ((cmd: () => Promise<any>) => void) | null = null;
 
 export function getTabMenu(): TabMenu {
   if (!tabMenu) {
-    const renderPlaceholder = (title: string) => (ctx: CanvasRenderingContext2D, _canvas: HTMLCanvasElement, _input: InteractionState, _state: ServerState, rect: Rect) => {
-      ctx.fillStyle = COLORS.panel.textPrimary;
-      ctx.font = '24px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${title} Placeholder`, rect.x + rect.width / 2, rect.y + rect.height / 2);
+    const renderPlaceholder = (title: string) => (_canvas: HTMLCanvasElement, _input: InteractionState, _state: ServerState, rect: Rect) => {
+      const renderer = getActiveWebGLRenderer();
+      if (!renderer) return;
+      renderer.drawText({
+        text: `${title} Placeholder`,
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        font: '24px Arial',
+        color: COLORS.panel.textPrimary,
+        align: 'center',
+        baseline: 'middle'
+      });
     };
 
     const tabs: TabDefinition[] = [
@@ -37,11 +44,11 @@ export function getTabMenu(): TabMenu {
         hotkey: 'S',
         noticeParentId: NOTICE_PARENT_TAB_SHOP,
         noticeLeafId: NOTICE_LEAF_TAB_SHOP_BUTTON,
-        renderContent: (ctx, canvas, input, state, rect) => {
+        renderContent: (canvas, input, state, rect) => {
           if (shopActions) {
-            renderBasicShopTab(ctx, canvas, input, state, rect, shopActions);
+            renderBasicShopTab(canvas, input, state, rect, shopActions);
           } else {
-            drawLazyLoader(ctx, rect, 'Initializing Shop...');
+            drawLazyLoader(rect, 'Initializing Shop...');
           }
         }
       },
@@ -67,14 +74,22 @@ export function getTabMenu(): TabMenu {
       {
         id: 'save',
         label: 'Save Files',
-        renderContent: (ctx, canvas, input, state, rect) => {
+        renderContent: (canvas, input, state, rect) => {
           if (saveSlotActions) {
-            renderSaveFilesTab(ctx, canvas, input, state, rect, saveSlotActions);
+            renderSaveFilesTab(canvas, input, state, rect, saveSlotActions);
           } else {
-            ctx.fillStyle = COLORS.panel.textPrimary;
-            ctx.font = '18px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Actions not initialized', rect.x + rect.width / 2, rect.y + rect.height / 2);
+            const renderer = getActiveWebGLRenderer();
+            if (renderer) {
+              renderer.drawText({
+                text: 'Actions not initialized',
+                x: rect.x + rect.width / 2,
+                y: rect.y + rect.height / 2,
+                font: '18px Arial',
+                color: COLORS.panel.textPrimary,
+                align: 'center',
+                baseline: 'middle'
+              });
+            }
           }
         }
       }

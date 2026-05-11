@@ -17,7 +17,7 @@ export class ResetConfirmationModal implements Modal {
     private onCancel: () => void
   ) {}
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
+  render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
     if (!renderer) {
       return;
@@ -67,7 +67,7 @@ export class ResetConfirmationModal implements Modal {
     const cancelRect = { x: modalX + 40, y: btnY, width: btnWidth, height: btnHeight };
     this.okRect = { x: modalX + modalWidth - 40 - btnWidth, y: btnY, width: btnWidth, height: btnHeight };
 
-    const cancelClicked = doButton(ctx, input, cancelRect, 'Cancel', {
+    const cancelClicked = doButton(input, cancelRect, 'Cancel', {
         activeSurface: COLORS.button.secondary.surface,
         inactiveSurface: COLORS.button.secondary.surface,
         activeBorder: COLORS.button.secondary.border,
@@ -88,7 +88,7 @@ export class ResetConfirmationModal implements Modal {
         ? `HOLD (${Math.ceil((this.requiredHoldTime - this.holdTime)/1000)}s)` 
         : 'HOLD TO RESET';
         
-    drawButton(ctx, this.okRect, label, {
+    drawButton(this.okRect, label, {
         active: isHoveringOk,
         activeSurface: COLORS.button.surface.active,
         inactiveSurface: COLORS.button.surface.inactive
@@ -124,7 +124,7 @@ export class LoadingModal implements Modal {
 
     constructor(private message: string = 'Loading authoritative state...') {}
 
-    render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
+    render(canvas: HTMLCanvasElement, input: InteractionState) {
         const renderer = getActiveWebGLRenderer();
         if (!renderer) {
           return;

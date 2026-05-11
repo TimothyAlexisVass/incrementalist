@@ -5,8 +5,9 @@ import { ServerState } from '../../../../net/snapshots';
 import { Rect } from '../../../components/tab-menu/tab-menu';
 import { drawSaveSlotCard, SaveSlotActions } from '../../../components/cards/save-slot';
 
+import { getActiveWebGLRenderer } from '../../../../renderer/webgl';
+
 export function renderSaveFilesTab(
-  ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   input: InteractionState,
   state: ServerState,
@@ -15,10 +16,18 @@ export function renderSaveFilesTab(
 ) {
   const slots = state.slots;
   if (slots.length === 0) {
-    ctx.fillStyle = COLORS.panel.textPrimary;
-    ctx.font = '18px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Loading save files...', rect.x + rect.width / 2, rect.y + rect.height / 2);
+    const renderer = getActiveWebGLRenderer();
+    if (renderer) {
+      renderer.drawText({
+        text: 'Loading save files...',
+        x: rect.x + rect.width / 2,
+        y: rect.y + rect.height / 2,
+        font: '18px Arial',
+        color: COLORS.panel.textPrimary,
+        align: 'center',
+        baseline: 'middle'
+      });
+    }
     return;
   }
 
@@ -41,10 +50,10 @@ export function renderSaveFilesTab(
     };
 
     if (slot) {
-      drawSaveSlotCard(ctx, input, slotRect, slot, actions);
+      drawSaveSlotCard(input, slotRect, slot, actions);
     } else {
       // Draw as empty slot if server hasn't provided data for this index yet
-      drawSaveSlotCard(ctx, input, slotRect, {
+      drawSaveSlotCard(input, slotRect, {
         slot_index: i,
         file_index: i,
         is_current: false,
@@ -57,13 +66,16 @@ export function renderSaveFilesTab(
   }
 
   // Footer text
-  ctx.fillStyle = COLORS.overlay.bodyText;
-  ctx.font = SAVE_AUTOSAVE_FONT;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(
-    'Progress is autosaved continuously.', 
-    rect.x + 24, 
-    rect.y + rect.height - 24
-  );
+  const renderer = getActiveWebGLRenderer();
+  if (renderer) {
+    renderer.drawText({
+      text: 'Progress is autosaved continuously.',
+      x: rect.x + 24,
+      y: rect.y + rect.height - 24,
+      font: SAVE_AUTOSAVE_FONT,
+      color: COLORS.overlay.bodyText,
+      align: 'left',
+      baseline: 'bottom'
+    });
+  }
 }

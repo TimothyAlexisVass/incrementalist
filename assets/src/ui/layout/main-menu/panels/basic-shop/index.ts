@@ -8,7 +8,6 @@ import { handleShopInteractions, ShopActions } from './interactions';
 export type { ShopActions };
 
 export function renderBasicShopTab(
-  ctx: CanvasRenderingContext2D,
   _canvas: HTMLCanvasElement,
   input: InteractionState,
   state: ServerState,
@@ -21,5 +20,5 @@ export function renderBasicShopTab(
   handleShopInteractions(input, rect, viewModel, actions, () => clearShopHighlight(state));
   
   // 2. Draw the panel
-  drawShopPanel(ctx, rect, viewModel);
+  drawShopPanel(rect, viewModel);
 }

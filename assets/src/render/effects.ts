@@ -54,26 +54,13 @@ export interface FloatingText {
   stackIndex: number | null;
 }
 
-export interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  drag: number;
-  radius: number;
-  lineWidth: number;
-  color: string;
-  elapsedMs: number;
-  lifeMs: number;
-}
+
 
 export function createFloatingTextState(): FloatingText[] {
   return [];
 }
 
-export function createParticleState(): Particle[] {
-  return [];
-}
+
 
 export interface FloatingTextOptions {
   type?: string;
@@ -132,46 +119,7 @@ export function spawnFloatingText(
   }
 }
 
-export interface ClickParticleBurstOptions {
-  count?: number;
-  colors?: readonly string[];
-}
 
-export function spawnClickParticleBurst(
-  particles: Particle[],
-  x: number,
-  y: number,
-  options: ClickParticleBurstOptions = {}
-) {
-  if (!Array.isArray(particles)) return;
-
-  const count = options.count ?? Math.floor(8 + Math.random() * 7);
-  const palette = options.colors || CLICK_BURST_COLORS;
-
-  for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * TWO_PI;
-    const speed = 80 + Math.random() * 180;
-    const color = palette[Math.floor(Math.random() * palette.length)];
-    const radius = 1.5 + Math.random() * 2.7;
-
-    particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      drag: 0.92 + Math.random() * 0.04,
-      radius,
-      lineWidth: 1 + radius * 0.45,
-      color,
-      elapsedMs: 0,
-      lifeMs: 320 + Math.random() * 260
-    });
-  }
-
-  if (particles.length > MAX_CLICK_PARTICLES) {
-    particles.splice(0, particles.length - MAX_CLICK_PARTICLES);
-  }
-}
 
 export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   const canvasWidth = canvas?.width ?? CANVAS_WIDTH;
@@ -238,64 +186,11 @@ export function updateFloatingTexts(floatingTexts: FloatingText[], deltaTime: nu
   floatingTexts.length = writeIndex;
 }
 
-export function updateParticles(particles: Particle[], deltaTime: number) {
-  if (!Array.isArray(particles)) return;
 
-  const deltaSeconds = deltaTime / 1000;
 
-  for (let i = particles.length - 1; i >= 0; i -= 1) {
-    const particle = particles[i];
-    particle.elapsedMs += deltaTime;
 
-    if (particle.elapsedMs >= particle.lifeMs) {
-      particles.splice(i, 1);
-      continue;
-    }
 
-    const drag = Math.pow(particle.drag, deltaTime / 16.67);
-    particle.vx *= drag;
-    particle.vy *= drag;
-    particle.x += particle.vx * deltaSeconds;
-    particle.y += particle.vy * deltaSeconds;
-  }
-}
-
-export function renderParticles(ctx: CanvasRenderingContext2D, particles: Particle[]) {
-  if (!Array.isArray(particles) || particles.length === 0) return;
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineCap = 'round';
-  ctx.shadowBlur = 0;
-
-  for (let i = 0; i < particles.length; i += 1) {
-    const particle = particles[i];
-    const lifeProgress = particle.elapsedMs / particle.lifeMs;
-    const alpha = Math.pow(Math.max(0, 1 - lifeProgress), 1.35);
-    const tailScale = 0.018 + (1 - lifeProgress) * 0.012;
-
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = particle.color;
-    ctx.fillStyle = particle.color;
-    ctx.lineWidth = particle.lineWidth;
-
-    ctx.beginPath();
-    ctx.moveTo(particle.x, particle.y);
-    ctx.lineTo(
-      particle.x - particle.vx * tailScale,
-      particle.y - particle.vy * tailScale
-    );
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.radius * (0.65 + alpha * 0.35), 0, TWO_PI);
-    ctx.fill();
-  }
-
-  ctx.restore();
-}
-
-export function renderFloatingTexts(ctx: CanvasRenderingContext2D, floatingTexts: FloatingText[]) {
+export function renderFloatingTexts(floatingTexts: FloatingText[]) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;

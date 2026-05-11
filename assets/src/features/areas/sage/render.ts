@@ -40,7 +40,6 @@ type SageTipRender = {
 };
 
 export function renderSageArea(
-  ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   input: InteractionState,
   level: number,
@@ -65,28 +64,21 @@ export function renderSageArea(
   const bottomHudY = canvas.height - BOTTOM_HUD_HEIGHT;
   const maxBoxWidth = DISPLAY_AREA_WIDTH - 40;
 
-  ctx.save();
-  ctx.font = SMALL_TEXT_FONT;
-
   const tipsToRender = visibleTipLevels.map((tipLevel) => {
     const tip = SAGE_TIPS[tipLevel];
     const leafId = tipLeafId(tipLevel);
     const buttonLabel = tip.confirmation || 'Alright';
     const fullLines = tip.text;
     const maxLineWidth = fullLines.reduce((maxWidth, line) => {
-      const lineWidth = ctx.measureText(line).width;
+      const lineWidth = renderer ? renderer.measureTextWidth({ text: line, font: SMALL_TEXT_FONT }) : 0;
       return Math.max(maxWidth, lineWidth);
     }, 0);
-    ctx.font = SAGE_HEADER_FONT;
-    const headerWidth = ctx.measureText(SAGE_HEADER_TEXT).width;
-    ctx.font = SMALL_TEXT_FONT;
+    const headerWidth = renderer ? renderer.measureTextWidth({ text: SAGE_HEADER_TEXT, font: SAGE_HEADER_FONT }) : 0;
 
-    ctx.font = BOTTOM_HUD_BUTTON_FONT;
     const buttonWidth = Math.max(
       BUTTON_MIN_WIDTH,
-      Math.ceil(ctx.measureText(buttonLabel).width + BUTTON_INNER_PADDING * 2)
+      Math.ceil((renderer ? renderer.measureTextWidth({ text: buttonLabel, font: BOTTOM_HUD_BUTTON_FONT }) : 0) + BUTTON_INNER_PADDING * 2)
     );
-    ctx.font = SMALL_TEXT_FONT;
 
     const boxWidth = Math.min(
       Math.max(Math.max(maxLineWidth, headerWidth) + PANEL_PADDING * 2, buttonWidth + PANEL_PADDING * 2),
@@ -139,15 +131,14 @@ export function renderSageArea(
       height: tip.buttonRect.height
     };
 
-    renderTipPanel(ctx, input, tip, channel, runCommand, renderer);
+    renderTipPanel(input, tip, channel, runCommand, renderer);
     currentY += tip.boxHeight + PANEL_GAP;
   }
 
-  ctx.restore();
+  // No longer using ctx.restore() since we removed ctx.save()
 }
 
 function renderTipPanel(
-  ctx: CanvasRenderingContext2D,
   input: InteractionState,
   tip: SageTipRender,
   channel?: GameChannel,
@@ -218,7 +209,7 @@ function renderTipPanel(
     });
   }
 
-  const buttonClicked = doButton(ctx, input, buttonRect, buttonLabel, {
+  const buttonClicked = doButton(input, buttonRect, buttonLabel, {
     font: BOTTOM_HUD_BUTTON_FONT,
     showNotice: notices.hasLeafNotice(leafId),
     showNoticePing: true

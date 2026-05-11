@@ -25,7 +25,7 @@ function getAreaBackgroundImage(areaKey: string) {
   return areaBackgroundImages.get(areaKey)!;
 }
 
-export function renderAreaBackground(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+export function renderAreaBackground(canvas: HTMLCanvasElement) {
   const renderer = getActiveWebGLRenderer();
   const model = getAreaViewModel();
   const areaKey = model.currentArea;
@@ -50,7 +50,6 @@ export function renderAreaBackground(ctx: CanvasRenderingContext2D, canvas: HTML
 }
 
 export function renderAreaSpecifics(
-  ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
   input: InteractionState,
   level: number,
@@ -59,7 +58,7 @@ export function renderAreaSpecifics(
 ) {
   const model = getAreaViewModel();
   if (model.currentArea === 'sage') {
-    renderSageArea(ctx, canvas, input, level, channel, runCommand);
+    renderSageArea(canvas, input, level, channel, runCommand);
   }
 }
 
@@ -67,7 +66,6 @@ export function renderAreaSpecifics(
 let isDropdownOpen = false;
 
 export function renderAreaDropdown(
-  ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
   onSelect: (areaKey: string) => void,
@@ -118,7 +116,7 @@ export function renderAreaDropdown(
           runCommand
         );
 
-        ctx.save();
+
 
         availableAreas.forEach((area, i) => {
           const itemRect = {
@@ -131,7 +129,7 @@ export function renderAreaDropdown(
           const isHovered = pointInRect(input.pointer, itemRect);
           
           const renderItem = () => {
-            drawButton(ctx, itemRect, area.is_locked ? "" : area.name, {
+            drawButton(itemRect, area.is_locked ? "" : area.name, {
               active: isHovered,
               padding: 0,
               font: BOTTOM_HUD_BUTTON_FONT,
@@ -146,7 +144,7 @@ export function renderAreaDropdown(
             const leafId = `leaf.area.${area.key}.go_button`;
             const hasNotice = !area.is_locked && notices.hasLeafNotice(leafId);
             if (hasNotice) {
-              drawNoticeDot(ctx, itemRect.x + itemRect.width - 10, itemRect.y + 10);
+              drawNoticeDot(itemRect.x + itemRect.width - 10, itemRect.y + 10);
               notices.reportLeafVisible(leafId, true, channel, runCommand);
             }
           };
@@ -155,7 +153,7 @@ export function renderAreaDropdown(
             // Keep the same full-size row visuals as unlocked items, then
             // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
             renderItem();
-            drawLockedElement(ctx, canvas, input, itemRect, () => {}, {
+            drawLockedElement(canvas, input, itemRect, () => {}, {
               opacity: 0,
               criteria: `Requires Level ${area.unlock_level}`
             });
@@ -171,13 +169,13 @@ export function renderAreaDropdown(
             input.consumed = true;
           }
         });
-        ctx.restore();
+
       }
     }
   }
 
   // Draw the main button
-  if (doButton(ctx, input, buttonRect, buttonLabel, {
+  if (doButton(input, buttonRect, buttonLabel, {
     showNotice: notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)
   })) {
     // Click also toggles or handles selection if needed, but hover handles open.

@@ -12,12 +12,11 @@ import { drawShopItemCard } from '../../../../components/cards/shop-item';
 import { drawLazyLoader } from '../../../../components/utils/lazy-loader';
 
 export function drawShopPanel(
-  ctx: CanvasRenderingContext2D,
   rect: Rect,
   items: ShopItemViewModel[]
 ) {
   if (items.length === 0) {
-    drawLazyLoader(ctx, rect, 'Fetching items...');
+    drawLazyLoader(rect, 'Fetching items...');
     return;
   }
 
@@ -35,7 +34,7 @@ export function drawShopPanel(
       height: itemHeight
     };
 
-    drawShopItemCard(ctx, itemRect, { 
+    drawShopItemCard(itemRect, { 
       item, 
       canAfford: item.canAfford,
       isHighlighted: item.isHighlighted

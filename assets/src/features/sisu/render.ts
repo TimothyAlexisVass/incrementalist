@@ -13,9 +13,10 @@ import type { ServerState } from "../../net/snapshots";
 import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
 import { drawButton } from "../../ui/components/button";
 import { notices } from "../../ui/managers/notices";
-import type { InteractionState } from "../../ui/managers/interactions";
+import { InteractionState } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
-import { clampNumber, drawLockedElement } from "../../utils";
+import { drawLockedElement } from "../../ui/components/locked-element";
+import { clampNumber } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
@@ -44,14 +45,14 @@ let sisuSurface: HTMLCanvasElement | null = null;
 let sisuSurfaceCtx: CanvasRenderingContext2D | null = null;
 
 export function renderSisuControl(
-  ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
+  input: InteractionState,
   state: ServerState
 ): SisuControlLayout | null {
   const renderer = getActiveWebGLRenderer();
-  const target = renderer ? getSisuSurfaceContext(canvas) : ctx;
+  const target = renderer ? getSisuSurfaceContext(canvas) : null;
   if (!target) return null;
-  const layout = renderSisuControlToContext(target, canvas, state);
+  const layout = renderSisuControlToContext(target, canvas, input, state);
   if (renderer && sisuSurface) {
     renderer.drawImage({
       image: sisuSurface,
@@ -67,6 +68,7 @@ export function renderSisuControl(
 function renderSisuControlToContext(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
+  input: InteractionState,
   state: ServerState
 ): SisuControlLayout | null {
   const snapshot = state.snapshot;
@@ -147,7 +149,7 @@ function renderSisuControlToContext(
   };
 
   if (!isUnlocked) {
-    drawLockedElement(ctx, controlRect, drawSisuControl, {
+    drawLockedElement(canvas, input, controlRect, drawSisuControl, {
       font: SISU_METER_FONT,
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
       showNoticePing: true
@@ -181,9 +183,9 @@ class SisuGeneratorModalImpl implements Modal {
     private readonly onClose: () => void
   ) {}
 
-  render(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState) {
+  render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
-    const drawCtx = renderer ? getSisuSurfaceContext(canvas) : ctx;
+    const drawCtx = renderer ? getSisuSurfaceContext(canvas) : null;
     if (!drawCtx) return;
     const snapshot = this.getState().snapshot;
     if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
@@ -223,7 +225,7 @@ class SisuGeneratorModalImpl implements Modal {
     drawCtx.textBaseline = "middle";
     drawCtx.fillText("Sisu Generator", modalX + 24, modalY + 36);
 
-    drawButton(drawCtx, this.closeRect, "Close", { active: false });
+    drawButton(this.closeRect, "Close", { active: false });
 
     const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
@@ -278,7 +280,7 @@ class SisuGeneratorModalImpl implements Modal {
     };
 
     const upgradeState = getUpgradeButtonState(snapshot.state.shards, maxUpgradeLevel);
-    drawButton(drawCtx, this.upgradeRect, upgradeState.label, {
+    drawButton(this.upgradeRect, upgradeState.label, {
       active: false,
       activeSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
       inactiveSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
@@ -303,7 +305,7 @@ class SisuGeneratorModalImpl implements Modal {
       });
     }
     if (pendingUpgradeCost !== null) {
-      drawUpgradeCostLabel(drawCtx, this.upgradeRect, pendingUpgradePrefix, pendingUpgradeCost);
+      drawUpgradeCostLabel(this.upgradeRect, pendingUpgradePrefix, pendingUpgradeCost);
     }
 
     handleSisuModalInteractions(
@@ -338,7 +340,7 @@ function getSisuSurfaceContext(canvas: HTMLCanvasElement): CanvasRenderingContex
   return sisuSurfaceCtx;
 }
 
-function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix: string | null, cost: BigNum) {
+function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum) {
   const renderer = getActiveWebGLRenderer();
   const textY = rect.y + 23;
   const iconSize = 18;
@@ -351,16 +353,16 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
   const leftWidth = leftText
     ? (renderer
       ? renderer.measureTextWidth({ text: leftText, font: SISU_UPGRADE_BUTTON_FONT })
-      : ctx.measureText(leftText).width)
+      : 0)
     : 0;
-  const amountWidth = measureCurrencyAmount(ctx, cost, iconSize, {
+  const amountWidth = measureCurrencyAmount(cost, iconSize, {
     font: SISU_UPGRADE_BUTTON_FONT,
     iconGap
   });
   const rightWidth = rightText
     ? (renderer
       ? renderer.measureTextWidth({ text: rightText, font: SISU_UPGRADE_BUTTON_FONT })
-      : ctx.measureText(rightText).width)
+      : 0)
     : 0;
   const totalWidth = leftWidth + amountWidth + rightWidth;
   let currentX = rect.x + rect.width / 2 - totalWidth / 2;
@@ -376,18 +378,11 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
         align: "left",
         baseline: "alphabetic"
       });
-    } else {
-      ctx.save();
-      ctx.font = SISU_UPGRADE_BUTTON_FONT;
-      ctx.fillStyle = textColor;
-      ctx.textAlign = "left";
-      ctx.fillText(leftText, currentX, textY);
-      ctx.restore();
     }
     currentX += leftWidth;
   }
 
-  drawCurrencyAmount(ctx, currencyKey, cost, currentX, textY, iconSize, {
+  drawCurrencyAmount(currencyKey, cost, currentX, textY, iconSize, {
     align: "left",
     font: SISU_UPGRADE_BUTTON_FONT,
     textColor,
@@ -407,13 +402,6 @@ function drawUpgradeCostLabel(ctx: CanvasRenderingContext2D, rect: Rect, prefix:
         align: "left",
         baseline: "alphabetic"
       });
-    } else {
-      ctx.save();
-      ctx.font = SISU_UPGRADE_BUTTON_FONT;
-      ctx.fillStyle = textColor;
-      ctx.textAlign = "left";
-      ctx.fillText(rightText, currentX, textY);
-      ctx.restore();
     }
   }
 }

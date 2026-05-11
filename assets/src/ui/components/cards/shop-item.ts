@@ -27,7 +27,6 @@ export interface ShopItemCardProps {
 }
 
 export function drawShopItemCard(
-  ctx: CanvasRenderingContext2D,
   rect: Rect,
   props: ShopItemCardProps
 ) {
@@ -100,7 +99,6 @@ export function drawShopItemCard(
     });
   } else {
     drawCurrencyAmount(
-      ctx,
       item.currency,
       item.cost,
       rect.x + rect.width - 16,
@@ -137,7 +135,7 @@ export function drawShopItemCard(
       };
 
       // Just draw the button, don't handle logic here
-      drawButton(ctx, btnRect, 'Purchase', {
+      drawButton(btnRect, 'Purchase', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
         showNotice: notices.hasLeafNotice(`leaf.shop_item.${item.id}.purchase_button`),

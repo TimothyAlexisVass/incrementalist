@@ -11,7 +11,6 @@ import {
 } from "../../managers/notices";
 
 export function renderBottomHUD(
-  ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
   isMainMenuOpen: boolean,
@@ -39,14 +38,14 @@ export function renderBottomHUD(
   const buttonX = canvas.width - buttonWidth - paddingRight;
   const buttonY = canvas.height - buttonHeight - paddingBottom;
 
-  if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
+  if (doButton(input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
     showNotice: !isMainMenuOpen && notices.hasParentNotice(NOTICE_PARENT_MENU_MAIN)
   })) {
     onMenuClick();
   }
 
   // Draw Area selection dropdown on the left
-  renderAreaDropdown(ctx, canvas, input, (areaKey) => {
+  renderAreaDropdown(canvas, input, (areaKey) => {
     if (onAreaSelect) onAreaSelect(areaKey);
   }, channel, runCommand);
 }

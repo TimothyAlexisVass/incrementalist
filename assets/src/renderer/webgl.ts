@@ -11,6 +11,7 @@ export interface DrawRectOptions {
   width: number;
   height: number;
   color: RGBA;
+  alpha?: number;
 }
 
 export interface DrawTextOptions {
@@ -227,7 +228,8 @@ export class WebGLRenderer {
     gl.enableVertexAttribArray(this.colorPositionLocation);
     gl.vertexAttribPointer(this.colorPositionLocation, 2, gl.FLOAT, false, 0, 0);
     gl.uniform2f(this.colorResolutionLocation, this.canvas.width, this.canvas.height);
-    gl.uniform4f(this.colorUniformLocation, color[0], color[1], color[2], color[3]);
+    const alpha = clamp01(options.alpha ?? 1);
+    gl.uniform4f(this.colorUniformLocation, color[0], color[1], color[2], color[3] * alpha);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 

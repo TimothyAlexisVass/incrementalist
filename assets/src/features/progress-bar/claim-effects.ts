@@ -11,6 +11,7 @@ import {
 } from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
 import { BigNum, ZERO, sub, compare } from "../../core/bignum";
+import { getActiveWebGLRenderer } from "../../renderer/webgl";
 
 let nextLevelUpNoticeGroupId = 1;
 
@@ -39,7 +40,6 @@ const POPUP_OFFSET = Object.freeze({
 export function spawnProgressClaimRewardEffects(
   floatingTexts: FloatingText[],
   canvas: HTMLCanvasElement,
-  textMeasureContext: CanvasRenderingContext2D,
   currentAmounts: ResourceAmounts,
   newAmounts: ResourceAmounts,
   anchorPoint: { x: number; y: number } | null = null
@@ -74,7 +74,7 @@ export function spawnProgressClaimRewardEffects(
     y: barLayout.y + barLayout.height / 2
   };
 
-  const anchor = clampRewardAnchorToCanvas(textMeasureContext, canvas, rawAnchor, rewardGroupEntries);
+  const anchor = clampRewardAnchorToCanvas(canvas, rawAnchor, rewardGroupEntries);
 
   if (levelGain > 0) {
     const levelUps = computeLevelUps(currentAmounts.level, newAmounts.level);
@@ -126,7 +126,6 @@ export function spawnProgressClaimRewardEffects(
 }
 
 function clampRewardAnchorToCanvas(
-  textMeasureContext: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   point: { x: number; y: number },
   entries: RewardEntry[]
@@ -137,7 +136,7 @@ function clampRewardAnchorToCanvas(
   let maxY = Number.POSITIVE_INFINITY;
 
   for (const entry of entries) {
-    const bounds = getCenteredPopupAnchorBounds(textMeasureContext, canvas, entry.text, entry.font, entry.offsetX, entry.offsetY);
+    const bounds = getCenteredPopupAnchorBounds(canvas, entry.text, entry.font, entry.offsetX, entry.offsetY);
     minX = Math.max(minX, bounds.minX);
     maxX = Math.min(maxX, bounds.maxX);
     minY = Math.max(minY, bounds.minY);
@@ -161,7 +160,6 @@ function clampRewardAnchorToCanvas(
 }
 
 function getCenteredPopupAnchorBounds(
-  textMeasureContext: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   text: string,
   font: string,
@@ -170,7 +168,7 @@ function getCenteredPopupAnchorBounds(
   margin = 8
 ) {
   const fontSize = parseFontSizePx(font);
-  const textWidth = measureTextWidth(textMeasureContext, text, font);
+  const textWidth = measureTextWidth(text, font);
   const halfWidth = textWidth / 2;
   const bottomPadding = Math.max(6, Math.round(fontSize * 0.3));
   const displayAreaRight = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH;
@@ -184,12 +182,12 @@ function getCenteredPopupAnchorBounds(
   };
 }
 
-function measureTextWidth(textMeasureContext: CanvasRenderingContext2D, text: string, font: string) {
-  textMeasureContext.save();
-  textMeasureContext.font = font;
-  const width = textMeasureContext.measureText(text).width;
-  textMeasureContext.restore();
-  return width;
+function measureTextWidth(text: string, font: string) {
+  const renderer = getActiveWebGLRenderer();
+  if (renderer) {
+    return renderer.measureTextWidth({ text, font });
+  }
+  return 0;
 }
 
 function getAvailableNoticeGroupIndexes(floatingTexts: FloatingText[], type: string, count: number) {

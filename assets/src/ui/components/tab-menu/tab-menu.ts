@@ -20,7 +20,7 @@ export interface TabDefinition {
   id: string;
   label: string;
   hotkey?: string;
-  renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
+  renderContent: (canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
   noticeParentId?: string;
   noticeLeafId?: string;
@@ -69,7 +69,6 @@ export class TabMenu {
   }
 
   public render(
-    ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     input: InteractionState,
     state: ServerState,
@@ -208,7 +207,7 @@ export class TabMenu {
         label += ` [${tab.hotkey}]`;
       }
 
-      const clicked = doButton(ctx, input, rect, label, {
+      const clicked = doButton(input, rect, label, {
         active: isActive || undefined,
         activeSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
         inactiveSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
@@ -246,7 +245,7 @@ export class TabMenu {
         );
       }
 
-      activeTab.renderContent(ctx, canvas, input, state, contentRect);
+      activeTab.renderContent(canvas, input, state, contentRect);
     }
   }
 }

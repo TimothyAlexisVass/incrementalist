@@ -94,7 +94,7 @@ export const COLORS = Object.freeze({
     countdownText: '#FFFFFF'
   },
   overlay: {
-    backdrop: 'rgba(0, 0, 0, 0.72)',
+    backdrop: 'rgba(0, 0, 0, 0.1)',
     panelBorder: '#3a5273',
     titleText: '#dbe8ff',
     starsText: '#ffd966',

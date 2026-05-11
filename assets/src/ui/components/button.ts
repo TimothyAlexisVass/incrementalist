@@ -72,7 +72,6 @@ function drawNoticePing(x: number, y: number, radius: number) {
 }
 
 export function drawButton(
-  _ctx: CanvasRenderingContext2D,
   rect: { x: number; y: number; width: number; height: number },
   label: string,
   options: ButtonOptions = {}
@@ -123,12 +122,11 @@ export function drawButton(
   });
 
   if (options.showNotice) {
-    drawNoticeDot(_ctx, rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
+    drawNoticeDot(rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
   }
 }
 
 export function drawNoticeDot(
-  _ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number = 4,
@@ -170,7 +168,6 @@ export function drawNoticeDot(
 import { InteractionState, pointInRect } from '../managers/interactions';
 
 export function doButton(
-  ctx: CanvasRenderingContext2D,
   input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   label: string,
@@ -199,7 +196,7 @@ export function doButton(
   const isDown = input.isPressed;
   options.active = isDown ? (startedInside && isHovered) : isHovered;
 
-  drawButton(ctx, rect, label, options);
+  drawButton(rect, label, options);
 
   return clicked;
 }

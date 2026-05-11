@@ -9,7 +9,6 @@ export interface CheckboxOptions {
 }
 
 export function drawCheckbox(
-  _ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   size: number,
@@ -55,7 +54,6 @@ export function drawCheckbox(
 import { InteractionState, pointInRect } from '../managers/interactions';
 
 export function doCheckbox(
-  ctx: CanvasRenderingContext2D,
   input: InteractionState,
   x: number,
   y: number,
@@ -77,7 +75,7 @@ export function doCheckbox(
     drawOptions.borderColor = drawOptions.borderColor || COLORS.button.border.active;
   }
 
-  drawCheckbox(ctx, x, y, size, checked, drawOptions);
+  drawCheckbox(x, y, size, checked, drawOptions);
 
   return toggled;
 }

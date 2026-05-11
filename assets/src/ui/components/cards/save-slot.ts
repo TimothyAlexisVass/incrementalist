@@ -23,7 +23,6 @@ export interface SaveSlotActions {
 }
 
 export function drawSaveSlotCard(
-  ctx: CanvasRenderingContext2D,
   input: InteractionState,
   rect: Rect,
   slot: SaveSlotSummary,
@@ -114,7 +113,6 @@ export function drawSaveSlotCard(
     const btnWidth = 140;
     const btnHeight = 28;
     const switchClicked = doButton(
-        ctx, 
         input, 
         { 
             x: rect.x + (rect.width - btnWidth) / 2, 
@@ -141,7 +139,7 @@ export function drawSaveSlotCard(
       height: deleteBtnHeight
     };
     
-    if (doButton(ctx, input, deleteRect, 'DELETE', {
+    if (doButton(input, deleteRect, 'DELETE', {
         font: SAVE_DELETE_FONT,
         activeSurface: COLORS.button.secondary.surface,
         inactiveSurface: COLORS.button.secondary.surface,

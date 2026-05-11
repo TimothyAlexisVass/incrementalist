@@ -15,7 +15,7 @@ function getCurrencyIconImage(currencyKey: string) {
   return currencyIconImages.get(currencyKey) || null;
 }
 
-export function drawCurrencyIcon(_ctx: CanvasRenderingContext2D, currencyKey: string, x: number, y: number, size: number) {
+export function drawCurrencyIcon(currencyKey: string, x: number, y: number, size: number) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer || size <= 0) {
     return;
@@ -38,11 +38,11 @@ export function drawCurrencyIcon(_ctx: CanvasRenderingContext2D, currencyKey: st
   });
 }
 
-export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: number | BigNum, iconSize: number, options: any = {}) {
+export function measureCurrencyAmount(amount: number | BigNum, iconSize: number, options: any = {}) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return 0;
   const {
-    font = ctx?.font || 'bold 16px Arial',
+    font = 'bold 16px Arial',
     iconGap = 5,
     formatter = formatNumber
   } = options;
@@ -55,7 +55,6 @@ export function measureCurrencyAmount(ctx: CanvasRenderingContext2D, amount: num
 }
 
 export function drawCurrencyAmount(
-  ctx: CanvasRenderingContext2D,
   currencyKey: string,
   amount: number | BigNum,
   x: number,
@@ -70,7 +69,7 @@ export function drawCurrencyAmount(
 
   const {
     align = 'left',
-    font = ctx?.font || 'bold 16px Arial',
+    font = 'bold 16px Arial',
     textColor = '#ffffff',
     iconGap = 5,
     iconPosition = 'left',
@@ -102,7 +101,7 @@ export function drawCurrencyAmount(
   const textHeight = ascent + descent;
   const iconY = y - ascent + ((textHeight - resolvedIconSize) / 2);
 
-  drawCurrencyIcon(ctx, currencyKey, iconX, iconY, resolvedIconSize);
+  drawCurrencyIcon(currencyKey, iconX, iconY, resolvedIconSize);
   renderer.drawText({
     text: amountText,
     x: amountX,
