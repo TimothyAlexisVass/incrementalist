@@ -3,7 +3,11 @@ import { BOTTOM_HUD_HEIGHT } from "../../../config";
 import { doButton } from '../../components/button';
 import { InteractionState } from '../../managers/interactions';
 import { renderAreaDropdown } from '../../../features/areas/render';
-import { notices } from "../../managers/notices";
+import { GameChannel } from "../../../net/game-channel";
+import {
+  NOTICE_PARENT_MENU_MAIN,
+  notices
+} from "../../managers/notices";
 
 export function renderBottomHUD(
   ctx: CanvasRenderingContext2D, 
@@ -11,7 +15,9 @@ export function renderBottomHUD(
   input: InteractionState, 
   isMainMenuOpen: boolean,
   onMenuClick: () => void,
-  onAreaSelect?: (areaKey: string) => void
+  onAreaSelect?: (areaKey: string) => void,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
 ) {
   ctx.save();
 
@@ -28,7 +34,7 @@ export function renderBottomHUD(
   const buttonY = canvas.height - buttonHeight - paddingBottom;
 
   if (doButton(ctx, input, { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight }, 'Menu [ESC]', {
-    showNotice: !isMainMenuOpen && notices.hasMenuNotice()
+    showNotice: !isMainMenuOpen && notices.hasParentNotice(NOTICE_PARENT_MENU_MAIN)
   })) {
     onMenuClick();
   }
@@ -36,7 +42,7 @@ export function renderBottomHUD(
   // Draw Area selection dropdown on the left
   renderAreaDropdown(ctx, canvas, input, (areaKey) => {
     if (onAreaSelect) onAreaSelect(areaKey);
-  });
+  }, channel, runCommand);
 
   ctx.restore();
 }

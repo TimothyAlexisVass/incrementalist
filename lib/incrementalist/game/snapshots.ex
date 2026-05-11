@@ -7,7 +7,7 @@ defmodule Incrementalist.Game.Snapshots do
   and save-slot loads where partial state would leave stale client projection.
   """
 
-  alias Incrementalist.Game.{State, Time}
+  alias Incrementalist.Game.{Notices, State, Time}
 
   def full(save_slot, active_slot_index, now \\ Time.now()) do
     %{
@@ -15,7 +15,7 @@ defmodule Incrementalist.Game.Snapshots do
       "server_time" => Time.iso8601(now),
       "active_save_slot" => active_slot_index,
       "state" => State.visible_state(save_slot.state, now),
-      "notices" => save_slot.notices,
+      "notices" => Notices.payload(save_slot.notices || Notices.new(save_slot.state)),
       "save_slot" => State.summary(save_slot, active_slot_index)
     }
   end

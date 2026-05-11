@@ -6,7 +6,7 @@ defmodule Incrementalist.Game.CommandsTest do
   alias Incrementalist.Game.Commands
   alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, SaveSlot, SaveSlots}
   alias Incrementalist.Game.Session.PlayerServer
-  alias Incrementalist.Game.{Sessions, State, Time}
+  alias Incrementalist.Game.{Notices, Sessions, State, Time}
   alias Incrementalist.Repo
 
   @now ~U[2026-05-04 12:00:00Z]
@@ -163,31 +163,78 @@ defmodule Incrementalist.Game.CommandsTest do
 
   test "area.select updates the current area when unlocked" do
     player = create_player()
-    
+
     # Sage is unlocked by default
     result = Commands.enqueue(player.id, "area.select", intent(0, %{"area" => "sage"}), @now)
     assert result["type"] == "area.select.result"
     assert result["area"] == "sage"
-    
+
     Commands.ack(player.id, 0, @now)
-    
+
     # Cloverfield is locked at level 1
-    locked = Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+    locked =
+      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+
     assert locked["type"] == "command.error"
     assert locked["reason"] == "area_locked"
   end
 
-  test "notice.see can dismiss a sage tip leaf independently" do
+  test "notice.event child_clicked clears an active sage tip leaf" do
     player = create_player()
 
-    result = Commands.enqueue(player.id, "notice.see", intent(0, %{"leaf_id" => "sage_tip:1"}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "notice.event",
+        intent(0, %{"event" => "child_clicked", "leaf_id" => "leaf.sage_tip.1.confirm_button"}),
+        @now
+      )
 
-    assert result["type"] == "notice.see.result"
-    assert result["leaf_id"] == "sage_tip:1"
+    assert result["type"] == "notice.event.result"
+    assert result["leaf_id"] == "leaf.sage_tip.1.confirm_button"
 
     slot = SaveSlots.get_slot!(player.id, 0)
-    assert "sage_tip:1" in slot.notices.seen_leaf_ids
-    assert slot.notices.last_ack_level == %{}
+    refute "leaf.sage_tip.1.confirm_button" in slot.notices.active_leaf_ids
+    assert "leaf.sage_tip.1.confirm_button" in slot.notices.dismissed_leaf_ids
+  end
+
+  test "dismissed non-sage area leaf notice stays cleared after area navigation" do
+    player = create_player()
+    slot = SaveSlots.get_slot!(player.id, 0)
+    unlocked_state = %{slot.state | level: 10, area: "sage"}
+
+    slot
+    |> SaveSlot.changeset(%{
+      state: unlocked_state,
+      notices: Notices.new(unlocked_state),
+      last_saved_at: @now
+    })
+    |> Repo.update!()
+
+    click_notice =
+      Commands.enqueue(
+        player.id,
+        "notice.event",
+        intent(0, %{"event" => "child_clicked", "leaf_id" => "leaf.area.cloverfield.go_button"}),
+        @now
+      )
+
+    assert click_notice["type"] == "notice.event.result"
+    Commands.ack(player.id, 0, @now)
+
+    go_cloverfield =
+      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+
+    assert go_cloverfield["type"] == "area.select.result"
+    Commands.ack(player.id, 1, @now)
+
+    go_sage = Commands.enqueue(player.id, "area.select", intent(2, %{"area" => "sage"}), @now)
+
+    assert go_sage["type"] == "area.select.result"
+
+    updated_slot = SaveSlots.get_slot!(player.id, 0)
+    refute "leaf.area.cloverfield.go_button" in updated_slot.notices.active_leaf_ids
+    assert "leaf.area.cloverfield.go_button" in updated_slot.notices.dismissed_leaf_ids
   end
 
   test "stored results replay without re-executing command rules" do

@@ -15,7 +15,8 @@ import { notices } from '../../managers/notices';
 
 export interface ShopItemActions {
   onPurchase: (itemId: string) => void;
-  onSee: (itemId: string) => void;
+  onNoticeClick?: (itemId: string) => void;
+  onNoticeVisible?: (itemId: string) => void;
 }
 
 export interface ShopItemCardProps {
@@ -117,7 +118,7 @@ export function drawShopItemCard(
       drawButton(ctx, btnRect, 'Purchase', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
-        showNotice: notices.hasLeafNotice(`shop:${item.id}`),
+        showNotice: notices.hasLeafNotice(`leaf.shop_item.${item.id}.purchase_button`),
         showNoticePing: true
       });
     }
@@ -150,8 +151,9 @@ export function handleShopItemCardInteractions(
     input.clicked && !input.consumed) {
     
     // Clear notice on interaction
-    if (notices.hasLeafNotice(`shop:${item.id}`)) {
-      actions.onSee(item.id);
+    const leafId = `leaf.shop_item.${item.id}.purchase_button`;
+    if (notices.hasLeafNotice(leafId) && actions.onNoticeClick) {
+      actions.onNoticeClick(item.id);
     }
 
     if (canAfford) {

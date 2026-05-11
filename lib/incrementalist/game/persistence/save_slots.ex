@@ -89,22 +89,47 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   def initialize_if_empty(save_slot, now \\ Time.now())
 
   def initialize_if_empty(%SaveSlot{state: nil} = save_slot, now) do
+    next_state = State.new(now)
+
     save_slot
     |> SaveSlot.changeset(%{
-      state: State.new(now),
-      notices: Notices.new(),
+      state: next_state,
+      notices: Notices.new(next_state),
       last_saved_at: now
     })
     |> Repo.update!()
   end
 
-  def initialize_if_empty(%SaveSlot{notices: nil} = save_slot, now) do
+  def initialize_if_empty(%SaveSlot{state: %State{} = state, notices: nil} = save_slot, now) do
     save_slot
     |> SaveSlot.changeset(%{
-      notices: Notices.new(),
+      notices: Notices.new(state),
       last_saved_at: now
     })
     |> Repo.update!()
+  end
+
+  def initialize_if_empty(
+        %SaveSlot{state: %State{} = state, notices: %Notices{} = notices} = save_slot,
+        now
+      ) do
+    if notices.dismissed_leaf_ids == [] and notices.active_leaf_ids == [] and
+         notices.active_parent_ids == [] do
+      seeded = Notices.new(state)
+
+      if seeded.active_leaf_ids != [] or seeded.active_parent_ids != [] do
+        save_slot
+        |> SaveSlot.changeset(%{
+          notices: seeded,
+          last_saved_at: now
+        })
+        |> Repo.update!()
+      else
+        save_slot
+      end
+    else
+      save_slot
+    end
   end
 
   def initialize_if_empty(%SaveSlot{} = save_slot, _now), do: save_slot
@@ -129,10 +154,12 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   end
 
   def reset(%SaveSlot{} = save_slot, now \\ Time.now()) do
+    next_state = State.new(now)
+
     save_slot
     |> SaveSlot.changeset(%{
-      state: State.new(now),
-      notices: Notices.new(),
+      state: next_state,
+      notices: Notices.new(next_state),
       last_saved_at: now
     })
     |> Repo.update!()

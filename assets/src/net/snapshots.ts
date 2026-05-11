@@ -1,10 +1,10 @@
 import type {
   GameSnapshot,
+  NoticeState,
   SaveSlotSummary,
   ServerResult,
   AreaSelectResult,
-  NoticeSeeResult,
-  NoticeAckResult,
+  NoticeEventResult,
   SisuState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
@@ -76,7 +76,11 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     state.snapshot.state.idle_mode = result.idle_mode;
   }
 
-  if (result.type === "notice.see.result" || result.type === "notice.ack.result") {
+  if ("notices" in result && result.notices) {
+    applyNoticeState(state, result.notices);
+  }
+
+  if (result.type === "notice.event.result") {
     applyNoticeResult(state, result);
   }
 
@@ -171,22 +175,15 @@ export function applyAreaResult(state: ServerState, result: AreaSelectResult) {
   updateAreaViewModel(state.snapshot.state);
 }
 
-export function applyNoticeResult(state: ServerState, result: NoticeSeeResult | NoticeAckResult) {
+export function applyNoticeState(state: ServerState, notices: NoticeState) {
   if (!state.snapshot) return;
+  state.snapshot.notices.active_leaf_ids = notices.active_leaf_ids;
+  state.snapshot.notices.active_parent_ids = notices.active_parent_ids;
+}
 
-  if (result.type === "notice.see.result") {
-    if (!state.snapshot.notices.seen_leaf_ids.includes(result.leaf_id)) {
-      state.snapshot.notices.seen_leaf_ids.push(result.leaf_id);
-    }
-    // Bubbling clear on the client: marking a leaf as seen should also clear its parents.
-    // The server handles this durably, but we do it here for instant UI feedback.
-    // We don't know the parent IDs here though, unless we pass them or the UI manager handles it.
-  }
-
-  if (result.type === "notice.ack.result") {
-    state.snapshot.notices.last_ack_level[result.parent_id] = state.snapshot.state.level;
-    state.snapshot.notices.last_ack_time[result.parent_id] = new Date().toISOString();
-  }
+export function applyNoticeResult(state: ServerState, result: NoticeEventResult) {
+  if (!state.snapshot) return;
+  applyNoticeState(state, result.notices);
 }
 
 function snapshotFromResult(result: ServerResult): GameSnapshot | null {

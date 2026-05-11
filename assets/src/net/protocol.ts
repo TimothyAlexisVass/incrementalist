@@ -45,9 +45,8 @@ export type ProjectionParams = {
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
 export type NoticeState = {
-  seen_leaf_ids: string[];
-  last_ack_level: Record<string, number>;
-  last_ack_time: Record<string, string>;
+  active_leaf_ids: string[];
+  active_parent_ids: string[];
 };
 
 export type GameSnapshot = {
@@ -127,6 +126,7 @@ export type ProgressClaimInResult = {
   sisu: SisuState;
   can_claim_at: string | null;
   fill_rate: number;
+  notices: NoticeState;
 };
 
 export type ProgressClaimRewardResult = {
@@ -139,6 +139,7 @@ export type ProgressClaimRewardResult = {
   shards: BigNum;
   cores: BigNum;
   sisu: SisuState;
+  notices: NoticeState;
 };
 
 export type SisuRefillResult = {
@@ -149,6 +150,7 @@ export type SisuRefillResult = {
   sisu: SisuState;
   can_claim_at: string | null;
   fill_rate: number;
+  notices: NoticeState;
 };
 
 export type SisuUpgradeMaxResult = {
@@ -159,6 +161,7 @@ export type SisuUpgradeMaxResult = {
   shards: BigNum;
   can_claim_at: string | null;
   fill_rate: number;
+  notices: NoticeState;
 };
 
 export type AreaSelectResult = {
@@ -166,6 +169,7 @@ export type AreaSelectResult = {
   status: "ok";
   command_id: number;
   area: string;
+  notices: NoticeState;
 };
 
 export type ShopPurchaseResult = {
@@ -179,6 +183,7 @@ export type ShopPurchaseResult = {
   sisu?: SisuState;
   can_claim_at?: string | null;
   fill_rate?: number;
+  notices: NoticeState;
 };
 
 export type ProgressSetIdleModeResult = {
@@ -188,20 +193,18 @@ export type ProgressSetIdleModeResult = {
   idle_mode: boolean;
   fill_rate: number;
   can_claim_at: string | null;
+  notices: NoticeState;
 };
 
-export type NoticeSeeResult = {
-  type: "notice.see.result";
+export type NoticeEventKind = "child_shown" | "child_clicked";
+
+export type NoticeEventResult = {
+  type: "notice.event.result";
   status: "ok";
   command_id: number;
+  event: NoticeEventKind;
   leaf_id: string;
-};
-
-export type NoticeAckResult = {
-  type: "notice.ack.result";
-  status: "ok";
-  command_id: number;
-  parent_id: string;
+  notices: NoticeState;
 };
 
 export type CommandErrorReason =
@@ -217,7 +220,10 @@ export type CommandErrorReason =
   | "sisu_max_upgrade_reached"
   | "insufficient_shards"
   | "sisu_already_higher"
-  | "upgrade_cost_missing";
+  | "upgrade_cost_missing"
+  | "notice_event_required"
+  | "invalid_notice_event"
+  | "leaf_id_required";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -242,8 +248,7 @@ export type AckableCommandResult =
   | AreaSelectResult
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
-  | NoticeSeeResult
-  | NoticeAckResult
+  | NoticeEventResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -293,8 +298,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "area.select.result" ||
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||
-    result.type === "notice.see.result" ||
-    result.type === "notice.ack.result" ||
+    result.type === "notice.event.result" ||
     result.type === "command.error"
   );
 }

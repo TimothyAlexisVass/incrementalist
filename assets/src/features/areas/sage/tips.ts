@@ -38,10 +38,10 @@ export const SAGE_TIPS: Record<number, SageTip> = {
   },
   15: {
     text: [
+      "Fortuna favet audacibus!",
       "You have collected many resources on your journey.",
       "It is now time to learn how to profit from trade.",
-      "Go to the Market to trade your goods and acquire new capabilities.",
-      "Fortuna favet audacibus!",
+      "Go to the Market to trade your goods and acquire new capabilities."
     ],
     confirmation: "Audentes Fortuna iuvat!"
   }

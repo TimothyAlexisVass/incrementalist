@@ -9,6 +9,7 @@ import {
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components/button';
 import { formatPercent, clampNumber, drawLockedElement, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { notices } from '../../ui/managers/notices';
 import {
   setGpuProgressBarGlow,
   spawnGpuProgressCollectionLaserBurst,
@@ -904,7 +905,11 @@ export function renderIdleModeToggle(
   });
 
   if (!state.features?.idleModePurchased) {
-    drawLockedElement(ctx, toggleRect, drawToggle, { font: IDLE_TOGGLE_FONT });
+    drawLockedElement(ctx, toggleRect, drawToggle, {
+      font: IDLE_TOGGLE_FONT,
+      showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
+      showNoticePing: true
+    });
     return null;
   }
 

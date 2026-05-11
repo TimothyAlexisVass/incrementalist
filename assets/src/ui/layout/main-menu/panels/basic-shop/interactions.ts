@@ -32,6 +32,10 @@ export function handleShopInteractions(
       height: itemHeight
     };
 
+    if (actions.onNoticeVisible) {
+      actions.onNoticeVisible(item.id);
+    }
+
     handleShopItemCardInteractions(input, itemRect, { item, canAfford: item.canAfford }, actions);
   });
 }

@@ -7,8 +7,6 @@ import {
   progressClaimIn,
   selectArea,
   shopPurchase,
-  noticeSee,
-  noticeAck,
   listSaveSlots
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
@@ -47,7 +45,11 @@ import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
-import { notices } from "../ui/managers/notices";
+import {
+  NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
+  NOTICE_PARENT_MENU_MAIN,
+  notices
+} from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 
 // Cached snapshots are projection data. They make boot and slot switches feel
@@ -114,9 +116,11 @@ export class GameClient {
         if (!this.channel) return;
         this.runCommand(() => shopPurchase(this.channel!, itemId));
       },
-      onSee: (itemId: string) => {
-        if (!this.channel) return;
-        this.runCommand(() => noticeSee(this.channel!, `shop:${itemId}`, ['shop_tab', 'menu_button']));
+      onNoticeClick: (itemId: string) => {
+        notices.reportLeafClicked(`leaf.shop_item.${itemId}.purchase_button`, this.channel || undefined, (cmd) => this.runCommand(cmd));
+      },
+      onNoticeVisible: (itemId: string) => {
+        notices.reportLeafVisible(`leaf.shop_item.${itemId}.purchase_button`, true, this.channel || undefined, (cmd) => this.runCommand(cmd));
       }
     });
 
@@ -279,8 +283,7 @@ export class GameClient {
     if (result.type === "progress.claim_reward.result" ||
         result.type === "area.select.result" ||
         result.type === "shop.purchase.result" ||
-        result.type === "notice.see.result" ||
-        result.type === "notice.ack.result" ||
+        result.type === "notice.event.result" ||
         result.type === "save_slot.switch.result" ||
         result.type === "save_slot.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
@@ -312,7 +315,17 @@ export class GameClient {
     }
 
     if (event.key === 'Escape') {
+      const isOpening = !this.ui.overlays.isActive(this.mainMenu);
       this.ui.overlays.toggle(this.mainMenu);
+      if (isOpening) {
+        notices.reportParentVisibleViaPseudoLeaf(
+          NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
+          NOTICE_PARENT_MENU_MAIN,
+          true,
+          this.channel || undefined,
+          (cmd) => this.runCommand(cmd)
+        );
+      }
       event.preventDefault();
       return;
     }
@@ -334,6 +347,13 @@ export class GameClient {
         } else {
           this.mainMenu.setTab(targetTab);
           this.ui.overlays.open(this.mainMenu);
+          notices.reportParentVisibleViaPseudoLeaf(
+            NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
+            NOTICE_PARENT_MENU_MAIN,
+            true,
+            this.channel || undefined,
+            (cmd) => this.runCommand(cmd)
+          );
         }
         event.preventDefault();
         return;
@@ -378,6 +398,24 @@ export class GameClient {
     this.sisuControlLayout = this.store.state.snapshot
       ? renderSisuControl(this.ctx, this.canvas, this.store.state)
       : null;
+
+    if (this.store.state.snapshot && !this.store.state.snapshot.state.features.idle_mode_purchased) {
+      notices.reportLeafVisible(
+        "leaf.feature.idle_mode.locked_text",
+        true,
+        this.channel || undefined,
+        (cmd) => this.runCommand(cmd)
+      );
+    }
+
+    if (this.store.state.snapshot && !this.store.state.snapshot.state.features.sisu_generator_purchased) {
+      notices.reportLeafVisible(
+        "leaf.feature.sisu_generator.locked_text",
+        true,
+        this.channel || undefined,
+        (cmd) => this.runCommand(cmd)
+      );
+    }
     
     if (this.store.state.snapshot) {
       renderAreaSpecifics(this.ctx, this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
@@ -441,20 +479,21 @@ export class GameClient {
     renderBottomHUD(this.ctx, this.canvas, input, isMainMenuOpen, () => {
       const isOpening = !this.ui.overlays.isActive(this.mainMenu);
       this.ui.overlays.toggle(this.mainMenu);
-      
-      if (isOpening && this.channel && notices.hasMenuNotice()) {
-        this.runCommand(() => noticeAck(this.channel!, 'menu_button'));
+
+      if (isOpening) {
+        notices.reportParentVisibleViaPseudoLeaf(
+          NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
+          NOTICE_PARENT_MENU_MAIN,
+          true,
+          this.channel || undefined,
+          (cmd) => this.runCommand(cmd)
+        );
       }
     }, (areaKey) => {
       if (this.channel) {
         this.runCommand(() => selectArea(this.channel!, areaKey));
-        
-        // Clear area unlock notice
-        if (notices.hasLeafNotice(`area:${areaKey}`)) {
-          this.runCommand(() => noticeSee(this.channel!, `area:${areaKey}`, ['area_dropdown', 'menu_button']));
-        }
       }
-    });
+    }, this.channel || undefined, (cmd) => this.runCommand(cmd));
 
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);

@@ -314,6 +314,13 @@ Deliverable: Sisu meter, refills, max upgrades, and decay are ported.
 - Implement `quest.claim` and `quest.claim_all`.
 - Render Quests and Achievements tabs inside the Canvas menu overlay.
 - Return achievement-unlocked and quest-claimed events for animation.
+- Integrate Quests/Achievements notice behavior into the centralized notice system (do not add feature-local notice logic).
+- Register all quest/achievement notice IDs in the server-owned notice registry (no ad-hoc UI string IDs).
+- Define parent chains in the server registry (for example quest/achievement leaves -> tab parent -> main menu parent).
+- Use semantic notice events only (`child_shown`, `child_clicked`) and idempotent handling.
+- Parent clear must occur on child shown (visible/active), child clear on child click.
+- Client must emit notice events only for currently active noticed children; no per-frame spam.
+- Snapshot/result payloads must include authoritative `active_leaf_ids` and `active_parent_ids` so Quest/Achievement tabs render notice state without client-derived heuristics.
 
 Deliverable: reward multiplier is server-derived from quest and achievement state.
 

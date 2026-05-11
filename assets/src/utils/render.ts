@@ -1,4 +1,5 @@
 import { clampNumber } from './math';
+import { drawNoticeDot } from '../ui/components/button';
 
 export const LOCKED_ELEMENT_OPACITY = 0.1;
 
@@ -18,6 +19,8 @@ export interface LockedDrawOptions {
   outlineWidth?: number;
   textX?: number;
   textY?: number;
+  showNotice?: boolean;
+  showNoticePing?: boolean;
 }
 
 export function drawLockedElement(
@@ -58,7 +61,9 @@ export function drawLockedText(
     outlineColor = '#000000',
     outlineWidth = 3,
     textX = rect.x + (rect.width / 2),
-    textY = rect.y + (rect.height / 2)
+    textY = rect.y + (rect.height / 2),
+    showNotice = false,
+    showNoticePing = false
   } = options;
 
   ctx.save();
@@ -76,5 +81,28 @@ export function drawLockedText(
 
   ctx.fillStyle = textColor;
   ctx.fillText(label, textX, textY);
+
+  if (showNotice) {
+    const textMetrics = ctx.measureText(label);
+    const fallbackAscent = estimateFontAscent(font);
+    const textTop = textY - (textMetrics.actualBoundingBoxAscent || fallbackAscent);
+    const textRight =
+      textX +
+      (textMetrics.actualBoundingBoxRight > 0
+        ? textMetrics.actualBoundingBoxRight
+        : textMetrics.width / 2);
+
+    const noticeRadius = 4;
+    const noticeX = textRight + noticeRadius + 2;
+    const noticeY = textTop + noticeRadius - 1;
+    drawNoticeDot(ctx, noticeX, noticeY, noticeRadius, showNoticePing);
+  }
+
   ctx.restore();
+}
+
+function estimateFontAscent(font: string): number {
+  const match = /(\d+(?:\.\d+)?)px/i.exec(font);
+  const px = match ? Number.parseFloat(match[1]) : 12;
+  return px * 0.8;
 }

@@ -9,7 +9,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
   alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlot, SaveSlots}
-  alias Incrementalist.Game.{Snapshots, Time}
+  alias Incrementalist.Game.{Notices, Snapshots, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Repo
   import Ecto.Query
@@ -39,9 +39,16 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
         {next_state, can_claim_in} = Bar.ensure_can_claim_at(active_slot.state, now)
 
-        if next_state != active_slot.state do
+        next_notices =
+          Notices.refresh_for_state_transition(
+            active_slot.notices || Notices.new(active_slot.state),
+            active_slot.state,
+            next_state
+          )
+
+        if next_state != active_slot.state or next_notices != active_slot.notices do
           active_slot
-          |> SaveSlot.changeset(%{state: next_state, last_saved_at: now})
+          |> SaveSlot.changeset(%{state: next_state, notices: next_notices, last_saved_at: now})
           |> Repo.update!()
         end
 
@@ -52,7 +59,8 @@ defmodule Incrementalist.Game.CommandExecutor do
            "can_claim_in" => can_claim_in,
            "sisu" => next_state.sisu,
            "can_claim_at" => next_state.can_claim_at,
-           "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+           "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
+           "notices" => Notices.payload(next_notices)
          }, active_slot.id}
 
       "progress.claim_reward" ->
@@ -68,10 +76,20 @@ defmodule Incrementalist.Game.CommandExecutor do
             |> Sisu.advance_cycle(now)
             |> Bar.finalize_claim(now)
 
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: new_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              new_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: new_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
@@ -82,7 +100,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "level" => new_state.level,
              "shards" => new_state.shards,
              "cores" => new_state.cores,
-             "sisu" => new_state.sisu
+             "sisu" => new_state.sisu,
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {"failed",
@@ -122,17 +141,28 @@ defmodule Incrementalist.Game.CommandExecutor do
         with {:ok, area_key} <- fetch_area_key(command.intent),
              {:ok, next_state} <-
                Incrementalist.Game.Features.Areas.select_area(active_slot.state, area_key) do
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
              "type" => "area.select.result",
              "status" => "ok",
              "command_id" => command.command_id,
-             "area" => area_key
+             "area" => area_key,
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {:error, reason} ->
@@ -147,10 +177,20 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, enabled} <- fetch_boolean(command.intent, "enabled"),
              {:ok, next_state} <- Bar.set_idle_mode(active_slot.state, enabled) do
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
@@ -159,7 +199,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "command_id" => command.command_id,
              "idle_mode" => enabled,
              "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
-             "can_claim_at" => next_state.can_claim_at
+             "can_claim_at" => next_state.can_claim_at,
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {:error, reason} ->
@@ -174,10 +215,20 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, tier_id} <- fetch_tier_id(command.intent),
              {:ok, next_state} <- Sisu.refill(active_slot.state, tier_id, now) do
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
@@ -187,7 +238,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "tier_id" => tier_id,
              "sisu" => next_state.sisu,
              "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {:error, reason} ->
@@ -198,10 +250,20 @@ defmodule Incrementalist.Game.CommandExecutor do
         active_slot = active_slot(player, now)
 
         with {:ok, next_state} <- Sisu.upgrade_max(active_slot.state, now) do
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
@@ -211,7 +273,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "sisu" => next_state.sisu,
              "shards" => next_state.shards,
              "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {:error, reason} ->
@@ -231,10 +294,20 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             end
 
-          updated_slot =
-            SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now})
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
 
-          Repo.update!(updated_slot)
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
 
           {"succeeded",
            %{
@@ -247,75 +320,45 @@ defmodule Incrementalist.Game.CommandExecutor do
              "cores" => next_state.cores,
              "sisu" => next_state.sisu,
              "can_claim_at" => next_state.can_claim_at,
-             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now)
+             "fill_rate" => Bar.get_progress_bar_fill_rate(next_state, now),
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
         end
 
-      "notice.see" ->
+      "notice.event" ->
         active_slot = active_slot(player, now)
 
-        with {:ok, leaf_id} <- fetch_leaf_id(command.intent) do
-          parent_ids =
-            Map.get(command.intent, "parent_ids", []) || Map.get(command.intent, :parent_ids, [])
-
-          # 1. Mark leaf as seen
+        with {:ok, event_kind} <- fetch_notice_event_kind(command.intent),
+             {:ok, leaf_id} <- fetch_leaf_id(command.intent),
+             true <- Notices.valid_event_kind?(event_kind),
+             true <- Notices.valid_leaf_id?(leaf_id) do
           next_notices =
-            Incrementalist.Game.Notices.see(
-              active_slot.notices,
-              leaf_id,
-              active_slot.state.level,
-              now
+            Notices.apply_event(
+              active_slot.notices || Notices.new(active_slot.state),
+              event_kind,
+              leaf_id
             )
 
-          # 2. Acknowledge parents (bubbling clear)
-          next_notices =
-            Enum.reduce(parent_ids, next_notices, fn pid, acc ->
-              Incrementalist.Game.Notices.ack(acc, pid, active_slot.state.level, now)
-            end)
-
-          active_slot
-          |> SaveSlot.changeset(%{notices: next_notices, last_saved_at: now})
-          |> Repo.update!()
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{notices: next_notices, last_saved_at: now})
+          )
 
           {"succeeded",
            %{
-             "type" => "notice.see.result",
+             "type" => "notice.event.result",
              "status" => "ok",
              "command_id" => command.command_id,
-             "leaf_id" => leaf_id
+             "event" => Atom.to_string(event_kind),
+             "leaf_id" => leaf_id,
+             "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
-          {:error, reason} ->
-            {"failed", error_result(reason, command), active_slot.id}
-        end
+          false ->
+            {"failed", error_result("invalid_notice_event", command), active_slot.id}
 
-      "notice.ack" ->
-        active_slot = active_slot(player, now)
-
-        with {:ok, parent_id} <- fetch_parent_id(command.intent) do
-          next_notices =
-            Incrementalist.Game.Notices.ack(
-              active_slot.notices,
-              parent_id,
-              active_slot.state.level,
-              now
-            )
-
-          active_slot
-          |> SaveSlot.changeset(%{notices: next_notices, last_saved_at: now})
-          |> Repo.update!()
-
-          {"succeeded",
-           %{
-             "type" => "notice.ack.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "parent_id" => parent_id
-           }, active_slot.id}
-        else
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
         end
@@ -432,9 +475,17 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_leaf_id(%{leaf_id: id}) when is_binary(id), do: {:ok, id}
   defp fetch_leaf_id(_intent), do: {:error, "leaf_id_required"}
 
-  defp fetch_parent_id(%{"parent_id" => id}) when is_binary(id), do: {:ok, id}
-  defp fetch_parent_id(%{parent_id: id}) when is_binary(id), do: {:ok, id}
-  defp fetch_parent_id(_intent), do: {:error, "parent_id_required"}
+  defp fetch_notice_event_kind(%{"event" => event}) when is_binary(event),
+    do: normalize_notice_event_kind(event)
+
+  defp fetch_notice_event_kind(%{event: event}) when is_binary(event),
+    do: normalize_notice_event_kind(event)
+
+  defp fetch_notice_event_kind(_intent), do: {:error, "notice_event_required"}
+
+  defp normalize_notice_event_kind("child_shown"), do: {:ok, :child_shown}
+  defp normalize_notice_event_kind("child_clicked"), do: {:ok, :child_clicked}
+  defp normalize_notice_event_kind(_), do: {:error, "invalid_notice_event"}
 
   defp fetch_boolean(intent, key) do
     case Map.get(intent, key) do

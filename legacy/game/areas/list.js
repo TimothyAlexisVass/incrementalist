@@ -9,7 +9,7 @@ export const AREAS = {
     unlockLevel: 10
   },
   market: {
-    name: 'The Market',
+    name: 'Market',
     description: 'A bustling market to trade your hard earned goods.',
     unlockLevel: 15
   }

@@ -7,6 +7,12 @@ import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { GameChannel } from '../../../net/game-channel';
+import {
+  NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
+  NOTICE_LEAF_TAB_QUEST_BUTTON,
+  NOTICE_LEAF_TAB_SHOP_BUTTON,
+  NOTICE_PARENT_TAB_SHOP
+} from '../../managers/notices';
 
 let tabMenu: TabMenu | null = null;
 let saveSlotActions: SaveSlotActions | null = null;
@@ -29,8 +35,8 @@ export function getTabMenu(): TabMenu {
         id: 'shop',
         label: 'Shop',
         hotkey: 'S',
-        noticeType: 'shop_item',
-        noticeParentId: 'shop_tab',
+        noticeParentId: NOTICE_PARENT_TAB_SHOP,
+        noticeLeafId: NOTICE_LEAF_TAB_SHOP_BUTTON,
         renderContent: (ctx, canvas, input, state, rect) => {
           if (shopActions) {
             renderBasicShopTab(ctx, canvas, input, state, rect, shopActions);
@@ -43,16 +49,14 @@ export function getTabMenu(): TabMenu {
         id: 'quest',
         label: 'Quest',
         hotkey: 'Q',
-        noticeType: 'quest',
-        noticeParentId: 'quest_tab',
+        noticeLeafId: NOTICE_LEAF_TAB_QUEST_BUTTON,
         renderContent: renderPlaceholder('Quest')
       },
       {
         id: 'achievements',
         label: 'Achievements',
         hotkey: 'A',
-        noticeType: 'achievement',
-        noticeParentId: 'achievement_tab',
+        noticeLeafId: NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
         renderContent: renderPlaceholder('Achievements')
       },
       {

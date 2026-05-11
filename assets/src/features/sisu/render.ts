@@ -12,6 +12,7 @@ import type { ServerResult } from "../../net/protocol";
 import type { ServerState } from "../../net/snapshots";
 import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
 import { drawButton } from "../../ui/components/button";
+import { notices } from "../../ui/managers/notices";
 import type { InteractionState } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
 import { clampNumber, drawLockedElement, rgbArrayToCss } from "../../utils";
@@ -98,7 +99,11 @@ export function renderSisuControl(
   };
 
   if (!isUnlocked) {
-    drawLockedElement(ctx, controlRect, drawSisuControl, { font: SISU_METER_FONT });
+    drawLockedElement(ctx, controlRect, drawSisuControl, {
+      font: SISU_METER_FONT,
+      showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
+      showNoticePing: true
+    });
   } else {
     drawSisuControl();
   }

@@ -74,4 +74,17 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
+
+  # Notice IDs
+  def notice_parent_menu_main, do: "parent.menu.main"
+  def notice_parent_tab_shop, do: "parent.tab.shop"
+  def notice_parent_area_dropdown, do: "parent.area.dropdown"
+
+  def notice_leaf_area_dropdown_button, do: "leaf.area_dropdown.button"
+  def notice_leaf_tab_shop_button, do: "leaf.tab.shop.button"
+  def notice_leaf_tab_quest_button, do: "leaf.tab.quest.button"
+  def notice_leaf_tab_achievements_button, do: "leaf.tab.achievements.button"
+  def notice_leaf_tab_menu_any_button, do: "leaf.tab.menu.any.button"
+
+  def sage_tip_levels, do: [1, 2, 4, 10, 15]
 end

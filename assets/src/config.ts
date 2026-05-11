@@ -100,7 +100,7 @@ export const BOTTOM_HUD_HEIGHT = 50;
 export const DISPLAY_AREA_X = 0;
 export const DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
 // Ends just before the progress bar column (bar is at canvas.width - 92)
-// TODO: progress bar must hvae PROGRESS_BAR_X, PROGRESS_BAR_Y and PROGRESS_BAR_HEIGHT
+// TODO: progress bar must have PROGRESS_BAR_X, PROGRESS_BAR_Y and PROGRESS_BAR_HEIGHT
 // TODO: when progress bar has these, set DISPLAY_AREA_WIDTH based on that instead of this hardcoded number
 export const DISPLAY_AREA_WIDTH = CANVAS_WIDTH - 146;
 export const DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;

@@ -1,99 +1,108 @@
-import { GameSnapshot } from "../../net/protocol";
-import { SAGE_TIPS } from "../../features/areas/sage/tips";
+import { noticeEvent } from "../../net/commands";
+import { GameChannel } from "../../net/game-channel";
+import type { GameSnapshot } from "../../net/protocol";
+
+type CommandRunner = (cmd: () => Promise<any>) => void;
 
 export class Notices {
   private snapshot: GameSnapshot | null = null;
+  private shownSentByLeafId = new Set<string>();
 
   public setSnapshot(snapshot: GameSnapshot | null) {
     this.snapshot = snapshot;
+
+    if (!snapshot) {
+      this.shownSentByLeafId.clear();
+      return;
+    }
+
+    const activeLeaves = new Set(snapshot.notices.active_leaf_ids);
+    for (const sentId of Array.from(this.shownSentByLeafId)) {
+      const pseudoParent = this.parentIdForPseudoLeaf(sentId);
+      if (pseudoParent) {
+        if (!snapshot.notices.active_parent_ids.includes(pseudoParent)) {
+          this.shownSentByLeafId.delete(sentId);
+        }
+        continue;
+      }
+
+      if (!activeLeaves.has(sentId)) {
+        this.shownSentByLeafId.delete(sentId);
+      }
+    }
   }
 
   public hasLeafNotice(id: string): boolean {
     if (!this.snapshot) return false;
-    return !this.snapshot.notices.seen_leaf_ids.includes(id);
+    return this.snapshot.notices.active_leaf_ids.includes(id);
   }
 
-  /**
-   * Checks if a parent element should show a notice dot.
-   * A parent shows a dot if any of its children are "new" 
-   * (unlocked at a level higher than the last time this parent was acknowledged).
-   */
-  public hasParentNotice(parentId: string, type: 'shop_item' | 'area_unlock' | 'quest' | 'achievement'): boolean {
+  public hasParentNotice(parentId: string): boolean {
     if (!this.snapshot) return false;
-    const lastAckLevel = this.snapshot.notices.last_ack_level[parentId] ?? 0;
-    
-    if (type === 'shop_item') {
-      return this.snapshot.state.shop.some(item => 
-        !item.is_purchased && 
-        item.can_purchase && 
-        item.required_level > lastAckLevel
-      );
-    }
-    
-    if (type === 'area_unlock') {
-      return this.snapshot.state.areas.some(area => 
-        !area.is_locked && 
-        area.unlock_level > lastAckLevel
-      );
-    }
-
-    return false;
+    return this.snapshot.notices.active_parent_ids.includes(parentId);
   }
 
-  public hasAreaNotice(): boolean {
-    if (!this.snapshot) return false;
+  public reportLeafVisible(
+    leafId: string,
+    isVisible: boolean,
+    channel?: GameChannel,
+    runCommand?: CommandRunner
+  ) {
+    if (!this.snapshot) return;
+    if (!isVisible) return;
+    if (!this.hasLeafNotice(leafId)) return;
+    if (this.shownSentByLeafId.has(leafId)) return;
+    if (!channel || !runCommand) return;
 
-    const currentArea = this.snapshot.state.area;
-    const lastAckLevel = this.snapshot.notices.last_ack_level['area_dropdown'] ?? 0;
-
-    return this.snapshot.state.areas.some(area =>
-      area.key !== currentArea &&
-      !area.is_locked &&
-      area.unlock_level > lastAckLevel
-    );
+    this.shownSentByLeafId.add(leafId);
+    runCommand(() => noticeEvent(channel, "child_shown", leafId));
   }
 
-  public hasSageNotice(): boolean {
-    if (!this.snapshot) return false;
+  public reportLeafClicked(
+    leafId: string,
+    channel?: GameChannel,
+    runCommand?: CommandRunner
+  ) {
+    if (!this.snapshot) return;
+    if (!this.hasLeafNotice(leafId)) return;
+    if (!channel || !runCommand) return;
 
-    return this.getUnlockedSageTipLevels().some((level) => this.hasLeafNotice(`sage_tip:${level}`));
+    runCommand(() => noticeEvent(channel, "child_clicked", leafId));
   }
 
-  /**
-   * Special case for the Menu button which aggregates multiple types.
-   */
-  public hasMenuNotice(): boolean {
-    if (!this.snapshot) return false;
-    const lastAckLevel = this.snapshot.notices.last_ack_level['menu_button'] ?? 0;
-    const currentArea = this.snapshot.state.area;
-    
-    // New Shop Items
-    const hasNewShop = this.snapshot.state.shop.some(i => 
-      !i.is_purchased && i.can_purchase && i.required_level > lastAckLevel
-    );
-    if (hasNewShop) return true;
-    
-    // New Areas
-    const hasNewArea = this.snapshot.state.areas.some(a => 
-      a.key !== currentArea &&
-      !a.is_locked && a.unlock_level > lastAckLevel
-    );
-    if (hasNewArea) return true;
+  public reportParentVisibleViaPseudoLeaf(
+    pseudoLeafId: string,
+    parentId: string,
+    isVisible: boolean,
+    channel?: GameChannel,
+    runCommand?: CommandRunner
+  ) {
+    if (!this.snapshot) return;
+    if (!isVisible) return;
+    if (!this.hasParentNotice(parentId)) return;
+    if (!channel || !runCommand) return;
+    if (this.shownSentByLeafId.has(pseudoLeafId)) return;
 
-    // Add Quest/Achievement checks here later...
-    
-    return false;
+    this.shownSentByLeafId.add(pseudoLeafId);
+    runCommand(() => noticeEvent(channel, "child_shown", pseudoLeafId));
   }
 
-  private getUnlockedSageTipLevels(): number[] {
-    if (!this.snapshot) return [];
-
-    return Object.keys(SAGE_TIPS)
-      .map(Number)
-      .filter((level) => level <= this.snapshot!.state.level)
-      .sort((a, b) => a - b);
+  private parentIdForPseudoLeaf(leafId: string): string | null {
+    if (leafId === NOTICE_LEAF_AREA_DROPDOWN_BUTTON) return NOTICE_PARENT_AREA_DROPDOWN;
+    if (leafId === NOTICE_LEAF_TAB_SHOP_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    if (leafId === NOTICE_LEAF_TAB_QUEST_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    if (leafId === NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    if (leafId === NOTICE_LEAF_TAB_MENU_ANY_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    return null;
   }
 }
 
-// Global instance for convenience, updated by GameClient
 export const notices = new Notices();
+export const NOTICE_PARENT_AREA_DROPDOWN = "parent.area.dropdown";
+export const NOTICE_PARENT_MENU_MAIN = "parent.menu.main";
+export const NOTICE_PARENT_TAB_SHOP = "parent.tab.shop";
+export const NOTICE_LEAF_AREA_DROPDOWN_BUTTON = "leaf.area_dropdown.button";
+export const NOTICE_LEAF_TAB_SHOP_BUTTON = "leaf.tab.shop.button";
+export const NOTICE_LEAF_TAB_QUEST_BUTTON = "leaf.tab.quest.button";
+export const NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON = "leaf.tab.achievements.button";
+export const NOTICE_LEAF_TAB_MENU_ANY_BUTTON = "leaf.tab.menu.any.button";

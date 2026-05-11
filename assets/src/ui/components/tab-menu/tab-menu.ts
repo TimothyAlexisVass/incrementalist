@@ -3,7 +3,6 @@ import { doButton } from '../button';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { notices } from '../../managers/notices';
-import { noticeAck } from '../../../net/commands';
 import { GameChannel } from '../../../net/game-channel';
 
 export type TabMenuLayout = 'horizontal' | 'vertical';
@@ -22,8 +21,8 @@ export interface TabDefinition {
   hotkey?: string;
   renderContent: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
-  noticeType?: 'shop_item' | 'area_unlock' | 'quest' | 'achievement';
   noticeParentId?: string;
+  noticeLeafId?: string;
 }
 
 export interface TabMenuConfig {
@@ -216,17 +215,19 @@ export class TabMenu {
         inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
         textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
         font: font,
-        showNotice:
-          !isActive && tab.noticeType && tab.noticeParentId
-            ? notices.hasParentNotice(tab.noticeParentId, tab.noticeType)
-            : false
+        showNotice: !isActive && tab.noticeParentId ? notices.hasParentNotice(tab.noticeParentId) : false
       });
 
       if (clicked) {
         this.activeTabId = tab.id;
-        if (channel && runCommand && tab.noticeParentId && tab.noticeType && notices.hasParentNotice(tab.noticeParentId, tab.noticeType)) {
-          const parentId = tab.noticeParentId;
-          runCommand(() => noticeAck(channel, parentId));
+        if (tab.noticeParentId) {
+          notices.reportParentVisibleViaPseudoLeaf(
+            tab.noticeLeafId || `leaf.tab.${tab.id}.button`,
+            tab.noticeParentId,
+            true,
+            channel,
+            runCommand
+          );
         }
       }
     }
@@ -234,6 +235,16 @@ export class TabMenu {
     // Render Content
     const activeTab = this.tabs.find(t => t.id === this.activeTabId);
     if (activeTab) {
+      if (activeTab.noticeParentId) {
+        notices.reportParentVisibleViaPseudoLeaf(
+          activeTab.noticeLeafId || `leaf.tab.${activeTab.id}.button`,
+          activeTab.noticeParentId,
+          true,
+          channel,
+          runCommand
+        );
+      }
+
       ctx.save();
       activeTab.renderContent(ctx, canvas, input, state, contentRect);
       ctx.restore();

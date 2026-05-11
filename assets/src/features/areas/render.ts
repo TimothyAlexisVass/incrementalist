@@ -5,7 +5,11 @@ import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawNoticeDot } from "../../ui/components/button";
 import { drawLockedElement } from "../../ui/components/locked-element";
-import { notices } from "../../ui/managers/notices";
+import {
+  NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
+  NOTICE_PARENT_AREA_DROPDOWN,
+  notices
+} from "../../ui/managers/notices";
 import { GameChannel } from "../../net/game-channel";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
@@ -50,13 +54,14 @@ export function renderAreaSpecifics(
 
 // Dropdown UI state
 let isDropdownOpen = false;
-let hoveredAreaKey: string | null = null;
 
 export function renderAreaDropdown(
   ctx: CanvasRenderingContext2D, 
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
-  onSelect: (areaKey: string) => void
+  onSelect: (areaKey: string) => void,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
 ) {
   const model = getAreaViewModel();
   const buttonWidth = 140;
@@ -88,6 +93,14 @@ export function renderAreaDropdown(
       if (!isHoveringButton && !isHoveringMenu) {
         isDropdownOpen = false;
       } else {
+        notices.reportParentVisibleViaPseudoLeaf(
+          NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
+          NOTICE_PARENT_AREA_DROPDOWN,
+          true,
+          channel,
+          runCommand
+        );
+
         // Render menu background
         ctx.save();
         ctx.fillStyle = COLORS.panel.bg;
@@ -121,12 +134,11 @@ export function renderAreaDropdown(
             ctx.fillText(area.name, itemRect.x + itemRect.width / 2, itemRect.y + itemRect.height / 2);
 
             // Locked areas cannot be acted on, so they should not advertise notices.
-            const hasNotice =
-              !area.is_locked &&
-              (notices.hasLeafNotice(`area:${area.key}`) ||
-                (area.key === 'sage' && notices.hasSageNotice()));
+            const leafId = `leaf.area.${area.key}.go_button`;
+            const hasNotice = !area.is_locked && notices.hasLeafNotice(leafId);
             if (hasNotice) {
               drawNoticeDot(ctx, itemRect.x + itemRect.width - 10, itemRect.y + 10);
+              notices.reportLeafVisible(leafId, true, channel, runCommand);
             }
           };
 
@@ -139,6 +151,7 @@ export function renderAreaDropdown(
           }
 
           if (isHovered && input.clicked && !area.is_locked) {
+            notices.reportLeafClicked(`leaf.area.${area.key}.go_button`, channel, runCommand);
             onSelect(area.key);
             isDropdownOpen = false;
             input.consumed = true;
@@ -151,7 +164,7 @@ export function renderAreaDropdown(
 
   // Draw the main button
   if (doButton(ctx, input, buttonRect, buttonLabel, {
-    showNotice: notices.hasAreaNotice()
+    showNotice: notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)
   })) {
     // Click also toggles or handles selection if needed, but hover handles open.
   }

@@ -8,7 +8,6 @@ import {
   BOTTOM_HUD_BUTTON_FONT
 } from '../../../config';
 import { InteractionState } from '../../../ui/managers/interactions';
-import { noticeSee } from '../../../net/commands';
 import { GameChannel } from '../../../net/game-channel';
 import { notices } from '../../../ui/managers/notices';
 import { COLORS } from '../../../colors';
@@ -163,8 +162,10 @@ function renderTipPanel(
     showNoticePing: true
   });
 
-  if (buttonClicked && channel && runCommand && notices.hasLeafNotice(leafId)) {
-    runCommand(() => noticeSee(channel, leafId));
+  notices.reportLeafVisible(leafId, notices.hasLeafNotice(leafId), channel, runCommand);
+
+  if (buttonClicked) {
+    notices.reportLeafClicked(leafId, channel, runCommand);
     input.consumed = true;
   }
 }
@@ -177,5 +178,5 @@ function getVisibleTipLevels(level: number): number[] {
 }
 
 function tipLeafId(level: number): string {
-  return `sage_tip:${level}`;
+  return `leaf.sage_tip.${level}.confirm_button`;
 }
