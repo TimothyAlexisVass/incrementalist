@@ -61,8 +61,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     state = %State{
       sisu: %State.Sisu{
         current: BigNum.from_number(5.0),
-        max_basic: BigNum.from_number(Levels.base_max()),
-        max_upgrade_level: 0,
+        target_current: BigNum.from_number(4.6),
         cycle_decay: 8.0,
         projected_at: DateTime.to_iso8601(@now)
       },
@@ -74,7 +73,12 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     advanced = Sisu.advance_cycle(state, @now)
 
     assert_in_delta BigNum.to_float(advanced.sisu.current), 4.6, 0.000001
-    assert_in_delta advanced.sisu.cycle_decay, 7.84, 0.000001
+    # Verify that it cleared the old target and project_projection calculated the next decay step
+    # 4.6 * (1 - 0.08) = 4.232
+    assert_in_delta BigNum.to_float(advanced.sisu.target_current), 4.232, 0.000001
+    assert_in_delta advanced.sisu.cycle_decay, 8.0, 0.000001
+    # Note: target_cycle_decay will be softened
+    assert_in_delta advanced.sisu.target_cycle_decay, 7.84, 0.000001
   end
 
   test "refill/3 and upgrade_max/2 return the narrow Sisu projection payload" do
@@ -94,8 +98,10 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
 
     {:ok, refilled} = Sisu.refill(state, "yellow", @now)
 
-    assert_in_delta BigNum.to_float(refilled.sisu.current), 3.0, 0.000001
-    assert refilled.sisu.cycle_decay == 7.0
+    # Deferred application: current stays at 1.0, target becomes 3.0
+    assert_in_delta BigNum.to_float(refilled.sisu.current), 1.0, 0.000001
+    assert_in_delta BigNum.to_float(refilled.sisu.target_current), 3.0, 0.000001
+    assert refilled.sisu.target_cycle_decay == 7.0
     assert is_binary(refilled.can_claim_at)
 
     {:ok, upgraded} = Sisu.upgrade_max(state, @now)

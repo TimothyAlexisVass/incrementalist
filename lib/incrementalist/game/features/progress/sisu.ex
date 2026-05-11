@@ -81,7 +81,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
     updated_sisu =
       next_sisu
-      |> Map.put(:current, BigNum.from_number(Levels.base_max()))
+      |> Map.put(:current, BigNum.one())
       |> Map.put(:max_basic, BigNum.from_number(Levels.base_max()))
       |> Map.put(:max_upgrade_level, 0)
       |> Map.put(:cycle_decay, @refill_tiers["blue"].cycle_decay)
@@ -143,6 +143,8 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
         state.sisu
         |> Map.put(:current, state.sisu.target_current || state.sisu.current)
         |> Map.put(:cycle_decay, state.sisu.target_cycle_decay || state.sisu.cycle_decay)
+        |> Map.put(:target_current, nil)
+        |> Map.put(:target_cycle_decay, nil)
         |> Map.put(:projected_at, Time.iso8601(now))
 
       project_projection(%{state | sisu: updated_sisu}, now)
