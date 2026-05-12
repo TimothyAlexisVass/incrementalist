@@ -110,10 +110,15 @@ uniform vec4 u_color;
 uniform float u_innerRadius;
 uniform float u_thickness;
 uniform float u_softness;
+uniform float u_startAngle;
+uniform float u_endAngle;
 varying vec2 v_texcoord;
 
+#define PI 3.14159265359
+
 void main() {
-  float dist = distance(v_texcoord, vec2(0.5)) * 2.0;
+  vec2 uv = v_texcoord - 0.5;
+  float dist = length(uv) * 2.0;
   float alpha = 0.0;
   
   if (u_thickness > 0.0) {
@@ -125,6 +130,29 @@ void main() {
     // Circle logic: glow centered at 0, edge at u_innerRadius
     float d = dist - u_innerRadius;
     alpha = smoothstep(u_softness, 0.0, d);
+  }
+  
+  // Angle clipping for Arcs
+  // We use a small epsilon to avoid float equality issues for "no clipping"
+  if (abs(u_startAngle - u_endAngle) > 0.001 && abs(u_startAngle - u_endAngle) < 6.28) {
+    float angle = atan(uv.y, uv.x);
+    if (angle < 0.0) angle += 2.0 * PI;
+    
+    float s = mod(u_startAngle, 2.0 * PI);
+    if (s < 0.0) s += 2.0 * PI;
+    float e = mod(u_endAngle, 2.0 * PI);
+    if (e < 0.0) e += 2.0 * PI;
+    
+    bool inRange = false;
+    if (s <= e) {
+      inRange = (angle >= s && angle <= e);
+    } else {
+      inRange = (angle >= s || angle <= e);
+    }
+    
+    if (!inRange) {
+      alpha = 0.0;
+    }
   }
   
   float finalAlpha = u_color.a * alpha;
@@ -186,6 +214,8 @@ export class WebGLRenderer {
   private readonly shapeInnerRadiusLocation: WebGLUniformLocation;
   private readonly shapeThicknessLocation: WebGLUniformLocation;
   private readonly shapeSoftnessLocation: WebGLUniformLocation;
+  private readonly shapeStartAngleLocation: WebGLUniformLocation;
+  private readonly shapeEndAngleLocation: WebGLUniformLocation;
   private readonly shapePositionBuffer: WebGLBuffer;
   private readonly shapeTexcoordBuffer: WebGLBuffer;
 
@@ -237,6 +267,8 @@ export class WebGLRenderer {
     this.shapeInnerRadiusLocation = mustGetUniform(gl, this.shapeProgram, "u_innerRadius");
     this.shapeThicknessLocation = mustGetUniform(gl, this.shapeProgram, "u_thickness");
     this.shapeSoftnessLocation = mustGetUniform(gl, this.shapeProgram, "u_softness");
+    this.shapeStartAngleLocation = mustGetUniform(gl, this.shapeProgram, "u_startAngle");
+    this.shapeEndAngleLocation = mustGetUniform(gl, this.shapeProgram, "u_endAngle");
     this.shapePositionBuffer = mustCreateBuffer(gl);
     this.shapeTexcoordBuffer = mustCreateBuffer(gl);
 
@@ -332,7 +364,9 @@ export class WebGLRenderer {
       color,
       innerRadius: radius / drawRadius, // Edge of the solid part
       thickness: 0,
-      softness: (glowSize / drawRadius) // Normalized softness
+      softness: (glowSize / drawRadius), // Normalized softness
+      startAngle: 0,
+      endAngle: 0
     });
     this.setBlendMode("normal");
   }
@@ -356,7 +390,33 @@ export class WebGLRenderer {
       color: finalColor,
       innerRadius: radius / drawRadius, // Center of ring
       thickness: thickness / drawRadius, // Base thickness
-      softness: (glowSize / drawRadius) // Normalized softness
+      softness: (glowSize / drawRadius), // Normalized softness
+      startAngle: 0,
+      endAngle: 0
+    });
+    this.setBlendMode("normal");
+  }
+
+  drawArc(x: number, y: number, radius: number, thickness: number, startAngle: number, endAngle: number, color: RGBA, softness = 0.1, blendMode: "normal" | "additive" = "normal") {
+    const aaPadding = 1.5;
+    const glowSize = (thickness + radius * 0.25) * softness + aaPadding;
+    const drawRadius = radius + thickness + glowSize;
+    
+    const alphaScale = Math.min(1.0, thickness);
+    const finalColor: RGBA = [color[0], color[1], color[2], color[3] * alphaScale];
+
+    this.setBlendMode(blendMode);
+    this.drawShape({
+      x: x - drawRadius,
+      y: y - drawRadius,
+      width: drawRadius * 2,
+      height: drawRadius * 2,
+      color: finalColor,
+      innerRadius: radius / drawRadius,
+      thickness: thickness / drawRadius,
+      softness: (glowSize / drawRadius),
+      startAngle,
+      endAngle
     });
     this.setBlendMode("normal");
   }
@@ -370,6 +430,9 @@ export class WebGLRenderer {
     innerRadius: number;
     thickness: number;
     softness: number;
+    startAngle: number;
+    endAngle: number;
+    alpha?: number;
   }) {
     const gl = this.gl;
     const { x, y, width, height, color, innerRadius, thickness, softness } = options;
@@ -413,6 +476,8 @@ export class WebGLRenderer {
     gl.uniform1f(this.shapeInnerRadiusLocation, innerRadius);
     gl.uniform1f(this.shapeThicknessLocation, thickness);
     gl.uniform1f(this.shapeSoftnessLocation, softness);
+    gl.uniform1f(this.shapeStartAngleLocation, options.startAngle);
+    gl.uniform1f(this.shapeEndAngleLocation, options.endAngle);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
