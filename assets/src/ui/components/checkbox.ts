@@ -1,5 +1,6 @@
 import { COLORS } from '../../colors';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
+import { hexToRgba, RGBA } from '../../utils/color';
 
 export interface CheckboxOptions {
   trackColor?: string;
@@ -84,7 +85,7 @@ function drawRectOutline(
   width: number,
   height: number,
   lineWidth: number,
-  color: [number, number, number, number]
+  color: RGBA
 ) {
   const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
   renderer.drawRect({ x, y, width, height: stroke, color });
@@ -93,13 +94,3 @@ function drawRectOutline(
   renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
 }
 
-function hexToRgba(color: string): [number, number, number, number] {
-  const normalized = String(color || '').trim();
-  const match = normalized.match(/^#([0-9a-f]{6})$/i);
-  if (!match) return [1, 1, 1, 1];
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  return [r, g, b, 1];
-}

@@ -1,6 +1,6 @@
 import { compare, fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
 import type { ServerState } from "../../net/snapshots";
-import { clampNumber, hexToRgbArray, lerp, lerpColor } from "../../utils";
+import { clampNumber, lerp, lerpColor } from "../../utils";
 import { formatMultiplierDelta } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getViewModel as getProgressBarViewModel } from "../progress-bar/view-model";
@@ -58,27 +58,6 @@ export function getSisuTierTarget(maxBasic: number, tierId: TierId): number {
   return Math.round(maxBasic * tier.multiplier * 100) / 100;
 }
 
-export function getSisuMeterColorArray(sisuValue: number, maxBasic: number): [number, number, number] {
-  const blueMax = Math.max(1, maxBasic);
-  const yellowMax = blueMax * SISU_REFILL_TIERS_BY_ID.yellow.multiplier;
-  const purpleMax = blueMax * SISU_REFILL_TIERS_BY_ID.purple.multiplier;
-  const sisu = clampNumber(sisuValue, 0, purpleMax);
-
-  const darkBlue = hexToRgbArray(COLORS.sisu.darkBlue);
-  const blue = hexToRgbArray(COLORS.sisu.blue);
-  const yellow = hexToRgbArray(COLORS.sisu.yellow);
-  const purple = hexToRgbArray(COLORS.sisu.purple);
-
-  if (sisu <= blueMax) {
-    return lerpColor(darkBlue, blue, blueMax > 0 ? sisu / blueMax : 0);
-  }
-
-  if (sisu <= yellowMax) {
-    return lerpColor(blue, yellow, (sisu - blueMax) / Math.max(1, yellowMax - blueMax));
-  }
-
-  return lerpColor(yellow, purple, (sisu - yellowMax) / Math.max(1, purpleMax - yellowMax));
-}
 
 export function toFiniteBigNumNumber(value: BigNum | undefined | null, fallback: number): number {
   if (!value) return fallback;

@@ -310,10 +310,10 @@ function getProgressColorArray(percent: number, idleMode = false): Rgb {
 
   if (clampedPercent < 50) {
     const t = clampedPercent / 50;
-    color = lerpColor(start, mid, t);
+    color = lerpColor(start, mid, t) as Rgb;
   } else {
     const t = (clampedPercent - 50) / 50;
-    color = lerpColor(mid, end, t);
+    color = lerpColor(mid, end, t) as Rgb;
   }
 
   return color;

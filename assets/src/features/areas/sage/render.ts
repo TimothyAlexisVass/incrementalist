@@ -13,6 +13,7 @@ import { notices } from '../../../ui/managers/notices';
 import { COLORS } from '../../../colors';
 import { doButton } from '../../../ui/components/button';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
+import { hexToRgba } from '../../../utils/color';
 
 const LETTERS_PER_SECOND = 40;
 const PANEL_PADDING = 16;
@@ -223,16 +224,6 @@ function renderTipPanel(
   }
 }
 
-function hexToRgba(hex: string): [number, number, number, number] {
-  const normalized = String(hex || "").trim();
-  const match = normalized.match(/^#([0-9a-f]{6})$/i);
-  if (!match) return [0, 0, 0, 1];
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  return [r, g, b, 1];
-}
 
 function getVisibleTipLevels(level: number): number[] {
   return Object.keys(SAGE_TIPS)

@@ -1,37 +1,45 @@
 import { clampNumber, lerp } from './math';
 
-export function lerpColor(c1: number[] | readonly number[], c2: number[] | readonly number[], t: number): [number, number, number] {
+/**
+ * Normalized RGBA color tuple [r, g, b, a] where each component is 0.0 to 1.0.
+ */
+export type RGBA = readonly [number, number, number, number];
+
+/**
+ * Linearly interpolates between two color tuples.
+ * Works for both normalized [0..1] and 0..255 scales.
+ */
+export function lerpColor(c1: number[] | readonly number[], c2: number[] | readonly number[], t: number): number[] {
+  return c1.map((val, i) => lerp(val, c2[i], t));
+}
+
+/**
+ * Converts a hex color string to a normalized RGBA tuple [0..1].
+ */
+export function hexToRgba(hex: string, alpha = 1): RGBA {
+  const normalized = String(hex || "").trim().replace(/^#/, "");
+  const expanded = normalized.length === 3
+    ? normalized[0] + normalized[0] + normalized[1] + normalized[1] + normalized[2] + normalized[2]
+    : normalized;
+    
+  const value = parseInt(expanded, 16);
+  if (isNaN(value) || (normalized.length !== 3 && normalized.length !== 6)) {
+    return [0, 0, 0, alpha];
+  }
+
   return [
-    Math.floor(lerp(c1[0], c2[0], t)),
-    Math.floor(lerp(c1[1], c2[1], t)),
-    Math.floor(lerp(c1[2], c2[2], t))
+    ((value >> 16) & 255) / 255,
+    ((value >> 8) & 255) / 255,
+    (value & 255) / 255,
+    clampNumber(alpha, 0, 1)
   ];
 }
 
-export function hexToRgbArray(color: string | number[] | readonly number[]): [number, number, number] {
-  if (Array.isArray(color)) {
-    return [color[0], color[1], color[2]];
-  }
-
-  if (typeof color !== 'string') {
-    return [0, 0, 0];
-  }
-
-  const hex = color.trim().replace(/^#/, '');
-  const expanded = hex.length === 3
-    ? hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
-    : hex;
-  const value = Number.parseInt(expanded, 16);
-
-  if (!Number.isFinite(value)) {
-    return [0, 0, 0];
-  }
-
-  return [
-    (value >> 16) & 255,
-    (value >> 8) & 255,
-    value & 255
-  ];
+/**
+ * Converts a normalized RGBA tuple to a 0..255 tuple.
+ */
+export function to255(rgba: RGBA | number[]): [number, number, number, number] {
+  return [rgba[0] * 255, rgba[1] * 255, rgba[2] * 255, (rgba[3] ?? 1) * 255];
 }
 
 export function rgbArrayToCss(rgb: number[] | readonly number[]): string {
