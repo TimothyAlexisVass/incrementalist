@@ -11,10 +11,12 @@ export const COLORS = Object.freeze({
     track: '#0f1b30',
     border: '#5b6f93',
     progress: {
+      border: '#412407',
       fillStart: [255, 107, 107], // #FF6B6B
       fillMid: [255, 230, 109],   // #FFE66D
       fillEnd: [78, 205, 196],    // #4ECDC4
       idle: {
+        border: '#2b1c48ff',
         fillStart: [38, 58, 103], // #263A67
         fillMid: [82, 97, 163],   // #5261A3
         fillEnd: [108, 188, 144]  // #6CBC90

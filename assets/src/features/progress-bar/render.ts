@@ -76,6 +76,9 @@ const MAX_PROGRESS_COMPLETION_PARTICLES = 512;
 const MAX_PROGRESS_LIQUID_BUBBLES = 58;
 const LIQUID_SURFACE_WAVE_HEIGHT = 2.2;
 
+const YELLOW_GLOW: Rgb = [255, 255, 0];
+const IDLE_GLOW: Rgb = [160, 100, 255];
+
 const COMPLETION_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillStart,
   COLORS.bar.progress.fillMid,
@@ -228,9 +231,7 @@ function renderProgressBarToContext(
   const collectionGlowFade = hasCollectionGlow
     ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1)
     : 0;
-  const glowColor = hasCollectionGlow
-    ? progressPalette.fillEnd
-    : getProgressColorArray(displayedFillRatio * 100, idleMode);
+  const glowColor = idleMode ? IDLE_GLOW : YELLOW_GLOW;
   const gpuGlowFillY = hasCollectionGlow ? barY : fillY;
   const gpuGlowFillHeight = hasCollectionGlow ? barHeight : fillHeight;
   const gpuFillCharge = Math.pow(displayedFillRatio, 0.85);
@@ -289,7 +290,7 @@ function renderProgressBarToContext(
     ctx.shadowColor = rgbaArrayToCss(progressPalette.fillEnd, 0.22 * pulse);
     ctx.shadowBlur = 2 + 2 * pulse;
   }
-  ctx.strokeStyle = COLORS.bar.border;
+  ctx.strokeStyle = progressPalette.border;
   ctx.lineWidth = 2;
   ctx.strokeRect(barX, barY, barWidth, barHeight);
   ctx.restore();
@@ -716,9 +717,7 @@ function renderProgressGlow(
   const collectionFade = hasCollectionGlow
     ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1)
     : 0;
-  const glowColor = collectionPulse > 0
-    ? getProgressPalette(idleMode).fillEnd
-    : getProgressColorArray(fillRatio * 100, idleMode);
+  const glowColor = idleMode ? IDLE_GLOW : YELLOW_GLOW;
   const charge = Math.pow(fillRatio, 0.85);
   const pulse = isFull ? getFullPulse(now) : 1;
   const baseGlowPower = charge * pulse;
