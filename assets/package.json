@@ -5,7 +5,12 @@
     "check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/three": "^0.184.1",
     "esbuild": "^0.25.0",
     "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "three": "^0.184.0",
+    "troika-three-text": "^0.52.4"
   }
 }

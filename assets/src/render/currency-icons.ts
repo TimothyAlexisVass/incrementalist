@@ -63,6 +63,7 @@ export function drawCurrencyAmount(
     textColor = '#ffffff',
     iconGap = 5,
     iconPosition = 'left',
+    baseline = 'alphabetic',
     formatter = formatNumber,
     alpha = 1
   } = options;
@@ -89,7 +90,7 @@ export function drawCurrencyAmount(
     : startX;
 
   const textHeight = ascent + descent;
-  const iconY = y - ascent + ((textHeight - resolvedIconSize) / 2);
+  const iconY = computeIconYForBaseline(y, resolvedIconSize, textHeight, ascent, baseline);
 
   drawCurrencyIcon(currencyKey, iconX, iconY, resolvedIconSize);
   renderer.drawText({
@@ -99,7 +100,7 @@ export function drawCurrencyAmount(
     font,
     color: String(textColor),
     align: 'left',
-    baseline: 'alphabetic',
+    baseline,
     alpha,
     strokeColor: String(textColor),
     strokeWidth: 0.6
@@ -116,4 +117,24 @@ function resolveIconSize(iconSize: number) {
 function getFontPixelSize(font: string) {
   const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
   return match ? Number(match[1]) : 16;
+}
+
+function computeIconYForBaseline(
+  textY: number,
+  iconSize: number,
+  textHeight: number,
+  ascent: number,
+  baseline: CanvasTextBaseline
+) {
+  if (baseline === 'middle') {
+    return textY - iconSize / 2;
+  }
+  if (baseline === 'top' || baseline === 'hanging') {
+    return textY + ((textHeight - iconSize) / 2);
+  }
+  if (baseline === 'bottom') {
+    return textY - textHeight + ((textHeight - iconSize) / 2);
+  }
+
+  return textY - ascent + ((textHeight - iconSize) / 2);
 }

@@ -98,49 +98,52 @@ export function drawShopItemCard(
       baseline: 'top'
     });
   } else {
-    drawCurrencyAmount(
-      item.currency,
-      item.cost,
-      rect.x + rect.width - 16,
-      rect.y + 16,
-      24,
-      {
-        align: 'right',
-        font: SHOP_ITEM_COST_FONT,
-        textColor: COLORS.hud[item.currency] || COLORS.panel.textPrimary,
-        iconGap: 6,
-        iconPosition: 'right',
-        formatter: formatBigNum
-      }
-    );
+    const btnWidth = 120;
+    const btnHeight = 32;
+    const btnRect = {
+      x: rect.x + rect.width - btnWidth - 16,
+      y: rect.y + rect.height - btnHeight - 16,
+      width: btnWidth,
+      height: btnHeight
+    };
 
     if (!item.can_purchase) {
       renderer.drawText({
         text: `Requires ${formatLevel(item.required_level)}`,
-        x: rect.x + rect.width - 16,
-        y: rect.y + 44,
+        x: btnRect.x + (btnRect.width / 2),
+        y: btnRect.y + (btnRect.height / 2),
         font: SHOP_ITEM_REQ_FONT,
         color: COLORS.panel.textSecondary,
-        align: 'right',
-        baseline: 'top'
+        align: 'center',
+        baseline: 'middle'
       });
     } else {
-      const btnWidth = 120;
-      const btnHeight = 32;
-      const btnRect = {
-        x: rect.x + rect.width - btnWidth - 16,
-        y: rect.y + rect.height - btnHeight - 16,
-        width: btnWidth,
-        height: btnHeight
-      };
-
       // Just draw the button, don't handle logic here
-      drawButton(btnRect, 'Purchase', {
+      drawButton(btnRect, '', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
         showNotice: notices.hasLeafNotice(`leaf.shop_item.${item.id}.purchase_button`),
         showNoticePing: true
       });
+
+      drawCurrencyAmount(
+        item.currency,
+        item.cost,
+        btnRect.x + (btnRect.width / 2),
+        btnRect.y + (btnRect.height / 2),
+        18,
+        {
+          align: 'center',
+          font: SHOP_ITEM_COST_FONT,
+          textColor: canAfford
+            ? (COLORS.hud[item.currency] || COLORS.panel.textPrimary)
+            : COLORS.panel.textSecondary,
+          iconGap: 6,
+          iconPosition: 'right',
+          baseline: 'middle',
+          formatter: formatBigNum
+        }
+      );
     }
   }
 }

@@ -1,3 +1,6 @@
+import { OrthographicCamera, Scene, WebGLRenderer as ThreeWebGLRenderer } from "three";
+import { Text } from "troika-three-text";
+
 export type RGBA = readonly [number, number, number, number];
 
 export interface WebGLRendererOptions {
@@ -45,18 +48,16 @@ export interface DrawImageOptions {
   alpha?: number;
 }
 
-interface TextSprite {
-  texture: WebGLTexture;
-  width: number;
-  height: number;
-  textX: number;
-  textWidth: number;
-  ascent: number;
-  descent: number;
-  baselineY: number;
+interface ParsedFontSpec {
+  fontFamily: string;
+  fontSizePx: number;
+  fontWeight: "normal" | "bold";
+  fontStyle: "normal" | "italic";
+  troikaFontUrl: string;
 }
 
-interface TextSpriteStyle {
+interface TextDrawStyle {
+  fontSpec: ParsedFontSpec;
   color: string;
   strokeColor: string;
   strokeWidth: number;
@@ -66,9 +67,25 @@ interface TextSpriteStyle {
   shadowOffsetY: number;
 }
 
-const DEFAULT_FONT = "bold 16px Arial";
+interface CachedTextMesh {
+  mesh: Text;
+  ready: boolean;
+  frameLastUsed: number;
+}
+
+interface CachedTextMeasurement {
+  mesh: Text;
+  width: number;
+  ready: boolean;
+  frameLastUsed: number;
+}
+
+const DEFAULT_FONT = "bold 16px Inter";
 const DEFAULT_TEXT_COLOR = "#ffffff";
-const MAX_TEXT_CACHE_SIZE = 256;
+const INTER_REGULAR_FONT_URL = "/fonts/Inter-Regular.woff";
+const INTER_BOLD_FONT_URL = "/fonts/Inter-Bold.woff";
+const MAX_TEXT_CACHE_SIZE = 384;
+const TEXT_CACHE_FRAME_TTL = 900;
 
 const COLOR_VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
@@ -219,10 +236,13 @@ export class WebGLRenderer {
   private readonly shapePositionBuffer: WebGLBuffer;
   private readonly shapeTexcoordBuffer: WebGLBuffer;
 
-  private readonly textMeasureCanvas: HTMLCanvasElement;
-  private readonly textMeasureCtx: CanvasRenderingContext2D;
-  private readonly textCache = new Map<string, TextSprite>();
+  private readonly threeRenderer: ThreeWebGLRenderer;
+  private readonly textScene: Scene;
+  private readonly textCamera: OrthographicCamera;
+  private readonly textCache = new Map<string, CachedTextMesh>();
+  private readonly textMeasureCache = new Map<string, CachedTextMeasurement>();
   private readonly imageCache = new WeakMap<object, WebGLTexture>();
+  private frameCounter = 0;
   private _globalAlpha = 1.0;
 
   constructor(options: WebGLRendererOptions) {
@@ -272,12 +292,19 @@ export class WebGLRenderer {
     this.shapePositionBuffer = mustCreateBuffer(gl);
     this.shapeTexcoordBuffer = mustCreateBuffer(gl);
 
-    this.textMeasureCanvas = document.createElement("canvas");
-    const measureCtx = this.textMeasureCanvas.getContext("2d");
-    if (!measureCtx) {
-      throw new Error("WebGLRenderer requires a 2d text measurement context");
-    }
-    this.textMeasureCtx = measureCtx;
+    this.threeRenderer = new ThreeWebGLRenderer({
+      canvas: this.canvas,
+      context: gl,
+      alpha: true,
+      antialias: false,
+      depth: false,
+      premultipliedAlpha: false
+    });
+    this.threeRenderer.autoClear = false;
+    this.threeRenderer.setPixelRatio(1);
+    this.textScene = new Scene();
+    this.textCamera = new OrthographicCamera(0, this.canvas.width, this.canvas.height, 0, -1, 1);
+    this.textCamera.position.z = 1;
 
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
@@ -310,9 +337,17 @@ export class WebGLRenderer {
     if (this.canvas.height !== nextHeight) this.canvas.height = nextHeight;
 
     this.gl.viewport(0, 0, nextWidth, nextHeight);
+    this.threeRenderer.setSize(nextWidth, nextHeight, false);
+    this.textCamera.left = 0;
+    this.textCamera.right = nextWidth;
+    this.textCamera.top = nextHeight;
+    this.textCamera.bottom = 0;
+    this.textCamera.updateProjectionMatrix();
   }
 
   beginFrame(clearColor: RGBA = [0, 0, 0, 0]) {
+    this.frameCounter += 1;
+    this.evictUnusedTextCacheEntries();
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -530,92 +565,78 @@ export class WebGLRenderer {
   }
 
   drawText(options: DrawTextOptions) {
-    const gl = this.gl;
     const text = options.text;
     if (!text) return;
 
-    const font = options.font || DEFAULT_FONT;
-    const color = options.color || DEFAULT_TEXT_COLOR;
-    const strokeColor = options.strokeColor || "transparent";
-    const strokeWidth = Math.max(0, Number(options.strokeWidth) || 0);
-    const shadowColor = options.shadowColor || "transparent";
-    const shadowBlur = Math.max(0, Number(options.shadowBlur) || 0);
-    const shadowOffsetX = Number(options.shadowOffsetX) || 0;
-    const shadowOffsetY = Number(options.shadowOffsetY) || 0;
-    const align = options.align || "left";
-    const baseline = options.baseline || "alphabetic";
-
-    const sprite = this.getOrCreateTextSprite(text, font, {
-      color,
-      strokeColor,
-      strokeWidth,
-      shadowColor,
-      shadowBlur,
-      shadowOffsetX,
-      shadowOffsetY
-    });
-    const anchorX = computeAnchorX(sprite, align);
-    const anchorY = computeAnchorY(sprite, baseline);
-
-    const x = options.x - anchorX;
-    const y = options.y - anchorY;
-    const x2 = x + sprite.width;
-    const y2 = y + sprite.height;
-
-    const positions = new Float32Array([
-      x, y,
-      x2, y,
-      x, y2,
-      x, y2,
-      x2, y,
-      x2, y2
-    ]);
-
-    const texcoords = new Float32Array([
-      0, 0,
-      1, 0,
-      0, 1,
-      0, 1,
-      1, 0,
-      1, 1
-    ]);
-
-    gl.useProgram(this.textProgram);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.textPositionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(this.textPositionLocation);
-    gl.vertexAttribPointer(this.textPositionLocation, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.textTexcoordBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.DYNAMIC_DRAW);
-    gl.enableVertexAttribArray(this.textTexcoordLocation);
-    gl.vertexAttribPointer(this.textTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
-
-    gl.uniform2f(this.textResolutionLocation, this.canvas.width, this.canvas.height);
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
-    gl.uniform1f(this.textAlphaLocation, alpha);
+    if (alpha <= 0) return;
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, sprite.texture);
-    gl.uniform1i(this.textTextureLocation, 0);
+    const fontSpec = parseFontSpec(options.font || DEFAULT_FONT);
+    const style: TextDrawStyle = {
+      fontSpec,
+      color: options.color || DEFAULT_TEXT_COLOR,
+      strokeColor: options.strokeColor || "transparent",
+      strokeWidth: Math.max(0, Number(options.strokeWidth) || 0),
+      shadowColor: options.shadowColor || "transparent",
+      shadowBlur: Math.max(0, Number(options.shadowBlur) || 0),
+      shadowOffsetX: Number(options.shadowOffsetX) || 0,
+      shadowOffsetY: Number(options.shadowOffsetY) || 0
+    };
+    const anchorX = mapTextAlign(options.align || "left");
+    const anchorY = mapTextBaseline(options.baseline || "alphabetic");
+    const cached = this.getOrCreateTroikaText(text, style, anchorX, anchorY, alpha);
+    cached.frameLastUsed = this.frameCounter;
 
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    const mesh = cached.mesh;
+    mesh.position.set(options.x, this.canvas.height - options.y, 0);
+    this.textScene.add(mesh);
+    this.threeRenderer.resetState();
+    this.threeRenderer.render(this.textScene, this.textCamera);
+    this.textScene.remove(mesh);
   }
 
   measureTextWidth(options: MeasureTextOptions) {
     const text = String(options.text ?? "");
-    const font = options.font || DEFAULT_FONT;
-    this.textMeasureCtx.font = font;
-    return this.textMeasureCtx.measureText(text).width;
+    if (!text) return 0;
+
+    const fontSpec = parseFontSpec(options.font || DEFAULT_FONT);
+    const key = `${text}\u0000${fontSpec.fontFamily}\u0000${fontSpec.fontSizePx}\u0000${fontSpec.fontWeight}\u0000${fontSpec.fontStyle}`;
+    const cached = this.textMeasureCache.get(key);
+    if (cached) {
+      cached.frameLastUsed = this.frameCounter;
+      return cached.width;
+    }
+
+    const mesh = new Text();
+    mesh.font = fontSpec.troikaFontUrl;
+    mesh.fontSize = fontSpec.fontSizePx;
+    mesh.fontWeight = fontSpec.fontWeight;
+    mesh.fontStyle = fontSpec.fontStyle;
+    mesh.text = text;
+    const entry: CachedTextMeasurement = {
+      mesh,
+      width: estimateTextWidth(text, fontSpec.fontSizePx),
+      ready: false,
+      frameLastUsed: this.frameCounter
+    };
+    this.textMeasureCache.set(key, entry);
+    this.enforceTextCacheSize();
+    mesh.sync(() => {
+      entry.width = readTextWidth(mesh, entry.width);
+      entry.ready = true;
+    });
+    return entry.width;
   }
 
   clearTextCache() {
-    const gl = this.gl;
-    for (const sprite of this.textCache.values()) {
-      gl.deleteTexture(sprite.texture);
+    for (const entry of this.textCache.values()) {
+      entry.mesh.dispose();
     }
     this.textCache.clear();
+    for (const entry of this.textMeasureCache.values()) {
+      entry.mesh.dispose();
+    }
+    this.textMeasureCache.clear();
   }
 
   dispose() {
@@ -629,12 +650,24 @@ export class WebGLRenderer {
     gl.deleteProgram(this.colorProgram);
     gl.deleteProgram(this.textProgram);
     gl.deleteProgram(this.shapeProgram);
+    this.threeRenderer.dispose();
   }
 
-  private getOrCreateTextSprite(text: string, font: string, style: TextSpriteStyle) {
+  private getOrCreateTroikaText(
+    text: string,
+    style: TextDrawStyle,
+    anchorX: "left" | "center" | "right",
+    anchorY: "top" | "top-baseline" | "middle" | "bottom" | "bottom-baseline",
+    alpha: number
+  ): CachedTextMesh {
     const key = [
       text,
-      font,
+      style.fontSpec.fontFamily,
+      style.fontSpec.fontSizePx,
+      style.fontSpec.fontWeight,
+      style.fontSpec.fontStyle,
+      anchorX,
+      anchorY,
       style.color,
       style.strokeColor,
       style.strokeWidth,
@@ -645,96 +678,116 @@ export class WebGLRenderer {
     ].join("\u0000");
     const cached = this.textCache.get(key);
     if (cached) {
+      this.configureTroikaText(cached.mesh, text, style, anchorX, anchorY, alpha);
       return cached;
     }
 
-    const sprite = this.createTextSprite(text, font, style);
-
-    if (this.textCache.size >= MAX_TEXT_CACHE_SIZE) {
-      const firstKey = this.textCache.keys().next().value;
-      if (typeof firstKey === "string") {
-        const firstSprite = this.textCache.get(firstKey);
-        if (firstSprite) {
-          this.gl.deleteTexture(firstSprite.texture);
-        }
-        this.textCache.delete(firstKey);
-      }
-    }
-
-    this.textCache.set(key, sprite);
-    return sprite;
+    const mesh = new Text();
+    const entry: CachedTextMesh = {
+      mesh,
+      ready: false,
+      frameLastUsed: this.frameCounter
+    };
+    this.configureTroikaText(mesh, text, style, anchorX, anchorY, alpha);
+    mesh.sync(() => {
+      entry.ready = true;
+    });
+    this.textCache.set(key, entry);
+    this.enforceTextCacheSize();
+    return entry;
   }
 
-  private createTextSprite(text: string, font: string, style: TextSpriteStyle): TextSprite {
-    const gl = this.gl;
-    const measure = this.textMeasureCtx;
-    measure.font = font;
-    measure.textAlign = "left";
-    measure.textBaseline = "alphabetic";
-
-    const metrics = measure.measureText(text);
-    const fontSize = parseFontSizePx(font);
-    const ascent = Math.ceil(metrics.fontBoundingBoxAscent || metrics.actualBoundingBoxAscent || fontSize * 0.82);
-    const descent = Math.ceil(metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || fontSize * 0.28);
-    const strokePad = Math.ceil(style.strokeWidth);
-    const shadowPadX = Math.ceil(Math.abs(style.shadowOffsetX) + style.shadowBlur);
-    const shadowPadY = Math.ceil(Math.abs(style.shadowOffsetY) + style.shadowBlur);
-    const padX = 1 + strokePad + shadowPadX;
-    const padY = 1 + strokePad + shadowPadY;
-    const width = Math.max(1, Math.ceil(metrics.width + padX * 2));
-    const height = Math.max(1, Math.ceil(ascent + descent + padY * 2));
-
-    const textCanvas = document.createElement("canvas");
-    textCanvas.width = width;
-    textCanvas.height = height;
-    const textCtx = textCanvas.getContext("2d");
-
-    if (!textCtx) {
-      throw new Error("WebGLRenderer failed to create text sprite context");
+  private configureTroikaText(
+    mesh: Text,
+    text: string,
+    style: TextDrawStyle,
+    anchorX: "left" | "center" | "right",
+    anchorY: "top" | "top-baseline" | "middle" | "bottom" | "bottom-baseline",
+    alpha: number
+  ) {
+    const hasStroke = style.strokeColor !== "transparent" && style.strokeWidth > 0;
+    const hasShadow = style.shadowColor !== "transparent" && (
+      style.shadowBlur > 0 ||
+      style.shadowOffsetX !== 0 ||
+      style.shadowOffsetY !== 0
+    );
+    mesh.text = text;
+    mesh.font = style.fontSpec.troikaFontUrl;
+    mesh.fontSize = style.fontSpec.fontSizePx;
+    mesh.fontStyle = style.fontSpec.fontStyle;
+    mesh.fontWeight = style.fontSpec.fontWeight;
+    mesh.color = style.color;
+    mesh.textAlign = anchorX;
+    mesh.anchorX = anchorX;
+    mesh.anchorY = anchorY;
+    mesh.strokeColor = "transparent";
+    mesh.strokeWidth = 0;
+    mesh.strokeOpacity = 0;
+    mesh.fillOpacity = alpha;
+    if (hasStroke) {
+      mesh.outlineWidth = style.strokeWidth;
+      mesh.outlineColor = style.strokeColor;
+      mesh.outlineBlur = 0;
+      mesh.outlineOffsetX = 0;
+      mesh.outlineOffsetY = 0;
+      mesh.outlineOpacity = alpha;
+    } else if (hasShadow) {
+      mesh.outlineWidth = 0;
+      mesh.outlineColor = style.shadowColor;
+      mesh.outlineBlur = style.shadowBlur;
+      mesh.outlineOffsetX = style.shadowOffsetX;
+      mesh.outlineOffsetY = -style.shadowOffsetY;
+      mesh.outlineOpacity = alpha;
+    } else {
+      mesh.outlineWidth = 0;
+      mesh.outlineColor = "transparent";
+      mesh.outlineBlur = 0;
+      mesh.outlineOffsetX = 0;
+      mesh.outlineOffsetY = 0;
+      mesh.outlineOpacity = 0;
     }
+    mesh.frustumCulled = false;
+  }
 
-    textCtx.clearRect(0, 0, width, height);
-    textCtx.font = font;
-    textCtx.textAlign = "left";
-    textCtx.textBaseline = "alphabetic";
-    const textX = padX;
-    const textY = padY + ascent;
-    textCtx.shadowColor = style.shadowColor;
-    textCtx.shadowBlur = style.shadowBlur;
-    textCtx.shadowOffsetX = style.shadowOffsetX;
-    textCtx.shadowOffsetY = style.shadowOffsetY;
-    if (style.strokeWidth > 0 && style.strokeColor !== "transparent") {
-      textCtx.lineJoin = "round";
-      textCtx.lineWidth = style.strokeWidth;
-      textCtx.strokeStyle = style.strokeColor;
-      textCtx.strokeText(text, textX, textY);
+  private enforceTextCacheSize() {
+    while (this.textCache.size > MAX_TEXT_CACHE_SIZE) {
+      const firstKey = this.textCache.keys().next().value;
+      if (typeof firstKey !== "string") {
+        break;
+      }
+      const entry = this.textCache.get(firstKey);
+      if (entry) {
+        entry.mesh.dispose();
+      }
+      this.textCache.delete(firstKey);
     }
-    textCtx.fillStyle = style.color;
-    textCtx.fillText(text, textX, textY);
-
-    const texture = gl.createTexture();
-    if (!texture) {
-      throw new Error("WebGLRenderer failed to create text texture");
+    while (this.textMeasureCache.size > MAX_TEXT_CACHE_SIZE) {
+      const firstKey = this.textMeasureCache.keys().next().value;
+      if (typeof firstKey !== "string") {
+        break;
+      }
+      const entry = this.textMeasureCache.get(firstKey);
+      if (entry) {
+        entry.mesh.dispose();
+      }
+      this.textMeasureCache.delete(firstKey);
     }
+  }
 
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    return {
-      texture,
-      width,
-      height,
-      textX,
-      textWidth: Math.max(0, metrics.width),
-      ascent,
-      descent,
-      baselineY: textY
-    };
+  private evictUnusedTextCacheEntries() {
+    const minFrame = this.frameCounter - TEXT_CACHE_FRAME_TTL;
+    for (const [key, entry] of this.textCache.entries()) {
+      if (entry.frameLastUsed < minFrame) {
+        entry.mesh.dispose();
+        this.textCache.delete(key);
+      }
+    }
+    for (const [key, entry] of this.textMeasureCache.entries()) {
+      if (entry.frameLastUsed < minFrame) {
+        entry.mesh.dispose();
+        this.textMeasureCache.delete(key);
+      }
+    }
   }
 
   private getOrCreateImageTexture(image: TexImageSource) {
@@ -853,20 +906,68 @@ function parseFontSizePx(font: string, fallback = 16) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function computeAnchorX(sprite: TextSprite, align: CanvasTextAlign) {
-  if (align === "center") return sprite.textX + sprite.textWidth / 2;
-  if (align === "right" || align === "end") return sprite.textX + sprite.textWidth;
-  return sprite.textX;
+function parseFontSpec(font: string): ParsedFontSpec {
+  const normalized = (font || DEFAULT_FONT).trim();
+  const fontSizePx = parseFontSizePx(normalized, 16);
+  const weightMatch = /\b([1-9]00|normal|bold)\b/i.exec(normalized);
+  const weightValue = weightMatch ? weightMatch[1].toLowerCase() : "normal";
+  const isBold = weightValue === "bold" || Number(weightValue) >= 600;
+  const fontWeight: "normal" | "bold" = isBold ? "bold" : "normal";
+  const fontStyle: "normal" | "italic" = /\bitalic\b/i.test(normalized) ? "italic" : "normal";
+  const sizeMatch = /(\d+(?:\.\d+)?)px/.exec(normalized);
+  let fontFamily = "Inter";
+  if (sizeMatch) {
+    const start = sizeMatch.index + sizeMatch[0].length;
+    const rawFamily = normalized.slice(start).trim();
+    if (rawFamily.length > 0) {
+      fontFamily = rawFamily.replace(/["']/g, "").split(",")[0].trim() || "Inter";
+    }
+  }
+
+  return {
+    fontFamily,
+    fontSizePx,
+    fontWeight,
+    fontStyle,
+    troikaFontUrl: fontWeight === "bold" ? INTER_BOLD_FONT_URL : INTER_REGULAR_FONT_URL
+  };
 }
 
-function computeAnchorY(sprite: TextSprite, baseline: CanvasTextBaseline) {
-  if (baseline === "alphabetic") return sprite.baselineY;
-  const textTop = sprite.baselineY - sprite.ascent;
-  const textBottom = sprite.baselineY + sprite.descent;
-  if (baseline === "middle") return textTop + (textBottom - textTop) / 2;
-  if (baseline === "bottom" || baseline === "ideographic") return textBottom;
-  if (baseline === "top" || baseline === "hanging") return textTop;
-  return sprite.baselineY;
+function mapTextAlign(align: CanvasTextAlign): "left" | "center" | "right" {
+  if (align === "center") return "center";
+  if (align === "right" || align === "end") return "right";
+  return "left";
+}
+
+function mapTextBaseline(baseline: CanvasTextBaseline): "top" | "top-baseline" | "middle" | "bottom" | "bottom-baseline" {
+  if (baseline === "top" || baseline === "hanging") return "top";
+  if (baseline === "middle") return "middle";
+  if (baseline === "bottom") return "bottom";
+  if (baseline === "ideographic") return "bottom-baseline";
+  return "top-baseline";
+}
+
+function estimateTextWidth(text: string, fontSizePx: number) {
+  return text.length * fontSizePx * 0.62;
+}
+
+function readTextWidth(mesh: Text, fallback: number) {
+  const bounds = mesh.textRenderInfo?.blockBounds;
+  if (Array.isArray(bounds) && bounds.length === 4) {
+    const width = Number(bounds[2]) - Number(bounds[0]);
+    if (Number.isFinite(width) && width >= 0) {
+      return width;
+    }
+  }
+  mesh.geometry?.computeBoundingBox?.();
+  const box = mesh.geometry?.boundingBox;
+  if (box) {
+    const width = box.max.x - box.min.x;
+    if (Number.isFinite(width) && width >= 0) {
+      return width;
+    }
+  }
+  return fallback;
 }
 
 function isRenderableImage(image: TexImageSource): image is TexImageSource {
