@@ -1,6 +1,6 @@
-export const SAVE_KEY = 'aitg_save';
-export const SAVE_KEY_PREFIX = 'aitg_save_';
-export const GLOBAL_OPTIONS_KEY = 'aitg_global';
+export const SAVE_KEY = 'incrementalist_save';
+export const SAVE_KEY_PREFIX = 'incrementalist_save_';
+export const GLOBAL_OPTIONS_KEY = 'incrementalist_global';
 export const MAX_SAVEFILES = 4;
 
 export const BAR_RESET_LERP_SPEED = 7;
