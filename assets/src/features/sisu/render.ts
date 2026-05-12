@@ -38,6 +38,7 @@ import {
 
 export type SisuControlLayout = {
   controlRect: Rect;
+  sisuBlitted?: boolean;
 };
 
 export { getSisuControlRect };
@@ -53,7 +54,7 @@ export function renderSisuControl(
   const target = getSisuSurfaceContext(canvas);
   if (!target || !renderer) return null;
   const layout = renderSisuControlToContext(target, canvas, input, state);
-  if (sisuSurface) {
+  if (sisuSurface && !layout?.sisuBlitted) {
     renderer.drawImage({
       image: sisuSurface,
       x: 0,
@@ -71,6 +72,7 @@ function renderSisuControlToContext(
   input: InteractionState,
   state: ServerState
 ): SisuControlLayout | null {
+  const renderer = getActiveWebGLRenderer();
   const snapshot = state.snapshot;
   if (!snapshot) return null;
 
@@ -148,17 +150,32 @@ function renderSisuControlToContext(
     ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 12);
   };
 
+  let sisuBlitted = false;
+  const drawSisuControlAndBlit = () => {
+    drawSisuControl();
+    if (sisuSurface) {
+      renderer.drawImage({
+        image: sisuSurface,
+        x: 0,
+        y: 0,
+        width: canvas.width,
+        height: canvas.height
+      });
+      sisuBlitted = true;
+    }
+  };
+
   if (!isUnlocked) {
-    drawLockedElement(canvas, input, controlRect, drawSisuControl, {
+    drawLockedElement(canvas, input, controlRect, drawSisuControlAndBlit, {
       font: SISU_METER_FONT,
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
       showNoticePing: true
     });
   } else {
-    drawSisuControl();
+    drawSisuControlAndBlit();
   }
 
-  return { controlRect };
+  return { controlRect, sisuBlitted };
 }
 
 export function createSisuGeneratorModal(

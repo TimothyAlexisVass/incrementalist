@@ -129,6 +129,9 @@ export function renderAreaDropdown(
           
           const isHovered = pointInRect(input.pointer, itemRect);
           
+          const leafId = `leaf.area.${area.key}.go_button`;
+          const hasNotice = notices.hasLeafNotice(leafId);
+
           const renderItem = () => {
             drawButton(itemRect, area.is_locked ? "" : area.name, {
               active: isHovered,
@@ -138,14 +141,11 @@ export function renderAreaDropdown(
               inactiveSurface: COLORS.panel.bg,
               activeBorder: COLORS.panel.border,
               inactiveBorder: COLORS.panel.border,
-              textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary
+              textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary,
+              showNotice: !area.is_locked && hasNotice // Button draws its own notice if not locked
             });
 
-            // Locked areas cannot be acted on, so they should not advertise notices.
-            const leafId = `leaf.area.${area.key}.go_button`;
-            const hasNotice = !area.is_locked && notices.hasLeafNotice(leafId);
             if (hasNotice) {
-              drawNoticeDot(itemRect.x + itemRect.width - 10, itemRect.y + 10);
               notices.reportLeafVisible(leafId, true, channel, runCommand);
             }
           };
@@ -153,10 +153,10 @@ export function renderAreaDropdown(
           if (area.is_locked) {
             // Keep the same full-size row visuals as unlocked items, then
             // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
-            renderItem();
-            drawLockedElement(canvas, input, itemRect, () => {}, {
+            drawLockedElement(canvas, input, itemRect, renderItem, {
               opacity: 0,
-              criteria: `Requires Level ${area.unlock_level}`
+              criteria: `Requires Level ${area.unlock_level}`,
+              showNotice: hasNotice // Locked element draws the notice on top of the lock
             });
           } else {
             renderItem();

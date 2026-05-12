@@ -2,6 +2,7 @@ import { COLORS } from "../../colors";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { InteractionState, pointInRect } from "../managers/interactions";
 import { drawTooltip } from "./tooltip";
+import { drawNoticeDot } from "./button";
 
 export interface LockedElementOptions {
   label?: string;
@@ -55,30 +56,10 @@ export function drawLockedElement(
   });
 
   if (showNotice) {
-    const noticeRadius = 4;
-    const textWidth = renderer.measureTextWidth({ text: label, font });
-    const noticeX = textX + textWidth / 2 + noticeRadius + 2;
-    const noticeY = textY - 8;
+    const noticeX = rect.x + rect.width + 2;
+    const noticeY = rect.y - 2;
     
-    renderer.drawRect({
-      x: noticeX - noticeRadius,
-      y: noticeY - noticeRadius,
-      width: noticeRadius * 2,
-      height: noticeRadius * 2,
-      color: [1, 0, 0, 1]
-    });
-
-    if (showNoticePing) {
-      const time = Date.now() / 1000;
-      const pulse = Math.sin(time * 10) * 0.5 + 0.5;
-      renderer.drawRect({
-        x: noticeX - noticeRadius - 2,
-        y: noticeY - noticeRadius - 2,
-        width: noticeRadius * 2 + 4,
-        height: noticeRadius * 2 + 4,
-        color: [1, 0, 0, 0.2 * pulse]
-      });
-    }
+    drawNoticeDot(noticeX, noticeY, 4, showNoticePing);
   }
 
   if (criteria && input.pointer && pointInRect(input.pointer, rect)) {

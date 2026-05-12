@@ -90,6 +90,48 @@ void main() {
 }
 `;
 
+const SHAPE_VERTEX_SHADER_SOURCE = `
+attribute vec2 a_position;
+attribute vec2 a_texcoord;
+uniform vec2 u_resolution;
+varying vec2 v_texcoord;
+
+void main() {
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+  gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+  v_texcoord = a_texcoord;
+}
+`;
+
+const SHAPE_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+uniform vec4 u_color;
+uniform float u_innerRadius;
+uniform float u_thickness;
+uniform float u_softness;
+varying vec2 v_texcoord;
+
+void main() {
+  float dist = distance(v_texcoord, vec2(0.5)) * 2.0;
+  float alpha = 0.0;
+  
+  if (u_thickness > 0.0) {
+    // Ring logic: glow centered at u_innerRadius with width u_thickness
+    float halfThickness = u_thickness * 0.5;
+    float d = abs(dist - u_innerRadius) - halfThickness;
+    alpha = smoothstep(u_softness, 0.0, d);
+  } else {
+    // Circle logic: glow centered at 0, edge at u_innerRadius
+    float d = dist - u_innerRadius;
+    alpha = smoothstep(u_softness, 0.0, d);
+  }
+  
+  float finalAlpha = u_color.a * alpha;
+  gl_FragColor = vec4(u_color.rgb * finalAlpha, finalAlpha);
+}
+`;
+
 const TEXT_VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
 attribute vec2 a_texcoord;
@@ -112,7 +154,8 @@ varying vec2 v_texcoord;
 
 void main() {
   vec4 sampled = texture2D(u_texture, v_texcoord);
-  gl_FragColor = vec4(sampled.rgb, sampled.a * u_alpha);
+  float alpha = sampled.a * u_alpha;
+  gl_FragColor = vec4(sampled.rgb * alpha, alpha);
 }
 `;
 
@@ -134,6 +177,17 @@ export class WebGLRenderer {
   private readonly textTextureLocation: WebGLUniformLocation;
   private readonly textPositionBuffer: WebGLBuffer;
   private readonly textTexcoordBuffer: WebGLBuffer;
+
+  private readonly shapeProgram: WebGLProgram;
+  private readonly shapePositionLocation: number;
+  private readonly shapeTexcoordLocation: number;
+  private readonly shapeResolutionLocation: WebGLUniformLocation;
+  private readonly shapeColorLocation: WebGLUniformLocation;
+  private readonly shapeInnerRadiusLocation: WebGLUniformLocation;
+  private readonly shapeThicknessLocation: WebGLUniformLocation;
+  private readonly shapeSoftnessLocation: WebGLUniformLocation;
+  private readonly shapePositionBuffer: WebGLBuffer;
+  private readonly shapeTexcoordBuffer: WebGLBuffer;
 
   private readonly textMeasureCanvas: HTMLCanvasElement;
   private readonly textMeasureCtx: CanvasRenderingContext2D;
@@ -174,6 +228,17 @@ export class WebGLRenderer {
     this.textPositionBuffer = mustCreateBuffer(gl);
     this.textTexcoordBuffer = mustCreateBuffer(gl);
 
+    this.shapeProgram = mustCreateProgram(gl, SHAPE_VERTEX_SHADER_SOURCE, SHAPE_FRAGMENT_SHADER_SOURCE);
+    this.shapePositionLocation = gl.getAttribLocation(this.shapeProgram, "a_position");
+    this.shapeTexcoordLocation = gl.getAttribLocation(this.shapeProgram, "a_texcoord");
+    this.shapeResolutionLocation = mustGetUniform(gl, this.shapeProgram, "u_resolution");
+    this.shapeColorLocation = mustGetUniform(gl, this.shapeProgram, "u_color");
+    this.shapeInnerRadiusLocation = mustGetUniform(gl, this.shapeProgram, "u_innerRadius");
+    this.shapeThicknessLocation = mustGetUniform(gl, this.shapeProgram, "u_thickness");
+    this.shapeSoftnessLocation = mustGetUniform(gl, this.shapeProgram, "u_softness");
+    this.shapePositionBuffer = mustCreateBuffer(gl);
+    this.shapeTexcoordBuffer = mustCreateBuffer(gl);
+
     this.textMeasureCanvas = document.createElement("canvas");
     const measureCtx = this.textMeasureCanvas.getContext("2d");
     if (!measureCtx) {
@@ -183,7 +248,17 @@ export class WebGLRenderer {
 
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    this.setBlendMode("normal");
+  }
+
+  public setBlendMode(mode: "normal" | "additive") {
+    const gl = this.gl;
+    if (mode === "additive") {
+      gl.blendFunc(gl.ONE, gl.ONE);
+    } else {
+      // Use ONE for src since we are premultiplying in the shader
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    }
   }
 
   resize(width: number, height: number) {
@@ -233,16 +308,103 @@ export class WebGLRenderer {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  drawCircle(x: number, y: number, radius: number, color: RGBA) {
-    const diameter = Math.max(0, radius * 2);
-    if (diameter <= 0) return;
-    this.drawRect({
-      x: x - radius,
-      y: y - radius,
-      width: diameter,
-      height: diameter,
-      color
+  drawCircle(x: number, y: number, radius: number, color: RGBA, softness = 0.1, blendMode: "normal" | "additive" = "normal") {
+    // Add a small padding for anti-aliasing even if softness is 0
+    const aaPadding = 1.5; 
+    const glowSize = (radius * softness) + aaPadding;
+    const drawRadius = radius + glowSize;
+
+    this.setBlendMode(blendMode);
+    this.drawShape({
+      x: x - drawRadius,
+      y: y - drawRadius,
+      width: drawRadius * 2,
+      height: drawRadius * 2,
+      color,
+      innerRadius: radius / drawRadius, // Edge of the solid part
+      thickness: 0,
+      softness: (glowSize / drawRadius) // Normalized softness
     });
+    this.setBlendMode("normal");
+  }
+
+  drawRing(x: number, y: number, radius: number, thickness: number, color: RGBA, softness = 0.1, blendMode: "normal" | "additive" = "normal") {
+    // Add a small padding for anti-aliasing
+    const aaPadding = 1.5;
+    const glowSize = (thickness + radius * 0.25) * softness + aaPadding;
+    const drawRadius = radius + thickness + glowSize;
+    
+    // For sub-pixel thickness, scale alpha to simulate anti-aliasing and ensure 0.2 != 0.002
+    const alphaScale = Math.min(1.0, thickness);
+    const finalColor: RGBA = [color[0], color[1], color[2], color[3] * alphaScale];
+
+    this.setBlendMode(blendMode);
+    this.drawShape({
+      x: x - drawRadius,
+      y: y - drawRadius,
+      width: drawRadius * 2,
+      height: drawRadius * 2,
+      color: finalColor,
+      innerRadius: radius / drawRadius, // Center of ring
+      thickness: thickness / drawRadius, // Base thickness
+      softness: (glowSize / drawRadius) // Normalized softness
+    });
+    this.setBlendMode("normal");
+  }
+
+  private drawShape(options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color: RGBA;
+    innerRadius: number;
+    thickness: number;
+    softness: number;
+  }) {
+    const gl = this.gl;
+    const { x, y, width, height, color, innerRadius, thickness, softness } = options;
+
+    if (width <= 0 || height <= 0) return;
+
+    const x2 = x + width;
+    const y2 = y + height;
+    const positions = new Float32Array([
+      x, y,
+      x2, y,
+      x, y2,
+      x, y2,
+      x2, y,
+      x2, y2
+    ]);
+    const texcoords = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+      0, 1,
+      1, 0,
+      1, 1
+    ]);
+
+    gl.useProgram(this.shapeProgram);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.shapePositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.shapePositionLocation);
+    gl.vertexAttribPointer(this.shapePositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.shapeTexcoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.shapeTexcoordLocation);
+    gl.vertexAttribPointer(this.shapeTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform2f(this.shapeResolutionLocation, this.canvas.width, this.canvas.height);
+    gl.uniform4f(this.shapeColorLocation, color[0], color[1], color[2], color[3]);
+    gl.uniform1f(this.shapeInnerRadiusLocation, innerRadius);
+    gl.uniform1f(this.shapeThicknessLocation, thickness);
+    gl.uniform1f(this.shapeSoftnessLocation, softness);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
   drawImage(options: DrawImageOptions) {
@@ -387,8 +549,11 @@ export class WebGLRenderer {
     gl.deleteBuffer(this.colorBuffer);
     gl.deleteBuffer(this.textPositionBuffer);
     gl.deleteBuffer(this.textTexcoordBuffer);
+    gl.deleteBuffer(this.shapePositionBuffer);
+    gl.deleteBuffer(this.shapeTexcoordBuffer);
     gl.deleteProgram(this.colorProgram);
     gl.deleteProgram(this.textProgram);
+    gl.deleteProgram(this.shapeProgram);
   }
 
   private getOrCreateTextSprite(text: string, font: string, style: TextSpriteStyle) {

@@ -20,9 +20,9 @@ export interface ButtonOptions {
 }
 
 const TWO_PI = Math.PI * 2;
-const NOTICE_PING_INTERVAL_MS = 10_000;
-const NOTICE_PING_DURATION_MS = 1_000;
-const NOTICE_PING_MAX_RADIUS_PX = 100;
+const NOTICE_PING_INTERVAL_MS = 8_000;
+const NOTICE_PING_DURATION_MS = 2_000;
+const NOTICE_PING_MAX_RADIUS_PX = 120;
 const NOTICE_PING_COLOR = '#00ff00';
 const BUTTON_PADDING_PX = 3;
 const ZERO_ALPHA_RGBA: readonly [number, number, number, number] = [0, 0, 0, 0];
@@ -55,17 +55,13 @@ function drawNoticePing(x: number, y: number, radius: number) {
     return;
   }
 
-  const ringRadius = Math.max(radius, progress * NOTICE_PING_MAX_RADIUS_PX);
-  const fade = Math.pow(1 - progress, 1.5);
-  const ringRect = {
-    x: x - ringRadius,
-    y: y - ringRadius,
-    width: ringRadius * 2,
-    height: ringRadius * 2
-  };
+  const pingRadius = radius + (progress * (NOTICE_PING_MAX_RADIUS_PX - radius));
+  const fade = Math.pow(1.0 - progress, 2.5);
 
-  drawRectOutline(renderer, ringRect, 7, [0, 1, 0, 0.22 * fade]);
-  drawRectOutline(renderer, ringRect, 2, [0, 1, 0, 0.75 * fade]);
+  // Large ethereal glow ring (very soft) - USING ADDITIVE BLENDING
+  renderer.drawRing(x, y, pingRadius, 2, [0, 1, 0, 0.4 * fade], 0.95, "additive");
+  // Sharper inner edge for definition
+  renderer.drawRing(x, y, pingRadius, 1, [0.5, 1, 0.5, 0.6 * fade], 0.2, "additive");
 }
 
 export function drawButton(
@@ -135,28 +131,12 @@ export function drawNoticeDot(
     drawNoticePing(x, y, radius);
   }
 
-  const dotRect = {
-    x: x - radius,
-    y: y - radius,
-    width: radius * 2,
-    height: radius * 2
-  };
-  renderer.drawRect({
-    x: dotRect.x,
-    y: dotRect.y,
-    width: dotRect.width,
-    height: dotRect.height,
-    color: cssToRgba(NOTICE_PING_COLOR)
-  });
-  drawRectOutline(renderer, dotRect, 1, cssToRgba(NOTICE_PING_COLOR, 0.95));
-  const glowPad = Math.max(1, Math.round(radius * 0.8));
-  renderer.drawRect({
-    x: dotRect.x - glowPad,
-    y: dotRect.y - glowPad,
-    width: dotRect.width + glowPad * 2,
-    height: dotRect.height + glowPad * 2,
-    color: cssToRgba(NOTICE_PING_COLOR, 0.12)
-  });
+  const color = cssToRgba(NOTICE_PING_COLOR);
+
+  // Outer glow (soft) - USING ADDITIVE BLENDING
+  // renderer.drawCircle(x, y, radius * 1.3, [color[0], color[1], color[2], 0.25], 0.9, "additive");
+  // Main dot core (bright, solid)
+  renderer.drawCircle(x, y, radius, color, 0.05, "normal");
 }
 
 import { InteractionState, pointInRect } from '../managers/interactions';

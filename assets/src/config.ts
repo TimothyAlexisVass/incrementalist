@@ -88,7 +88,7 @@ export const MODAL_TITLE_FONT = 'bold 16px Arial';
 export const MODAL_BODY_FONT = '13px Arial';
 
 // Button fonts
-export const BUTTON_DEFAULT_FONT = '12px Arial';
+export const BUTTON_DEFAULT_FONT = '14px Arial';
 
 export const ACHIEVEMENT_ANNOUNCEMENT_LIFE_MS = 5000;
 export const ACHIEVEMENT_FLOAT_RISE_SPEED = 2;
