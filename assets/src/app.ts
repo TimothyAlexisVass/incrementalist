@@ -5,7 +5,7 @@ import { createWebGLRenderer, setActiveWebGLRenderer } from "./renderer/webgl";
 
 const incrementalistCanvas = requiredElement<HTMLCanvasElement>("#incrementalist");
 const effectsCanvas = requiredElement<HTMLCanvasElement>("#effects-canvas");
-const incrementalistGlContext = incrementalistCanvas.getContext("webgl", {
+const incrementalistGlContext = incrementalistCanvas.getContext("webgl2", {
   alpha: true,
   antialias: false,
   depth: false,

@@ -29,7 +29,7 @@ Uses offscreen canvases to downsample images in JavaScript before uploading them
 **Location:** `assets/src/renderer/webgl.ts`
 The core WebGL renderer currently uses a 2D canvas for text measurement and creates a unique offscreen canvas/texture for every unique string.
 - **Violation:** `textMeasureCanvas` (Line 177) and `textCanvas` (Line 447).
-- **Remediation:** A true WebGL text system (Bitmap Font or MSDF) must be implemented.
+- **Remediation:** A true WebGL text system (SDF-based via Troika) must be implemented.
 
 ---
 
@@ -47,9 +47,11 @@ The remediation is split into 5 phases, starting with the simplest asset correct
 - Implement SDF-based shaders for rings, arcs, and circles.
 - Provides the foundation for UI meters.
 
-### [Phase 3: Bitmap Font System](file:///Users/timothy/incrementalist/plans/slop_repair_phase_3_bitmap_fonts.md)
+### [Phase 3: SDF Text System (Troika)](file:///Users/timothy/incrementalist/plans/slop_repair_phase_3_sdf_text.md)
 **Difficulty: Hard (Infrastructure)**
-- Replace the forbidden "Canvas-per-String" text system with a native Bitmap Font atlas.
+- Integrate Three.js and `troika-three-text`.
+- Replace the forbidden "Canvas-per-String" text system with a native SDF-based text engine.
+- Supports high-quality outlines, shadows, and smooth scaling.
 - Essential pre-requisite for all remaining UI features.
 
 ### [Phase 4: Progress Bar Migration](file:///Users/timothy/incrementalist/plans/slop_repair_phase_4_progress_bar.md)

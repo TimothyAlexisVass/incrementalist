@@ -347,7 +347,7 @@ export function initWebGLEffectsLayer(canvas: HTMLCanvasElement | null, width: n
   WEBGL_EFFECTS.canvas = canvas;
   resizeWebGLEffectsLayer(width, height);
 
-  const gl = canvas.getContext('webgl', {
+  const gl = canvas.getContext('webgl2', {
     alpha: true,
     antialias: false,
     depth: false,
