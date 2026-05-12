@@ -139,10 +139,13 @@ function renderSisuControlToContext(
       ctx.stroke();
     }
 
-    ctx.fillStyle = COLORS.hud.textPrimary;
     ctx.font = SISU_MAX_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 5;
+    ctx.strokeText(displayCurrent.toFixed(2), centerX, centerY);
+    ctx.fillStyle = COLORS.hud.textPrimary;
     ctx.fillText(displayCurrent.toFixed(2), centerX, centerY);
   };
 
@@ -246,10 +249,14 @@ class SisuGeneratorModalImpl implements Modal {
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
 
-    drawCtx.fillStyle = COLORS.sisu.blue;
+    const multiplierText = formatSisuMultiplier(currentSisu);
     drawCtx.font = SISU_CURRENT_FONT;
     drawCtx.textAlign = "center";
-    drawCtx.fillText(formatSisuMultiplier(currentSisu), modalX + modalWidth / 2, modalY + 100);
+    drawCtx.strokeStyle = "black";
+    drawCtx.lineWidth = 4;
+    drawCtx.strokeText(multiplierText, modalX + modalWidth / 2, modalY + 100);
+    drawCtx.fillStyle = COLORS.sisu.blue;
+    drawCtx.fillText(multiplierText, modalX + modalWidth / 2, modalY + 100);
 
     this.refillRects.length = 0;
     const refillWidth = 132;
@@ -274,14 +281,14 @@ class SisuGeneratorModalImpl implements Modal {
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
+    const maxSisuText = `Max Sisu: ${formatSisuMultiplier(maxBasic)} (Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`;
     drawCtx.fillStyle = COLORS.hud.textPrimary;
     drawCtx.font = SISU_MAX_FONT;
     drawCtx.textAlign = "left";
-    drawCtx.fillText(
-      `Max Sisu: ${formatSisuMultiplier(maxBasic)} (Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`,
-      modalX + 38,
-      modalY + 272
-    );
+    drawCtx.strokeStyle = "black";
+    drawCtx.lineWidth = 3;
+    drawCtx.strokeText(maxSisuText, modalX + 38, modalY + 272);
+    drawCtx.fillText(maxSisuText, modalX + 38, modalY + 272);
 
     this.upgradeRect = {
       x: modalX + modalWidth - 220,
@@ -457,5 +464,9 @@ function drawSisuRefillControl(
   ctx.textBaseline = "middle";
   ctx.fillText(label, circleX, rect.y + 57);
   ctx.font = TINY_TEXT_FONT;
-  ctx.fillText(formatSisuMultiplier(target), circleX, rect.y + 76);
+  const targetText = formatSisuMultiplier(target);
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = 2;
+  ctx.strokeText(targetText, circleX, rect.y + 76);
+  ctx.fillText(targetText, circleX, rect.y + 76);
 }
