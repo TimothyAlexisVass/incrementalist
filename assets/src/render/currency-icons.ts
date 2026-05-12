@@ -17,7 +17,7 @@ function getCurrencyIconImage(currencyKey: string) {
 
 export function drawCurrencyIcon(currencyKey: string, x: number, y: number, size: number) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer || size <= 0) {
+  if (size <= 0) {
     return;
   }
   const image = getCurrencyIconImage(currencyKey);
@@ -40,7 +40,6 @@ export function drawCurrencyIcon(currencyKey: string, x: number, y: number, size
 
 export function measureCurrencyAmount(amount: number | BigNum, iconSize: number, options: any = {}) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) return 0;
   const {
     font = 'bold 16px Arial',
     iconGap = 5,
@@ -63,9 +62,6 @@ export function drawCurrencyAmount(
   options: any = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) {
-    return 0;
-  }
 
   const {
     align = 'left',

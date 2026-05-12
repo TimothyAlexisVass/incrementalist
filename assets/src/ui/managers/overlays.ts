@@ -40,7 +40,7 @@ export class Overlays {
 
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     if (!this.activeOverlay) return;
-    if (!getActiveWebGLRenderer()) return;
+    getActiveWebGLRenderer();
 
     // Overlays can optionally draw their own backdrop, but typically they do.
     // For now we assume the overlay handles its own background/backdrop.

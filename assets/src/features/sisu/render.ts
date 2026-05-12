@@ -50,10 +50,10 @@ export function renderSisuControl(
   state: ServerState
 ): SisuControlLayout | null {
   const renderer = getActiveWebGLRenderer();
-  const target = renderer ? getSisuSurfaceContext(canvas) : null;
-  if (!target) return null;
+  const target = getSisuSurfaceContext(canvas);
+  if (!target || !renderer) return null;
   const layout = renderSisuControlToContext(target, canvas, input, state);
-  if (renderer && sisuSurface) {
+  if (sisuSurface) {
     renderer.drawImage({
       image: sisuSurface,
       x: 0,
@@ -185,8 +185,8 @@ class SisuGeneratorModalImpl implements Modal {
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
-    const drawCtx = renderer ? getSisuSurfaceContext(canvas) : null;
-    if (!drawCtx) return;
+    const drawCtx = getSisuSurfaceContext(canvas);
+    if (!drawCtx || !renderer) return;
     const snapshot = this.getState().snapshot;
     if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
       this.onClose();
@@ -295,7 +295,7 @@ class SisuGeneratorModalImpl implements Modal {
     const pendingUpgradePrefix = upgradeState.prefix;
 
     drawCtx.restore();
-    if (renderer && sisuSurface) {
+    if (sisuSurface) {
       renderer.drawImage({
         image: sisuSurface,
         x: 0,
@@ -351,34 +351,28 @@ function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum) {
   const rightText = prefix ? ")" : "";
 
   const leftWidth = leftText
-    ? (renderer
-      ? renderer.measureTextWidth({ text: leftText, font: SISU_UPGRADE_BUTTON_FONT })
-      : 0)
+    ? renderer.measureTextWidth({ text: leftText, font: SISU_UPGRADE_BUTTON_FONT })
     : 0;
   const amountWidth = measureCurrencyAmount(cost, iconSize, {
     font: SISU_UPGRADE_BUTTON_FONT,
     iconGap
   });
   const rightWidth = rightText
-    ? (renderer
-      ? renderer.measureTextWidth({ text: rightText, font: SISU_UPGRADE_BUTTON_FONT })
-      : 0)
+    ? renderer.measureTextWidth({ text: rightText, font: SISU_UPGRADE_BUTTON_FONT })
     : 0;
   const totalWidth = leftWidth + amountWidth + rightWidth;
   let currentX = rect.x + rect.width / 2 - totalWidth / 2;
 
   if (leftText) {
-    if (renderer) {
-      renderer.drawText({
-        text: leftText,
-        x: currentX,
-        y: textY,
-        font: SISU_UPGRADE_BUTTON_FONT,
-        color: textColor,
-        align: "left",
-        baseline: "alphabetic"
-      });
-    }
+    renderer.drawText({
+      text: leftText,
+      x: currentX,
+      y: textY,
+      font: SISU_UPGRADE_BUTTON_FONT,
+      color: textColor,
+      align: "left",
+      baseline: "alphabetic"
+    });
     currentX += leftWidth;
   }
 
@@ -392,17 +386,15 @@ function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum) {
   currentX += amountWidth;
 
   if (rightText) {
-    if (renderer) {
-      renderer.drawText({
-        text: rightText,
-        x: currentX,
-        y: textY,
-        font: SISU_UPGRADE_BUTTON_FONT,
-        color: textColor,
-        align: "left",
-        baseline: "alphabetic"
-      });
-    }
+    renderer.drawText({
+      text: rightText,
+      x: currentX,
+      y: textY,
+      font: SISU_UPGRADE_BUTTON_FONT,
+      color: textColor,
+      align: "left",
+      baseline: "alphabetic"
+    });
   }
 }
 

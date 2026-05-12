@@ -9,7 +9,7 @@ export class UserInterface {
   public readonly overlays = new Overlays();
 
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
-    if (!getActiveWebGLRenderer()) return;
+    getActiveWebGLRenderer();
 
     // Render order: Overlays first, Modals on top. 
     // Modals block input to lower layers.

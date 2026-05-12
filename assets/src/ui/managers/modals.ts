@@ -26,7 +26,6 @@ export class Modals {
     if (!this.activeModal) return;
 
     const renderer = getActiveWebGLRenderer();
-    if (!renderer) return;
 
     renderer.drawRect({
       x: 0,

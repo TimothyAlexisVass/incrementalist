@@ -16,9 +16,6 @@ export function drawCheckbox(
   options: CheckboxOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) {
-    return;
-  }
 
   const {
     trackColor = COLORS.bar.track,

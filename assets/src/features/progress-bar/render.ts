@@ -13,6 +13,7 @@ import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
 import {
   setGpuProgressBarGlow,
+  updateGpuProgressLiquidBubbles,
   spawnGpuProgressCollectionLaserBurst,
   spawnGpuProgressCompletionBurst,
   ColorInput
@@ -53,7 +54,6 @@ const PROGRESS_VISUAL_STATE: {
   completionParticles: CompletionParticle[];
   liquidBubbles: LiquidBubble[];
   liquidBubbleSpawnAccumulator: number;
-  usesGpuLiquidBubbles: boolean;
   displayedFillRatio: number;
   collectionGlowStartedAt: number;
 } = {
@@ -63,7 +63,6 @@ const PROGRESS_VISUAL_STATE: {
   completionParticles: [],
   liquidBubbles: [],
   liquidBubbleSpawnAccumulator: 0,
-  usesGpuLiquidBubbles: false,
   displayedFillRatio: 0,
   collectionGlowStartedAt: 0
 };
@@ -123,11 +122,11 @@ export function renderProgressBar(
 ) {
   if (!canvas) return;
   const renderer = getActiveWebGLRenderer();
-  const target = renderer ? getProgressSurfaceContext(canvas) : null;
-  if (!target) return;
+  const target = getProgressSurfaceContext(canvas);
+  if (!target || !renderer) return;
   renderProgressBarToContext(target, canvas, input);
 
-  if (renderer && progressSurface) {
+  if (progressSurface) {
     renderer.drawImage({
       image: progressSurface,
       x: 0,
@@ -180,8 +179,15 @@ function renderProgressBarToContext(
 
   const fillHeight = displayedFillRatio * barHeight;
   const fillY = barY + barHeight - fillHeight;
-  PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles = false;
-  updateProgressLiquidBubbles(deltaTime, barX, barY, barWidth, barHeight, displayedFillRatio, now);
+  updateGpuProgressLiquidBubbles(deltaTime, {
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    fillHeight,
+    fillRatio: displayedFillRatio,
+    fillY
+  });
 
   const pulse = isFull ? getFullPulse(now) : 1;
   const hasCollectionGlow = collectionPulse > 0;
@@ -411,9 +417,6 @@ function renderLiquidProgressFill(
   ctx.fillStyle = progressGradient;
   ctx.fillRect(barX, barY, barWidth, barHeight);
 
-  if (!PROGRESS_VISUAL_STATE.usesGpuLiquidBubbles) {
-    renderLiquidBubbles(ctx, barX, barY, barWidth, barHeight, fillY, fillHeight, fillRatio, now);
-  }
   ctx.restore();
 
   renderLiquidSurfaceHighlight(

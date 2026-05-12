@@ -193,7 +193,6 @@ export function updateFloatingTexts(floatingTexts: FloatingText[], deltaTime: nu
 export function renderFloatingTexts(floatingTexts: FloatingText[]) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) return;
 
   for (let i = 0; i < floatingTexts.length; i += 1) {
     const ft = floatingTexts[i];

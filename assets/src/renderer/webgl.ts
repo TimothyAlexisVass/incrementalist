@@ -529,7 +529,10 @@ export function setActiveWebGLRenderer(renderer: WebGLRenderer | null) {
   activeWebGLRenderer = renderer;
 }
 
-export function getActiveWebGLRenderer() {
+export function getActiveWebGLRenderer(): WebGLRenderer {
+  if (!activeWebGLRenderer) {
+    throw new Error("WebGL renderer is not initialized");
+  }
   return activeWebGLRenderer;
 }
 

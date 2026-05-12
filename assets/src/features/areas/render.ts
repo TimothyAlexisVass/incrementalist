@@ -32,7 +32,7 @@ export function renderAreaBackground(canvas: HTMLCanvasElement) {
   
   const image = getAreaBackgroundImage(areaKey);
 
-  if (renderer && image.complete && image.naturalWidth > 0) {
+  if (image.complete && image.naturalWidth > 0) {
     renderer.drawImage({
       image,
       x: DISPLAY_AREA_X,
@@ -43,7 +43,7 @@ export function renderAreaBackground(canvas: HTMLCanvasElement) {
     return;
   }
 
-  if (!renderer) return;
+
 
   const color = hexToRgba(COLORS.game.background);
   renderer.drawRect({ x: 0, y: 0, width: canvas.width, height: canvas.height, color });

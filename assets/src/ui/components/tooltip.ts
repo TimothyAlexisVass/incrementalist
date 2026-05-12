@@ -22,7 +22,7 @@ export function drawTooltip(
   options: TooltipOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer || !canvas || !anchorPoint) {
+  if (!canvas || !anchorPoint) {
     return null;
   }
 

@@ -20,9 +20,6 @@ export function drawLockedElement(
   options: LockedElementOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) {
-    return;
-  }
 
   const {
     label = "LOCKED",

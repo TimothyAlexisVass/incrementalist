@@ -77,9 +77,6 @@ export class TabMenu {
     runCommand?: (cmd: () => Promise<any>) => void
   ) {
     const renderer = getActiveWebGLRenderer();
-    if (!renderer) {
-      return;
-    }
 
     const layout = this.config.layout || 'horizontal';
     const position = this.config.position || 'top-left';

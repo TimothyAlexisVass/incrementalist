@@ -48,9 +48,6 @@ function getNoticePingProgress(x: number, y: number, radius: number) {
 
 function drawNoticePing(x: number, y: number, radius: number) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) {
-    return;
-  }
 
   const progress = getNoticePingProgress(x, y, radius);
 
@@ -77,7 +74,7 @@ export function drawButton(
   options: ButtonOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer || !rect) {
+  if (!rect) {
     return;
   }
 
@@ -133,9 +130,6 @@ export function drawNoticeDot(
   animated: boolean = true
 ) {
   const renderer = getActiveWebGLRenderer();
-  if (!renderer) {
-    return;
-  }
 
   if (animated) {
     drawNoticePing(x, y, radius);
@@ -207,7 +201,6 @@ function drawRectOutline(
   lineWidth: number,
   color: readonly [number, number, number, number]
 ) {
-  if (!renderer) return;
   const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
   renderer.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: stroke, color });
   renderer.drawRect({ x: rect.x, y: rect.y + rect.height - stroke, width: rect.width, height: stroke, color });
