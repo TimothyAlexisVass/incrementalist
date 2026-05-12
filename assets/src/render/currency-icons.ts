@@ -3,7 +3,6 @@ import { BigNum } from '../core/bignum';
 import { getActiveWebGLRenderer } from '../renderer/webgl';
 
 const currencyIconImages = new Map<string, HTMLImageElement>();
-const smoothedCurrencyIconCanvases = new Map<string, HTMLCanvasElement>();
 
 function getCurrencyIconImage(currencyKey: string) {
   if (!currencyKey || typeof Image === 'undefined') return null;
@@ -21,15 +20,10 @@ export function drawCurrencyIcon(currencyKey: string, x: number, y: number, size
     return;
   }
   const image = getCurrencyIconImage(currencyKey);
-  if (!image) return;
-
-  const iconSize = Math.max(1, Math.round(size));
-  const renderSource = image.complete && image.naturalWidth > 0
-    ? getSmoothedCurrencyIconCanvas(currencyKey, image, iconSize) || image
-    : image;
+  if (!image || !image.complete || image.naturalWidth === 0) return;
 
   renderer.drawImage({
-    image: renderSource,
+    image,
     x,
     y,
     width: size,
@@ -114,21 +108,6 @@ export function drawCurrencyAmount(
   return width;
 }
 
-function getSmoothedCurrencyIconCanvas(currencyKey: string, image: HTMLImageElement, size: number) {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-
-  const cacheKey = `${currencyKey}:${size}`;
-  if (smoothedCurrencyIconCanvases.has(cacheKey)) {
-    return smoothedCurrencyIconCanvases.get(cacheKey) || null;
-  }
-
-  const canvas = downsampleImage(image, size);
-  smoothedCurrencyIconCanvases.set(cacheKey, canvas);
-  return canvas;
-}
-
 function resolveIconSize(iconSize: number) {
   const size = Number(iconSize);
   return Number.isFinite(size) && size > 0 ? size : 16;
@@ -137,34 +116,4 @@ function resolveIconSize(iconSize: number) {
 function getFontPixelSize(font: string) {
   const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
   return match ? Number(match[1]) : 16;
-}
-
-function downsampleImage(image: HTMLImageElement | HTMLCanvasElement, targetSize: number) {
-  let source: HTMLImageElement | HTMLCanvasElement = image;
-  let sourceWidth = 'naturalWidth' in image ? image.naturalWidth : image.width;
-  let sourceHeight = 'naturalHeight' in image ? image.naturalHeight : image.height;
-
-  while (sourceWidth > targetSize * 2 && sourceHeight > targetSize * 2) {
-    const nextWidth = Math.max(targetSize, Math.round(sourceWidth / 2));
-    const nextHeight = Math.max(targetSize, Math.round(sourceHeight / 2));
-    const nextCanvas = createSmoothedCanvas(nextWidth, nextHeight);
-    nextCanvas.getContext('2d')!.drawImage(source, 0, 0, nextWidth, nextHeight);
-    source = nextCanvas;
-    sourceWidth = nextWidth;
-    sourceHeight = nextHeight;
-  }
-
-  const targetCanvas = createSmoothedCanvas(targetSize, targetSize);
-  targetCanvas.getContext('2d')!.drawImage(source, 0, 0, targetSize, targetSize);
-  return targetCanvas;
-}
-
-function createSmoothedCanvas(width: number, height: number) {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const canvasContext = canvas.getContext('2d')!;
-  canvasContext.imageSmoothingEnabled = true;
-  canvasContext.imageSmoothingQuality = 'high';
-  return canvas;
 }
