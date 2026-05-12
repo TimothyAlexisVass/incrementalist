@@ -36,7 +36,9 @@ type SageTipRender = {
   boxY: number;
   boxWidth: number;
   boxHeight: number;
-  visibleLines: string[];
+  fullLines: string[];
+  lineWidths: number[];
+  visibleCharCounts: number[];
   buttonRect: { x: number; y: number; width: number; height: number };
 };
 
@@ -70,10 +72,8 @@ export function renderSageArea(
     const leafId = tipLeafId(tipLevel);
     const buttonLabel = tip.confirmation || 'Alright';
     const fullLines = tip.text;
-    const maxLineWidth = fullLines.reduce((maxWidth, line) => {
-      const lineWidth = renderer ? renderer.measureTextWidth({ text: line, font: SMALL_TEXT_FONT }) : 0;
-      return Math.max(maxWidth, lineWidth);
-    }, 0);
+    const lineWidths = fullLines.map((line) => (renderer ? renderer.measureTextWidth({ text: line, font: SMALL_TEXT_FONT }) : 0));
+    const maxLineWidth = lineWidths.reduce((maxWidth, lineWidth) => Math.max(maxWidth, lineWidth), 0);
     const headerWidth = renderer ? renderer.measureTextWidth({ text: SAGE_HEADER_TEXT, font: SAGE_HEADER_FONT }) : 0;
 
     const buttonWidth = Math.max(
@@ -99,8 +99,7 @@ export function renderSageArea(
     const revealStart = tipRevealStarts.get(tipLevel) ?? now;
     const elapsedSeconds = (now - revealStart) / 1000;
     const lettersToShow = Math.floor(elapsedSeconds * LETTERS_PER_SECOND);
-    const visibleText = fullLines.join('\n').substring(0, lettersToShow);
-    const visibleLines = visibleText.length > 0 ? visibleText.split('\n') : [];
+    const visibleCharCounts = getVisibleCharCounts(fullLines, lettersToShow);
 
     return {
       leafId,
@@ -109,7 +108,9 @@ export function renderSageArea(
       boxY: DISPLAY_AREA_Y,
       boxWidth,
       boxHeight,
-      visibleLines,
+      fullLines,
+      lineWidths,
+      visibleCharCounts,
       buttonRect: { x: 0, y: 0, width: buttonWidth, height: BUTTON_HEIGHT }
     } satisfies SageTipRender;
   });
@@ -147,7 +148,7 @@ function renderTipPanel(
   renderer = getActiveWebGLRenderer()
 ) {
   if (!renderer) return;
-  const { boxX, boxY, boxWidth, boxHeight, visibleLines, buttonLabel, buttonRect, leafId } = tip;
+  const { boxX, boxY, boxWidth, boxHeight, fullLines, lineWidths, visibleCharCounts, buttonLabel, buttonRect, leafId } = tip;
 
   renderer.drawRect({
     x: boxX,
@@ -196,11 +197,14 @@ function renderTipPanel(
 
   const bodyStartY = boxY + PANEL_TOP_PADDING + LINE_HEIGHT + SAGE_HEADER_MARGIN_BOTTOM;
 
-  for (let i = 0; i < visibleLines.length; i += 1) {
+  for (let i = 0; i < fullLines.length; i += 1) {
+    const fullLine = fullLines[i];
+    const visibleChars = visibleCharCounts[i] ?? 0;
     const x = boxX + PANEL_PADDING;
     const y = bodyStartY + (i * LINE_HEIGHT);
+
     renderer.drawText({
-      text: visibleLines[i],
+      text: fullLine,
       x,
       y,
       font: SMALL_TEXT_FONT,
@@ -208,6 +212,22 @@ function renderTipPanel(
       align: 'left',
       baseline: 'top'
     });
+
+    if (visibleChars < fullLine.length) {
+      const visibleWidth = visibleChars <= 0
+        ? 0
+        : renderer.measureTextWidth({ text: fullLine.slice(0, visibleChars), font: SMALL_TEXT_FONT });
+      const hiddenWidth = Math.max(0, (lineWidths[i] ?? 0) - visibleWidth);
+      if (hiddenWidth > 0) {
+        renderer.drawRect({
+          x: x + visibleWidth,
+          y,
+          width: hiddenWidth + 2,
+          height: LINE_HEIGHT,
+          color: hexToRgba(COLORS.panel.bg)
+        });
+      }
+    }
   }
 
   const buttonClicked = doButton(input, buttonRect, buttonLabel, {
@@ -234,4 +254,15 @@ function getVisibleTipLevels(level: number): number[] {
 
 function tipLeafId(level: number): string {
   return `leaf.sage_tip.${level}.confirm_button`;
+}
+
+function getVisibleCharCounts(fullLines: string[], lettersToShow: number): number[] {
+  let remaining = Math.max(0, lettersToShow);
+
+  return fullLines.map((line, index) => {
+    const visibleChars = Math.min(line.length, remaining);
+    const hasTrailingNewline = index < fullLines.length - 1;
+    remaining = Math.max(0, remaining - line.length - (hasTrailingNewline ? 1 : 0));
+    return visibleChars;
+  });
 }

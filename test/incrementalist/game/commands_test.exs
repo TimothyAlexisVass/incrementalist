@@ -198,6 +198,43 @@ defmodule Incrementalist.Game.CommandsTest do
     assert "leaf.sage_tip.1.confirm_button" in slot.notices.dismissed_leaf_ids
   end
 
+  test "notice.event child_shown for a sage tip keeps sage guidance cleared after area switch" do
+    player = create_player()
+    slot = SaveSlots.get_slot!(player.id, 0)
+    unlocked_state = %{slot.state | level: 10, area: "sage"}
+
+    slot
+    |> SaveSlot.changeset(%{
+      state: unlocked_state,
+      notices: Notices.new(unlocked_state),
+      last_saved_at: @now
+    })
+    |> Repo.update!()
+
+    shown_notice =
+      Commands.enqueue(
+        player.id,
+        "notice.event",
+        intent(0, %{"event" => "child_shown", "leaf_id" => "leaf.sage_tip.1.confirm_button"}),
+        @now
+      )
+
+    assert shown_notice["type"] == "notice.event.result"
+    Commands.ack(player.id, 0, @now)
+
+    go_cloverfield =
+      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+
+    assert go_cloverfield["type"] == "area.select.result"
+    refute "leaf.area.sage.go_button" in go_cloverfield["notices"]["active_leaf_ids"]
+    refute "parent.area.dropdown" in go_cloverfield["notices"]["active_parent_ids"]
+
+    updated_slot = SaveSlots.get_slot!(player.id, 0)
+    assert "leaf.sage_tip.1.confirm_button" in updated_slot.notices.seen_leaf_ids
+    refute "leaf.sage_tip.1.confirm_button" in updated_slot.notices.dismissed_leaf_ids
+    refute "leaf.area.sage.go_button" in updated_slot.notices.active_leaf_ids
+  end
+
   test "dismissed non-sage area leaf notice stays cleared after area navigation" do
     player = create_player()
     slot = SaveSlots.get_slot!(player.id, 0)

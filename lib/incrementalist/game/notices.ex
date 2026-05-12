@@ -21,6 +21,7 @@ defmodule Incrementalist.Game.Notices do
   @derive Jason.Encoder
   embedded_schema do
     field :dismissed_leaf_ids, {:array, :string}, default: []
+    field :seen_leaf_ids, {:array, :string}, default: []
     field :active_leaf_ids, {:array, :string}, default: []
     field :active_parent_ids, {:array, :string}, default: []
   end
@@ -29,12 +30,13 @@ defmodule Incrementalist.Game.Notices do
 
   def changeset(schema \\ %__MODULE__{}, attrs) do
     schema
-    |> cast(attrs, [:dismissed_leaf_ids, :active_leaf_ids, :active_parent_ids])
+    |> cast(attrs, [:dismissed_leaf_ids, :seen_leaf_ids, :active_leaf_ids, :active_parent_ids])
   end
 
   def new(state \\ nil) do
     base = %__MODULE__{
       dismissed_leaf_ids: [],
+      seen_leaf_ids: [],
       active_leaf_ids: [],
       active_parent_ids: []
     }
@@ -150,6 +152,8 @@ defmodule Incrementalist.Game.Notices do
         notices
 
       true ->
+        next_seen_leaf_ids = Enum.uniq([leaf_id | notices.seen_leaf_ids])
+
         next_active_leaf_ids =
           case parse_leaf_id(leaf_id) do
             {:sage_tip, _level} ->
@@ -170,7 +174,8 @@ defmodule Incrementalist.Game.Notices do
 
         %{
           notices
-          | active_leaf_ids: next_active_leaf_ids,
+          | seen_leaf_ids: next_seen_leaf_ids,
+            active_leaf_ids: next_active_leaf_ids,
             active_parent_ids: next_active_parent_ids
         }
     end
@@ -202,6 +207,7 @@ defmodule Incrementalist.Game.Notices do
 
   defp eligible_leaf_ids(%State{} = state, %__MODULE__{} = notices) do
     dismissed = MapSet.new(notices.dismissed_leaf_ids)
+    seen = MapSet.new(notices.seen_leaf_ids)
     current_area = state.area || "sage"
 
     area_leaves =
@@ -248,7 +254,9 @@ defmodule Incrementalist.Game.Notices do
 
     has_unconfirmed_sage_tip? =
       sage_tip_leaves
-      |> Enum.any?(fn leaf_id -> not MapSet.member?(dismissed, leaf_id) end)
+      |> Enum.any?(fn leaf_id ->
+        not MapSet.member?(dismissed, leaf_id) and not MapSet.member?(seen, leaf_id)
+      end)
 
     sage_area_guidance_leaf =
       if current_area != "sage" and has_unconfirmed_sage_tip? do
