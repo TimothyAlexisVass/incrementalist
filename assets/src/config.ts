@@ -66,8 +66,8 @@ export const DAILY_BONUS_LABEL_FONT = '12px Arial';
 export const DAILY_BONUS_BUTTON_FONT = 'bold 14px Arial';
 
 // Coin Rain fonts
-export const COIN_RAIN_TIMER_FONT = '24px sans-serif';
-export const COIN_RAIN_COUNTDOWN_FONT = '48px sans-serif';
+export const COIN_RAIN_TIMER_FONT = '24px Arial';
+export const COIN_RAIN_COUNTDOWN_FONT = '48px Arial';
 
 // Save panel fonts
 export const SAVE_AUTOSAVE_FONT = '14px Arial';

@@ -918,11 +918,11 @@ function renderProgressCompletionParticles(ctx: CanvasRenderingContext2D) {
 
 export function getProgressBarLayout(canvas: HTMLCanvasElement) {
   const baseHeight = canvas.height - 120;
-  const barHeight = 437;
+  const barHeight = 418;
 
   return {
     x: canvas.width - 100,
-    y: 100,
+    y: 120,
     width: PROGRESS_BAR_WIDTH,
     height: barHeight
   };
