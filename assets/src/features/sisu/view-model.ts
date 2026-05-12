@@ -1,13 +1,13 @@
 import { compare, fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
 import type { ServerState } from "../../net/snapshots";
-import { clampNumber, lerp, lerpColor } from "../../utils";
+import { clampNumber, lerp } from "../../utils";
 import { formatMultiplierDelta } from "../../utils/format";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getViewModel as getProgressBarViewModel } from "../progress-bar/view-model";
 import { getServerNow } from "../../core/time";
+import { SISU_METER_RADIUS } from "../../config";
 
 import { UPGRADE_COSTS } from "./levels";
-import { COLORS } from "../../colors";
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -34,14 +34,13 @@ export const SISU_REFILL_TIERS: readonly SisuRefillTier[] = Object.values(SISU_R
 
 const SISU_VISUAL_STATE = {
   displayCurrent: SISU_MIN_MULTIPLIER,
-  displayCycleDecay: 0,
   initialized: false,
   lastTimestampMs: 0
 };
 
 export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
   const progressBar = getProgressBarLayout(canvas);
-  const barRadius = 35;
+  const barRadius = SISU_METER_RADIUS;
   const centerX = progressBar.x + progressBar.width / 2;
   const centerY = progressBar.y + progressBar.height + 120;
 
@@ -83,33 +82,24 @@ export function updateSisuVisualProjection(snapshot: NonNullable<ServerState["sn
   const nextFactor = fromNumber(1.0 - boundedCycleDecay / 100);
   const nextSisu = mul(snapshot.state.sisu.current, nextFactor);
   const targetAtClaim = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(nextSisu, baseCurrent));
-  const cycleDecayAtClaim = Math.max(0, baseCycleDecay * 0.98);
 
   const projectedCurrent = lerp(baseCurrent, targetAtClaim, progressRatio);
-  const projectedCycleDecay = lerp(baseCycleDecay, cycleDecayAtClaim, progressRatio);
 
   if (!SISU_VISUAL_STATE.initialized) {
     SISU_VISUAL_STATE.displayCurrent = projectedCurrent;
-    SISU_VISUAL_STATE.displayCycleDecay = projectedCycleDecay;
     SISU_VISUAL_STATE.initialized = true;
   }
 
   const meterSpeed = projectedCurrent >= SISU_VISUAL_STATE.displayCurrent ? 10 : 2;
   const meterT = clampNumber(1 - Math.exp(-meterSpeed * dtSeconds), 0, 1);
-  const decayT = clampNumber(1 - Math.exp(-8 * dtSeconds), 0, 1);
 
   SISU_VISUAL_STATE.displayCurrent = Math.max(
     SISU_MIN_MULTIPLIER,
     lerp(SISU_VISUAL_STATE.displayCurrent, projectedCurrent, meterT)
   );
-  SISU_VISUAL_STATE.displayCycleDecay = Math.max(
-    0,
-    lerp(SISU_VISUAL_STATE.displayCycleDecay, projectedCycleDecay, decayT)
-  );
 
   return {
-    displayCurrent: SISU_VISUAL_STATE.displayCurrent,
-    displayCycleDecay: SISU_VISUAL_STATE.displayCycleDecay
+    displayCurrent: SISU_VISUAL_STATE.displayCurrent
   };
 }
 
@@ -119,12 +109,6 @@ function getNowMs() {
   }
 
   return getServerNow();
-}
-
-export function formatDecay(value: number | null | undefined): string {
-  const parsed = Number(value);
-  const safe = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-  return (Math.round(safe * 100) / 100).toFixed(2);
 }
 
 export function getUpgradeButtonState(

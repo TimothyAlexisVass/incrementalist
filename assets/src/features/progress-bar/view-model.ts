@@ -59,25 +59,25 @@ export function updateProjectedFill(deltaTimeMs: number) {
   const now = getServerNow();
 
   if (currentViewModel.state === "awaiting_server_confirmation") {
-     if (currentViewModel.canClaimInMs !== null) {
-        currentViewModel.canClaimInMs -= deltaTimeMs;
-        if (currentViewModel.canClaimInMs <= 0) {
-           // Local countdown reached the boundary: require server verification.
-           currentViewModel.canClaimInMs = null;
-           currentViewModel.nextVerifyAtMs = now;
-           currentViewModel.projectedFill = 100;
-        }
-        return;
-     }
+    if (currentViewModel.canClaimInMs !== null) {
+      currentViewModel.canClaimInMs -= deltaTimeMs;
+      if (currentViewModel.canClaimInMs <= 0) {
+        // Local countdown reached the boundary: require server verification.
+        currentViewModel.canClaimInMs = null;
+        currentViewModel.nextVerifyAtMs = now;
+        currentViewModel.projectedFill = 100;
+      }
+      return;
+    }
 
-     // Waiting for the next server verification window.
-     return;
+    // Waiting for the next server verification window.
+    return;
   }
 
   if (currentViewModel.canClaimAt) {
     const endMs = Date.parse(currentViewModel.canClaimAt);
     const startMs = currentViewModel.snapshotAtMs;
-    
+
     if (now >= endMs) {
       currentViewModel.state = "confirmed_collectible";
       currentViewModel.canClaimInMs = 0;
@@ -90,16 +90,16 @@ export function updateProjectedFill(deltaTimeMs: number) {
     const totalDuration = endMs - startMs;
     const elapsed = now - startMs;
     const progress = Math.min(1.0, Math.max(0.0, elapsed / totalDuration));
-    
+
     // Lerp progress bar
     currentViewModel.projectedFill = currentViewModel.snapshotFill + (100 - currentViewModel.snapshotFill) * progress;
-    
+
     // Lerp Sisu
     const sStart = toNumber(currentViewModel.currentSisu);
     const sEnd = toNumber(currentViewModel.targetSisu);
     const currentSValue = sStart + (sEnd - sStart) * progress;
     currentViewModel.sisu = fromNumber(currentSValue);
-    
+
     // Lerp Sisu Decay
     const dStart = currentViewModel.currentSisuDecay;
     const dEnd = currentViewModel.targetSisuDecay;
@@ -112,6 +112,7 @@ export function updateProjectedFill(deltaTimeMs: number) {
 export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.state = "projecting";
   currentViewModel.projectedFill = snapshot.state.projection_params.current_fill;
+  // TODO(TimothyAlexisVass): Looks like we're getting current sisu twice here?
   currentViewModel.sisu = snapshot.state.sisu.current;
   currentViewModel.currentSisu = snapshot.state.projection_params.current_sisu;
   currentViewModel.targetSisu = snapshot.state.projection_params.sisu_at_claim;
@@ -309,5 +310,5 @@ function parseTimestamp(value: string | null | undefined, serverTime: string | n
 function conservativeFallbackFirstPlayedAt(serverTime: string | null | undefined) {
   const parsedServerTime = serverTime ? Date.parse(serverTime) : Number.NaN;
   const safeNow = Number.isFinite(parsedServerTime) ? parsedServerTime : getServerNow();
-  return safeNow - (30 * 24 * 60 * 60 * 1000); 
+  return safeNow - (30 * 24 * 60 * 60 * 1000);
 }

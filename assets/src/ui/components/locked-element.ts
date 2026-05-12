@@ -1,4 +1,5 @@
 import { COLORS } from "../../colors";
+import { withLockedAlpha } from "../../utils/locked";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { InteractionState, pointInRect } from "../managers/interactions";
 import { drawTooltip } from "./tooltip";
@@ -11,6 +12,8 @@ export interface LockedElementOptions {
   font?: string;
   showNotice?: boolean;
   showNoticePing?: boolean;
+  shape?: "rect" | "circle";
+  padding?: number;
 }
 
 export function drawLockedElement(
@@ -21,25 +24,21 @@ export function drawLockedElement(
   options: LockedElementOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
 
   const {
     label = "LOCKED",
-    opacity = 0.1,
+    opacity = 0.7,
     criteria,
-    font = "bold 12px Arial",
+    font = "bold 13px Arial",
     showNotice = false,
-    showNoticePing = false
+    showNoticePing = false,
+    shape = "rect",
+    padding = 0
   } = options;
 
-  drawElement();
-  renderer.drawRect({
-    x: rect.x,
-    y: rect.y,
-    width: rect.width,
-    height: rect.height,
-    color: [0, 0, 0, opacity]
-  });
-
+  withLockedAlpha(true, opacity, drawElement);
+  
   const textX = rect.x + rect.width / 2;
   const textY = rect.y + rect.height / 2;
 
@@ -56,15 +55,43 @@ export function drawLockedElement(
   });
 
   if (showNotice) {
-    const noticeX = rect.x + rect.width + 2;
-    const noticeY = rect.y - 2;
-    
+    const textWidth = renderer.measureTextWidth({ text: label, font });
+    const fontSize = parseFontSize(font);
+
+    const noticeX = textX + textWidth / 2 + 6;
+    const noticeY = textY - fontSize / 2 - 4;
+
     drawNoticeDot(noticeX, noticeY, 4, showNoticePing);
   }
 
-  if (criteria && input.pointer && pointInRect(input.pointer, rect)) {
-    drawTooltip(canvas, input.pointer, criteria);
+  const hitX = rect.x - padding;
+  const hitY = rect.y - padding;
+  const hitW = rect.width + padding * 2;
+  const hitH = rect.height + padding * 2;
+  const hitRect = { x: hitX, y: hitY, width: hitW, height: hitH };
+
+  let isHovered = false;
+  if (input.pointer) {
+    if (shape === "circle") {
+      const centerX = rect.x + rect.width / 2;
+      const centerY = rect.y + rect.height / 2;
+      const radius = Math.max(rect.width, rect.height) / 2 + padding;
+      const dx = input.pointer.x - centerX;
+      const dy = input.pointer.y - centerY;
+      isHovered = dx * dx + dy * dy <= radius * radius;
+    } else {
+      isHovered = pointInRect(input.pointer, hitRect);
+    }
   }
+
+  if (criteria && isHovered) {
+    drawTooltip(canvas, input.pointer!, criteria);
+  }
+}
+
+function parseFontSize(font: string): number {
+  const match = /(\d+)px/.exec(font);
+  return match ? parseInt(match[1], 10) : 12;
 }
 
 function clamp01(value: number) {

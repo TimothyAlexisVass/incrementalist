@@ -6,7 +6,7 @@ export interface CheckboxOptions {
   trackColor?: string;
   borderColor?: string;
   checkmarkColor?: string;
-  lineWidth?: number;
+  borderWidth?: number;
 }
 
 export function drawCheckbox(
@@ -22,7 +22,7 @@ export function drawCheckbox(
     trackColor = COLORS.bar.track,
     borderColor = COLORS.bar.border,
     checkmarkColor = COLORS.overlay.optionsCheckboxCheckmark,
-    lineWidth = 2
+    borderWidth = 2
   } = options;
 
   renderer.drawRect({
@@ -32,7 +32,7 @@ export function drawCheckbox(
     height: size,
     color: hexToRgba(trackColor)
   });
-  drawRectOutline(renderer, x, y, size, size, lineWidth, hexToRgba(borderColor));
+  drawRectOutline(renderer, x, y, size, size, borderWidth, hexToRgba(borderColor));
 
   if (!checked) {
     return;
@@ -84,10 +84,10 @@ function drawRectOutline(
   y: number,
   width: number,
   height: number,
-  lineWidth: number,
+  borderWidth: number,
   color: RGBA
 ) {
-  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  const stroke = Math.max(1, Number.isFinite(borderWidth) ? borderWidth : 1);
   renderer.drawRect({ x, y, width, height: stroke, color });
   renderer.drawRect({ x, y: y + height - stroke, width, height: stroke, color });
   renderer.drawRect({ x, y, width: stroke, height, color });

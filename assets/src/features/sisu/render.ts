@@ -1,10 +1,11 @@
 import { COLORS } from "../../colors";
 import {
   SISU_CURRENT_FONT,
-  SISU_DECAY_FONT,
   SISU_MAX_FONT,
   SISU_METER_FONT,
-  SISU_UPGRADE_BUTTON_FONT
+  SISU_METER_RADIUS,
+  SISU_UPGRADE_BUTTON_FONT,
+  TINY_TEXT_FONT
 } from "../../config";
 import type { BigNum } from "../../core/bignum";
 import type { GameChannel } from "../../net/game-channel";
@@ -23,7 +24,6 @@ import { getActiveWebGLRenderer } from "../../renderer/webgl";
 
 import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
 import {
-  formatDecay,
   getSisuControlRect,
   getSisuTierTarget,
   getUpgradeButtonState,
@@ -77,13 +77,13 @@ function renderSisuControlToContext(
   if (!snapshot) return null;
 
   const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
-  const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
+  const { displayCurrent } = updateSisuVisualProjection(snapshot);
   const blueMax = getSisuTierTarget(maxBasic, "blue");
   const yellowMax = getSisuTierTarget(maxBasic, "yellow");
   const purpleMax = getSisuTierTarget(maxBasic, "purple");
   const isUnlocked = Boolean(snapshot.state.features.sisu_generator_purchased);
 
-  const barRadius = 35;
+  const barRadius = SISU_METER_RADIUS;
   const progressBar = getProgressBarLayout(canvas);
   const centerX = progressBar.x + progressBar.width / 2;
   const centerY = progressBar.y + progressBar.height + 120;
@@ -143,11 +143,7 @@ function renderSisuControlToContext(
     ctx.font = SISU_MAX_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(formatSisuMultiplier(displayCurrent), centerX, centerY - 3);
-
-    ctx.fillStyle = COLORS.sisu.decay;
-    ctx.font = SISU_DECAY_FONT;
-    ctx.fillText(`-${formatDecay(displayCycleDecay)}%`, centerX, centerY + 12);
+    ctx.fillText(displayCurrent.toFixed(2), centerX, centerY);
   };
 
   let sisuBlitted = false;
@@ -169,7 +165,9 @@ function renderSisuControlToContext(
     drawLockedElement(canvas, input, controlRect, drawSisuControlAndBlit, {
       font: SISU_METER_FONT,
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
-      showNoticePing: true
+      showNoticePing: true,
+      shape: "circle",
+      padding: 8
     });
   } else {
     drawSisuControlAndBlit();
@@ -198,7 +196,7 @@ class SisuGeneratorModalImpl implements Modal {
     private readonly channel: GameChannel,
     private readonly runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>,
     private readonly onClose: () => void
-  ) {}
+  ) { }
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
@@ -244,18 +242,14 @@ class SisuGeneratorModalImpl implements Modal {
 
     drawButton(this.closeRect, "Close", { active: false });
 
-    const { displayCurrent, displayCycleDecay } = updateSisuVisualProjection(snapshot);
+    const { displayCurrent } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
 
     drawCtx.fillStyle = COLORS.sisu.blue;
     drawCtx.font = SISU_CURRENT_FONT;
     drawCtx.textAlign = "center";
-    drawCtx.fillText(formatSisuMultiplier(currentSisu), modalX + modalWidth / 2, modalY + 88);
-
-    drawCtx.fillStyle = COLORS.sisu.decay;
-    drawCtx.font = SISU_MAX_FONT;
-    drawCtx.fillText(`-${formatDecay(displayCycleDecay)}%`, modalX + modalWidth / 2, modalY + 116);
+    drawCtx.fillText(formatSisuMultiplier(currentSisu), modalX + modalWidth / 2, modalY + 100);
 
     this.refillRects.length = 0;
     const refillWidth = 132;
@@ -462,6 +456,6 @@ function drawSisuRefillControl(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(label, circleX, rect.y + 57);
-  ctx.font = SISU_DECAY_FONT;
+  ctx.font = TINY_TEXT_FONT;
   ctx.fillText(formatSisuMultiplier(target), circleX, rect.y + 76);
 }

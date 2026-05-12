@@ -31,15 +31,14 @@ export const UI_MESSAGE_SMALL_FONT = '18px Arial';
 export const SMALL_TEXT_FONT = '13px Arial';
 export const TINY_TEXT_FONT = '12px Arial';
 
-// Sisu UI fonts
+// Sisu UI constants and fonts
+export const SISU_METER_RADIUS = 28;
 export const SISU_METER_FONT = 'bold 14px Arial';
-export const SISU_DECAY_FONT = '10px Arial';
 export const SISU_CURRENT_FONT = 'bold 40px Arial';
 export const SISU_MAX_FONT = '16px Arial';
 export const SISU_UPGRADE_BUTTON_FONT = 'bold 13px Arial';
 
 // Progress bar fonts
-export const PROGRESS_PERCENT_FONT = 'bold 16px Arial';
 export const IDLE_TOGGLE_FONT = 'bold 14px Arial';
 
 // Shop fonts
@@ -102,7 +101,7 @@ export const DISPLAY_AREA_Y = TOP_HUD_HEIGHT;
 // Ends just before the progress bar column (bar is at canvas.width - 92)
 // TODO: progress bar must have PROGRESS_BAR_X, PROGRESS_BAR_Y and PROGRESS_BAR_HEIGHT
 // TODO: when progress bar has these, set DISPLAY_AREA_WIDTH based on that instead of this hardcoded number
-export const DISPLAY_AREA_WIDTH = CANVAS_WIDTH - 146;
+export const DISPLAY_AREA_WIDTH = 1120;
 export const DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
 export const TOP_HUD_EXP_BAR_X = 20;
 export const TOP_HUD_EXP_BAR_Y = 15;

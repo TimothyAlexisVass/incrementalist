@@ -35,8 +35,7 @@ export const COLORS = Object.freeze({
     darkBlue: '#0B1F4D',
     blue: '#1E90FF',
     yellow: '#FFD700',
-    purple: '#9932CC',
-    decay: '#ffa1a1'
+    purple: '#9932CC'
   },
   button: {
     surface: {

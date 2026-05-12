@@ -156,7 +156,8 @@ export function renderAreaDropdown(
             drawLockedElement(canvas, input, itemRect, renderItem, {
               opacity: 0,
               criteria: `Requires Level ${area.unlock_level}`,
-              showNotice: hasNotice // Locked element draws the notice on top of the lock
+              showNotice: hasNotice,
+              showNoticePing: true
             });
           } else {
             renderItem();

@@ -183,10 +183,10 @@ function drawRectOutline(
   y: number,
   width: number,
   height: number,
-  lineWidth: number,
+  borderWidth: number,
   color: [number, number, number, number]
 ) {
-  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  const stroke = Math.max(1, Number.isFinite(borderWidth) ? borderWidth : 1);
   renderer.drawRect({ x, y, width, height: stroke, color });
   renderer.drawRect({ x, y: y + height - stroke, width, height: stroke, color });
   renderer.drawRect({ x, y, width: stroke, height, color });

@@ -193,6 +193,7 @@ export class WebGLRenderer {
   private readonly textMeasureCtx: CanvasRenderingContext2D;
   private readonly textCache = new Map<string, TextSprite>();
   private readonly imageCache = new WeakMap<object, WebGLTexture>();
+  private _globalAlpha = 1.0;
 
   constructor(options: WebGLRendererOptions) {
     this.canvas = options.canvas;
@@ -261,6 +262,14 @@ export class WebGLRenderer {
     }
   }
 
+  public setGlobalAlpha(alpha: number) {
+    this._globalAlpha = clamp01(alpha);
+  }
+
+  public getGlobalAlpha() {
+    return this._globalAlpha;
+  }
+
   resize(width: number, height: number) {
     const nextWidth = Math.max(1, Math.floor(Number(width) || this.canvas.width || 1));
     const nextHeight = Math.max(1, Math.floor(Number(height) || this.canvas.height || 1));
@@ -303,8 +312,8 @@ export class WebGLRenderer {
     gl.enableVertexAttribArray(this.colorPositionLocation);
     gl.vertexAttribPointer(this.colorPositionLocation, 2, gl.FLOAT, false, 0, 0);
     gl.uniform2f(this.colorResolutionLocation, this.canvas.width, this.canvas.height);
-    const alpha = clamp01(options.alpha ?? 1);
-    gl.uniform4f(this.colorUniformLocation, color[0], color[1], color[2], color[3] * alpha);
+    const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
+    gl.uniform4f(this.colorUniformLocation, color[0] * alpha, color[1] * alpha, color[2] * alpha, color[3] * alpha);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -399,7 +408,8 @@ export class WebGLRenderer {
     gl.vertexAttribPointer(this.shapeTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.uniform2f(this.shapeResolutionLocation, this.canvas.width, this.canvas.height);
-    gl.uniform4f(this.shapeColorLocation, color[0], color[1], color[2], color[3]);
+    const alpha = (options.alpha ?? 1.0) * this._globalAlpha;
+    gl.uniform4f(this.shapeColorLocation, color[0], color[1], color[2], (color[3] ?? 1.0) * alpha);
     gl.uniform1f(this.shapeInnerRadiusLocation, innerRadius);
     gl.uniform1f(this.shapeThicknessLocation, thickness);
     gl.uniform1f(this.shapeSoftnessLocation, softness);
@@ -410,7 +420,6 @@ export class WebGLRenderer {
   drawImage(options: DrawImageOptions) {
     const gl = this.gl;
     const { image, x, y, width, height } = options;
-    const alpha = clamp01(options.alpha ?? 1);
     if (width <= 0 || height <= 0 || !isRenderableImage(image)) return;
 
     const texture = this.getOrCreateImageTexture(image);
@@ -447,6 +456,7 @@ export class WebGLRenderer {
     gl.vertexAttribPointer(this.textTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.uniform2f(this.textResolutionLocation, this.canvas.width, this.canvas.height);
+    const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform1f(this.textAlphaLocation, alpha);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -469,7 +479,6 @@ export class WebGLRenderer {
     const shadowOffsetY = Number(options.shadowOffsetY) || 0;
     const align = options.align || "left";
     const baseline = options.baseline || "alphabetic";
-    const alpha = clamp01(options.alpha ?? 1);
 
     const sprite = this.getOrCreateTextSprite(text, font, {
       color,
@@ -519,6 +528,7 @@ export class WebGLRenderer {
     gl.vertexAttribPointer(this.textTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
 
     gl.uniform2f(this.textResolutionLocation, this.canvas.width, this.canvas.height);
+    const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform1f(this.textAlphaLocation, alpha);
 
     gl.activeTexture(gl.TEXTURE0);
@@ -599,8 +609,8 @@ export class WebGLRenderer {
 
     const metrics = measure.measureText(text);
     const fontSize = parseFontSizePx(font);
-    const ascent = Math.ceil(metrics.actualBoundingBoxAscent || fontSize * 0.82);
-    const descent = Math.ceil(metrics.actualBoundingBoxDescent || fontSize * 0.28);
+    const ascent = Math.ceil(metrics.fontBoundingBoxAscent || metrics.actualBoundingBoxAscent || fontSize * 0.82);
+    const descent = Math.ceil(metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || fontSize * 0.28);
     const strokePad = Math.ceil(style.strokeWidth);
     const shadowPadX = Math.ceil(Math.abs(style.shadowOffsetX) + style.shadowBlur);
     const shadowPadY = Math.ceil(Math.abs(style.shadowOffsetY) + style.shadowBlur);

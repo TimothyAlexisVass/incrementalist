@@ -3,12 +3,14 @@ import {
   BAR_FULL_PULSE_SPEED,
   BAR_RESET_LERP_SPEED,
   PROGRESS_BAR_WIDTH,
-  PROGRESS_PERCENT_FONT,
   IDLE_TOGGLE_FONT,
+  TOP_HUD_HEIGHT,
+  BOTTOM_HUD_HEIGHT,
 } from '../../config';
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components/button';
-import { formatPercent, clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { hexToRgba } from '../../utils/color';
 import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
 import {
@@ -116,6 +118,15 @@ export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | n
   );
 }
 
+let progressBarBackgroundImage: HTMLImageElement | null = null;
+function getProgressBarBackgroundImage() {
+  if (!progressBarBackgroundImage) {
+    progressBarBackgroundImage = new Image();
+    progressBarBackgroundImage.src = 'images/progress_bar_background.png';
+  }
+  return progressBarBackgroundImage;
+}
+
 export function renderProgressBar(
   canvas: HTMLCanvasElement | null,
   input: InteractionState
@@ -124,6 +135,29 @@ export function renderProgressBar(
   const renderer = getActiveWebGLRenderer();
   const target = getProgressSurfaceContext(canvas);
   if (!target || !renderer) return;
+
+  const bgWidth = 160;
+  const bgX = canvas.width - bgWidth;
+
+  const bgImage = getProgressBarBackgroundImage();
+  if (bgImage.complete && bgImage.naturalWidth > 0) {
+    renderer.drawImage({
+      image: bgImage,
+      x: bgX,
+      y: TOP_HUD_HEIGHT,
+      width: bgWidth,
+      height: canvas.height - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT
+    });
+  } else {
+    renderer.drawRect({
+      x: bgX,
+      y: 0,
+      width: bgWidth,
+      height: canvas.height,
+      color: hexToRgba(COLORS.panel.bg)
+    });
+  }
+
   renderProgressBarToContext(target, canvas, input);
 
   if (progressSurface) {
@@ -262,15 +296,6 @@ function renderProgressBarToContext(
 
   renderProgressCompletionParticles(ctx);
 
-  const progressPercent = Math.floor(displayedFillValue);
-
-  ctx.save();
-  ctx.fillStyle = getProgressColor(progressPercent, idleMode);
-  ctx.font = PROGRESS_PERCENT_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(formatPercent(progressPercent, 0), barX + barWidth / 2, barY - 16);
-  ctx.restore();
 
   if (isFull) {
     const pulse = getFullPulse(now);
@@ -279,9 +304,6 @@ function renderProgressBarToContext(
     ctx.fillStyle = rgbaArrayToCss([255, 255, 255], 0.78 + 0.22 * pulse);
     ctx.shadowColor = rgbaArrayToCss(progressPalette.fillEnd, 0.22);
     ctx.shadowBlur = 2;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('ACT!', barX + barWidth / 2, barY + barHeight + 16);
     ctx.restore();
   }
 
@@ -897,11 +919,11 @@ function renderProgressCompletionParticles(ctx: CanvasRenderingContext2D) {
 
 export function getProgressBarLayout(canvas: HTMLCanvasElement) {
   const baseHeight = canvas.height - 120;
-  const barHeight = baseHeight * 0.70;
+  const barHeight = 437;
 
   return {
-    x: canvas.width - 92,
-    y: 90,
+    x: canvas.width - 100,
+    y: 100,
     width: PROGRESS_BAR_WIDTH,
     height: barHeight
   };
@@ -910,9 +932,9 @@ export function getProgressBarLayout(canvas: HTMLCanvasElement) {
 export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
   const barLayout = getProgressBarLayout(canvas);
   return {
-    x: barLayout.x + barLayout.width / 2 - 30,
+    x: barLayout.x + barLayout.width / 2 - 32,
     y: barLayout.y + barLayout.height + 40,
-    width: 60,
+    width: 66,
     height: 20
   };
 }
@@ -929,15 +951,17 @@ export function renderIdleModeToggle(
     inactiveSurface: state.idleMode ? COLORS.button.toggle.off : COLORS.button.toggle.on,
     activeBorder: COLORS.button.border.inactive,
     inactiveBorder: COLORS.button.border.inactive,
+    borderWidth: 1,
     textColor: COLORS.button.text,
-    font: IDLE_TOGGLE_FONT,
-    textY: toggleRect.y + 11
+    font: IDLE_TOGGLE_FONT
   });
 
   if (!state.features?.idleModePurchased) {
     drawLockedElement(canvas, input, toggleRect, drawToggle, {
-      opacity: 0.1,
-      criteria: "Requires Level 5"
+      criteria: "Requires Level 5",
+      showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
+      showNoticePing: true,
+      padding: 3
     });
     return null;
   }

@@ -9,7 +9,7 @@ export interface ButtonOptions {
   activeBorder?: string;
   inactiveBorder?: string;
   textColor?: string;
-  lineWidth?: number;
+  borderWidth?: number;
   font?: string;
   textAlign?: CanvasTextAlign;
   textX?: number;
@@ -81,7 +81,7 @@ export function drawButton(
     activeBorder = COLORS.button.border.active,
     inactiveBorder = COLORS.button.border.inactive,
     textColor = COLORS.button.text,
-    lineWidth = 2,
+    borderWidth = 2,
     font = BUTTON_DEFAULT_FONT,
     textAlign = 'center',
     textX = rect.x + (rect.width / 2),
@@ -103,7 +103,7 @@ export function drawButton(
     height: paddedRect.height,
     color: cssToRgba(active ? activeSurface : inactiveSurface)
   });
-  drawRectOutline(renderer, paddedRect, lineWidth, cssToRgba(active ? activeBorder : inactiveBorder));
+  drawRectOutline(renderer, paddedRect, borderWidth, cssToRgba(active ? activeBorder : inactiveBorder));
   renderer.drawText({
     text: label,
     x: textX,
@@ -178,10 +178,11 @@ export function doButton(
 function drawRectOutline(
   renderer: ReturnType<typeof getActiveWebGLRenderer>,
   rect: { x: number; y: number; width: number; height: number },
-  lineWidth: number,
+  borderWidth: number,
   color: readonly [number, number, number, number]
 ) {
-  const stroke = Math.max(1, Number.isFinite(lineWidth) ? lineWidth : 1);
+  const stroke = Number.isFinite(borderWidth) ? borderWidth : 1;
+  if (stroke <= 0) return;
   renderer.drawRect({ x: rect.x, y: rect.y, width: rect.width, height: stroke, color });
   renderer.drawRect({ x: rect.x, y: rect.y + rect.height - stroke, width: rect.width, height: stroke, color });
   renderer.drawRect({ x: rect.x, y: rect.y, width: stroke, height: rect.height, color });
