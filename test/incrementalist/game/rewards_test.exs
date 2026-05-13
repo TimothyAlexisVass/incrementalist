@@ -5,8 +5,8 @@ defmodule Incrementalist.Game.RewardsTest do
 
   describe "apply_level_ups/1" do
     test "does not level up if exp < required_exp" do
-      # Level 1 needs 19.1
-      state = %State{level: 1, exp: BigNum.from_number(5), required_exp: BigNum.from_number(19.1)}
+      # Level 1 needs 20.
+      state = %State{level: 1, exp: BigNum.from_number(5), required_exp: BigNum.from_number(20)}
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 1
@@ -14,30 +14,38 @@ defmodule Incrementalist.Game.RewardsTest do
     end
 
     test "levels up when exp >= required_exp" do
-      # Level 1 requires 19.1. We give 25 exp.
-      state = %State{level: 1, exp: BigNum.from_number(25), required_exp: BigNum.from_number(19.1)}
+      # Level 1 requires 20. We give 25 exp.
+      state = %State{level: 1, exp: BigNum.from_number(25), required_exp: BigNum.from_number(20)}
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 2
-      # 25 - 19.1 = 5.9 exp remaining
-      assert BigNum.compare(new_state.exp, BigNum.from_number(5.9)) == 0
-      # Level 2 required_exp: 10.1 * 4 + 9 = 49.4
-      assert BigNum.compare(new_state.required_exp, BigNum.from_number(49.4)) == 0
+      # 25 - 20 = 5 exp remaining
+      assert BigNum.compare(new_state.exp, BigNum.from_number(5)) == 0
+      # Level 2 required_exp: 10.1 * 4 + 9 = 49.4, snapped to 50.
+      assert BigNum.compare(new_state.required_exp, BigNum.from_number(50)) == 0
     end
 
     test "levels up multiple times" do
-      # Level 1 needs 19.1, Level 2 needs 49.4. Total 68.5.
-      state = %State{level: 1, exp: BigNum.from_number(80), required_exp: BigNum.from_number(19.1)}
+      # Level 1 needs 20, Level 2 needs 50. Total 70.
+      state = %State{level: 1, exp: BigNum.from_number(80), required_exp: BigNum.from_number(20)}
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 3
-      # 80 - 19.1 - 49.4 = 11.5 exp remaining
-      assert BigNum.compare(new_state.exp, BigNum.from_number(11.5)) == 0
+      # 80 - 20 - 50 = 10 exp remaining
+      assert BigNum.compare(new_state.exp, BigNum.from_number(10)) == 0
+    end
+
+    test "keeps required_exp below 1000 on a multiple of 10" do
+      state = %State{level: 8, exp: BigNum.from_number(660), required_exp: BigNum.from_number(660)}
+      new_state = Rewards.apply_level_ups(state)
+
+      assert new_state.level == 9
+      assert BigNum.compare(new_state.required_exp, BigNum.from_number(830)) == 0
     end
 
     test "level 100 rewards" do
-      # Level 99 needs 10.1 * 99^2 + 9 = 10.1 * 9801 + 9 = 98989.1 + 9 = 99008.1
-      req = BigNum.from_number(99008.1)
+      # Level 99 needs 10.1 * 99^2 + 9 = 10.1 * 9801 + 9 = 98999.1
+      req = BigNum.from_number(98999.1)
       state = %State{level: 99, exp: req, coins: BigNum.zero(), shards: BigNum.zero(), cores: BigNum.zero(), required_exp: req}
       new_state = Rewards.apply_level_ups(state)
 

@@ -49,7 +49,19 @@ defmodule Incrementalist.Game.Rewards do
     # Sync with frontend: 10.1 * level^2 + 9
     base = BigNum.from_number(level)
     term1 = BigNum.mul(BigNum.from_number(10.1), BigNum.pow(base, 2))
-    BigNum.add(term1, BigNum.from_number(9))
+    term1
+    |> BigNum.add(BigNum.from_number(9))
+    |> snap_small_required_exp()
+  end
+
+  defp snap_small_required_exp(%BigNum{} = required_exp) do
+    # Keep early-game requirements on clean tens so the server snapshot and HUD projection stay in sync.
+    if BigNum.compare(required_exp, BigNum.from_number(1000)) < 0 do
+      rounded_requirement = round(BigNum.to_float(required_exp) / 10) * 10
+      BigNum.from_number(rounded_requirement)
+    else
+      required_exp
+    end
   end
 
   defp get_level_up_rewards(level) do
@@ -67,4 +79,3 @@ defmodule Incrementalist.Game.Rewards do
     {coins, shards, cores}
   end
 end
-
