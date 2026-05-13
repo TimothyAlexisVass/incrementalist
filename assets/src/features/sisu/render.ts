@@ -28,6 +28,8 @@ import { getProgressBarLayout } from "../progress-bar/render";
 import { formatUnlockRequirement, getShopItemRequiredLevel } from "../requirements";
 import { getActiveWebGLRenderer, WebGLRenderer, RGBA } from "../../renderer/webgl";
 import { hexToRgba } from "../../utils/color";
+import { queueTooltip } from "../../ui/components/tooltip";
+import { renderSisuCrystal, type SisuCrystalTier } from "./crystal";
 
 import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
 import {
@@ -72,7 +74,7 @@ export function renderSisuControl(
   const barRadius = SISU_METER_RADIUS;
 
   const drawNative = () => {
-    drawSisuControlNative(renderer, snapshot, centerX, centerY, barRadius, displayCurrent);
+    drawSisuControlNative(renderer, input, controlRect, snapshot, centerX, centerY, barRadius, displayCurrent);
   };
 
   if (!isUnlocked) {
@@ -93,6 +95,8 @@ export function renderSisuControl(
 
 function drawSisuControlNative(
   renderer: WebGLRenderer,
+  input: InteractionState,
+  controlRect: Rect,
   snapshot: any,
   centerX: number,
   centerY: number,
@@ -111,6 +115,21 @@ function drawSisuControlNative(
     if (tierMax <= tierMin) return value >= tierMax ? 1 : 0;
     return clampNumber((value - tierMin) / (tierMax - tierMin), 0, 1);
   };
+
+  const showSisuHoverInfo = Boolean(snapshot.state.features.sisu_generator_purchased);
+  let crystalTier: SisuCrystalTier = "azure";
+  if (displayCurrent > orangeMax) {
+    crystalTier = "transcendent";
+  } else if (displayCurrent > aetherMax) {
+    crystalTier = "lucent";
+  } else if (displayCurrent > blueMax) {
+    crystalTier = "aether";
+  }
+
+  // Crystal goes behind the meter.
+  if (showSisuHoverInfo && displayCurrent > 1) {
+    renderSisuCrystal(renderer, centerX, centerY, 45, crystalTier);
+  }
 
   // Border/Track
   renderer.drawRing(centerX, centerY, barRadius, SISU_METER_THICKNESS, hexToRgba(COLORS.bar.track));
@@ -139,31 +158,23 @@ function drawSisuControlNative(
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * transcendentFillRatio, hexToRgba(COLORS.sisu.white));
   }
 
-  // Center Multiplier Text
-  const text = resolveUpdatingText(
-    SISU_MULTIPLIER_TEXT_KEY,
-    displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2),
-    (candidate) => renderer.isTextReady({
-      text: candidate,
-      font: SISU_MAX_FONT,
-      color: COLORS.hud.textPrimary,
-      align: "center",
-      baseline: "middle",
-      strokeColor: "black",
-      strokeWidth: 1
-    })
-  );
-  renderer.drawText({
-    text,
-    x: centerX,
-    y: centerY,
-    font: SISU_MAX_FONT,
-    color: COLORS.hud.textPrimary,
-    align: "center",
-    baseline: "middle",
-    strokeColor: "black",
-    strokeWidth: 1
-  });
+  // Multiplier Tooltip
+  if (showSisuHoverInfo && input.pointer && pointInRect(input.pointer, controlRect)) {
+    const text = resolveUpdatingText(
+      SISU_MULTIPLIER_TEXT_KEY,
+      displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2),
+      (candidate) => renderer.isTextReady({
+        text: candidate,
+        font: SISU_MAX_FONT,
+        color: COLORS.hud.textPrimary,
+        align: "center",
+        baseline: "middle",
+        strokeColor: "black",
+        strokeWidth: 1
+      })
+    );
+    queueTooltip(input.pointer, `Sisu Multiplier: x${text}`);
+  }
 }
 
 export function createSisuGeneratorModal(

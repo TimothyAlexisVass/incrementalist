@@ -1,4 +1,4 @@
-import { OrthographicCamera, Scene, WebGLRenderer as ThreeWebGLRenderer } from "three";
+import { Camera, OrthographicCamera, Scene, WebGLRenderer as ThreeWebGLRenderer } from "three";
 import { Text } from "troika-three-text";
 
 export type RGBA = readonly [number, number, number, number];
@@ -49,6 +49,15 @@ export interface DrawImageOptions {
   width: number;
   height: number;
   alpha?: number;
+}
+
+export interface DrawThreeSceneOptions {
+  scene: Scene;
+  camera: Camera;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 interface ParsedFontSpec {
@@ -870,6 +879,38 @@ export class WebGLRenderer {
     this.threeRenderer.resetState();
     this.threeRenderer.render(this.textScene, this.textCamera);
     this.textScene.remove(mesh);
+  }
+
+  drawThreeScene(options: DrawThreeSceneOptions) {
+    const { scene, camera, x, y, width, height } = options;
+    if (width <= 0 || height <= 0) return;
+
+    const gl = this.gl;
+    const viewportX = Math.max(0, Math.floor(x));
+    const viewportY = Math.max(0, Math.floor(y));
+    const viewportWidth = Math.max(1, Math.floor(width));
+    const viewportHeight = Math.max(1, Math.floor(height));
+    const scissorBottom = this.canvas.height - (viewportY + viewportHeight);
+
+    this.threeRenderer.resetState();
+    this.threeRenderer.setScissorTest(true);
+    this.threeRenderer.setScissor(viewportX, scissorBottom, viewportWidth, viewportHeight);
+    this.threeRenderer.setViewport(viewportX, scissorBottom, viewportWidth, viewportHeight);
+
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(viewportX, scissorBottom, viewportWidth, viewportHeight);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    this.threeRenderer.render(scene, camera);
+
+    this.threeRenderer.setScissorTest(false);
+    this.threeRenderer.setViewport(0, 0, this.canvas.width, this.canvas.height);
+    this.threeRenderer.resetState();
+    gl.disable(gl.SCISSOR_TEST);
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    this.setBlendMode("normal");
   }
 
   isTextReady(options: TextReadinessOptions) {

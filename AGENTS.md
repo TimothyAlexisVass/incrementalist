@@ -2,6 +2,10 @@
 All date/time calculations must be done in UTC.
 The client MUST synchronize its local clock with the server-provided `server_time` to account for drift and time zone differences; do not use raw `Date.now()` for authoritative countdowns or projections.
 
+Offscreen workaround rendering is forbidden: do not introduce any kind of offscreen canvas/surface composition paths as a render shortcut!
+No temporary 2d canvas hacks are allowed either.
+ONLY Direct WebGL rendering is allowed in this project.
+
 If a repo convention or principle is missing here, ask about it and suggest where to add it.
 NEVER STAGE CHANGES UNLESS EXPLICITLY ORDERED TO DO SO.
 
