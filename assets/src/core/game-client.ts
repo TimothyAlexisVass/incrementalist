@@ -10,7 +10,7 @@ import {
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
-import { applyResult, createServerState, type ServerState } from "../net/snapshots";
+import { applyResult, clearShopHighlight, createServerState, type ServerState } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
 import {
   updateProjectedFill,
@@ -28,7 +28,7 @@ import {
   clearPendingClaimPopupPoint
 } from "../features/progress-bar/interactions";
 import { renderProgressBar, renderProgressBarForeground } from "../features/progress-bar/render";
-import { renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
+import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { 
   createFloatingTextState, 
@@ -91,8 +91,7 @@ export class GameClient {
         if (!this.channel) return;
         this.ui.modals.open(new LoadingModal('Switching save slot...'));
         this.runCommand(() => switchSaveSlot(this.channel!, index, false)).then(() => {
-          this.ui.modals.close();
-          this.ui.overlays.close();
+          this.closeAllTransientUi();
         });
       },
       onReset: (index: number) => {
@@ -103,8 +102,7 @@ export class GameClient {
             if (!this.channel) return;
             this.ui.modals.open(new LoadingModal('Resetting save slot...'));
             this.runCommand(() => resetSaveSlot(this.channel!)).then(() => {
-              this.ui.modals.close();
-              this.ui.overlays.close();
+              this.closeAllTransientUi();
             });
           },
           () => this.ui.modals.close()
@@ -214,11 +212,15 @@ export class GameClient {
     this.cacheSnapshotFromResult(result);
 
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
-      this.ui.modals.close();
+      this.closeAllTransientUi();
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
         syncHudInstantly(this.store.state.snapshot.state);
       }
+    }
+
+    if (result.type === "area.select.result") {
+      this.closeAllTransientUi();
     }
 
 
@@ -241,10 +243,14 @@ export class GameClient {
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
+        this.closeAllTransientUi();
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
           syncHudInstantly(this.store.state.snapshot.state);
         }
+      }
+      if (next.type === "area.select.result") {
+        this.closeAllTransientUi();
       }
       // The server releases at most one queued result per acknowledgement so the
       // client cannot accidentally skip over a command result.
@@ -522,6 +528,12 @@ export class GameClient {
     this.store.state.uiHints.highlightedShopItemId = itemId;
     this.mainMenu.setTab("shop");
     this.ui.overlays.open(this.mainMenu);
+  }
+
+  private closeAllTransientUi() {
+    closeAreaDropdown();
+    this.ui.closeAll();
+    clearShopHighlight(this.store.state);
   }
 }
 

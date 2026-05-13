@@ -8,6 +8,11 @@ export class UserInterface {
   public readonly modals = new Modals();
   public readonly overlays = new Overlays();
 
+  closeAll() {
+    this.modals.close();
+    this.overlays.close();
+  }
+
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     getActiveWebGLRenderer();
 

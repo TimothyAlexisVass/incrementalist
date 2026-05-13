@@ -66,6 +66,10 @@ export function renderAreaSpecifics(
 // Dropdown UI state
 let isDropdownOpen = false;
 
+export function closeAreaDropdown() {
+  isDropdownOpen = false;
+}
+
 export function renderAreaDropdown(
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
