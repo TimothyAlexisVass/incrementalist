@@ -131,7 +131,7 @@ function drawSisuControlNative(
   // Center Multiplier Text
   const text = resolveUpdatingText(
     SISU_MULTIPLIER_TEXT_KEY,
-    displayCurrent.toFixed(2),
+    displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2),
     (candidate) => renderer.isTextReady({
       text: candidate,
       font: SISU_MAX_FONT,

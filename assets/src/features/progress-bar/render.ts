@@ -154,7 +154,7 @@ function renderProgressBarDirect(
   const idleMode = state.idleMode;
   const progressPalette = getProgressPalette(idleMode);
   const displayedFillRatio = updateDisplayedProgressFill(fillRatio, deltaTime);
-  const isFull = state?.state === "confirmed_collectible";
+  const isFull = state?.state === "confirmed_collectible" || (state?.projectedFill >= 100);
   const collectionPulse = getCollectionGlowPulse(now);
 
   if (isFull && !PROGRESS_VISUAL_STATE.wasFull) {

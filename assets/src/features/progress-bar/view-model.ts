@@ -51,6 +51,8 @@ let currentViewModel: ProgressViewModel = {
   snapshotFill: 0
 };
 
+const IDLE_MODE_BUFFER = 3000;
+
 export function updateProjectedFill(deltaTimeMs: number) {
   if (currentViewModel.state !== "projecting" && currentViewModel.state !== "awaiting_server_confirmation") {
     return;
@@ -89,21 +91,25 @@ export function updateProjectedFill(deltaTimeMs: number) {
 
     const totalDuration = endMs - startMs;
     const elapsed = now - startMs;
-    const progress = Math.min(1.0, Math.max(0.0, elapsed / totalDuration));
+
+    // In idle mode, we want to reach 100% visual fill 100ms early to allow
+    // the "ready to collect" burst to be visible before automatic claim.
+    const visualDuration = currentViewModel.idleMode ? Math.max(0, totalDuration - IDLE_MODE_BUFFER) : totalDuration;
+    const visualProgress = visualDuration > 0 ? Math.min(1.0, Math.max(0.0, elapsed / visualDuration)) : 1.0;
 
     // Lerp progress bar
-    currentViewModel.projectedFill = currentViewModel.snapshotFill + (100 - currentViewModel.snapshotFill) * progress;
+    currentViewModel.projectedFill = currentViewModel.snapshotFill + (100 - currentViewModel.snapshotFill) * visualProgress;
 
     // Lerp Sisu
     const sStart = toNumber(currentViewModel.currentSisu);
     const sEnd = toNumber(currentViewModel.targetSisu);
-    const currentSValue = sStart + (sEnd - sStart) * progress;
+    const currentSValue = sStart + (sEnd - sStart) * visualProgress;
     currentViewModel.sisu = fromNumber(currentSValue);
 
     // Lerp Sisu Decay
     const dStart = currentViewModel.currentSisuDecay;
     const dEnd = currentViewModel.targetSisuDecay;
-    currentViewModel.currentSisuDecay = dStart + (dEnd - dStart) * progress;
+    currentViewModel.currentSisuDecay = dStart + (dEnd - dStart) * visualProgress;
 
     currentViewModel.canClaimInMs = endMs - now;
   }
