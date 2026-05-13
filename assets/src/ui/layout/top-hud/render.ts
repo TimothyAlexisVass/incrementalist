@@ -156,6 +156,8 @@ function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, 
       textColor: color,
       iconGap: 6,
       iconPosition: 'right',
+      // Keep currency counters on a stable width so text-sync updates do not nudge the HUD.
+      widthMode: 'estimated',
       formatter: () => stableAmountText
     }
   );

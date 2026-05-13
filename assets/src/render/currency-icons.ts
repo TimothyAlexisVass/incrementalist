@@ -3,6 +3,7 @@ import { BigNum } from '../core/bignum';
 import { getActiveWebGLRenderer } from '../renderer/webgl';
 
 const currencyIconImages = new Map<string, HTMLImageElement>();
+type CurrencyAmountWidthMode = 'measured' | 'estimated';
 
 function getCurrencyIconImage(currencyKey: string) {
   if (!currencyKey || typeof Image === 'undefined') return null;
@@ -37,12 +38,12 @@ export function measureCurrencyAmount(amount: number | BigNum, iconSize: number,
   const {
     font = 'bold 16px Arial',
     iconGap = 5,
-    formatter = formatNumber
+    formatter = formatNumber,
+    widthMode = 'measured'
   } = options;
   const resolvedIconSize = resolveIconSize(iconSize);
   const amountText = formatter(amount);
-
-  const textWidth = renderer.measureTextWidth({ text: amountText, font });
+  const textWidth = resolveAmountTextWidth(renderer, amountText, font, widthMode);
 
   return resolvedIconSize + iconGap + textWidth;
 }
@@ -65,12 +66,13 @@ export function drawCurrencyAmount(
     iconPosition = 'left',
     baseline = 'alphabetic',
     formatter = formatNumber,
-    alpha = 1
+    alpha = 1,
+    widthMode = 'measured'
   } = options;
 
   const resolvedIconSize = resolveIconSize(iconSize);
   const amountText = formatter(amount);
-  const amountWidth = renderer.measureTextWidth({ text: amountText, font });
+  const amountWidth = resolveAmountTextWidth(renderer, amountText, font, widthMode);
   const ascent = getFontPixelSize(font) * 0.75;
   const descent = getFontPixelSize(font) * 0.25;
   const width = resolvedIconSize + iconGap + amountWidth;
@@ -117,6 +119,23 @@ function resolveIconSize(iconSize: number) {
 function getFontPixelSize(font: string) {
   const match = String(font || '').match(/(\d+(?:\.\d+)?)px/);
   return match ? Number(match[1]) : 16;
+}
+
+function resolveAmountTextWidth(
+  renderer: ReturnType<typeof getActiveWebGLRenderer>,
+  text: string,
+  font: string,
+  widthMode: CurrencyAmountWidthMode
+) {
+  if (widthMode === 'estimated') {
+    return estimateTextWidth(text, font);
+  }
+
+  return renderer.measureTextWidth({ text, font });
+}
+
+function estimateTextWidth(text: string, font: string) {
+  return String(text ?? '').length * getFontPixelSize(font) * 0.62;
 }
 
 function computeIconYForBaseline(
