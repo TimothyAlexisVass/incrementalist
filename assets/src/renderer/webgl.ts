@@ -177,6 +177,67 @@ void main() {
 }
 `;
 
+const LIQUID_VERTEX_SHADER_SOURCE = `
+attribute vec2 a_position;
+attribute vec2 a_texcoord;
+uniform vec2 u_resolution;
+varying vec2 v_texcoord;
+
+void main() {
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+  gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+  v_texcoord = a_texcoord;
+}
+`;
+
+const LIQUID_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+uniform float u_time;
+uniform float u_progress;
+uniform vec3 u_colorStart;
+uniform vec3 u_colorMid;
+uniform vec3 u_colorEnd;
+uniform float u_barHeight;
+uniform float u_alpha;
+varying vec2 v_texcoord;
+
+void main() {
+  // Wave height logic ported from JS
+  float maxWaveHeight = 2.2; 
+  float waveHeightUV = min(maxWaveHeight / u_barHeight, min(u_progress * 0.08, (1.0 - u_progress) * 0.55));
+  
+  float xRatio = v_texcoord.x;
+  float primaryWave = sin(xRatio * 6.28318 * 0.7 + u_time * 0.0032);
+  float secondaryWave = sin(xRatio * 6.28318 * 1.35 - u_time * 0.0024);
+  float surfaceY = (1.0 - u_progress) + primaryWave * waveHeightUV + secondaryWave * waveHeightUV * 0.22;
+
+  if (v_texcoord.y < surfaceY) {
+    discard;
+  }
+
+  vec3 color;
+  // Gradient logic ported from JS: 0=End (top), 0.5=Mid, 1.0=Start (bottom)
+  if (v_texcoord.y < 0.5) {
+    float t = v_texcoord.y * 2.0;
+    color = mix(u_colorEnd, u_colorMid, t);
+  } else {
+    float t = (v_texcoord.y - 0.5) * 2.0;
+    color = mix(u_colorMid, u_colorStart, t);
+  }
+
+  // Surface highlight logic
+  float distToSurface = abs(v_texcoord.y - surfaceY);
+  float highlight = smoothstep(1.5 / u_barHeight, 0.0, distToSurface);
+  float surfaceGlow = clamp(0.22 + u_progress * 0.34, 0.0, 0.5);
+  
+  // Mix in highlight
+  color = mix(color, vec3(1.0), highlight * surfaceGlow);
+
+  gl_FragColor = vec4(color * u_alpha, u_alpha);
+}
+`;
+
 const TEXT_VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
 attribute vec2 a_texcoord;
@@ -236,6 +297,20 @@ export class WebGLRenderer {
   private readonly shapePositionBuffer: WebGLBuffer;
   private readonly shapeTexcoordBuffer: WebGLBuffer;
 
+  private readonly liquidProgram: WebGLProgram;
+  private readonly liquidPositionLocation: number;
+  private readonly liquidTexcoordLocation: number;
+  private readonly liquidResolutionLocation: WebGLUniformLocation;
+  private readonly liquidTimeLocation: WebGLUniformLocation;
+  private readonly liquidProgressLocation: WebGLUniformLocation;
+  private readonly liquidColorStartLocation: WebGLUniformLocation;
+  private readonly liquidColorMidLocation: WebGLUniformLocation;
+  private readonly liquidColorEndLocation: WebGLUniformLocation;
+  private readonly liquidBarHeightLocation: WebGLUniformLocation;
+  private readonly liquidAlphaLocation: WebGLUniformLocation;
+  private readonly liquidPositionBuffer: WebGLBuffer;
+  private readonly liquidTexcoordBuffer: WebGLBuffer;
+
   private readonly threeRenderer: ThreeWebGLRenderer;
   private readonly textScene: Scene;
   private readonly textCamera: OrthographicCamera;
@@ -291,6 +366,20 @@ export class WebGLRenderer {
     this.shapeEndAngleLocation = mustGetUniform(gl, this.shapeProgram, "u_endAngle");
     this.shapePositionBuffer = mustCreateBuffer(gl);
     this.shapeTexcoordBuffer = mustCreateBuffer(gl);
+
+    this.liquidProgram = mustCreateProgram(gl, LIQUID_VERTEX_SHADER_SOURCE, LIQUID_FRAGMENT_SHADER_SOURCE);
+    this.liquidPositionLocation = gl.getAttribLocation(this.liquidProgram, "a_position");
+    this.liquidTexcoordLocation = gl.getAttribLocation(this.liquidProgram, "a_texcoord");
+    this.liquidResolutionLocation = mustGetUniform(gl, this.liquidProgram, "u_resolution");
+    this.liquidTimeLocation = mustGetUniform(gl, this.liquidProgram, "u_time");
+    this.liquidProgressLocation = mustGetUniform(gl, this.liquidProgram, "u_progress");
+    this.liquidColorStartLocation = mustGetUniform(gl, this.liquidProgram, "u_colorStart");
+    this.liquidColorMidLocation = mustGetUniform(gl, this.liquidProgram, "u_colorMid");
+    this.liquidColorEndLocation = mustGetUniform(gl, this.liquidProgram, "u_colorEnd");
+    this.liquidBarHeightLocation = mustGetUniform(gl, this.liquidProgram, "u_barHeight");
+    this.liquidAlphaLocation = mustGetUniform(gl, this.liquidProgram, "u_alpha");
+    this.liquidPositionBuffer = mustCreateBuffer(gl);
+    this.liquidTexcoordBuffer = mustCreateBuffer(gl);
 
     this.threeRenderer = new ThreeWebGLRenderer({
       canvas: this.canvas,
@@ -381,6 +470,67 @@ export class WebGLRenderer {
     gl.uniform2f(this.colorResolutionLocation, this.canvas.width, this.canvas.height);
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform4f(this.colorUniformLocation, color[0] * alpha, color[1] * alpha, color[2] * alpha, color[3] * alpha);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  public drawLiquidRect(options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    progress: number;
+    time: number;
+    colorStart: [number, number, number];
+    colorMid: [number, number, number];
+    colorEnd: [number, number, number];
+    alpha?: number;
+  }) {
+    const gl = this.gl;
+    const { x, y, width, height, progress, time, colorStart, colorMid, colorEnd } = options;
+
+    if (width <= 0 || height <= 0) return;
+
+    const x2 = x + width;
+    const y2 = y + height;
+    const positions = new Float32Array([
+      x, y,
+      x2, y,
+      x, y2,
+      x, y2,
+      x2, y,
+      x2, y2
+    ]);
+    const texcoords = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+      0, 1,
+      1, 0,
+      1, 1
+    ]);
+
+    gl.useProgram(this.liquidProgram);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.liquidPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.liquidPositionLocation);
+    gl.vertexAttribPointer(this.liquidPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.liquidTexcoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.liquidTexcoordLocation);
+    gl.vertexAttribPointer(this.liquidTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform2f(this.liquidResolutionLocation, this.canvas.width, this.canvas.height);
+    gl.uniform1f(this.liquidTimeLocation, time);
+    gl.uniform1f(this.liquidProgressLocation, progress);
+    gl.uniform3f(this.liquidColorStartLocation, colorStart[0] / 255, colorStart[1] / 255, colorStart[2] / 255);
+    gl.uniform3f(this.liquidColorMidLocation, colorMid[0] / 255, colorMid[1] / 255, colorMid[2] / 255);
+    gl.uniform3f(this.liquidColorEndLocation, colorEnd[0] / 255, colorEnd[1] / 255, colorEnd[2] / 255);
+    gl.uniform1f(this.liquidBarHeightLocation, height);
+    const alpha = (options.alpha ?? 1.0) * this._globalAlpha;
+    gl.uniform1f(this.liquidAlphaLocation, alpha);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -647,9 +797,12 @@ export class WebGLRenderer {
     gl.deleteBuffer(this.textTexcoordBuffer);
     gl.deleteBuffer(this.shapePositionBuffer);
     gl.deleteBuffer(this.shapeTexcoordBuffer);
+    gl.deleteBuffer(this.liquidPositionBuffer);
+    gl.deleteBuffer(this.liquidTexcoordBuffer);
     gl.deleteProgram(this.colorProgram);
     gl.deleteProgram(this.textProgram);
     gl.deleteProgram(this.shapeProgram);
+    gl.deleteProgram(this.liquidProgram);
     this.threeRenderer.dispose();
   }
 
@@ -978,9 +1131,6 @@ function isRenderableImage(image: TexImageSource): image is TexImageSource {
     return image.width > 0 && image.height > 0;
   }
   if (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) {
-    return image.width > 0 && image.height > 0;
-  }
-  if (typeof OffscreenCanvas !== "undefined" && image instanceof OffscreenCanvas) {
     return image.width > 0 && image.height > 0;
   }
   if (typeof HTMLVideoElement !== "undefined" && image instanceof HTMLVideoElement) {

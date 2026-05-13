@@ -21,11 +21,10 @@ Refactor the Progress Bar to use direct WebGL rendering, removing the offscreen 
     - Use `renderer.drawRect` for the background track.
     - Use `renderer.drawRect` for the solid fill portion.
     - Use a single quad with the `LIQUID_SURFACE` shader for the top layer of the liquid.
-    - Use the new native `renderer.drawText` for the percentage/timer.
 2.  **Removal**:
     - Delete `progressSurface`, `progressCtx`, and all logic related to blitting the offscreen canvas.
 
 ## 4. Verification
 - Verify the liquid effect still moves smoothly.
-- Verify progress accurately matches the underlying state.
+- Verify progress bar fill is still a gradient color.
 - Verify zero offscreen canvases are created.
