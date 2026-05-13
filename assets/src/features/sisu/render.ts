@@ -3,6 +3,7 @@ import {
   SISU_MAX_FONT,
   SISU_METER_FONT,
   SISU_METER_RADIUS,
+  SISU_METER_THICKNESS,
   SISU_UPGRADE_BUTTON_FONT,
   TINY_TEXT_FONT,
   DISPLAY_AREA_X,
@@ -104,25 +105,24 @@ function drawSisuControlNative(
   };
 
   // Border/Track
-  renderer.drawRing(centerX, centerY, barRadius, 14, hexToRgba(COLORS.bar.border));
-  renderer.drawRing(centerX, centerY, barRadius, 12, hexToRgba(COLORS.bar.track));
+  renderer.drawRing(centerX, centerY, barRadius, SISU_METER_THICKNESS, hexToRgba(COLORS.bar.track));
 
   // Blue Tier
   const blueFillRatio = getTierFillRatio(displayCurrent, SISU_MIN_MULTIPLIER, blueMax);
   if (blueFillRatio > 0) {
-    renderer.drawArc(centerX, centerY, barRadius, 10, startAngle, startAngle + fullCircle * blueFillRatio, hexToRgba(COLORS.sisu.blue));
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * blueFillRatio, hexToRgba(COLORS.sisu.blue));
   }
 
   // Yellow Tier
   const yellowFillRatio = getTierFillRatio(displayCurrent, blueMax, yellowMax);
   if (yellowFillRatio > 0) {
-    renderer.drawArc(centerX, centerY, barRadius, 10, startAngle, startAngle + fullCircle * yellowFillRatio, hexToRgba(COLORS.sisu.yellow));
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * yellowFillRatio, hexToRgba(COLORS.sisu.yellow));
   }
 
   // Purple Tier
   const purpleFillRatio = getTierFillRatio(displayCurrent, yellowMax, purpleMax);
   if (purpleFillRatio > 0) {
-    renderer.drawArc(centerX, centerY, barRadius, 10, startAngle, startAngle + fullCircle * purpleFillRatio, hexToRgba(COLORS.sisu.purple));
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * purpleFillRatio, hexToRgba(COLORS.sisu.purple));
   }
 
   // Center Multiplier Text
@@ -136,7 +136,7 @@ function drawSisuControlNative(
     align: "center",
     baseline: "middle",
     strokeColor: "black",
-    strokeWidth: 5
+    strokeWidth: 1
   });
 }
 
@@ -215,7 +215,7 @@ class SisuGeneratorModalImpl implements Modal {
       align: "left",
       baseline: "middle",
       strokeColor: "black",
-      strokeWidth: 3
+      strokeWidth: 2
     });
 
     this.upgradeRect = {
@@ -350,11 +350,11 @@ function drawSisuRefillControl(
 
   const circleX = rect.x + rect.width / 2;
   const circleY = rect.y + 28;
-  
+
   if (canRefill && isHovered) {
     renderer.drawCircle(circleX, circleY, 16, [1, 1, 1, 0.2], 0.8, "additive");
   }
-  
+
   renderer.drawCircle(circleX, circleY, 14, hexToRgba(tierColor), 0.15);
   renderer.drawRing(circleX, circleY, 14, 1.5, hexToRgba(COLORS.button.text));
 

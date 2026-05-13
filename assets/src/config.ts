@@ -32,9 +32,10 @@ export const SMALL_TEXT_FONT = '13px Arial';
 export const TINY_TEXT_FONT = '12px Arial';
 
 // Sisu UI constants and fonts
-export const SISU_METER_RADIUS = 28;
+export const SISU_METER_RADIUS = 26;
+export const SISU_METER_THICKNESS = 8;
 export const SISU_METER_FONT = 'bold 14px Arial';
-export const SISU_MAX_FONT = '16px Arial';
+export const SISU_MAX_FONT = '17px Arial';
 export const SISU_UPGRADE_BUTTON_FONT = 'bold 13px Arial';
 
 // Progress bar fonts
