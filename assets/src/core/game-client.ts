@@ -27,7 +27,7 @@ import {
   getPendingClaimPopupPoint,
   clearPendingClaimPopupPoint
 } from "../features/progress-bar/interactions";
-import { renderProgressBar } from "../features/progress-bar/render";
+import { renderProgressBar, renderProgressBarForeground } from "../features/progress-bar/render";
 import { renderAreaBackground, renderAreaSpecifics } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { 
@@ -405,6 +405,7 @@ export class GameClient {
     this.sisuControlLayout = this.store.state.snapshot
       ? renderSisuControl(this.canvas, input, this.store.state)
       : null;
+    renderProgressBarForeground(this.canvas);
 
     if (this.store.state.snapshot && !this.store.state.snapshot.state.features.idle_mode_purchased) {
       notices.reportLeafVisible(

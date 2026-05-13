@@ -99,6 +99,15 @@ function getProgressBarBackgroundImage() {
   return progressBarBackgroundImage;
 }
 
+let progressBarForegroundImage: HTMLImageElement | null = null;
+function getProgressBarForegroundImage() {
+  if (!progressBarForegroundImage) {
+    progressBarForegroundImage = new Image();
+    progressBarForegroundImage.src = 'images/progress_bar_foreground.png';
+  }
+  return progressBarForegroundImage;
+}
+
 export function renderProgressBar(
   canvas: HTMLCanvasElement | null,
   input: InteractionState
@@ -130,6 +139,26 @@ export function renderProgressBar(
   }
 
   renderProgressBarDirect(renderer, canvas, input);
+}
+
+export function renderProgressBarForeground(canvas: HTMLCanvasElement | null) {
+  if (!canvas) return;
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
+
+  const bgWidth = 160;
+  const bgX = canvas.width - bgWidth;
+  const fgImage = getProgressBarForegroundImage();
+
+  if (fgImage.complete && fgImage.naturalWidth > 0) {
+    renderer.drawImage({
+      image: fgImage,
+      x: bgX,
+      y: TOP_HUD_HEIGHT,
+      width: bgWidth,
+      height: canvas.height - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT
+    });
+  }
 }
 
 import { WebGLRenderer } from '../../renderer/webgl';
