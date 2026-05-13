@@ -216,6 +216,7 @@ class SisuGeneratorModalImpl implements Modal {
     const refillWidth = 120;
     const refillHeight = 96;
     const refillGap = 14;
+    const refillToUpgradeGap = 16;
     const totalRefillWidth = refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
     const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
     const refillY = modalY + 40;
@@ -239,8 +240,8 @@ class SisuGeneratorModalImpl implements Modal {
     const maxSisuText = `Max Sisu: ${formatSisuMultiplier(maxBasic)} (Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`;
     renderer.drawText({
       text: maxSisuText,
-      x: modalX + 38,
-      y: modalY + 156,
+      x: modalX + 18,
+      y: modalY + 168,
       font: SISU_MAX_FONT,
       color: COLORS.hud.textPrimary,
       align: "left",
@@ -250,8 +251,8 @@ class SisuGeneratorModalImpl implements Modal {
     });
 
     this.upgradeRect = {
-      x: modalX + modalWidth - 220,
-      y: modalY + 136,
+      x: modalX + modalWidth - 180 - 22,
+      y: refillY + refillHeight + refillToUpgradeGap,
       width: 180,
       height: 36
     };
