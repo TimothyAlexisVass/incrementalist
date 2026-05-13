@@ -2,7 +2,7 @@ import { COLORS } from "../../colors";
 import { DISPLAY_AREA_HEIGHT, DISPLAY_AREA_WIDTH, DISPLAY_AREA_X, DISPLAY_AREA_Y, REWARD_POPUP_FONT } from "../../config";
 import { formatSignedNumber, clampNumber, parseFontSizePx } from "../../utils";
 import { getProgressBarLayout } from "./render";
-import { computeLevelUps } from "../../ui/layout/top-hud/progression";
+import { computeLevelUps, getRequiredExp } from "../../ui/layout/top-hud/progression";
 import {
   spawnFloatingText,
   type FloatingText,
@@ -10,7 +10,7 @@ import {
   spawnRewardPopup
 } from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
-import { BigNum, ZERO, sub, compare } from "../../core/bignum";
+import { BigNum, ZERO, add, sub, compare } from "../../core/bignum";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 
 let nextLevelUpNoticeGroupId = 1;
@@ -44,8 +44,8 @@ export function spawnProgressClaimRewardEffects(
   newAmounts: ResourceAmounts,
   anchorPoint: { x: number; y: number } | null = null
 ) {
-  const expGain = sub(newAmounts.exp, currentAmounts.exp);
   const levelGain = Math.max(0, newAmounts.level - currentAmounts.level);
+  const expGain = calculateClaimExpGain(currentAmounts, newAmounts);
   const coinGain = sub(newAmounts.coins, currentAmounts.coins);
   const shardGain = sub(newAmounts.shards, currentAmounts.shards);
   const coreGain = sub(newAmounts.cores, currentAmounts.cores);
@@ -123,6 +123,28 @@ export function spawnProgressClaimRewardEffects(
       "cores"
     );
   }
+}
+
+function calculateClaimExpGain(
+  currentAmounts: ResourceAmounts,
+  newAmounts: ResourceAmounts
+) {
+  if (newAmounts.level === currentAmounts.level) {
+    return sub(newAmounts.exp, currentAmounts.exp);
+  }
+
+  // One level-up is: EXP left to finish the current level + EXP already earned
+  // in the new level after the reset.
+  let expGain = add(
+    sub(getRequiredExp(currentAmounts.level), currentAmounts.exp),
+    newAmounts.exp
+  );
+
+  for (let level = currentAmounts.level + 1; level < newAmounts.level; level += 1) {
+    expGain = add(expGain, getRequiredExp(level));
+  }
+
+  return expGain;
 }
 
 function clampRewardAnchorToCanvas(
@@ -262,5 +284,3 @@ function spawnLevelUpEffects(floatingTexts: FloatingText[], canvas: HTMLCanvasEl
     }
   }
 }
-
-
