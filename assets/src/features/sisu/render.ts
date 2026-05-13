@@ -23,6 +23,7 @@ import type { Modal } from "../../ui/managers/modals";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import { clampNumber } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
+import { resolveUpdatingText } from "../../utils/text";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { getActiveWebGLRenderer, WebGLRenderer, RGBA } from "../../renderer/webgl";
 import { hexToRgba } from "../../utils/color";
@@ -46,6 +47,8 @@ export type SisuControlLayout = {
 };
 
 export { getSisuControlRect };
+
+const SISU_MULTIPLIER_TEXT_KEY = "sisu.control.multiplier";
 
 export function renderSisuControl(
   canvas: HTMLCanvasElement,
@@ -126,7 +129,19 @@ function drawSisuControlNative(
   }
 
   // Center Multiplier Text
-  const text = displayCurrent.toFixed(2);
+  const text = resolveUpdatingText(
+    SISU_MULTIPLIER_TEXT_KEY,
+    displayCurrent.toFixed(2),
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: SISU_MAX_FONT,
+      color: COLORS.hud.textPrimary,
+      align: "center",
+      baseline: "middle",
+      strokeColor: "black",
+      strokeWidth: 1
+    })
+  );
   renderer.drawText({
     text,
     x: centerX,

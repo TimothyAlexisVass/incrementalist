@@ -6,13 +6,14 @@ import {
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
 } from "../../../config";
-import { formatNumberRatio } from "../../../utils";
+import { formatNumber, formatNumberRatio } from "../../../utils";
 import { BigNum, toNumber } from "../../../core/bignum";
 import { getRequiredExp } from "./progression";
 import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
+import { resolveUpdatingText } from "../../../utils/text";
 
 const MAX_EXP_BAR_LEVEL_UP_PARTICLES = 228;
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
@@ -23,6 +24,8 @@ const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
   '#ffffff',
   COLORS.rewards.expGain
 ]);
+const TOP_HUD_EXP_TEXT_KEY = "top_hud.exp";
+const TOP_HUD_LEVEL_TEXT_KEY = "top_hud.level";
 
 export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   const renderer = getActiveWebGLRenderer();
@@ -67,8 +70,19 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
   renderer.drawRect({ x: TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH - 2, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
 
+  const expText = resolveUpdatingText(
+    TOP_HUD_EXP_TEXT_KEY,
+    `${formatNumberRatio(model.displayedExp, requiredExp)} EXP`,
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: TOP_HUD_EXP_FONT,
+      color: COLORS.panel.textPrimary,
+      align: 'center',
+      baseline: 'alphabetic'
+    })
+  );
   renderer.drawText({
-    text: `${formatNumberRatio(model.displayedExp, requiredExp)} EXP`,
+    text: expText,
     x: TOP_HUD_EXP_COUNTER_X,
     y: TOP_HUD_EXP_COUNTER_Y,
     font: TOP_HUD_EXP_FONT,
@@ -76,8 +90,19 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
     align: 'center',
     baseline: 'alphabetic'
   });
+  const levelText = resolveUpdatingText(
+    TOP_HUD_LEVEL_TEXT_KEY,
+    String(model.displayedLevel),
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: TOP_HUD_LEVEL_FONT,
+      color: COLORS.panel.textPrimary,
+      align: 'left',
+      baseline: 'alphabetic'
+    })
+  );
   renderer.drawText({
-    text: String(model.displayedLevel),
+    text: levelText,
     x: TOP_HUD_LEVEL_X,
     y: 34,
     font: TOP_HUD_LEVEL_FONT,
@@ -104,6 +129,21 @@ function cssToRgba(color: string): [number, number, number, number] {
 }
 
 function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, counterRight: number) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
+  const stableAmountText = resolveUpdatingText(
+    `top_hud.currency.${label.toLowerCase()}`,
+    formatNumber(amount),
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: TOP_HUD_COINS_FONT,
+      color,
+      align: 'left',
+      baseline: 'alphabetic',
+      strokeColor: color,
+      strokeWidth: 0.6
+    })
+  );
   drawCurrencyAmount(
     label.toLowerCase(),
     amount,
@@ -115,7 +155,8 @@ function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, 
       font: TOP_HUD_COINS_FONT,
       textColor: color,
       iconGap: 6,
-      iconPosition: 'right'
+      iconPosition: 'right',
+      formatter: () => stableAmountText
     }
   );
 }

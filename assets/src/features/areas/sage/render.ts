@@ -14,6 +14,7 @@ import { COLORS } from '../../../colors';
 import { doButton } from '../../../ui/components/button';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { hexToRgba } from '../../../utils/color';
+import { clearUpdatingTextKeysByPrefix, resolveUpdatingText } from '../../../utils/text';
 
 const LETTERS_PER_SECOND = 40;
 const PANEL_PADDING = 16;
@@ -56,6 +57,7 @@ export function renderSageArea(
   for (const tipLevel of Array.from(tipRevealStarts.keys())) {
     if (!visibleLevelSet.has(tipLevel)) {
       tipRevealStarts.delete(tipLevel);
+      clearUpdatingTextKeysByPrefix(getSageTipTextKeyPrefix(tipLevel));
     }
   }
 
@@ -148,7 +150,7 @@ function renderTipPanel(
   renderer = getActiveWebGLRenderer()
 ) {
   if (!renderer) return;
-  const { boxX, boxY, boxWidth, boxHeight, fullLines, lineWidths, visibleCharCounts, buttonLabel, buttonRect, leafId } = tip;
+  const { boxX, boxY, boxWidth, boxHeight, fullLines, visibleCharCounts, buttonLabel, buttonRect, leafId } = tip;
 
   renderer.drawRect({
     x: boxX,
@@ -202,9 +204,21 @@ function renderTipPanel(
     const visibleChars = visibleCharCounts[i] ?? 0;
     const x = boxX + PANEL_PADDING;
     const y = bodyStartY + (i * LINE_HEIGHT);
+    const nextVisibleLine = fullLine.slice(0, visibleChars);
+    const renderedLine = resolveUpdatingText(
+      getSageTipLineTextKey(leafId, i),
+      nextVisibleLine,
+      (candidate) => renderer.isTextReady({
+        text: candidate,
+        font: SMALL_TEXT_FONT,
+        color: COLORS.panel.textPrimary,
+        align: 'left',
+        baseline: 'top'
+      })
+    );
 
     renderer.drawText({
-      text: fullLine,
+      text: renderedLine,
       x,
       y,
       font: SMALL_TEXT_FONT,
@@ -212,22 +226,6 @@ function renderTipPanel(
       align: 'left',
       baseline: 'top'
     });
-
-    if (visibleChars < fullLine.length) {
-      const visibleWidth = visibleChars <= 0
-        ? 0
-        : renderer.measureTextWidth({ text: fullLine.slice(0, visibleChars), font: SMALL_TEXT_FONT });
-      const hiddenWidth = Math.max(0, (lineWidths[i] ?? 0) - visibleWidth);
-      if (hiddenWidth > 0) {
-        renderer.drawRect({
-          x: x + visibleWidth,
-          y,
-          width: hiddenWidth + 2,
-          height: LINE_HEIGHT,
-          color: hexToRgba(COLORS.panel.bg)
-        });
-      }
-    }
   }
 
   const buttonClicked = doButton(input, buttonRect, buttonLabel, {
@@ -254,6 +252,14 @@ function getVisibleTipLevels(level: number): number[] {
 
 function tipLeafId(level: number): string {
   return `leaf.sage_tip.${level}.confirm_button`;
+}
+
+function getSageTipTextKeyPrefix(level: number): string {
+  return `sage.tip.${tipLeafId(level)}.`;
+}
+
+function getSageTipLineTextKey(leafId: string, lineIndex: number): string {
+  return `sage.tip.${leafId}.line.${lineIndex}`;
 }
 
 function getVisibleCharCounts(fullLines: string[], lettersToShow: number): number[] {

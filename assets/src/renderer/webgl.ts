@@ -34,6 +34,8 @@ export interface DrawTextOptions {
   shadowOffsetY?: number;
 }
 
+export type TextReadinessOptions = Omit<DrawTextOptions, "x" | "y">;
+
 export interface MeasureTextOptions {
   text: string;
   font?: string;
@@ -743,6 +745,31 @@ export class WebGLRenderer {
     this.threeRenderer.resetState();
     this.threeRenderer.render(this.textScene, this.textCamera);
     this.textScene.remove(mesh);
+  }
+
+  isTextReady(options: TextReadinessOptions) {
+    const text = String(options.text ?? "");
+    if (!text) return true;
+
+    const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
+    if (alpha <= 0) return true;
+
+    const fontSpec = parseFontSpec(options.font || DEFAULT_FONT);
+    const style: TextDrawStyle = {
+      fontSpec,
+      color: options.color || DEFAULT_TEXT_COLOR,
+      strokeColor: options.strokeColor || "transparent",
+      strokeWidth: Math.max(0, Number(options.strokeWidth) || 0),
+      shadowColor: options.shadowColor || "transparent",
+      shadowBlur: Math.max(0, Number(options.shadowBlur) || 0),
+      shadowOffsetX: Number(options.shadowOffsetX) || 0,
+      shadowOffsetY: Number(options.shadowOffsetY) || 0
+    };
+    const anchorX = mapTextAlign(options.align || "left");
+    const anchorY = mapTextBaseline(options.baseline || "alphabetic");
+    const cached = this.getOrCreateTroikaText(text, style, anchorX, anchorY, alpha);
+    cached.frameLastUsed = this.frameCounter;
+    return cached.ready;
   }
 
   measureTextWidth(options: MeasureTextOptions) {
