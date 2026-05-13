@@ -4,6 +4,7 @@ import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
+import { queueTooltip } from "../../ui/components/tooltip";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import {
   NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
@@ -205,6 +206,9 @@ function renderDropdownItems(
       });
     } else {
       renderItem();
+      if (isHovered && area.description) {
+        queueTooltip(input.pointer!, area.description);
+      }
     }
 
     const startedInside = pointInRect(input.pressStartPointer, itemRect);
