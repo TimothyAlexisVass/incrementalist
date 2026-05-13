@@ -13,6 +13,7 @@ import { clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../uti
 import { hexToRgba } from '../../utils/color';
 import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
+import { SHOP_UNLOCK_REQUIRED_LEVELS, formatUnlockRequirement } from "../requirements";
 import {
   setGpuProgressBarGlow,
   updateGpuProgressLiquidBubbles,
@@ -322,7 +323,8 @@ function renderProgressBarDirect(
     idleMode: state.idleMode,
     features: {
       idleModePurchased: state.idleModePurchased
-    }
+    },
+    idleModeRequiredLevel: state.idleModeRequiredLevel
   });
 }
 
@@ -445,7 +447,7 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
 export function renderIdleModeToggle(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  state: { idleMode: boolean; features?: { idleModePurchased?: boolean } }
+  state: { idleMode: boolean; features?: { idleModePurchased?: boolean }; idleModeRequiredLevel?: number }
 ) {
   const toggleRect = getIdleModeToggleRect(canvas);
   const drawToggle = () => drawButton(toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
@@ -460,8 +462,10 @@ export function renderIdleModeToggle(
   });
 
   if (!state.features?.idleModePurchased) {
+    const requiredLevel = state.idleModeRequiredLevel ?? SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode;
+
     drawLockedElement(canvas, input, toggleRect, drawToggle, {
-      criteria: "Requires Level 5",
+      criteria: formatUnlockRequirement(requiredLevel),
       showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
       showNoticePing: true,
       padding: 3

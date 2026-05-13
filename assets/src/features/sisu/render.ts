@@ -25,6 +25,7 @@ import { clampNumber } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
 import { resolveUpdatingText } from "../../utils/text";
 import { getProgressBarLayout } from "../progress-bar/render";
+import { formatUnlockRequirement, getShopItemRequiredLevel } from "../requirements";
 import { getActiveWebGLRenderer, WebGLRenderer, RGBA } from "../../renderer/webgl";
 import { hexToRgba } from "../../utils/color";
 
@@ -62,6 +63,7 @@ export function renderSisuControl(
   const controlRect = getSisuControlRect(canvas);
   const { displayCurrent } = updateSisuVisualProjection(snapshot);
   const isUnlocked = Boolean(snapshot.state.features.sisu_generator_purchased);
+  const sisuRequiredLevel = getShopItemRequiredLevel(snapshot.state.shop, "sisu_generator");
 
   const progressBar = getProgressBarLayout(canvas);
   const centerX = progressBar.x + progressBar.width / 2;
@@ -75,6 +77,7 @@ export function renderSisuControl(
   if (!isUnlocked) {
     drawLockedElement(canvas, input, controlRect, drawNative, {
       font: SISU_METER_FONT,
+      criteria: formatUnlockRequirement(sisuRequiredLevel),
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
       showNoticePing: true,
       shape: "circle",

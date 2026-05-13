@@ -50,15 +50,15 @@ export function drawTooltip(
   const width = Math.ceil(contentWidth + paddingX * 2);
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
 
-  let x = anchorPoint.x + offsetX;
+  let x = anchorPoint.x - width - offsetX;
   let y = anchorPoint.y - height - offsetY;
-
-  if (x + width > canvas.width - margin) {
-    x = canvas.width - margin - width;
-  }
 
   if (x < margin) {
     x = margin;
+  }
+
+  if (x + width > canvas.width - margin) {
+    x = canvas.width - margin - width;
   }
 
   if (y < margin) {

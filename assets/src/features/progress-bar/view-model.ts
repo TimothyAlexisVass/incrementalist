@@ -3,6 +3,7 @@ import { type BigNum, toNumber, ZERO, fromNumber } from "../../core/bignum";
 import {
   BAR_RESET_LERP_SPEED,
 } from "../../config";
+import { SHOP_UNLOCK_REQUIRED_LEVELS, getShopItemRequiredLevel } from "../requirements";
 import { spawnProgressClaimRewardEffects, type ResourceAmounts } from "./claim-effects";
 import { FloatingText } from "../../render/effects";
 import { getServerNow } from "../../core/time";
@@ -26,6 +27,7 @@ export type ProgressViewModel = {
   nextVerifyAtMs: number;
   pendingClaimIntent: boolean;
   idleModePurchased: boolean;
+  idleModeRequiredLevel: number;
   snapshotAtMs: number;
   snapshotFill: number;
 };
@@ -47,6 +49,7 @@ let currentViewModel: ProgressViewModel = {
   nextVerifyAtMs: 0,
   pendingClaimIntent: false,
   idleModePurchased: false,
+  idleModeRequiredLevel: SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode,
   snapshotAtMs: 0,
   snapshotFill: 0
 };
@@ -133,6 +136,7 @@ export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.nextVerifyAtMs = 0;
   currentViewModel.pendingClaimIntent = false;
   currentViewModel.idleModePurchased = snapshot.state.features.idle_mode_purchased;
+  currentViewModel.idleModeRequiredLevel = getShopItemRequiredLevel(snapshot.state.shop, "idle_mode");
   currentViewModel.snapshotAtMs = getServerNow();
   currentViewModel.snapshotFill = snapshot.state.projection_params.current_fill;
 }

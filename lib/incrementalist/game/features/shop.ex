@@ -10,7 +10,7 @@ defmodule Incrementalist.Game.Features.Shop do
          :ok <- check_not_purchased(state, item_id),
          :ok <- check_level_requirement(state, item),
          {:ok, next_state} <- deduct_cost(state, item) do
-      {:ok, apply_unlocks(next_state, item)}
+      {:ok, apply_purchase_effects(next_state, item)}
     end
   end
 
@@ -60,25 +60,16 @@ defmodule Incrementalist.Game.Features.Shop do
     end
   end
 
-  defp apply_unlocks(state, item) do
+  defp apply_purchase_effects(state, item) do
     features = state.features
 
     features =
       case item.id do
-        "idle_mode" -> %{features | idle_mode_purchased: true}
+        "idle_mode" -> %{features | idle_mode_purchased: true, world_map_unlocked: true}
         "sisu_generator" -> %{features | sisu_generator_purchased: true}
         "bonus_time" -> %{features | bonus_time_purchased: true}
         _ -> features
       end
-
-    # Handle automatic unlocks triggered by this item
-    features =
-      Enum.reduce(item.unlocks, features, fn unlock, acc ->
-        case unlock do
-          :world_map -> %{acc | world_map_unlocked: true}
-          _ -> acc
-        end
-      end)
 
     %{state | features: features}
   end

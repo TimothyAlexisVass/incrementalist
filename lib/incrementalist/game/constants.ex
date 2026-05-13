@@ -3,6 +3,17 @@ defmodule Incrementalist.Game.Constants do
   Centralizes magic numbers and domain limits.
   """
 
+  @requirements_dir Path.expand("../../../shared/requirements", __DIR__)
+  @areas_path Path.join(@requirements_dir, "areas.json")
+  @sage_tip_levels_path Path.join(@requirements_dir, "sage-tip-levels.json")
+  @shop_items_path Path.join(@requirements_dir, "shop-items.json")
+  @external_resource @areas_path
+  @external_resource @sage_tip_levels_path
+  @external_resource @shop_items_path
+  @areas @areas_path |> File.read!() |> Jason.decode!()
+  @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
+  @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
+
   def max_save_slots, do: 4
   def valid_slot_indexes, do: 0..(max_save_slots() - 1)
 
@@ -10,58 +21,11 @@ defmodule Incrementalist.Game.Constants do
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
 
   def area_defs do
-    [
-      %{
-        key: "sage",
-        name: "The Sage",
-        description: "A quiet, ancient place of wisdom where growth begins.",
-        unlock_level: 1
-      },
-      %{
-        key: "cloverfield",
-        name: "Cloverfield",
-        description: "A lush field where luck intertwines with every step.",
-        unlock_level: 10
-      },
-      %{
-        key: "market",
-        name: "The Market",
-        description: "A bustling market to trade your hard earned goods.",
-        unlock_level: 15
-      }
-    ]
+    Enum.map(@areas, &normalize_area/1)
   end
 
   def shop_item_defs do
-    [
-      %{
-        id: "idle_mode",
-        name: "Idle Mode",
-        description: "Allows you to claim rewards automatically, but slowly!",
-        cost: BigNum.from_number(500),
-        currency: :coins,
-        required_level: 2,
-        unlocks: [:world_map]
-      },
-      %{
-        id: "sisu_generator",
-        name: "Sisu Generator",
-        description: "Refill Sisu and upgrade Max Sisu!",
-        cost: BigNum.from_number(2000),
-        currency: :coins,
-        required_level: 4,
-        unlocks: []
-      },
-      %{
-        id: "bonus_time",
-        name: "BONUSTIME",
-        description: "Play daily bonus games when a daily token is ready!",
-        cost: BigNum.from_number(1000),
-        currency: :shards,
-        required_level: 15,
-        unlocks: []
-      }
-    ]
+    Enum.map(@shop_items, &normalize_shop_item/1)
   end
 
   # Progress Bar Constants
@@ -85,5 +49,33 @@ defmodule Incrementalist.Game.Constants do
   def notice_leaf_tab_achievements_button, do: "leaf.tab.achievements.button"
   def notice_leaf_tab_menu_any_button, do: "leaf.tab.menu.any.button"
 
-  def sage_tip_levels, do: [1, 2, 4, 10, 15]
+  def sage_tip_levels do
+    @sage_tip_levels
+  end
+
+  defp normalize_area(%{"key" => key, "name" => name, "description" => description, "unlock_level" => unlock_level}) do
+    %{
+      key: key,
+      name: name,
+      description: description,
+      unlock_level: unlock_level
+    }
+  end
+
+  defp normalize_shop_item(%{"id" => id, "name" => name, "description" => description, "cost" => cost, "currency" => currency, "required_level" => required_level}) do
+    %{
+      id: id,
+      name: name,
+      description: description,
+      cost: BigNum.normalize(%BigNum{m: cost["m"], e: cost["e"]}),
+      currency: normalize_shop_currency(currency),
+      required_level: required_level
+    }
+  end
+
+  defp normalize_shop_currency("coins"), do: :coins
+  defp normalize_shop_currency("shards"), do: :shards
+  defp normalize_shop_currency("cores"), do: :cores
+  defp normalize_shop_currency(currency), do: raise(ArgumentError, "unknown shop currency #{inspect(currency)}")
+
 end
