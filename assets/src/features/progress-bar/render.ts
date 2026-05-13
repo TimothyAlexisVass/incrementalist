@@ -4,6 +4,7 @@ import {
   BAR_RESET_LERP_SPEED,
   PROGRESS_BAR_WIDTH,
   IDLE_TOGGLE_FONT,
+  TINY_TEXT_FONT,
   TOP_HUD_HEIGHT,
   BOTTOM_HUD_HEIGHT,
 } from '../../config';
@@ -13,6 +14,7 @@ import { clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../uti
 import { hexToRgba } from '../../utils/color';
 import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
+import { pointInRect } from '../../ui/managers/interactions';
 import { SHOP_UNLOCK_REQUIRED_LEVELS, formatUnlockRequirement } from "../requirements";
 import {
   setGpuProgressBarGlow,
@@ -25,6 +27,7 @@ import { getViewModel } from './view-model';
 import { InteractionState } from '../../ui/managers/interactions';
 import { getServerNow } from '../../core/time';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
+import { queueTooltip } from '../../ui/components/tooltip';
 
 type Rgb = [number, number, number];
 // Types for visual state tracking
@@ -66,6 +69,7 @@ const COLLECTION_LASER_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   [142, 246, 255] as const,
   COLORS.bar.progress.fillStart
 ]);
+const PROGRESS_TOOLTIP_TEXT_KEY = "progress.bar.hover";
 export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | null = null) {
   PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
   PROGRESS_VISUAL_STATE.collectionGlowStartedAt = getNowMs();
@@ -348,6 +352,22 @@ function renderProgressBarDirect(
   renderer.drawRect({ x: barX, y: barY, width: bw, height: barHeight, color: borderColor }); // left
   renderer.drawRect({ x: barX + barWidth - bw, y: barY, width: bw, height: barHeight, color: borderColor }); // right
 
+  const tooltipHoverRect = {
+    x: barX - 12,
+    y: barY,
+    width: barWidth + 24,
+    height: barHeight
+  };
+  if (input.pointer && pointInRect(input.pointer, tooltipHoverRect)) {
+    queueTooltip(input.pointer, `Progress: ${fillValue.toFixed(0)}%\nTime left: ${getProgressTimeLeftSeconds(state).toFixed(1)}`, {
+      font: TINY_TEXT_FONT,
+      textColor: '#f4f7ff',
+      widthMode: 'estimated',
+      estimatedWidthFactor: 0.46,
+      textUpdateKey: PROGRESS_TOOLTIP_TEXT_KEY
+    });
+  }
+
   renderIdleModeToggle(canvas, input, {
     idleMode: state.idleMode,
     features: {
@@ -355,6 +375,25 @@ function renderProgressBarDirect(
     },
     idleModeRequiredLevel: state.idleModeRequiredLevel
   });
+}
+
+function getProgressTimeLeftSeconds(state: ReturnType<typeof getViewModel>): number {
+  const now = getServerNow();
+  if (state.state === "confirmed_collectible") return 0;
+
+  if (typeof state.canClaimInMs === "number") {
+    return Math.max(0, state.canClaimInMs) / 1000;
+  }
+
+  if (state.state === "awaiting_server_confirmation" && state.nextVerifyAtMs > 0) {
+    return Math.max(0, state.nextVerifyAtMs - now) / 1000;
+  }
+
+  if (state.canClaimAt) {
+    return Math.max(0, Date.parse(state.canClaimAt) - now) / 1000;
+  }
+
+  return 0;
 }
 
 
