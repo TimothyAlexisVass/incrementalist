@@ -5,6 +5,8 @@ import { getActiveWebGLRenderer } from '../../renderer/webgl';
 export interface Modal {
   render(canvas: HTMLCanvasElement, input: InteractionState): void;
   tick(dt: number, input: InteractionState): void;
+  backdropAlpha?: number;
+  closeOnMenuButton?: boolean;
 }
 
 export class Modals {
@@ -16,6 +18,10 @@ export class Modals {
 
   close() {
     this.activeModal = null;
+  }
+
+  getActiveModal(): Modal | null {
+    return this.activeModal;
   }
 
   isOpen(): boolean {
@@ -32,7 +38,7 @@ export class Modals {
       y: 0,
       width: canvas.width,
       height: canvas.height,
-      color: cssToRgba(COLORS.overlay.backdrop)
+      color: cssToRgba(COLORS.overlay.backdrop, this.activeModal.backdropAlpha)
     });
 
     this.activeModal.render(canvas, input);
@@ -45,7 +51,7 @@ export class Modals {
   }
 }
 
-function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number, number] {
+function cssToRgba(color: string, overrideAlpha?: number): [number, number, number, number] {
   const normalized = String(color || '').trim().toLowerCase();
   if (!normalized) return [0, 0, 0, 0];
 
@@ -60,7 +66,7 @@ function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number,
       ((value >> 16) & 255) / 255,
       ((value >> 8) & 255) / 255,
       (value & 255) / 255,
-      clamp01(alphaMultiplier)
+      clamp01(overrideAlpha ?? 1)
     ];
   }
 
@@ -68,17 +74,17 @@ function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number,
   if (rgbaMatch) {
     const parts = rgbaMatch[1].split(',').map((part) => Number(part.trim()));
     if (parts.length >= 3) {
-      const alpha = parts.length >= 4 ? clamp01(parts[3]) : 1;
+      const alpha = overrideAlpha !== undefined ? clamp01(overrideAlpha) : (parts.length >= 4 ? clamp01(parts[3]) : 1);
       return [
         clamp01(parts[0] / 255),
         clamp01(parts[1] / 255),
         clamp01(parts[2] / 255),
-        clamp01(alpha * alphaMultiplier)
+        alpha
       ];
     }
   }
 
-  return [1, 1, 1, clamp01(alphaMultiplier)];
+  return [1, 1, 1, clamp01(overrideAlpha ?? 1)];
 }
 
 function clamp01(value: number) {

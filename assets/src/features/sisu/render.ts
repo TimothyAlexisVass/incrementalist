@@ -179,6 +179,8 @@ class SisuGeneratorModalImpl implements Modal {
   private readonly refillRects: SisuRefillHitRect[] = [];
   private modalRect: Rect | null = null;
   private upgradeRect: Rect | null = null;
+  public readonly backdropAlpha = 0.3;
+  public readonly closeOnMenuButton = true;
 
   constructor(
     private readonly getState: () => ServerState,

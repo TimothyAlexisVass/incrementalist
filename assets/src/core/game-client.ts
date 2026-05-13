@@ -326,23 +326,13 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private onKeydown(event: KeyboardEvent) {
-    if (this.ui.modals.isOpen()) {
+    if (event.key === 'Escape') {
+      this.handleMenuButtonPress();
+      event.preventDefault();
       return;
     }
 
-    if (event.key === 'Escape') {
-      const isOpening = !this.ui.overlays.isActive(this.mainMenu);
-      this.ui.overlays.toggle(this.mainMenu);
-      if (isOpening) {
-        notices.reportParentVisibleViaPseudoLeaf(
-          NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
-          NOTICE_PARENT_MENU_MAIN,
-          true,
-          this.channel || undefined,
-          (cmd) => this.runCommand(cmd)
-        );
-      }
-      event.preventDefault();
+    if (this.ui.modals.isOpen()) {
       return;
     }
 
@@ -493,18 +483,7 @@ export class GameClient {
     // toggle overlays without being immediately countered by "click-outside" logic.
     const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
     renderBottomHUD(this.canvas, input, isMainMenuOpen, () => {
-      const isOpening = !this.ui.overlays.isActive(this.mainMenu);
-      this.ui.overlays.toggle(this.mainMenu);
-
-      if (isOpening) {
-        notices.reportParentVisibleViaPseudoLeaf(
-          NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
-          NOTICE_PARENT_MENU_MAIN,
-          true,
-          this.channel || undefined,
-          (cmd) => this.runCommand(cmd)
-        );
-      }
+      this.handleMenuButtonPress();
     }, (areaKey) => {
       if (this.channel) {
         this.runCommand(() => selectArea(this.channel!, areaKey));
@@ -534,6 +513,33 @@ export class GameClient {
     closeAreaDropdown();
     this.ui.closeAll();
     clearShopHighlight(this.store.state);
+  }
+
+  private handleMenuButtonPress(): boolean {
+    const activeModal = this.ui.modals.getActiveModal();
+    if (activeModal) {
+      if (!activeModal.closeOnMenuButton) {
+        return false;
+      }
+
+      this.ui.modals.close();
+      return true;
+    }
+
+    const isOpening = !this.ui.overlays.isActive(this.mainMenu);
+    this.ui.overlays.toggle(this.mainMenu);
+
+    if (isOpening) {
+      notices.reportParentVisibleViaPseudoLeaf(
+        NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
+        NOTICE_PARENT_MENU_MAIN,
+        true,
+        this.channel || undefined,
+        (cmd) => this.runCommand(cmd)
+      );
+    }
+
+    return true;
   }
 }
 
