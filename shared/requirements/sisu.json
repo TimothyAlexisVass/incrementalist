@@ -13,21 +13,21 @@
       "id": "aether",
       "label": "Aether",
       "color_key": "purple",
-      "multiplier": 2,
+      "multiplier": 1.3,
       "cycle_decay": 4.5
     },
     {
       "id": "lucent",
       "label": "Lucent",
       "color_key": "orange",
-      "multiplier": 4,
+      "multiplier": 1.7,
       "cycle_decay": 4
     },
     {
       "id": "transcendent",
       "label": "Transcendent",
       "color_key": "white",
-      "multiplier": 10,
+      "multiplier": 3,
       "cycle_decay": 3.5
     }
   ],

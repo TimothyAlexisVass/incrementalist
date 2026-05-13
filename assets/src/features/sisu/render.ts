@@ -23,7 +23,6 @@ import type { Modal } from "../../ui/managers/modals";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import { clampNumber } from "../../utils";
 import { formatCountRatio, formatNumber, formatSisuMultiplier } from "../../utils/format";
-import { resolveUpdatingText } from "../../utils/text";
 import { getProgressBarLayout } from "../progress-bar/render";
 import { formatUnlockRequirement, getShopItemRequiredLevel } from "../requirements";
 import { getActiveWebGLRenderer, WebGLRenderer, RGBA } from "../../renderer/webgl";
@@ -53,6 +52,7 @@ export type SisuControlLayout = {
 export { getSisuControlRect };
 
 const SISU_MULTIPLIER_TEXT_KEY = "sisu.control.multiplier";
+const SISU_GLASS_BALL_RADIUS = 32;
 
 export function renderSisuControl(
   canvas: HTMLCanvasElement,
@@ -93,6 +93,92 @@ export function renderSisuControl(
   return { controlRect };
 }
 
+export function renderSisuGlassBallOverlay(
+  canvas: HTMLCanvasElement,
+  state: ServerState
+) {
+  const renderer = getActiveWebGLRenderer();
+  const snapshot = state.snapshot;
+  if (!renderer || !snapshot) return;
+
+  const progressBar = getProgressBarLayout(canvas);
+  const centerX = progressBar.x + progressBar.width / 2;
+  const centerY = progressBar.y + progressBar.height + 120;
+  const radius = SISU_GLASS_BALL_RADIUS;
+
+  // Transparent glass body.
+  renderer.drawCircle(centerX, centerY, radius, [0.804, 0.91, 1, 0.085], 0.14);
+
+  // Inner refraction shadow for depth.
+  renderer.drawCircle(
+    centerX + radius * 0.16,
+    centerY + radius * 0.12,
+    radius * 0.8,
+    [0.039, 0.086, 0.149, 0.075],
+    0.42
+  );
+
+  // Crisp rim and glossy highlights.
+  renderer.drawRing(centerX, centerY, radius - 1, 1.5, [0.882, 0.957, 1, 0.26], 0.3);
+  renderer.drawArc(
+    centerX - radius * 0.04,
+    centerY - radius * 0.05,
+    radius * 0.98,
+    radius * 0.045,
+    -2.75 - Math.PI / 6,
+    -0.94 - Math.PI / 6,
+    [1, 1, 1, 0.286],
+    0.75,
+    "additive"
+  );
+  renderer.drawArc(
+    centerX - radius * 0.04,
+    centerY - radius * 0.05,
+    radius * 0.9,
+    radius * 0.05,
+    -2.45 - Math.PI / 6,
+    -1.14 - Math.PI / 6,
+    [1, 1, 1, 0.286],
+    0.02,
+    "additive"
+  );
+  renderer.drawCircle(
+    centerX - radius * 0.48,
+    centerY - radius * 0.43,
+    radius * 0.13,
+    [1, 1, 1, 0.34],
+    0.9,
+    "additive"
+  );
+  renderer.drawCircle(
+    centerX - radius * 0.28,
+    centerY - radius * 0.6,
+    radius * 0.06,
+    [1, 1, 1, 0.54],
+    0.9,
+    "additive"
+  );
+  renderer.drawCircle(
+    centerX - radius * 0.38,
+    centerY - radius * 0.5,
+    radius * 0.28,
+    [1, 1, 1, 0.24],
+    0.5,
+    "additive"
+  );
+  renderer.drawArc(
+    centerX + radius * 0.05,
+    centerY + radius * 0.04,
+    radius * 0.86,
+    radius * 0.035,
+    -0.05,
+    1.75,
+    [0.588, 0.824, 1, 0.24],
+    0.62,
+    "additive"
+  );
+}
+
 function drawSisuControlNative(
   renderer: WebGLRenderer,
   input: InteractionState,
@@ -117,18 +203,18 @@ function drawSisuControlNative(
   };
 
   const showSisuHoverInfo = Boolean(snapshot.state.features.sisu_generator_purchased);
-  let crystalTier: SisuCrystalTier = "azure";
-  if (displayCurrent > orangeMax) {
-    crystalTier = "transcendent";
-  } else if (displayCurrent > aetherMax) {
-    crystalTier = "lucent";
-  } else if (displayCurrent > blueMax) {
-    crystalTier = "aether";
-  }
+  const activeTier = snapshot.state.sisu.active_tier;
+  const crystalTier: SisuCrystalTier =
+    activeTier === "aether" ||
+    activeTier === "lucent" ||
+    activeTier === "transcendent" ||
+    activeTier === "azure"
+      ? activeTier
+      : "azure";
 
   // Crystal goes behind the meter.
   if (showSisuHoverInfo && displayCurrent > 1) {
-    renderSisuCrystal(renderer, centerX, centerY, 45, crystalTier);
+    renderSisuCrystal(renderer, centerX, centerY, 40, crystalTier);
   }
 
   // Border/Track
@@ -160,20 +246,12 @@ function drawSisuControlNative(
 
   // Multiplier Tooltip
   if (showSisuHoverInfo && input.pointer && pointInRect(input.pointer, controlRect)) {
-    const text = resolveUpdatingText(
-      SISU_MULTIPLIER_TEXT_KEY,
-      displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2),
-      (candidate) => renderer.isTextReady({
-        text: candidate,
-        font: SISU_MAX_FONT,
-        color: COLORS.hud.textPrimary,
-        align: "center",
-        baseline: "middle",
-        strokeColor: "black",
-        strokeWidth: 1
-      })
-    );
-    queueTooltip(input.pointer, `Sisu Multiplier: x${text}`);
+    const tooltipText = `Sisu Multiplier: x${displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2)}`;
+    queueTooltip(input.pointer, tooltipText, {
+      widthMode: 'estimated',
+      estimatedWidthFactor: displayCurrent >= 10 ? 0.46 : 0.45,
+      textUpdateKey: SISU_MULTIPLIER_TEXT_KEY
+    });
   }
 }
 

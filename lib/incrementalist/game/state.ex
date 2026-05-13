@@ -92,6 +92,7 @@ defmodule Incrementalist.Game.State do
       embeds_one :current, BigNum, on_replace: :update
       embeds_one :max_basic, BigNum, on_replace: :update
       embeds_one :target_current, BigNum, on_replace: :update
+      field :active_tier, :string, default: "azure"
       field :target_cycle_decay, :float
       field :max_upgrade_level, :integer, default: 0
       field :cycle_decay, :float
@@ -99,7 +100,13 @@ defmodule Incrementalist.Game.State do
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      cast(schema, attrs, [:max_upgrade_level, :cycle_decay, :projected_at, :target_cycle_decay])
+      cast(schema, attrs, [
+        :max_upgrade_level,
+        :cycle_decay,
+        :projected_at,
+        :target_cycle_decay,
+        :active_tier
+      ])
       |> cast_embed(:current)
       |> cast_embed(:max_basic)
       |> cast_embed(:target_current)
@@ -243,6 +250,7 @@ defmodule Incrementalist.Game.State do
         max_basic:
           BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max()),
         target_current: BigNum.one(),
+        active_tier: "azure",
         target_cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         max_upgrade_level: 0,
         cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
@@ -303,6 +311,8 @@ defmodule Incrementalist.Game.State do
           ),
         "max_upgrade_level" =>
           if(projected_state.sisu, do: projected_state.sisu.max_upgrade_level || 0, else: 0),
+        "active_tier" =>
+          if(projected_state.sisu, do: projected_state.sisu.active_tier || "azure", else: "azure"),
         "cycle_decay" =>
           if(projected_state.sisu,
             do: projected_state.sisu.cycle_decay || Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,

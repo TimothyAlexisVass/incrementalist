@@ -899,8 +899,6 @@ export class WebGLRenderer {
 
     gl.enable(gl.SCISSOR_TEST);
     gl.scissor(viewportX, scissorBottom, viewportWidth, viewportHeight);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     this.threeRenderer.render(scene, camera);
 

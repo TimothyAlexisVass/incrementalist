@@ -17,7 +17,12 @@ import {
   getStateFromSnapshot,
   applyProgressResult
 } from "../features/progress-bar/view-model";
-import { createSisuGeneratorModal, renderSisuControl, type SisuControlLayout } from "../features/sisu/render";
+import {
+  createSisuGeneratorModal,
+  renderSisuControl,
+  renderSisuGlassBallOverlay,
+  type SisuControlLayout
+} from "../features/sisu/render";
 import { updateAreaViewModel } from "../features/areas/view-model";
 import {
   handleProgressLoop,
@@ -404,6 +409,7 @@ export class GameClient {
       ? renderSisuControl(this.canvas, input, this.store.state)
       : null;
     renderProgressBarForeground(this.canvas);
+    renderSisuGlassBallOverlay(this.canvas, this.store.state);
 
     if (this.store.state.snapshot && !this.store.state.snapshot.state.features.idle_mode_purchased) {
       notices.reportLeafVisible(

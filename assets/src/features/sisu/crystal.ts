@@ -17,25 +17,25 @@ type CrystalPalette = {
 
 const CRYSTAL_PALETTES: Record<SisuCrystalTier, CrystalPalette> = {
   azure: {
-    color: 0x1e90ff,
-    emissive: 0x00ffff,
-    attenuation: 0x00ffff,
+    color: 0x2e50ff,
+    emissive: 0x0044ff,
+    attenuation: 0xffffff,
     sparkleA: 0xffffff,
-    sparkleB: 0x00ffff,
-    fillLight: 0x0000ff,
+    sparkleB: 0xffffff,
+    fillLight: 0x9999ff,
     backLight: 0x0000ff,
-    hemiSky: 0x1e90ff,
+    hemiSky: 0x3e99ff,
     keyLight: 0xffffff
   },
   aether: {
-    color: 0x9932cc,
+    color: 0xffffff,
     emissive: 0xff00ff,
     attenuation: 0xff00ff,
     sparkleA: 0xffffff,
-    sparkleB: 0xff00ff,
+    sparkleB: 0xff66ff,
     fillLight: 0x4b0082,
-    backLight: 0x4b0082,
-    hemiSky: 0x9932cc,
+    backLight: 0x4b8882,
+    hemiSky: 0xffffff,
     keyLight: 0xffffff
   },
   lucent: {
@@ -43,7 +43,7 @@ const CRYSTAL_PALETTES: Record<SisuCrystalTier, CrystalPalette> = {
     emissive: 0xffff00,
     attenuation: 0xffff00,
     sparkleA: 0xffffff,
-    sparkleB: 0xffff00,
+    sparkleB: 0xffff66,
     fillLight: 0xff0000,
     backLight: 0xff0000,
     hemiSky: 0xff8c1a,
@@ -135,19 +135,19 @@ function ensureRuntime(): CrystalRuntime | null {
   const crystalMaterial = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0x67d4ff),
     emissive: new THREE.Color(0x144cff),
-    emissiveIntensity: 0.08,
-    roughness: 0.025,
+    emissiveIntensity: 0.8,
+    roughness: 0.05,
     metalness: 0.0,
-    transmission: 1.0,
-    thickness: 2.4,
-    ior: 1.5,
-    reflectivity: 1.0,
+    transmission: 1.1,
+    thickness: 9.4,
+    ior: 99.5,
+    reflectivity: 9.6,
     attenuationColor: new THREE.Color(0x1196ff),
-    attenuationDistance: 0.75,
+    attenuationDistance: 1.95,
     clearcoat: 1.0,
     clearcoatRoughness: 0.01,
     transparent: true,
-    opacity: 0.97,
+    opacity: 0.99,
     flatShading: true,
     side: THREE.DoubleSide
   });
@@ -158,12 +158,12 @@ function ensureRuntime(): CrystalRuntime | null {
   const sparkleMaterials: THREE.MeshBasicMaterial[] = [];
   crystalGroup.add(sparkleGroup);
 
-  for (let i = 0; i < 18; i += 1) {
-    const g = new THREE.OctahedronGeometry(0.018 + Math.random() * 0.02, 0);
+  for (let i = 0; i < 9; i += 1) {
+    const g = new THREE.OctahedronGeometry(0.08 + Math.random() * 0.05, 0);
     const m = new THREE.MeshBasicMaterial({
-      color: Math.random() > 0.45 ? 0xb8ffff : 0x61beff,
+      color: Math.random() > 0.85 ? 0xb8ffff : 0x61beff,
       transparent: true,
-      opacity: 0.55
+      opacity: 0.35
     });
     sparkleMaterials.push(m);
     const s = new THREE.Mesh(g, m);
@@ -173,16 +173,16 @@ function ensureRuntime(): CrystalRuntime | null {
       Math.random() * 2 - 1,
       Math.random() * 2 - 1
     ).normalize();
-    const radius = 0.15 + Math.random() * 0.82;
+    const radius = 0.15 + Math.random() * 3.82;
     s.position.copy(dir.multiplyScalar(radius));
-    s.userData.variant = Math.random() > 0.45 ? "a" : "b";
+    s.userData.variant = Math.random() > 0.65 ? "a" : "b";
     s.userData.phase = Math.random() * Math.PI * 2;
     s.userData.baseScale = 0.75 + Math.random() * 0.75;
     sparkleGroup.add(s);
   }
 
-  const keyLight = new THREE.PointLight(0xd8f4ff, 20, 15);
-  keyLight.position.set(2.1, 2.8, 3.8);
+  const keyLight = new THREE.PointLight(0xffffff, 80, 15);
+  keyLight.position.set(4.1, 2.8, 3.8);
   scene.add(keyLight);
 
   const fillLight = new THREE.PointLight(0x4b9dff, 8, 12);
@@ -208,8 +208,8 @@ function ensureRuntime(): CrystalRuntime | null {
     backLight,
     hemiLight,
     activeTier: "azure",
-    angularVelocity: new THREE.Vector3(0.08, 0.12, 0.05),
-    targetAngularVelocity: new THREE.Vector3(0.08, 0.12, 0.05),
+    angularVelocity: new THREE.Vector3(9.8, 9.52, 9.05),
+    targetAngularVelocity: new THREE.Vector3(4.08, 3.12, 6.05),
     nextTargetIn: 0,
     deltaRotation: new THREE.Quaternion(),
     tmpAxis: new THREE.Vector3(),
@@ -250,7 +250,7 @@ export function renderSisuCrystal(
   renderer: WebGLRenderer,
   centerX: number,
   centerY: number,
-  sizePx = 45,
+  sizePx = 20,
   tier: SisuCrystalTier = "azure"
 ) {
   const nextRuntime = ensureRuntime();
@@ -290,8 +290,9 @@ export function renderSisuCrystal(
     child.rotation.y += dt * (0.55 + index * 0.012);
   });
 
-  nextRuntime.keyLight.intensity = 19 + Math.sin(t * 1.2) * 1.0;
-  nextRuntime.fillLight.intensity = 7.4 + Math.cos(t * 1.35) * 0.6;
+  nextRuntime.keyLight.intensity = 0.9 + Math.sin(t * 2.2) * -8.0;
+  nextRuntime.fillLight.intensity = 0.4 + Math.cos(t * 1.35) * -6.6;
+  nextRuntime.crystalMaterial.emissiveIntensity = 2.88 + Math.sin(t * 0.85) * 2.4;
 
   const size = Math.max(1, Math.round(sizePx));
   renderer.drawThreeScene({

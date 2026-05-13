@@ -7,6 +7,8 @@ export type ChargeCrystalsState = {
   transcendent: number;
 };
 
+export type SisuTierId = "azure" | "aether" | "lucent" | "transcendent";
+
 export type SaveSlotSummary = {
   slot_index: number;
   file_index: number;
@@ -40,6 +42,7 @@ export type SisuState = {
   current: BigNum;
   max_basic: BigNum;
   max_upgrade_level: number;
+  active_tier: SisuTierId;
   cycle_decay: number;
 };
 

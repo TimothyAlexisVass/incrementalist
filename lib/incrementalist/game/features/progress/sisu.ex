@@ -80,6 +80,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       |> Map.put(:current, BigNum.one())
       |> Map.put(:max_basic, BigNum.from_number(Levels.base_max()))
       |> Map.put(:max_upgrade_level, 0)
+      |> Map.put(:active_tier, "azure")
       |> Map.put(:cycle_decay, azure_cycle_decay())
       |> Map.put(:projected_at, Time.iso8601(now))
 
@@ -104,6 +105,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
           projected.sisu
           |> Map.put(:target_current, next_sisu)
           |> Map.put(:target_cycle_decay, tier.cycle_decay)
+          |> Map.put(:active_tier, tier.id)
           |> Map.put(:projected_at, Time.iso8601(now))
 
         {:ok,
@@ -243,6 +245,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
     |> Map.put(:current, current)
     |> Map.put(:max_basic, max_basic)
     |> Map.put(:max_upgrade_level, normalize_level(sisu.max_upgrade_level || 0))
+    |> Map.put(:active_tier, normalize_tier_id(sisu.active_tier))
     |> Map.put(:cycle_decay, cycle_decay)
   end
 
@@ -320,10 +323,17 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       current: BigNum.one(),
       max_basic: BigNum.from_number(Levels.base_max()),
       max_upgrade_level: 0,
+      active_tier: "azure",
       cycle_decay: azure_cycle_decay(),
       projected_at: nil
     }
   end
+
+  defp normalize_tier_id(tier_id) when is_binary(tier_id) do
+    if tier?(tier_id), do: tier_id, else: "azure"
+  end
+
+  defp normalize_tier_id(_), do: "azure"
 
   defp azure_cycle_decay do
     Levels.refill_tier("azure").cycle_decay

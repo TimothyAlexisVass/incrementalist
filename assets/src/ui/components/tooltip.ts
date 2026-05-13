@@ -1,6 +1,7 @@
 import { TINY_TEXT_FONT } from '../../config';
 import { getActiveWebGLRenderer, type WebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
+import { resolveUpdatingText } from '../../utils/text';
 
 export interface TooltipOptions {
   font?: string;
@@ -13,6 +14,9 @@ export interface TooltipOptions {
   offsetX?: number;
   offsetY?: number;
   margin?: number;
+  widthMode?: 'measured' | 'estimated';
+  estimatedWidthFactor?: number;
+  textUpdateKey?: string;
 }
 
 interface TooltipRequest {
@@ -83,11 +87,6 @@ function drawTooltipInternal(
     return null;
   }
 
-  const lines = normalizeTooltipLines(content);
-  if (lines.length === 0) {
-    return null;
-  }
-
   const {
     font = TINY_TEXT_FONT,
     textColor = '#f4f7ff',
@@ -98,11 +97,35 @@ function drawTooltipInternal(
     lineHeight = Math.max(14, parseFontSizePx(font, 12) + 4),
     offsetX = 14,
     offsetY = 14,
-    margin = 8
+    margin = 8,
+    widthMode = 'measured',
+    estimatedWidthFactor = 0.62,
+    textUpdateKey
   } = options;
 
+  const resolvedContent = (textUpdateKey && typeof content === 'string')
+    ? resolveUpdatingText(textUpdateKey, content, (candidate) => {
+      const candidateLines = normalizeTooltipLines(candidate);
+      return candidateLines.every((line) => renderer.isTextReady({
+        text: line,
+        font,
+        color: textColor,
+        align: 'left',
+        baseline: 'top'
+      }));
+    })
+    : content;
+
+  const lines = normalizeTooltipLines(resolvedContent);
+  if (lines.length === 0) {
+    return null;
+  }
+
   const contentWidth = lines.reduce((widest, line) => {
-    return Math.max(widest, renderer.measureTextWidth({ text: line, font }));
+    const textWidth = widthMode === 'estimated'
+      ? (line.length * parseFontSizePx(font, 12) * estimatedWidthFactor)
+      : renderer.measureTextWidth({ text: line, font });
+    return Math.max(widest, textWidth);
   }, 0);
   const width = Math.ceil(contentWidth + paddingX * 2);
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);

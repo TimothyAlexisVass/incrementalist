@@ -103,6 +103,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     assert_in_delta BigNum.to_float(refilled.sisu.current), 1.0, 0.000001
     assert_in_delta BigNum.to_float(refilled.sisu.target_current), 4.0, 0.000001
     assert refilled.sisu.target_cycle_decay == 4.5
+    assert refilled.sisu.active_tier == "aether"
     assert refilled.charge_crystals.aether == 0
     assert is_binary(refilled.can_claim_at)
 
@@ -133,6 +134,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
 
     assert_in_delta BigNum.to_float(refilled.sisu.target_current), 20.0, 0.000001
     assert refilled.sisu.target_cycle_decay == 3.5
+    assert refilled.sisu.active_tier == "transcendent"
     assert refilled.charge_crystals.transcendent == 0
   end
 
@@ -152,5 +154,27 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     }
 
     assert {:error, "insufficient_charge_crystals"} = Sisu.refill(state, "transcendent", @now)
+  end
+
+  test "refill/3 persists the selected crystal tier in Sisu state" do
+    state = %State{
+      charge_crystals: %State.ChargeCrystals{aether: 1},
+      features: %State.Features{sisu_generator_purchased: true},
+      progress_bar: %State.ProgressBar{},
+      first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
+      sisu: %State.Sisu{
+        current: BigNum.from_number(1.0),
+        max_basic: BigNum.from_number(Levels.base_max()),
+        max_upgrade_level: 0,
+        cycle_decay: 3.5,
+        projected_at: DateTime.to_iso8601(@now)
+      }
+    }
+
+    {:ok, refilled} = Sisu.refill(state, "aether", @now)
+    assert refilled.sisu.active_tier == "aether"
+
+    advanced = Sisu.advance_cycle(refilled, DateTime.add(@now, 5, :second))
+    assert advanced.sisu.active_tier == "aether"
   end
 end
