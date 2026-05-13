@@ -32,6 +32,7 @@ export interface DrawTextOptions {
   shadowBlur?: number;
   shadowOffsetX?: number;
   shadowOffsetY?: number;
+  scale?: number;
 }
 
 export type TextReadinessOptions = Omit<DrawTextOptions, "x" | "y">;
@@ -861,9 +862,10 @@ export class WebGLRenderer {
     const anchorY = mapTextBaseline(options.baseline || "alphabetic");
     const cached = this.getOrCreateTroikaText(text, style, anchorX, anchorY, alpha);
     cached.frameLastUsed = this.frameCounter;
-
     const mesh = cached.mesh;
     mesh.position.set(options.x, this.canvas.height - options.y, 0);
+    const s = options.scale ?? 1;
+    mesh.scale.set(s, s, 1);
     this.textScene.add(mesh);
     this.threeRenderer.resetState();
     this.threeRenderer.render(this.textScene, this.textCamera);
@@ -1056,26 +1058,43 @@ export class WebGLRenderer {
 
   private enforceTextCacheSize() {
     while (this.textCache.size > MAX_TEXT_CACHE_SIZE) {
-      const firstKey = this.textCache.keys().next().value;
-      if (typeof firstKey !== "string") {
+      let oldestKey: string | null = null;
+      let oldestFrame = Number.POSITIVE_INFINITY;
+
+      for (const [key, entry] of this.textCache.entries()) {
+        if (entry.frameLastUsed < oldestFrame) {
+          oldestFrame = entry.frameLastUsed;
+          oldestKey = key;
+        }
+      }
+
+      if (oldestKey === null) {
         break;
       }
-      const entry = this.textCache.get(firstKey);
-      if (entry) {
-        entry.mesh.dispose();
-      }
-      this.textCache.delete(firstKey);
+
+      const entry = this.textCache.get(oldestKey);
+      if (entry) entry.mesh.dispose();
+      this.textCache.delete(oldestKey);
     }
+
     while (this.textMeasureCache.size > MAX_TEXT_CACHE_SIZE) {
-      const firstKey = this.textMeasureCache.keys().next().value;
-      if (typeof firstKey !== "string") {
+      let oldestKey: string | null = null;
+      let oldestFrame = Number.POSITIVE_INFINITY;
+
+      for (const [key, entry] of this.textMeasureCache.entries()) {
+        if (entry.frameLastUsed < oldestFrame) {
+          oldestFrame = entry.frameLastUsed;
+          oldestKey = key;
+        }
+      }
+
+      if (oldestKey === null) {
         break;
       }
-      const entry = this.textMeasureCache.get(firstKey);
-      if (entry) {
-        entry.mesh.dispose();
-      }
-      this.textMeasureCache.delete(firstKey);
+
+      const entry = this.textMeasureCache.get(oldestKey);
+      if (entry) entry.mesh.dispose();
+      this.textMeasureCache.delete(oldestKey);
     }
   }
 
