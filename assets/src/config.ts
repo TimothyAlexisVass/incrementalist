@@ -34,7 +34,6 @@ export const TINY_TEXT_FONT = '12px Arial';
 // Sisu UI constants and fonts
 export const SISU_METER_RADIUS = 28;
 export const SISU_METER_FONT = 'bold 14px Arial';
-export const SISU_CURRENT_FONT = 'bold 40px Arial';
 export const SISU_MAX_FONT = '16px Arial';
 export const SISU_UPGRADE_BUTTON_FONT = 'bold 13px Arial';
 
@@ -82,7 +81,6 @@ export const STATS_LABEL_FONT = 'bold 13px Arial';
 export const STATS_VALUE_FONT = '13px Arial';
 
 // Overlay and modal fonts
-export const OVERLAY_TITLE_FONT = 'bold 20px Arial';
 export const MODAL_TITLE_FONT = 'bold 16px Arial';
 export const MODAL_BODY_FONT = '13px Arial';
 

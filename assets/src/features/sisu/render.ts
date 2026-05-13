@@ -1,11 +1,14 @@
 import { COLORS } from "../../colors";
 import {
-  SISU_CURRENT_FONT,
   SISU_MAX_FONT,
   SISU_METER_FONT,
   SISU_METER_RADIUS,
   SISU_UPGRADE_BUTTON_FONT,
-  TINY_TEXT_FONT
+  TINY_TEXT_FONT,
+  DISPLAY_AREA_X,
+  DISPLAY_AREA_Y,
+  DISPLAY_AREA_WIDTH,
+  DISPLAY_AREA_HEIGHT
 } from "../../config";
 import type { BigNum } from "../../core/bignum";
 import type { GameChannel } from "../../net/game-channel";
@@ -14,7 +17,7 @@ import type { ServerState } from "../../net/snapshots";
 import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency-icons";
 import { drawButton } from "../../ui/components/button";
 import { notices } from "../../ui/managers/notices";
-import { InteractionState } from "../../ui/managers/interactions";
+import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import { clampNumber } from "../../utils";
@@ -39,7 +42,6 @@ import {
 
 export type SisuControlLayout = {
   controlRect: Rect;
-  sisuBlitted?: boolean;
 };
 
 export { getSisuControlRect };
@@ -78,7 +80,7 @@ export function renderSisuControl(
     drawNative();
   }
 
-  return { controlRect, sisuBlitted: true };
+  return { controlRect };
 }
 
 function drawSisuControlNative(
@@ -150,7 +152,6 @@ export function createSisuGeneratorModal(
 class SisuGeneratorModalImpl implements Modal {
   private readonly refillRects: SisuRefillHitRect[] = [];
   private modalRect: Rect | null = null;
-  private closeRect: Rect | null = null;
   private upgradeRect: Rect | null = null;
 
   constructor(
@@ -169,44 +170,18 @@ class SisuGeneratorModalImpl implements Modal {
     }
 
     const modalWidth = 520;
-    const modalHeight = 330;
-    const modalX = Math.floor((canvas.width - modalWidth) / 2);
-    const modalY = Math.floor((canvas.height - modalHeight) / 2);
+    const modalHeight = 212;
+    const modalX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - modalWidth;
+    const modalY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - modalHeight;
 
     this.modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
-    this.closeRect = { x: modalX + modalWidth - 82, y: modalY + 14, width: 64, height: 28 };
 
     renderer.drawRect({ ...this.modalRect, color: hexToRgba(COLORS.panel.bg) });
     drawRectOutline(renderer, this.modalRect, 2, hexToRgba(COLORS.overlay.panelBorder));
 
-    renderer.drawText({
-      text: "Sisu Generator",
-      x: modalX + 24,
-      y: modalY + 36,
-      font: "bold 20px Arial",
-      color: COLORS.overlay.titleText,
-      align: "left",
-      baseline: "middle"
-    });
-
-    drawButton(this.closeRect, "Close", { active: false });
-
     const { displayCurrent } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
-
-    const multiplierText = formatSisuMultiplier(currentSisu);
-    renderer.drawText({
-      text: multiplierText,
-      x: modalX + modalWidth / 2,
-      y: modalY + 100,
-      font: SISU_CURRENT_FONT,
-      color: COLORS.sisu.blue,
-      align: "center",
-      baseline: "middle",
-      strokeColor: "black",
-      strokeWidth: 4
-    });
 
     this.refillRects.length = 0;
     const refillWidth = 132;
@@ -214,7 +189,7 @@ class SisuGeneratorModalImpl implements Modal {
     const refillGap = 22;
     const totalRefillWidth = refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
     const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
-    const refillY = modalY + 144;
+    const refillY = modalY + 40;
 
     for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
       const tier = SISU_REFILL_TIERS[index];
@@ -226,7 +201,7 @@ class SisuGeneratorModalImpl implements Modal {
         height: refillHeight
       };
       this.refillRects.push({ tier: tier.id, rect });
-      drawSisuRefillControlNative(renderer, rect, tier.label, tier.colorKey, target, currentSisu);
+      drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu);
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
@@ -234,7 +209,7 @@ class SisuGeneratorModalImpl implements Modal {
     renderer.drawText({
       text: maxSisuText,
       x: modalX + 38,
-      y: modalY + 272,
+      y: modalY + 156,
       font: SISU_MAX_FONT,
       color: COLORS.hud.textPrimary,
       align: "left",
@@ -245,14 +220,15 @@ class SisuGeneratorModalImpl implements Modal {
 
     this.upgradeRect = {
       x: modalX + modalWidth - 220,
-      y: modalY + 248,
+      y: modalY + 136,
       width: 180,
       height: 36
     };
 
     const upgradeState = getUpgradeButtonState(snapshot.state.shards, maxUpgradeLevel);
+    const isUpgradeActive = !upgradeState.disabled && this.upgradeRect && pointInRect(input.pointer, this.upgradeRect);
     drawButton(this.upgradeRect, upgradeState.label, {
-      active: false,
+      active: isUpgradeActive,
       activeSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
       inactiveSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
       activeBorder: upgradeState.disabled ? COLORS.button.secondary.border : COLORS.button.border.active,
@@ -272,7 +248,6 @@ class SisuGeneratorModalImpl implements Modal {
     handleSisuModalInteractions(
       input,
       this.modalRect,
-      this.closeRect,
       this.upgradeRect,
       !upgradeState.disabled,
       this.refillRects,
@@ -352,8 +327,9 @@ function drawRectOutline(renderer: WebGLRenderer, rect: Rect, width: number, col
   renderer.drawRect({ x: rect.x + rect.width - width, y: rect.y, width: width, height: rect.height, color });
 }
 
-function drawSisuRefillControlNative(
+function drawSisuRefillControl(
   renderer: WebGLRenderer,
+  input: InteractionState,
   rect: Rect,
   label: string,
   colorKey: "blue" | "yellow" | "purple",
@@ -361,17 +337,25 @@ function drawSisuRefillControlNative(
   currentSisu: number
 ) {
   const canRefill = currentSisu < target;
+  const isHovered = canRefill && pointInRect(input.pointer, rect);
   const tierColor = COLORS.sisu[colorKey];
 
-  const surfaceColor = canRefill ? COLORS.button.surface.active : COLORS.button.secondary.surface;
+  const surfaceColor = canRefill
+    ? (isHovered ? COLORS.button.surface.active : COLORS.button.surface.active)
+    : COLORS.button.secondary.surface;
   renderer.drawRect({ ...rect, color: hexToRgba(surfaceColor) });
 
   const borderColor = canRefill ? tierColor : COLORS.button.secondary.border;
-  drawRectOutline(renderer, rect, 2, hexToRgba(borderColor));
+  drawRectOutline(renderer, rect, isHovered ? 3 : 2, hexToRgba(borderColor));
 
   const circleX = rect.x + rect.width / 2;
   const circleY = rect.y + 28;
-  renderer.drawCircle(circleX, circleY, 14, hexToRgba(tierColor), 0.05);
+  
+  if (canRefill && isHovered) {
+    renderer.drawCircle(circleX, circleY, 16, [1, 1, 1, 0.2], 0.8, "additive");
+  }
+  
+  renderer.drawCircle(circleX, circleY, 14, hexToRgba(tierColor), 0.15);
   renderer.drawRing(circleX, circleY, 14, 1.5, hexToRgba(COLORS.button.text));
 
   renderer.drawText({

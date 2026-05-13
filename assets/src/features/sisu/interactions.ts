@@ -13,7 +13,6 @@ export type SisuRefillHitRect = {
 export function handleSisuModalInteractions(
   input: InteractionState,
   modalRect: Rect | null,
-  closeRect: Rect | null,
   upgradeRect: Rect | null,
   upgradeEnabled: boolean,
   refillRects: readonly SisuRefillHitRect[],
@@ -21,11 +20,6 @@ export function handleSisuModalInteractions(
   runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>,
   onClose: () => void
 ) {
-  if (consumeClick(input, closeRect)) {
-    onClose();
-    return;
-  }
-
   if (modalRect && input.clicked && !input.consumed && input.pointer && !pointInRect(input.pointer, modalRect)) {
     input.consumed = true;
     onClose();
