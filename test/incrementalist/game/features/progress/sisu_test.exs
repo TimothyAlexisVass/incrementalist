@@ -29,7 +29,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     projected = Sisu.project_state(state, @now)
 
     assert projected.can_claim_at ==
-             DateTime.add(@now, 8_621, :millisecond) |> DateTime.to_iso8601()
+             DateTime.add(@now, 2_273, :millisecond) |> DateTime.to_iso8601()
 
     assert_in_delta BigNum.to_float(projected.sisu.current), 2.0, 0.000001
     assert_in_delta projected.sisu.cycle_decay, 5.0, 0.000001
@@ -84,6 +84,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
   test "refill/3 and upgrade_max/2 return the narrow Sisu projection payload" do
     state = %State{
       shards: BigNum.from_number(3_000),
+      charge_crystals: %State.ChargeCrystals{azure: 1, aether: 1, lucent: 0, transcendent: 0},
       features: %State.Features{sisu_generator_purchased: true},
       progress_bar: %State.ProgressBar{},
       first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
@@ -96,12 +97,13 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
       }
     }
 
-    {:ok, refilled} = Sisu.refill(state, "yellow", @now)
+    {:ok, refilled} = Sisu.refill(state, "aether", @now)
 
-    # Deferred application: current stays at 1.0, target becomes 3.0
+    # Deferred application: current stays at 1.0, target becomes 4.0
     assert_in_delta BigNum.to_float(refilled.sisu.current), 1.0, 0.000001
-    assert_in_delta BigNum.to_float(refilled.sisu.target_current), 3.0, 0.000001
-    assert refilled.sisu.target_cycle_decay == 7.0
+    assert_in_delta BigNum.to_float(refilled.sisu.target_current), 4.0, 0.000001
+    assert refilled.sisu.target_cycle_decay == 4.5
+    assert refilled.charge_crystals.aether == 0
     assert is_binary(refilled.can_claim_at)
 
     {:ok, upgraded} = Sisu.upgrade_max(state, @now)
@@ -110,5 +112,45 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     assert_in_delta BigNum.to_float(upgraded.sisu.max_basic), 2.5, 0.000001
     assert_in_delta BigNum.to_float(upgraded.shards), 500.0, 0.000001
     assert is_binary(upgraded.can_claim_at)
+  end
+
+  test "refill/3 supports transcendent charge crystals" do
+    state = %State{
+      charge_crystals: %State.ChargeCrystals{transcendent: 1},
+      features: %State.Features{sisu_generator_purchased: true},
+      progress_bar: %State.ProgressBar{},
+      first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
+      sisu: %State.Sisu{
+        current: BigNum.from_number(1.0),
+        max_basic: BigNum.from_number(Levels.base_max()),
+        max_upgrade_level: 0,
+        cycle_decay: 3.5,
+        projected_at: DateTime.to_iso8601(@now)
+      }
+    }
+
+    {:ok, refilled} = Sisu.refill(state, "transcendent", @now)
+
+    assert_in_delta BigNum.to_float(refilled.sisu.target_current), 20.0, 0.000001
+    assert refilled.sisu.target_cycle_decay == 3.5
+    assert refilled.charge_crystals.transcendent == 0
+  end
+
+  test "refill/3 rejects when the player lacks the matching charge crystal" do
+    state = %State{
+      charge_crystals: %State.ChargeCrystals{},
+      features: %State.Features{sisu_generator_purchased: true},
+      progress_bar: %State.ProgressBar{},
+      first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
+      sisu: %State.Sisu{
+        current: BigNum.from_number(1.0),
+        max_basic: BigNum.from_number(Levels.base_max()),
+        max_upgrade_level: 0,
+        cycle_decay: 3.5,
+        projected_at: DateTime.to_iso8601(@now)
+      }
+    }
+
+    assert {:error, "insufficient_charge_crystals"} = Sisu.refill(state, "transcendent", @now)
   end
 end

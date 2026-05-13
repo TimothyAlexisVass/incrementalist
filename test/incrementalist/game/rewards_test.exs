@@ -65,5 +65,27 @@ defmodule Incrementalist.Game.RewardsTest do
       assert BigNum.compare(new_state.shards, BigNum.from_number(1000)) == 0
       assert BigNum.compare(new_state.cores, BigNum.from_number(1000)) == 0
     end
+
+    test "awards lucent and transcendent charge crystals on milestone levels" do
+      req = BigNum.from_number(98999.1)
+
+      state = %State{
+        level: 99,
+        exp: req,
+        coins: BigNum.zero(),
+        shards: BigNum.zero(),
+        cores: BigNum.zero(),
+        required_exp: req,
+        charge_crystals: %State.ChargeCrystals{}
+      }
+
+      new_state = Rewards.apply_level_ups(state)
+
+      assert new_state.level == 100
+      assert new_state.charge_crystals.lucent == 1
+      assert new_state.charge_crystals.transcendent == 1
+      assert new_state.charge_crystals.azure == 0
+      assert new_state.charge_crystals.aether == 0
+    end
   end
 end

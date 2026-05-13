@@ -4,28 +4,19 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
   """
 
   alias Incrementalist.Game.Constants
+  alias Incrementalist.Game.Features.Progress.ChargeCrystals
   alias Incrementalist.Game.Features.Progress.Bar
   alias Incrementalist.Game.Features.Progress.Sisu.Levels
   alias Incrementalist.Game.State
   alias Incrementalist.Game.Time
-
-  @refill_tiers %{
-    "blue" => %{id: "blue", multiplier: 1.0, cycle_decay: 5.0},
-    "yellow" => %{id: "yellow", multiplier: 1.5, cycle_decay: 7.0},
-    "purple" => %{id: "purple", multiplier: 2.5, cycle_decay: 10.0}
-  }
-
-  @default_cycle_decay 3.5
-
-  def refill_tiers, do: @refill_tiers
-  def default_cycle_decay, do: @default_cycle_decay
+  def refill_tiers, do: Levels.refill_tiers()
 
   def max_basic_for_level(level) do
     Levels.base_max() + normalize_level(level) * Levels.per_level()
   end
 
   def max_effective_for_level(level) do
-    tier_target_for_level(level, "purple")
+    tier_target_for_level(level, List.last(tier_ids()))
   end
 
   def tier_target_for_level(level_or_state, tier_id) do
@@ -39,10 +30,15 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
     Float.round(max_basic * tier.multiplier, 2)
   end
 
-  def tier(tier_id), do: Map.get(@refill_tiers, tier_id, @refill_tiers["blue"])
-  def tier?(tier_id), do: Map.has_key?(@refill_tiers, tier_id)
+  def tier(tier_id) do
+    Levels.refill_tier(tier_id) || List.first(Levels.refill_tiers())
+  end
 
-  def tier_ids, do: Map.keys(@refill_tiers)
+  def tier?(tier_id) do
+    Enum.any?(Levels.refill_tiers(), fn tier -> tier.id == tier_id end)
+  end
+
+  def tier_ids, do: Enum.map(Levels.refill_tiers(), & &1.id)
 
   def upgrade_cost(level) do
     Levels.upgrade_cost(level)
@@ -84,7 +80,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       |> Map.put(:current, BigNum.one())
       |> Map.put(:max_basic, BigNum.from_number(Levels.base_max()))
       |> Map.put(:max_upgrade_level, 0)
-      |> Map.put(:cycle_decay, @refill_tiers["blue"].cycle_decay)
+      |> Map.put(:cycle_decay, azure_cycle_decay())
       |> Map.put(:projected_at, Time.iso8601(now))
 
     project_projection(%{state | sisu: updated_sisu}, now)
@@ -101,15 +97,18 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
     if BigNum.compare(current, BigNum.from_number(target)) >= 0 do
       {:error, "sisu_already_higher"}
     else
-      next_sisu = BigNum.from_number(min(effective_max, target))
+      with {:ok, updated_charge_crystals} <- ChargeCrystals.spend(projected.charge_crystals, tier.id) do
+        next_sisu = BigNum.from_number(min(effective_max, target))
 
-      updated_sisu =
-        projected.sisu
-        |> Map.put(:target_current, next_sisu)
-        |> Map.put(:target_cycle_decay, tier.cycle_decay)
-        |> Map.put(:projected_at, Time.iso8601(now))
+        updated_sisu =
+          projected.sisu
+          |> Map.put(:target_current, next_sisu)
+          |> Map.put(:target_cycle_decay, tier.cycle_decay)
+          |> Map.put(:projected_at, Time.iso8601(now))
 
-      {:ok, %{projected | sisu: updated_sisu}}
+        {:ok,
+         %{projected | sisu: updated_sisu, charge_crystals: updated_charge_crystals}}
+      end
     end
   end
 
@@ -238,7 +237,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
         _ -> BigNum.from_number(Levels.base_max())
       end
 
-    cycle_decay = max(0.0, sisu.cycle_decay || @default_cycle_decay)
+    cycle_decay = max(0.0, sisu.cycle_decay || azure_cycle_decay())
 
     sisu
     |> Map.put(:current, current)
@@ -261,7 +260,7 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
   end
 
   defp max_effective_from_state(%State{} = state) do
-    tier_target_for_level(state, "purple")
+    tier_target_for_level(state, List.last(tier_ids()))
   end
 
   defp current_sisu_from_state(%State{} = state) do
@@ -279,8 +278,8 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
   defp current_cycle_decay_from_state(%State{} = state) do
     case state.sisu do
-      %{} = sisu -> max(0.0, sisu.cycle_decay || @default_cycle_decay)
-      _ -> @default_cycle_decay
+      %{} = sisu -> max(0.0, sisu.cycle_decay || azure_cycle_decay())
+      _ -> azure_cycle_decay()
     end
   end
 
@@ -321,8 +320,12 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       current: BigNum.one(),
       max_basic: BigNum.from_number(Levels.base_max()),
       max_upgrade_level: 0,
-      cycle_decay: @default_cycle_decay,
+      cycle_decay: azure_cycle_decay(),
       projected_at: nil
     }
+  end
+
+  defp azure_cycle_decay do
+    Levels.refill_tier("azure").cycle_decay
   end
 end

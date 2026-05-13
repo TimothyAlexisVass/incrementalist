@@ -202,11 +202,25 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     slot = SaveSlots.get_slot!(player.id, 0)
     unlocked_state = %{slot.state | level: 10, area: "sage"}
+    other_tip_leaf_ids =
+      Incrementalist.Game.Constants.sage_tip_levels()
+      |> Enum.reject(&(&1 == 1))
+      |> Enum.map(&Notices.leaf_sage_tip_id/1)
+
+    notices =
+      Notices.new(unlocked_state)
+      |> then(fn seeded ->
+        %{
+          seeded
+          | dismissed_leaf_ids: Enum.uniq(seeded.dismissed_leaf_ids ++ other_tip_leaf_ids),
+            active_leaf_ids: Enum.reject(seeded.active_leaf_ids, &(&1 in other_tip_leaf_ids))
+        }
+      end)
 
     slot
     |> SaveSlot.changeset(%{
       state: unlocked_state,
-      notices: Notices.new(unlocked_state),
+      notices: notices,
       last_saved_at: @now
     })
     |> Repo.update!()
@@ -364,9 +378,10 @@ defmodule Incrementalist.Game.CommandsTest do
         "progress.claim_reward",
         intent(1),
         claim_at
-      )
+    )
 
     assert claim_result["type"] == "progress.claim_reward.result"
+    assert claim_result["charge_crystals"].azure == 0
   end
 
   test "reconnect boot includes the unacked stored result" do

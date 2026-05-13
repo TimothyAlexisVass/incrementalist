@@ -55,6 +55,7 @@ function isUsableSnapshot(snapshot: GameSnapshot, slotIndex: number) {
   if (typeof snapshot.state.level !== "number") return false;
   if (typeof snapshot.state.idle_mode !== "boolean") return false;
   if (!("first_played_at" in snapshot.state)) return false;
+  if (!snapshot.state.charge_crystals || typeof snapshot.state.charge_crystals !== "object") return false;
   if (!snapshot.state.sisu || typeof snapshot.state.sisu !== "object") return false;
   if (!snapshot.state.projection_params || typeof snapshot.state.projection_params !== "object") return false;
   return true;

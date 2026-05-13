@@ -32,6 +32,7 @@ import { hexToRgba } from "../../utils/color";
 import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
 import {
   getSisuControlRect,
+  getChargeCrystalCount,
   getSisuTierTarget,
   getUpgradeButtonState,
   SISU_BASE_MAX,
@@ -99,9 +100,10 @@ function drawSisuControlNative(
   displayCurrent: number
 ) {
   const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
-  const blueMax = getSisuTierTarget(maxBasic, "blue");
-  const yellowMax = getSisuTierTarget(maxBasic, "yellow");
-  const purpleMax = getSisuTierTarget(maxBasic, "purple");
+  const blueMax = getSisuTierTarget(maxBasic, "azure");
+  const aetherMax = getSisuTierTarget(maxBasic, "aether");
+  const orangeMax = getSisuTierTarget(maxBasic, "lucent");
+  const whiteMax = getSisuTierTarget(maxBasic, "transcendent");
   const startAngle = -Math.PI / 2;
   const fullCircle = Math.PI * 2;
 
@@ -119,16 +121,22 @@ function drawSisuControlNative(
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * blueFillRatio, hexToRgba(COLORS.sisu.blue));
   }
 
-  // Yellow Tier
-  const yellowFillRatio = getTierFillRatio(displayCurrent, blueMax, yellowMax);
-  if (yellowFillRatio > 0) {
-    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * yellowFillRatio, hexToRgba(COLORS.sisu.yellow));
+  // Aether Tier
+  const aetherFillRatio = getTierFillRatio(displayCurrent, blueMax, aetherMax);
+  if (aetherFillRatio > 0) {
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * aetherFillRatio, hexToRgba(COLORS.sisu.purple));
   }
 
-  // Purple Tier
-  const purpleFillRatio = getTierFillRatio(displayCurrent, yellowMax, purpleMax);
-  if (purpleFillRatio > 0) {
-    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * purpleFillRatio, hexToRgba(COLORS.sisu.purple));
+  // Lucent Tier
+  const lucentFillRatio = getTierFillRatio(displayCurrent, aetherMax, orangeMax);
+  if (lucentFillRatio > 0) {
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * lucentFillRatio, hexToRgba(COLORS.sisu.orange));
+  }
+
+  // Transcendent Tier
+  const transcendentFillRatio = getTierFillRatio(displayCurrent, orangeMax, whiteMax);
+  if (transcendentFillRatio > 0) {
+    renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * transcendentFillRatio, hexToRgba(COLORS.sisu.white));
   }
 
   // Center Multiplier Text
@@ -181,14 +189,14 @@ class SisuGeneratorModalImpl implements Modal {
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
-    const snapshot = this.getState().snapshot;
-    if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
-      this.onClose();
-      return;
-    }
+  const snapshot = this.getState().snapshot;
+  if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
+    this.onClose();
+    return;
+  }
 
-    const modalWidth = 520;
-    const modalHeight = 212;
+    const modalWidth = 560;
+    const modalHeight = 224;
     const modalX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - modalWidth;
     const modalY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - modalHeight;
 
@@ -200,11 +208,12 @@ class SisuGeneratorModalImpl implements Modal {
     const { displayCurrent } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
+    const chargeCrystals = snapshot.state.charge_crystals;
 
     this.refillRects.length = 0;
-    const refillWidth = 132;
-    const refillHeight = 88;
-    const refillGap = 22;
+    const refillWidth = 120;
+    const refillHeight = 96;
+    const refillGap = 14;
     const totalRefillWidth = refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
     const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
     const refillY = modalY + 40;
@@ -212,14 +221,16 @@ class SisuGeneratorModalImpl implements Modal {
     for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
       const tier = SISU_REFILL_TIERS[index];
       const target = getSisuTierTarget(maxBasic, tier.id);
+      const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
+      const enabled = availableCount > 0 && currentSisu < target;
       const rect = {
         x: refillStartX + index * (refillWidth + refillGap),
         y: refillY,
         width: refillWidth,
         height: refillHeight
       };
-      this.refillRects.push({ tier: tier.id, rect });
-      drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu);
+      this.refillRects.push({ tier: tier.id, rect, enabled });
+      drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu, availableCount, enabled);
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
@@ -350,11 +361,13 @@ function drawSisuRefillControl(
   input: InteractionState,
   rect: Rect,
   label: string,
-  colorKey: "blue" | "yellow" | "purple",
+  colorKey: "blue" | "purple" | "orange" | "white",
   target: number,
-  currentSisu: number
+  currentSisu: number,
+  availableCount: number,
+  enabled: boolean
 ) {
-  const canRefill = currentSisu < target;
+  const canRefill = enabled && currentSisu < target;
   const isHovered = canRefill && pointInRect(input.pointer, rect);
   const tierColor = COLORS.sisu[colorKey];
 
@@ -379,10 +392,20 @@ function drawSisuRefillControl(
   renderer.drawText({
     text: label,
     x: circleX,
-    y: rect.y + 57,
+    y: rect.y + 60,
     font: SISU_METER_FONT,
     color: COLORS.button.text,
     align: "center",
+    baseline: "middle"
+  });
+
+  renderer.drawText({
+    text: `x${formatNumber(availableCount)}`,
+    x: rect.x + rect.width - 10,
+    y: rect.y + 16,
+    font: TINY_TEXT_FONT,
+    color: canRefill ? COLORS.button.text : COLORS.button.secondary.text,
+    align: "right",
     baseline: "middle"
   });
 
@@ -390,7 +413,7 @@ function drawSisuRefillControl(
   renderer.drawText({
     text: targetText,
     x: circleX,
-    y: rect.y + 76,
+    y: rect.y + 82,
     font: TINY_TEXT_FONT,
     color: COLORS.button.text,
     align: "center",

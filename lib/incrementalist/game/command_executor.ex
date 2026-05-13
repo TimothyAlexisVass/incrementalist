@@ -101,6 +101,7 @@ defmodule Incrementalist.Game.CommandExecutor do
              "level" => new_state.level,
              "shards" => new_state.shards,
              "cores" => new_state.cores,
+             "charge_crystals" => new_state.charge_crystals,
              "sisu" => new_state.sisu,
              "notices" => Notices.payload(next_notices)
            }, active_slot.id}
@@ -241,6 +242,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                "status" => "ok",
                "command_id" => command.command_id,
                "tier_id" => tier_id,
+               "charge_crystals" => next_state.charge_crystals,
                "sisu" => next_state.sisu,
                "notices" => Notices.payload(next_notices)
              },

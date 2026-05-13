@@ -1,5 +1,12 @@
 import type { BigNum } from "../core/bignum";
 
+export type ChargeCrystalsState = {
+  azure: number;
+  aether: number;
+  lucent: number;
+  transcendent: number;
+};
+
 export type SaveSlotSummary = {
   slot_index: number;
   file_index: number;
@@ -59,17 +66,18 @@ export type GameSnapshot = {
   active_save_slot: number;
   state: {
     area: string;
-    level: number;
-    exp: BigNum;
-    required_exp: BigNum;
-    coins: BigNum;
-    shards: BigNum;
-    cores: BigNum;
-    idle_mode: boolean;
-    first_played_at: string | null;
-    progress_bar: {
-      reward_multiplier: number;
-      rewards_claimed: number;
+  level: number;
+  exp: BigNum;
+  required_exp: BigNum;
+  coins: BigNum;
+  shards: BigNum;
+  cores: BigNum;
+  charge_crystals: ChargeCrystalsState;
+  idle_mode: boolean;
+  first_played_at: string | null;
+  progress_bar: {
+    reward_multiplier: number;
+    rewards_claimed: number;
     };
     sisu: SisuState;
     areas: AreaDefinition[];
@@ -140,6 +148,7 @@ export type ProgressClaimRewardResult = {
   level: number;
   shards: BigNum;
   cores: BigNum;
+  charge_crystals: ChargeCrystalsState;
   sisu: SisuState;
   notices: NoticeState;
 };
@@ -149,6 +158,7 @@ export type SisuRefillResult = {
   status: "ok";
   command_id: number;
   tier_id: string;
+  charge_crystals: ChargeCrystalsState;
   sisu: SisuState;
   notices: NoticeState;
 } & ProjectionParams;
@@ -213,6 +223,7 @@ export type CommandErrorReason =
   | "sisu_generator_not_purchased"
   | "sisu_max_upgrade_reached"
   | "insufficient_shards"
+  | "insufficient_charge_crystals"
   | "sisu_already_higher"
   | "upgrade_cost_missing"
   | "notice_event_required"

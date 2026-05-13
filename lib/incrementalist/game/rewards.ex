@@ -2,6 +2,7 @@ defmodule Incrementalist.Game.Rewards do
   @moduledoc """
   Centralized reward handler to process EXP gains, level-ups, and currency mutations consistently.
   """
+  alias Incrementalist.Game.Features.Progress.ChargeCrystals
   alias Incrementalist.Game.State
 
   def apply_level_ups(%State{} = state) do
@@ -10,9 +11,10 @@ defmodule Incrementalist.Game.Rewards do
     coins = state.coins || BigNum.zero()
     shards = state.shards || BigNum.zero()
     cores = state.cores || BigNum.zero()
+    charge_crystals = ChargeCrystals.normalize(state.charge_crystals)
 
-    {new_level, new_exp, new_coins, new_shards, new_cores} =
-      do_apply_level_ups(level, exp, coins, shards, cores)
+    {new_level, new_exp, new_coins, new_shards, new_cores, new_charge_crystals} =
+      do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals)
 
     %{
       state
@@ -21,27 +23,30 @@ defmodule Incrementalist.Game.Rewards do
         coins: new_coins,
         shards: new_shards,
         cores: new_cores,
+        charge_crystals: new_charge_crystals,
         required_exp: calculate_required_exp(new_level)
     }
   end
 
-  defp do_apply_level_ups(level, exp, coins, shards, cores) do
+  defp do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals) do
     required_exp = calculate_required_exp(level)
 
     if BigNum.compare(exp, required_exp) >= 0 do
       new_exp = BigNum.sub(exp, required_exp)
       new_level = level + 1
       {reward_coins, reward_shards, reward_cores} = get_level_up_rewards(new_level)
+      new_charge_crystals = ChargeCrystals.grant_level_up(charge_crystals, new_level)
 
       do_apply_level_ups(
         new_level,
         new_exp,
         BigNum.add(coins, reward_coins),
         BigNum.add(shards, reward_shards),
-        BigNum.add(cores, reward_cores)
+        BigNum.add(cores, reward_cores),
+        new_charge_crystals
       )
     else
-      {level, exp, coins, shards, cores}
+      {level, exp, coins, shards, cores, charge_crystals}
     end
   end
 

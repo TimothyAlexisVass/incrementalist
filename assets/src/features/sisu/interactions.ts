@@ -8,6 +8,7 @@ import type { Rect, TierId } from "./view-model";
 export type SisuRefillHitRect = {
   tier: TierId;
   rect: Rect;
+  enabled: boolean;
 };
 
 export function handleSisuModalInteractions(
@@ -32,7 +33,7 @@ export function handleSisuModalInteractions(
   }
 
   for (const refillRect of refillRects) {
-    if (consumeClick(input, refillRect.rect)) {
+    if (refillRect.enabled && consumeClick(input, refillRect.rect)) {
       void runCommand(() => sisuRefill(channel, refillRect.tier));
       return;
     }

@@ -1,4 +1,5 @@
 import { compare, fromNumber, mul, toNumber, type BigNum } from "../../core/bignum";
+import type { ChargeCrystalsState } from "../../net/protocol";
 import type { ServerState } from "../../net/snapshots";
 import { clampNumber, lerp } from "../../utils";
 import { formatMultiplierDelta } from "../../utils/format";
@@ -7,28 +8,38 @@ import { getViewModel as getProgressBarViewModel } from "../progress-bar/view-mo
 import { getServerNow } from "../../core/time";
 import { SISU_METER_RADIUS } from "../../config";
 
-import { UPGRADE_COSTS } from "./levels";
+import { REFILL_TIERS, UPGRADE_COSTS } from "./levels";
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
-export type TierId = "blue" | "yellow" | "purple";
+export type TierId = "azure" | "aether" | "lucent" | "transcendent";
 
 export type SisuRefillTier = {
   id: TierId;
   label: string;
-  colorKey: "blue" | "yellow" | "purple";
+  colorKey: "blue" | "purple" | "orange" | "white";
   multiplier: number;
+  cycleDecay: number;
 };
 
 export const SISU_BASE_MAX = 2;
 export const SISU_MIN_MULTIPLIER = 1;
 export const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
 
-const SISU_REFILL_TIERS_BY_ID: Record<TierId, SisuRefillTier> = {
-  blue: { id: "blue", label: "Blue", colorKey: "blue", multiplier: 1.0 },
-  yellow: { id: "yellow", label: "Yellow", colorKey: "yellow", multiplier: 1.5 },
-  purple: { id: "purple", label: "Purple", colorKey: "purple", multiplier: 2.5 }
-};
+const SISU_REFILL_TIERS_BY_ID: Record<TierId, SisuRefillTier> = Object.freeze(
+  Object.fromEntries(
+    REFILL_TIERS.map((tier) => [
+      tier.id,
+      {
+        id: tier.id,
+        label: tier.label,
+        colorKey: tier.color_key,
+        multiplier: tier.multiplier,
+        cycleDecay: tier.cycle_decay
+      } satisfies SisuRefillTier
+    ])
+  ) as Record<TierId, SisuRefillTier>
+);
 
 export const SISU_REFILL_TIERS: readonly SisuRefillTier[] = Object.values(SISU_REFILL_TIERS_BY_ID);
 
@@ -55,6 +66,23 @@ export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
 export function getSisuTierTarget(maxBasic: number, tierId: TierId): number {
   const tier = SISU_REFILL_TIERS_BY_ID[tierId];
   return Math.round(maxBasic * tier.multiplier * 100) / 100;
+}
+
+export function getChargeCrystalCount(chargeCrystals: ChargeCrystalsState | undefined | null, tierId: TierId): number {
+  if (!chargeCrystals) return 0;
+
+  switch (tierId) {
+    case "azure":
+      return chargeCrystals.azure || 0;
+    case "aether":
+      return chargeCrystals.aether || 0;
+    case "lucent":
+      return chargeCrystals.lucent || 0;
+    case "transcendent":
+      return chargeCrystals.transcendent || 0;
+    default:
+      return 0;
+  }
 }
 
 

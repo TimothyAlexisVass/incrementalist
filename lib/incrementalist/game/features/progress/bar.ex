@@ -1,5 +1,6 @@
 defmodule Incrementalist.Game.Features.Progress.Bar do
   alias Incrementalist.Game.Constants
+  alias Incrementalist.Game.Features.Progress.ChargeCrystals
   alias Incrementalist.Game.Features.Progress.Sisu
   alias Incrementalist.Game.State
   alias Incrementalist.Game.Time
@@ -63,10 +64,12 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     progress_bar = state.progress_bar || %State.ProgressBar{}
     rewards_claimed = (progress_bar.rewards_claimed || 0) + 1
     updated_progress_bar = %{progress_bar | rewards_claimed: rewards_claimed}
+    updated_charge_crystals = ChargeCrystals.grant_claim(state.charge_crystals, rewards_claimed)
 
     %{
       state
       | progress_bar: updated_progress_bar,
+        charge_crystals: updated_charge_crystals,
         last_claimed_at: Time.iso8601(now),
         cycle_started_at: nil,
         can_claim_at: nil

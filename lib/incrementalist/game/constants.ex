@@ -38,6 +38,11 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
 
+  def charge_crystal_azure_claim_interval, do: 4
+  def charge_crystal_aether_claim_interval, do: 20
+  def charge_crystal_lucent_level_interval, do: 10
+  def charge_crystal_transcendent_level_interval, do: 100
+
   # Notice IDs
   def notice_parent_menu_main, do: "parent.menu.main"
   def notice_parent_tab_shop, do: "parent.tab.shop"

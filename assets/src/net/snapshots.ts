@@ -1,5 +1,6 @@
 import type {
   GameSnapshot,
+  ChargeCrystalsState,
   NoticeState,
   SaveSlotSummary,
   ServerResult,
@@ -103,6 +104,7 @@ export function applyAuthoritativeData(
     level?: number;
     shards?: BigNum;
     cores?: BigNum;
+    charge_crystals?: ChargeCrystalsState;
     item_id?: string;
     sisu?: SisuState;
   }
@@ -129,6 +131,7 @@ export function applyAuthoritativeData(
 
   if (data.shards !== undefined) state.snapshot.state.shards = data.shards;
   if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
+  if (data.charge_crystals !== undefined) state.snapshot.state.charge_crystals = data.charge_crystals;
   if (data.sisu !== undefined) state.snapshot.state.sisu = data.sisu;
 
   if (data.item_id !== undefined) {

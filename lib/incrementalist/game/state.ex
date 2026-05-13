@@ -13,6 +13,35 @@ defmodule Incrementalist.Game.State do
 
   @current_version 1
 
+  defmodule ChargeCrystals do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :azure, :integer, default: 0
+      field :aether, :integer, default: 0
+      field :lucent, :integer, default: 0
+      field :transcendent, :integer, default: 0
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:azure, :aether, :lucent, :transcendent])
+    end
+
+    def visible_state(nil), do: visible_state(%__MODULE__{})
+
+    def visible_state(%__MODULE__{} = crystals) do
+      %{
+        "azure" => crystals.azure || 0,
+        "aether" => crystals.aether || 0,
+        "lucent" => crystals.lucent || 0,
+        "transcendent" => crystals.transcendent || 0
+      }
+    end
+  end
+
   defmodule ProgressBar do
     use Ecto.Schema
     import Ecto.Changeset
@@ -65,7 +94,7 @@ defmodule Incrementalist.Game.State do
       embeds_one :target_current, BigNum, on_replace: :update
       field :target_cycle_decay, :float
       field :max_upgrade_level, :integer, default: 0
-      field :cycle_decay, :float, default: 3.5
+      field :cycle_decay, :float
       field :projected_at, :string
     end
 
@@ -98,6 +127,7 @@ defmodule Incrementalist.Game.State do
     field :saved_at, :string
 
     embeds_one :progress_bar, ProgressBar, on_replace: :update
+    embeds_one :charge_crystals, ChargeCrystals, on_replace: :update
     embeds_one :features, Features, on_replace: :update
     embeds_one :sisu, Sisu, on_replace: :update
   end
@@ -123,6 +153,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:shards)
     |> cast_embed(:cores)
     |> cast_embed(:progress_bar)
+    |> cast_embed(:charge_crystals)
     |> cast_embed(:features)
     |> cast_embed(:sisu)
   end
@@ -154,6 +185,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:shards)
     |> maybe_put_embed(:cores)
     |> maybe_put_embed(:progress_bar)
+    |> maybe_put_embed(:charge_crystals)
     |> maybe_put_embed(:features)
     |> maybe_put_embed(:sisu)
   end
@@ -199,6 +231,7 @@ defmodule Incrementalist.Game.State do
         reward_multiplier: 1.0,
         rewards_claimed: 0
       },
+      charge_crystals: %__MODULE__.ChargeCrystals{},
       features: %Features{
         idle_mode_purchased: false,
         world_map_unlocked: false,
@@ -210,9 +243,9 @@ defmodule Incrementalist.Game.State do
         max_basic:
           BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max()),
         target_current: BigNum.one(),
-        target_cycle_decay: 3.5,
+        target_cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         max_upgrade_level: 0,
-        cycle_decay: 3.5,
+        cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         projected_at: timestamp
       }
     }
@@ -252,6 +285,10 @@ defmodule Incrementalist.Game.State do
             else: 0
           )
       },
+      "charge_crystals" =>
+        Incrementalist.Game.Features.Progress.ChargeCrystals.visible_state(
+          projected_state.charge_crystals
+        ),
       "sisu" => %{
         "current" =>
           if(projected_state.sisu,
@@ -267,7 +304,10 @@ defmodule Incrementalist.Game.State do
         "max_upgrade_level" =>
           if(projected_state.sisu, do: projected_state.sisu.max_upgrade_level || 0, else: 0),
         "cycle_decay" =>
-          if(projected_state.sisu, do: projected_state.sisu.cycle_decay || 3.5, else: 3.5)
+          if(projected_state.sisu,
+            do: projected_state.sisu.cycle_decay || Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
+            else: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay
+          )
       },
       "areas" =>
         Enum.map(Incrementalist.Game.Constants.area_defs(), fn area_def ->
