@@ -89,7 +89,10 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   def initialize_if_empty(save_slot, now \\ Time.now())
 
   def initialize_if_empty(%SaveSlot{state: nil} = save_slot, now) do
-    next_state = State.new(now)
+    next_state =
+      now
+      |> State.new()
+      |> Sisu.project_state(now)
 
     save_slot
     |> SaveSlot.changeset(%{
@@ -154,7 +157,10 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
   end
 
   def reset(%SaveSlot{} = save_slot, now \\ Time.now()) do
-    next_state = State.new(now)
+    next_state =
+      now
+      |> State.new()
+      |> Sisu.project_state(now)
 
     save_slot
     |> SaveSlot.changeset(%{

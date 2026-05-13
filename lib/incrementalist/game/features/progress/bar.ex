@@ -13,7 +13,7 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     end
   end
 
-  def base_progress_bar_fill_rate(%State{} = state, now) do
+  def base_progress_bar_fill_rate(%State{} = state, _now) do
     idle_mode = state.idle_mode || false
 
     base_rate =
@@ -23,24 +23,10 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         Constants.progress_bar_base_idle_mode_off_fill_rate()
       end
 
-    first_played_at_ms =
-      case state.first_played_at do
-        nil ->
-          Time.to_unix_ms(now)
-
-        iso_str ->
-          case Time.from_iso8601(iso_str) do
-            {:ok, dt} -> Time.to_unix_ms(dt)
-            _ -> Time.to_unix_ms(now)
-          end
-      end
-
-    now_ms = Time.to_unix_ms(now)
-    game_age_ms = now_ms - first_played_at_ms
     level = state.level || 1
 
     cond do
-      game_age_ms < Constants.progress_bar_new_player_bonus_window_ms() ->
+      level < 3 ->
         base_rate * Constants.progress_bar_new_player_bonus_fill_multiplier() +
           Constants.progress_bar_new_player_bonus_fill_bonus()
 

@@ -9,7 +9,7 @@ defmodule Incrementalist.Game.CommandsTest do
   alias Incrementalist.Game.{Notices, Sessions, State, Time}
   alias Incrementalist.Repo
 
-  @now ~U[2026-05-04 12:00:00Z]
+  @now ~U[2026-05-04 12:00:00.000000Z]
 
   test "anonymous sessions create four save slots and boot chooses slot zero when empty" do
     player = Sessions.authenticate_player(nil, @now)
@@ -343,6 +343,30 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert ack["released_result"] == nil
     assert command_statuses(player.id) == ["acked", "acked"]
+  end
+
+  test "save reset persists claim boundary from snapshot projection" do
+    player = create_player()
+
+    reset_result = Commands.enqueue(player.id, "save_slot.reset", intent(0), @now)
+    assert reset_result["type"] == "save_slot.reset.result"
+
+    can_claim_at = get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
+    assert is_binary(can_claim_at)
+
+    {:ok, claim_at, 0} = DateTime.from_iso8601(can_claim_at)
+
+    Commands.ack(player.id, 0, @now)
+
+    claim_result =
+      Commands.enqueue(
+        player.id,
+        "progress.claim_reward",
+        intent(1),
+        claim_at
+      )
+
+    assert claim_result["type"] == "progress.claim_reward.result"
   end
 
   test "reconnect boot includes the unacked stored result" do

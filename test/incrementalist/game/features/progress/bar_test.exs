@@ -55,11 +55,8 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
     end
 
     test "returns idle rate when idle_mode is true", %{now: now} do
-      first_played = DateTime.add(now, -30_000, :millisecond) |> DateTime.to_iso8601()
-
       state = %State{
         idle_mode: true,
-        first_played_at: first_played,
         level: 35,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
@@ -75,11 +72,9 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
     end
 
     test "applies new player bonus mechanics while idle", %{now: now} do
-      first_played = DateTime.add(now, -10_000, :millisecond) |> DateTime.to_iso8601()
-
       state = %State{
         idle_mode: true,
-        first_played_at: first_played,
+        level: 2,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
           current: BigNum.from_number(1.0),
@@ -97,12 +92,10 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       assert Bar.get_progress_bar_fill_rate(state, now) == expected
     end
 
-    test "applies new player bonus when game age < 25_000ms", %{now: now} do
-      first_played = DateTime.add(now, -10_000, :millisecond) |> DateTime.to_iso8601()
-
+    test "applies new player bonus when level is below 3", %{now: now} do
       state = %State{
         idle_mode: false,
-        first_played_at: first_played,
+        level: 2,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
           current: BigNum.from_number(1.0),
@@ -117,13 +110,10 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       assert Bar.get_progress_bar_fill_rate(state, now) == 22.0
     end
 
-    test "applies late new player bonus when level < 35 and game age >= 25_000ms", %{now: now} do
-      first_played = DateTime.add(now, -30_000, :millisecond) |> DateTime.to_iso8601()
-
+    test "applies late new player bonus when level is 3 through 34", %{now: now} do
       state = %State{
         idle_mode: false,
-        first_played_at: first_played,
-        level: 34,
+        level: 10,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
           current: BigNum.from_number(1.0),
@@ -138,12 +128,9 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       assert_in_delta Bar.get_progress_bar_fill_rate(state, now), 5.8, 0.000001
     end
 
-    test "applies standard rate when level >= 35 and game age >= 25_000ms", %{now: now} do
-      first_played = DateTime.add(now, -30_000, :millisecond) |> DateTime.to_iso8601()
-
+    test "applies standard rate when level >= 35", %{now: now} do
       state = %State{
         idle_mode: false,
-        first_played_at: first_played,
         level: 35,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
@@ -158,12 +145,14 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       assert Bar.get_progress_bar_fill_rate(state, now) == 0.8
     end
 
-    test "falls back to now when first_played_at is nil or invalid, giving new player bonus", %{
+    test "new player bonus is based on level and ignores first_played_at shape", %{
       now: now
     } do
-      # Test nil
+      expected = 22.0
+
       state_nil = %State{
         idle_mode: false,
+        level: 2,
         first_played_at: nil,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
@@ -174,12 +163,11 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
         }
       }
 
-      # game age = 0, so bonus applies
-      assert Bar.get_progress_bar_fill_rate(state_nil, now) == 22.0
+      assert Bar.get_progress_bar_fill_rate(state_nil, now) == expected
 
-      # Test invalid
       state_invalid = %State{
         idle_mode: false,
+        level: 2,
         first_played_at: "invalid_date",
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
@@ -190,15 +178,12 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
         }
       }
 
-      assert Bar.get_progress_bar_fill_rate(state_invalid, now) == 22.0
+      assert Bar.get_progress_bar_fill_rate(state_invalid, now) == expected
     end
 
     test "scales base rate appropriately with sisu", %{now: now} do
-      first_played = DateTime.add(now, -30_000, :millisecond) |> DateTime.to_iso8601()
-
       state = %State{
         idle_mode: false,
-        first_played_at: first_played,
         level: 35,
         progress_bar: %State.ProgressBar{},
         sisu: %State.Sisu{
