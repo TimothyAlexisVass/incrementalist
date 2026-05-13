@@ -47,7 +47,7 @@ export function renderBottomHUD(
   // Draw Area selection dropdown on the left
   renderAreaDropdown(canvas, input, (areaKey) => {
     if (onAreaSelect) onAreaSelect(areaKey);
-  }, channel, runCommand);
+  }, isMainMenuOpen, channel, runCommand);
 }
 
 function cssToRgba(color: string): [number, number, number, number] {

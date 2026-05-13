@@ -28,7 +28,7 @@ import {
   clearPendingClaimPopupPoint
 } from "../features/progress-bar/interactions";
 import { renderProgressBar, renderProgressBarForeground } from "../features/progress-bar/render";
-import { renderAreaBackground, renderAreaSpecifics } from "../features/areas/render";
+import { renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
 import { 
   createFloatingTextState, 
@@ -45,6 +45,7 @@ import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
+import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
 import {
   NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
   NOTICE_PARENT_MENU_MAIN,
@@ -378,6 +379,7 @@ export class GameClient {
 
   private tick(dt: number) {
     getActiveWebGLRenderer()?.beginFrame([0, 0, 0, 0]);
+    beginTooltipFrame();
 
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
@@ -506,6 +508,14 @@ export class GameClient {
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);
     this.ui.render(this.canvas, input, this.store.state);
+    if (isMainMenuOpen) {
+      renderAreaDropdownAboveMenu(this.canvas, input, (areaKey) => {
+        if (this.channel) {
+          this.runCommand(() => selectArea(this.channel!, areaKey));
+        }
+      }, this.channel || undefined, (cmd) => this.runCommand(cmd));
+    }
+    renderQueuedTooltips();
   }
 
   private openShopAndHighlight(itemId: string) {

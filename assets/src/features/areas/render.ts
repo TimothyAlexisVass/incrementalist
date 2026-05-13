@@ -70,117 +70,145 @@ export function renderAreaDropdown(
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
   onSelect: (areaKey: string) => void,
+  isMainMenuOpen: boolean,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
-  const model = getAreaViewModel();
-  const buttonWidth = 140;
-  const buttonHeight = 34;
-  const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
-  const buttonX = 20;
-  const buttonY = canvas.height - buttonHeight - paddingBottom;
-  
-  const currentArea = model.availableAreas.find(a => a.key === model.currentArea);
-  const buttonLabel = currentArea ? currentArea.name : 'Unknown Area';
-
-  const buttonRect = { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight };
+  const layout = getAreaDropdownLayout(canvas);
 
   // Handle hover for dropdown
-  const isHoveringButton = pointInRect(input.pointer, buttonRect);
+  const isHoveringButton = pointInRect(input.pointer, layout.buttonRect);
   if (isHoveringButton) {
     isDropdownOpen = true;
   }
 
   if (isDropdownOpen) {
-    const availableAreas = model.availableAreas.filter(a => a.key !== model.currentArea);
-    if (availableAreas.length > 0) {
-      const itemHeight = 34;
-      const menuWidth = buttonWidth + GO_TO_AREA_BUTTON_PADDING * 2;
-      const paddedItemHeight = itemHeight + GO_TO_AREA_BUTTON_PADDING * 2;
-      const menuHeight = availableAreas.length * paddedItemHeight + 9;
-      const menuRect = {
-        x: buttonX - GO_TO_AREA_BUTTON_PADDING,
-        y: buttonY - menuHeight,
-        width: menuWidth,
-        height: menuHeight
-      };
+    const isHoveringMenu = pointInRect(input.pointer, layout.menuRect);
+    if (!isHoveringButton && !isHoveringMenu) {
+      isDropdownOpen = false;
+    } else {
+      notices.reportParentVisibleViaPseudoLeaf(
+        NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
+        NOTICE_PARENT_AREA_DROPDOWN,
+        true,
+        channel,
+        runCommand
+      );
 
-      const isHoveringMenu = pointInRect(input.pointer, menuRect);
-      if (!isHoveringButton && !isHoveringMenu) {
-        isDropdownOpen = false;
-      } else {
-        notices.reportParentVisibleViaPseudoLeaf(
-          NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
-          NOTICE_PARENT_AREA_DROPDOWN,
-          true,
-          channel,
-          runCommand
-        );
-
-
-
-        availableAreas.forEach((area, i) => {
-          const itemRect = {
-            x: menuRect.x,
-            y: menuRect.y + i * paddedItemHeight,
-            width: menuRect.width,
-            height: paddedItemHeight
-          };
-          
-          const isHovered = pointInRect(input.pointer, itemRect);
-          
-          const leafId = `leaf.area.${area.key}.go_button`;
-          const hasNotice = notices.hasLeafNotice(leafId);
-
-          const renderItem = () => {
-            drawButton(itemRect, area.is_locked ? "" : area.name, {
-              active: isHovered,
-              padding: 0,
-              font: BOTTOM_HUD_BUTTON_FONT,
-              activeSurface: COLORS.button.surface.active,
-              inactiveSurface: COLORS.panel.bg,
-              activeBorder: COLORS.panel.border,
-              inactiveBorder: COLORS.panel.border,
-              textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary,
-              showNotice: !area.is_locked && hasNotice // Button draws its own notice if not locked
-            });
-
-            if (hasNotice) {
-              notices.reportLeafVisible(leafId, true, channel, runCommand);
-            }
-          };
-
-          if (area.is_locked) {
-            // Keep the same full-size row visuals as unlocked items, then
-            // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
-            drawLockedElement(canvas, input, itemRect, renderItem, {
-              opacity: 0,
-              criteria: `Requires Level ${area.unlock_level}`,
-              showNotice: hasNotice,
-              showNoticePing: true
-            });
-          } else {
-            renderItem();
-          }
-
-          const startedInside = pointInRect(input.pressStartPointer, itemRect);
-          if (isHovered && startedInside && input.clicked && !area.is_locked) {
-            notices.reportLeafClicked(`leaf.area.${area.key}.go_button`, channel, runCommand);
-            onSelect(area.key);
-            isDropdownOpen = false;
-            input.consumed = true;
-          }
-        });
-
+      if (!isMainMenuOpen) {
+        renderDropdownItems(canvas, input, layout, onSelect, channel, runCommand);
       }
     }
   }
 
   // Draw the main button
-  if (doButton(input, buttonRect, buttonLabel, {
+  if (doButton(input, layout.buttonRect, layout.buttonLabel, {
     showNotice: notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)
   })) {
     // Click also toggles or handles selection if needed, but hover handles open.
   }
 }
 
+export function renderAreaDropdownAboveMenu(
+  canvas: HTMLCanvasElement,
+  input: InteractionState,
+  onSelect: (areaKey: string) => void,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
+) {
+  if (!isDropdownOpen) return;
+
+  const layout = getAreaDropdownLayout(canvas);
+  renderDropdownItems(canvas, input, layout, onSelect, channel, runCommand);
+}
+
+function getAreaDropdownLayout(canvas: HTMLCanvasElement) {
+  const model = getAreaViewModel();
+  const buttonWidth = 140;
+  const buttonHeight = 34;
+  const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
+  const buttonX = 20;
+  const buttonY = canvas.height - buttonHeight - paddingBottom;
+  const currentArea = model.availableAreas.find(a => a.key === model.currentArea);
+  const buttonLabel = currentArea ? currentArea.name : 'Unknown Area';
+  const buttonRect = { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight };
+  const availableAreas = model.availableAreas.filter(a => a.key !== model.currentArea);
+  const itemHeight = 34;
+  const menuWidth = buttonWidth + GO_TO_AREA_BUTTON_PADDING * 2;
+  const paddedItemHeight = itemHeight + GO_TO_AREA_BUTTON_PADDING * 2;
+  const menuHeight = availableAreas.length * paddedItemHeight + 9;
+  const menuRect = {
+    x: buttonX - GO_TO_AREA_BUTTON_PADDING,
+    y: buttonY - menuHeight,
+    width: menuWidth,
+    height: menuHeight
+  };
+
+  return { buttonRect, buttonLabel, availableAreas, menuRect, paddedItemHeight };
+}
+
+function renderDropdownItems(
+  canvas: HTMLCanvasElement,
+  input: InteractionState,
+  layout: ReturnType<typeof getAreaDropdownLayout>,
+  onSelect: (areaKey: string) => void,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
+) {
+  if (layout.availableAreas.length === 0) {
+    return;
+  }
+
+  layout.availableAreas.forEach((area, i) => {
+    const itemRect = {
+      x: layout.menuRect.x,
+      y: layout.menuRect.y + i * layout.paddedItemHeight,
+      width: layout.menuRect.width,
+      height: layout.paddedItemHeight
+    };
+
+    const isHovered = pointInRect(input.pointer, itemRect);
+
+    const leafId = `leaf.area.${area.key}.go_button`;
+    const hasNotice = notices.hasLeafNotice(leafId);
+
+    const renderItem = () => {
+      drawButton(itemRect, area.is_locked ? "" : area.name, {
+        active: isHovered,
+        padding: 0,
+        font: BOTTOM_HUD_BUTTON_FONT,
+        activeSurface: COLORS.button.surface.active,
+        inactiveSurface: COLORS.panel.bg,
+        activeBorder: COLORS.panel.border,
+        inactiveBorder: COLORS.panel.border,
+        textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary,
+        showNotice: !area.is_locked && hasNotice // Button draws its own notice if not locked
+      });
+
+      if (hasNotice) {
+        notices.reportLeafVisible(leafId, true, channel, runCommand);
+      }
+    };
+
+    if (area.is_locked) {
+      // Keep the same full-size row visuals as unlocked items, then
+      // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
+      drawLockedElement(canvas, input, itemRect, renderItem, {
+        opacity: 0,
+        criteria: `Requires Level ${area.unlock_level}`,
+        showNotice: hasNotice,
+        showNoticePing: true
+      });
+    } else {
+      renderItem();
+    }
+
+    const startedInside = pointInRect(input.pressStartPointer, itemRect);
+    if (isHovered && startedInside && input.clicked && !area.is_locked) {
+      notices.reportLeafClicked(`leaf.area.${area.key}.go_button`, channel, runCommand);
+      onSelect(area.key);
+      isDropdownOpen = false;
+      input.consumed = true;
+    }
+  });
+}

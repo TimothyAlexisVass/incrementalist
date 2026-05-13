@@ -1,5 +1,5 @@
 import { TINY_TEXT_FONT } from '../../config';
-import { getActiveWebGLRenderer } from '../../renderer/webgl';
+import { getActiveWebGLRenderer, type WebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
 
 export interface TooltipOptions {
@@ -15,6 +15,53 @@ export interface TooltipOptions {
   margin?: number;
 }
 
+interface TooltipRequest {
+  anchorPoint: { x: number; y: number };
+  content: string | string[];
+  options: TooltipOptions;
+}
+
+interface TooltipRenderTarget {
+  canvas: HTMLCanvasElement;
+  renderer: WebGLRenderer;
+}
+
+const queuedTooltips: TooltipRequest[] = [];
+let tooltipRenderTarget: TooltipRenderTarget | null = null;
+
+export function setTooltipRenderTarget(canvas: HTMLCanvasElement, renderer: WebGLRenderer) {
+  tooltipRenderTarget = { canvas, renderer };
+}
+
+export function beginTooltipFrame() {
+  queuedTooltips.length = 0;
+  tooltipRenderTarget?.renderer.beginFrame([0, 0, 0, 0]);
+}
+
+export function queueTooltip(
+  anchorPoint: { x: number; y: number },
+  content: string | string[],
+  options: TooltipOptions = {}
+) {
+  queuedTooltips.push({ anchorPoint, content, options });
+}
+
+export function renderQueuedTooltips() {
+  const target = tooltipRenderTarget;
+  if (!target || queuedTooltips.length === 0) {
+    queuedTooltips.length = 0;
+    return;
+  }
+
+  const { canvas, renderer } = target;
+
+  for (const request of queuedTooltips) {
+    drawTooltipInternal(renderer, canvas, request.anchorPoint, request.content, request.options);
+  }
+
+  queuedTooltips.length = 0;
+}
+
 export function drawTooltip(
   canvas: HTMLCanvasElement,
   anchorPoint: { x: number; y: number },
@@ -22,6 +69,16 @@ export function drawTooltip(
   options: TooltipOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
+  return drawTooltipInternal(renderer, canvas, anchorPoint, content, options);
+}
+
+function drawTooltipInternal(
+  renderer: WebGLRenderer,
+  canvas: HTMLCanvasElement,
+  anchorPoint: { x: number; y: number },
+  content: string | string[],
+  options: TooltipOptions = {}
+) {
   if (!canvas || !anchorPoint) {
     return null;
   }
@@ -50,7 +107,7 @@ export function drawTooltip(
   const width = Math.ceil(contentWidth + paddingX * 2);
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
 
-  let x = anchorPoint.x - width - offsetX;
+  let x = anchorPoint.x - width;
   let y = anchorPoint.y - height - offsetY;
 
   if (x < margin) {

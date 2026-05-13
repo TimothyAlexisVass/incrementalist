@@ -2,7 +2,7 @@ import { COLORS } from "../../colors";
 import { withLockedAlpha } from "../../utils/locked";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { InteractionState, pointInRect } from "../managers/interactions";
-import { drawTooltip } from "./tooltip";
+import { queueTooltip } from "./tooltip";
 import { drawNoticeDot } from "./button";
 
 export interface LockedElementOptions {
@@ -85,7 +85,7 @@ export function drawLockedElement(
   }
 
   if (criteria && isHovered) {
-    drawTooltip(canvas, input.pointer!, criteria);
+    queueTooltip(input.pointer!, criteria);
   }
 }
 
