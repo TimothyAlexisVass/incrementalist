@@ -240,6 +240,54 @@ void main() {
 }
 `;
 
+const GLOW_VERTEX_SHADER_SOURCE = `
+attribute vec2 a_position;
+uniform vec2 u_resolution;
+varying vec2 v_position;
+
+void main() {
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+  gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+  v_position = a_position;
+}
+`;
+
+const GLOW_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+uniform vec4 u_rect;
+uniform vec3 u_color;
+uniform float u_intensity;
+uniform float u_radius;
+uniform float u_innerAlpha;
+uniform float u_outerAlpha;
+varying vec2 v_position;
+
+void main() {
+  vec2 rectMin = u_rect.xy;
+  vec2 rectMax = u_rect.xy + u_rect.zw;
+  vec2 outsideDelta = max(max(rectMin - v_position, v_position - rectMax), vec2(0.0));
+  float outsideDistance = length(outsideDelta);
+  
+  // Outer glow with multiple layers for softness
+  float outsideGlow = (1.0 - smoothstep(0.0, u_radius * 1.55, outsideDistance)) * step(0.0001, outsideDistance);
+  float outsideSoft = (1.0 - smoothstep(0.0, u_radius * 2.2, outsideDistance)) * step(0.0001, outsideDistance);
+  float finalOuter = (outsideGlow * 0.8 + outsideSoft * 0.2) * u_outerAlpha;
+  
+  // Inner glow (inset shadow)
+  float insideEdge = min(
+    min(v_position.x - rectMin.x, rectMax.x - v_position.x),
+    min(v_position.y - rectMin.y, rectMax.y - v_position.y)
+  );
+  float insideGlow = (1.0 - smoothstep(0.0, u_radius * 0.6, insideEdge)) * step(0.0, insideEdge);
+  float insideSoft = (1.0 - smoothstep(0.0, u_radius * 1.2, insideEdge)) * step(0.0, insideEdge);
+  float finalInner = (insideGlow * 0.7 + insideSoft * 0.3) * u_innerAlpha;
+  
+  float alpha = (finalOuter + finalInner) * u_intensity;
+  gl_FragColor = vec4(u_color * alpha, alpha);
+}
+`;
+
 const TEXT_VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
 attribute vec2 a_texcoord;
@@ -313,6 +361,17 @@ export class WebGLRenderer {
   private readonly liquidPositionBuffer: WebGLBuffer;
   private readonly liquidTexcoordBuffer: WebGLBuffer;
 
+  private readonly glowProgram: WebGLProgram;
+  private readonly glowPositionLocation: number;
+  private readonly glowResolutionLocation: WebGLUniformLocation;
+  private readonly glowRectLocation: WebGLUniformLocation;
+  private readonly glowColorLocation: WebGLUniformLocation;
+  private readonly glowIntensityLocation: WebGLUniformLocation;
+  private readonly glowRadiusLocation: WebGLUniformLocation;
+  private readonly glowInnerAlphaLocation: WebGLUniformLocation;
+  private readonly glowOuterAlphaLocation: WebGLUniformLocation;
+  private readonly glowBuffer: WebGLBuffer;
+
   private readonly threeRenderer: ThreeWebGLRenderer;
   private readonly textScene: Scene;
   private readonly textCamera: OrthographicCamera;
@@ -382,6 +441,17 @@ export class WebGLRenderer {
     this.liquidAlphaLocation = mustGetUniform(gl, this.liquidProgram, "u_alpha");
     this.liquidPositionBuffer = mustCreateBuffer(gl);
     this.liquidTexcoordBuffer = mustCreateBuffer(gl);
+
+    this.glowProgram = mustCreateProgram(gl, GLOW_VERTEX_SHADER_SOURCE, GLOW_FRAGMENT_SHADER_SOURCE);
+    this.glowPositionLocation = gl.getAttribLocation(this.glowProgram, "a_position");
+    this.glowResolutionLocation = mustGetUniform(gl, this.glowProgram, "u_resolution");
+    this.glowRectLocation = mustGetUniform(gl, this.glowProgram, "u_rect");
+    this.glowColorLocation = mustGetUniform(gl, this.glowProgram, "u_color");
+    this.glowIntensityLocation = mustGetUniform(gl, this.glowProgram, "u_intensity");
+    this.glowRadiusLocation = mustGetUniform(gl, this.glowProgram, "u_radius");
+    this.glowInnerAlphaLocation = mustGetUniform(gl, this.glowProgram, "u_innerAlpha");
+    this.glowOuterAlphaLocation = mustGetUniform(gl, this.glowProgram, "u_outerAlpha");
+    this.glowBuffer = mustCreateBuffer(gl);
 
     this.threeRenderer = new ThreeWebGLRenderer({
       canvas: this.canvas,
@@ -534,6 +604,59 @@ export class WebGLRenderer {
     gl.uniform1f(this.liquidAlphaLocation, alpha);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  public drawGlowRect(options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    color: RGBA;
+    radius: number;
+    intensity: number;
+    innerAlpha?: number;
+    outerAlpha?: number;
+    alpha?: number;
+    blendMode?: "normal" | "additive";
+  }) {
+    const gl = this.gl;
+    const { x, y, width, height, color, radius, intensity } = options;
+
+    if (width <= 0 || height <= 0) return;
+
+    // Expand vertex buffer slightly to ensure glow isn't clipped
+    const padding = radius * 2.5;
+    const x1 = x - padding;
+    const y1 = y - padding;
+    const x2 = x + width + padding;
+    const y2 = y + height + padding;
+
+    const vertices = new Float32Array([
+      x1, y1,
+      x2, y1,
+      x1, y2,
+      x1, y2,
+      x2, y1,
+      x2, y2
+    ]);
+
+    this.setBlendMode(options.blendMode || "normal");
+    gl.useProgram(this.glowProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.glowBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.glowPositionLocation);
+    gl.vertexAttribPointer(this.glowPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform2f(this.glowResolutionLocation, this.canvas.width, this.canvas.height);
+    gl.uniform4f(this.glowRectLocation, x, y, width, height);
+    gl.uniform3f(this.glowColorLocation, color[0] / 255, color[1] / 255, color[2] / 255);
+    gl.uniform1f(this.glowIntensityLocation, intensity * (options.alpha ?? 1.0) * this._globalAlpha);
+    gl.uniform1f(this.glowRadiusLocation, radius);
+    gl.uniform1f(this.glowInnerAlphaLocation, options.innerAlpha ?? 0.0);
+    gl.uniform1f(this.glowOuterAlphaLocation, options.outerAlpha ?? 0.0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    this.setBlendMode("normal");
   }
 
   drawCircle(x: number, y: number, radius: number, color: RGBA, softness = 0.1, blendMode: "normal" | "additive" = "normal") {
@@ -826,10 +949,12 @@ export class WebGLRenderer {
     gl.deleteBuffer(this.shapeTexcoordBuffer);
     gl.deleteBuffer(this.liquidPositionBuffer);
     gl.deleteBuffer(this.liquidTexcoordBuffer);
+    gl.deleteBuffer(this.glowBuffer);
     gl.deleteProgram(this.colorProgram);
     gl.deleteProgram(this.textProgram);
     gl.deleteProgram(this.shapeProgram);
     gl.deleteProgram(this.liquidProgram);
+    gl.deleteProgram(this.glowProgram);
     this.threeRenderer.dispose();
   }
 

@@ -180,6 +180,19 @@ function renderProgressBarDirect(
     color: hexToRgba(COLORS.bar.track)
   });
 
+  // Track Depth (Inner Shadow)
+  renderer.drawGlowRect({
+    x: barX,
+    y: barY,
+    width: barWidth,
+    height: barHeight,
+    color: [0, 0, 0, 1],
+    radius: 12,
+    intensity: 0.25,
+    innerAlpha: 1.0,
+    outerAlpha: 0.0
+  });
+
   const fillHeight = displayedFillRatio * barHeight;
   const fillY = barY + barHeight - fillHeight;
 
@@ -243,15 +256,58 @@ function renderProgressBarDirect(
     for (let i = 0; i < 3; i += 1) {
       const phase = ((now * 0.00022) + i / 3) % 1;
       const energyY = barY + barHeight - phase * barHeight;
-      const alpha = Math.sin(phase * Math.PI) * 0.2 * energyPulse;
-      renderer.drawRect({
-        x: barX + 4,
+      // Fade out at edges of the bar
+      const edgeAlpha = Math.sin(phase * Math.PI);
+      const alpha = edgeAlpha * 1.82 * energyPulse;
+
+      renderer.drawGlowRect({
+        x: barX + 6,
         y: energyY,
-        width: barWidth - 8,
+        width: barWidth - 12,
         height: 2,
-        color: [1, 1, 1, alpha]
+        color: [255, 255, 255, 0.9],
+        radius: 0.5,
+        intensity: alpha,
+        innerAlpha: 0.3,
+        outerAlpha: 0.4,
+        blendMode: "additive"
       });
     }
+  }
+
+  // Border glow
+  const glowAlpha = (
+    isFull ?
+      0.34 + 0.22 * pulse :
+      0.18 + gpuFillCharge * 1.5
+  ) * 0.4;
+  renderer.drawGlowRect({
+    x: barX,
+    y: barY,
+    width: barWidth,
+    height: barHeight,
+    color: [...glowColor, 1],
+    radius: isFull ? 22 + 10 * pulse : 12 + gpuFillCharge * 8,
+    intensity: glowAlpha,
+    innerAlpha: 0.0,
+    outerAlpha: 1.0,
+    blendMode: "additive"
+  });
+
+  if (isFull) {
+    // Extra white pulsing glow for completion state (reduced to 40% intensity)
+    renderer.drawGlowRect({
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight,
+      color: [255, 255, 255, 1],
+      radius: 32 + 28 * pulse,
+      intensity: (0.12 + 0.24 * pulse) * 0.4,
+      innerAlpha: 0.0,
+      outerAlpha: 1.0,
+      blendMode: "additive"
+    });
   }
 
   // Border
