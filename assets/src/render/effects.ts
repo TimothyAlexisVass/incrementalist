@@ -215,6 +215,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
+      scale: scale,
       strokeColor: '#ffffff',
       strokeWidth: 8,
       shadowColor: 'rgba(0, 0, 0, 0.6)',
@@ -232,6 +233,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
+      scale: scale,
       strokeColor: 'rgba(0, 0, 0, 0.8)',
       strokeWidth: 3,
       shadowColor: 'transparent',
@@ -249,6 +251,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
+      scale: scale,
       strokeColor: 'transparent',
       strokeWidth: 0,
       shadowColor: 'transparent',
@@ -294,7 +297,7 @@ function updateRewardPopup(ft: FloatingText) {
   ft.x = ft.startX + (ft.targetX - ft.startX) * eased;
   ft.y = holdY + (ft.targetY - holdY) * eased;
   ft.alpha = Math.max(0, 1 - flyProgress);
-  ft.scale = Math.max(0, 1 - flyProgress);
+  ft.scale = 1 - (flyProgress * 0.9);
 }
 
 function shouldRemoveFloatingText(ft: FloatingText) {
