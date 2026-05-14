@@ -30,6 +30,16 @@ import { hexToRgba } from "../../utils/color";
 import { queueTooltip } from "../../ui/components/tooltip";
 import { renderSisuCrystal, type SisuCrystalTier } from "./crystal";
 
+let sisuModalBackgroundImage: HTMLImageElement | null = null;
+function getSisuModalBackgroundImage() {
+  if (!sisuModalBackgroundImage) {
+    sisuModalBackgroundImage = new Image();
+    sisuModalBackgroundImage.src = "images/sisu_modal.png";
+  }
+  return sisuModalBackgroundImage;
+}
+
+
 import { handleSisuModalInteractions, type SisuRefillHitRect } from "./interactions";
 import {
   getSisuControlRect,
@@ -206,9 +216,9 @@ function drawSisuControlNative(
   const activeTier = snapshot.state.sisu.active_tier;
   const crystalTier: SisuCrystalTier =
     activeTier === "aether" ||
-    activeTier === "lucent" ||
-    activeTier === "transcendent" ||
-    activeTier === "azure"
+      activeTier === "lucent" ||
+      activeTier === "transcendent" ||
+      activeTier === "azure"
       ? activeTier
       : "azure";
 
@@ -268,7 +278,7 @@ class SisuGeneratorModalImpl implements Modal {
   private readonly refillRects: SisuRefillHitRect[] = [];
   private modalRect: Rect | null = null;
   private upgradeRect: Rect | null = null;
-  public readonly backdropAlpha = 0.3;
+  public readonly backdropAlpha = 0;
   public readonly closeOnMenuButton = true;
 
   constructor(
@@ -280,21 +290,37 @@ class SisuGeneratorModalImpl implements Modal {
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
-  const snapshot = this.getState().snapshot;
-  if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
-    this.onClose();
-    return;
-  }
+    const snapshot = this.getState().snapshot;
+    if (!snapshot || !snapshot.state.features.sisu_generator_purchased) {
+      this.onClose();
+      return;
+    }
 
-    const modalWidth = 560;
-    const modalHeight = 224;
+    const bgImage = getSisuModalBackgroundImage();
+    const isImageReady = bgImage.complete && bgImage.naturalWidth > 0;
+
+    // Scale the image down slightly to fit better.
+    const scale = 0.57;
+    const modalWidth = isImageReady ? bgImage.naturalWidth * scale : 560;
+    const modalHeight = isImageReady ? bgImage.naturalHeight * scale : 224;
+
     const modalX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - modalWidth;
     const modalY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - modalHeight;
 
     this.modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
 
-    renderer.drawRect({ ...this.modalRect, color: hexToRgba(COLORS.panel.bg) });
-    drawRectOutline(renderer, this.modalRect, 2, hexToRgba(COLORS.overlay.panelBorder));
+    if (isImageReady) {
+      renderer.drawImage({
+        image: bgImage,
+        x: modalX,
+        y: modalY,
+        width: modalWidth,
+        height: modalHeight
+      });
+    } else {
+      renderer.drawRect({ ...this.modalRect, color: hexToRgba(COLORS.panel.bg) });
+      drawRectOutline(renderer, this.modalRect, 2, hexToRgba(COLORS.overlay.panelBorder));
+    }
 
     const { displayCurrent } = updateSisuVisualProjection(snapshot);
     const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
@@ -302,35 +328,80 @@ class SisuGeneratorModalImpl implements Modal {
     const chargeCrystals = snapshot.state.charge_crystals;
 
     this.refillRects.length = 0;
-    const refillWidth = 120;
-    const refillHeight = 96;
-    const refillGap = 14;
-    const refillToUpgradeGap = 16;
-    const totalRefillWidth = refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
-    const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
-    const refillY = modalY + 40;
 
-    for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
-      const tier = SISU_REFILL_TIERS[index];
-      const target = getSisuTierTarget(maxBasic, tier.id);
-      const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
-      const enabled = availableCount > 0 && currentSisu < target;
-      const rect = {
-        x: refillStartX + index * (refillWidth + refillGap),
-        y: refillY,
-        width: refillWidth,
-        height: refillHeight
+    if (isImageReady) {
+      // Scaled coordinates from 1003x771 source image:
+      // Ornate Frames (Azure, Aether, Lucent, Transcendent):
+      // - Width: 186px, Height: 520px
+      // - Start Y: 230px, Start X: 104px
+      // - Spacing between frame origins: ~204px
+      const frameW = 186 * scale;
+      const frameH = 520 * scale;
+      const frameY = modalY + 230 * scale;
+      const startX = modalX + 104 * scale;
+      const frameGap = (308 - 104 - 186) * scale; // gap between frame x starts
+
+      for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
+        const tier = SISU_REFILL_TIERS[index];
+        const target = getSisuTierTarget(maxBasic, tier.id);
+        const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
+        const enabled = availableCount > 0 && currentSisu < target;
+        const rect = {
+          x: startX + index * (frameW + frameGap),
+          y: frameY,
+          width: frameW,
+          height: frameH
+        };
+        this.refillRects.push({ tier: tier.id, rect, enabled });
+        drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu, availableCount, enabled, true);
+      }
+
+      // Upgrade Button (BOOST CHARGE) alignment:
+      this.upgradeRect = {
+        x: modalX + 510 * scale,
+        y: modalY + 620 * scale,
+        width: 410 * scale,
+        height: 120 * scale
       };
-      this.refillRects.push({ tier: tier.id, rect, enabled });
-      drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu, availableCount, enabled);
+    } else {
+      const refillWidth = 120;
+      const refillHeight = 96;
+      const refillGap = 14;
+      const totalRefillWidth = refillWidth * SISU_REFILL_TIERS.length + refillGap * (SISU_REFILL_TIERS.length - 1);
+      const refillStartX = modalX + Math.floor((modalWidth - totalRefillWidth) / 2);
+      const refillY = modalY + 40;
+
+      for (let index = 0; index < SISU_REFILL_TIERS.length; index += 1) {
+        const tier = SISU_REFILL_TIERS[index];
+        const target = getSisuTierTarget(maxBasic, tier.id);
+        const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
+        const enabled = availableCount > 0 && currentSisu < target;
+        const rect = {
+          x: refillStartX + index * (refillWidth + refillGap),
+          y: refillY,
+          width: refillWidth,
+          height: refillHeight
+        };
+        this.refillRects.push({ tier: tier.id, rect, enabled });
+        drawSisuRefillControl(renderer, input, rect, tier.label, tier.colorKey, target, currentSisu, availableCount, enabled, false);
+      }
+
+      this.upgradeRect = {
+        x: modalX + modalWidth - 180 - 22,
+        y: refillY + refillHeight + 16,
+        width: 180,
+        height: 36
+      };
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
-    const maxSisuText = `Max Sisu: ${formatSisuMultiplier(maxBasic)} (Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`;
+    const maxSisuText = `Base ${formatSisuMultiplier(maxBasic)}(Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`;
+
+    // Max Sisu text positioned above the first frame (Azure)
     renderer.drawText({
       text: maxSisuText,
-      x: modalX + 18,
-      y: modalY + 168,
+      x: modalX + 40,
+      y: modalY + 385,
       font: SISU_MAX_FONT,
       color: COLORS.hud.textPrimary,
       align: "left",
@@ -339,31 +410,39 @@ class SisuGeneratorModalImpl implements Modal {
       strokeWidth: 2
     });
 
-    this.upgradeRect = {
-      x: modalX + modalWidth - 180 - 22,
-      y: refillY + refillHeight + refillToUpgradeGap,
-      width: 180,
-      height: 36
-    };
-
     const upgradeState = getUpgradeButtonState(snapshot.state.shards, maxUpgradeLevel);
     const isUpgradeActive = !upgradeState.disabled && this.upgradeRect && pointInRect(input.pointer, this.upgradeRect);
-    drawButton(this.upgradeRect, upgradeState.label, {
-      active: isUpgradeActive,
-      activeSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
-      inactiveSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
-      activeBorder: upgradeState.disabled ? COLORS.button.secondary.border : COLORS.button.border.active,
-      inactiveBorder: upgradeState.disabled ? COLORS.button.secondary.border : COLORS.button.border.active,
-      textColor: COLORS.button.text,
-      font: SISU_UPGRADE_BUTTON_FONT,
-      textY: this.upgradeRect.y + 23
-    });
+
+    if (isImageReady) {
+      // We still draw the cost and label over the image button.
+      // Boost Charge text is already in the image? Let's check.
+      // Yes, "BOOST CHARGE" is in the image.
+      // We just need to draw the cost.
+    } else {
+      drawButton(this.upgradeRect, upgradeState.label, {
+        active: isUpgradeActive,
+        activeSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
+        inactiveSurface: upgradeState.disabled ? COLORS.button.secondary.surface : COLORS.button.surface.active,
+        activeBorder: upgradeState.disabled ? COLORS.button.secondary.border : COLORS.button.border.active,
+        inactiveBorder: upgradeState.disabled ? COLORS.button.secondary.border : COLORS.button.border.active,
+        textColor: COLORS.button.text,
+        font: SISU_UPGRADE_BUTTON_FONT,
+        textY: this.upgradeRect.y + 23
+      });
+    }
 
     const pendingUpgradeCost = upgradeState.cost;
     const pendingUpgradePrefix = upgradeState.prefix;
 
     if (pendingUpgradeCost !== null) {
-      drawUpgradeCostLabel(this.upgradeRect, pendingUpgradePrefix, pendingUpgradeCost);
+      // If image is ready, draw cost below or above the button?
+      // In the image, "BOOST CHARGE" is in the middle of the button.
+      // I'll draw the cost below it.
+      if (isImageReady) {
+        drawUpgradeCostLabel(this.upgradeRect, null, pendingUpgradeCost, this.upgradeRect.y + this.upgradeRect.height - 20);
+      } else {
+        drawUpgradeCostLabel(this.upgradeRect, pendingUpgradePrefix, pendingUpgradeCost);
+      }
     }
 
     handleSisuModalInteractions(
@@ -378,14 +457,15 @@ class SisuGeneratorModalImpl implements Modal {
     );
   }
 
+
   tick(_dt: number, _input: InteractionState) {
     // Reactive-only modal.
   }
 }
 
-function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum) {
+function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum, overrideY?: number) {
   const renderer = getActiveWebGLRenderer();
-  const textY = rect.y + 23;
+  const textY = overrideY ?? rect.y + 63;
   const iconSize = 18;
   const iconGap = 4;
   const currencyKey = "shards";
@@ -409,7 +489,7 @@ function drawUpgradeCostLabel(rect: Rect, prefix: string | null, cost: BigNum) {
   if (leftText) {
     renderer.drawText({
       text: leftText,
-      x: currentX,
+      x: currentX + 40,
       y: textY,
       font: SISU_UPGRADE_BUTTON_FONT,
       color: textColor,
@@ -457,47 +537,61 @@ function drawSisuRefillControl(
   target: number,
   currentSisu: number,
   availableCount: number,
-  enabled: boolean
+  enabled: boolean,
+  minimal: boolean
 ) {
   const canRefill = enabled && currentSisu < target;
   const isHovered = canRefill && pointInRect(input.pointer, rect);
   const tierColor = COLORS.sisu[colorKey];
 
-  const surfaceColor = canRefill
-    ? (isHovered ? COLORS.button.surface.active : COLORS.button.surface.active)
-    : COLORS.button.secondary.surface;
-  renderer.drawRect({ ...rect, color: hexToRgba(surfaceColor) });
+  if (!minimal) {
+    const surfaceColor = canRefill
+      ? (isHovered ? COLORS.button.surface.active : COLORS.button.surface.active)
+      : COLORS.button.secondary.surface;
+    renderer.drawRect({ ...rect, color: hexToRgba(surfaceColor) });
 
-  const borderColor = canRefill ? tierColor : COLORS.button.secondary.border;
-  drawRectOutline(renderer, rect, isHovered ? 3 : 2, hexToRgba(borderColor));
-
-  const circleX = rect.x + rect.width / 2;
-  const circleY = rect.y + 28;
-
-  if (canRefill && isHovered) {
-    renderer.drawCircle(circleX, circleY, 16, [1, 1, 1, 0.2], 0.8, "additive");
+    const borderColor = canRefill ? tierColor : COLORS.button.secondary.border;
+    drawRectOutline(renderer, rect, isHovered ? 3 : 2, hexToRgba(borderColor));
   }
 
-  renderer.drawCircle(circleX, circleY, 14, hexToRgba(tierColor), 0.15);
-  renderer.drawRing(circleX, circleY, 14, 1.5, hexToRgba(COLORS.button.text));
+  const circleX = rect.x + rect.width / 2;
+  // Crystal center: ~45% down the frame in minimal/image mode
+  const circleY = minimal ? rect.y + rect.height * 0.45 : rect.y + 28;
 
-  renderer.drawText({
-    text: label,
-    x: circleX,
-    y: rect.y + 60,
-    font: SISU_METER_FONT,
-    color: COLORS.button.text,
-    align: "center",
-    baseline: "middle"
-  });
+  if (canRefill && isHovered) {
+    renderer.drawCircle(circleX, circleY, minimal ? 32 : 16, [1, 1, 1, 0.2], 0.8, "additive");
+  }
+
+  // Large crystal visual for minimal/image mode.
+  if (minimal) {
+    const crystalTier = colorKey === "blue" ? "azure" : colorKey === "purple" ? "aether" : colorKey === "orange" ? "lucent" : "transcendent";
+    renderSisuCrystal(renderer, circleX, circleY, 50, crystalTier);
+  } else {
+    renderer.drawCircle(circleX, circleY, 14, hexToRgba(tierColor), 0.15);
+    renderer.drawRing(circleX, circleY, 14, 1.5, hexToRgba(COLORS.button.text));
+
+    renderer.drawText({
+      text: label,
+      x: circleX,
+      y: rect.y + 60,
+      font: SISU_METER_FONT,
+      color: COLORS.button.text,
+      align: "center",
+      baseline: "middle"
+    });
+  }
+
+  // Text labels positioned relative to the frame height
+  const textYOffset = minimal ? rect.height * 0.75 : 82; // Target multiplier at ~75%
+  const countYOffset = minimal ? rect.height * 0.15 : 16; // Crystal count at ~15%
 
   renderer.drawText({
     text: `x${formatNumber(availableCount)}`,
-    x: rect.x + rect.width - 10,
-    y: rect.y + 16,
+    x: minimal ? circleX : rect.x + rect.width - 10,
+    y: rect.y + countYOffset,
     font: TINY_TEXT_FONT,
     color: canRefill ? COLORS.button.text : COLORS.button.secondary.text,
-    align: "right",
+    align: minimal ? "center" : "right",
     baseline: "middle"
   });
 
@@ -505,7 +599,7 @@ function drawSisuRefillControl(
   renderer.drawText({
     text: targetText,
     x: circleX,
-    y: rect.y + 82,
+    y: rect.y + textYOffset,
     font: TINY_TEXT_FONT,
     color: COLORS.button.text,
     align: "center",
