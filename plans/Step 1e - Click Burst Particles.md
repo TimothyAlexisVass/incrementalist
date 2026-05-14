@@ -11,6 +11,7 @@
 - File: `assets/src/render/webgl-effects.ts`
 - Move `spawnGpuClickBurst` to use the main WebGL context.
 - Ensure click particles blend correctly with the area background and UI.
+- Activate click burst on mouse click.
 
 ## Mandatory checks
 - `tsc --noEmit`

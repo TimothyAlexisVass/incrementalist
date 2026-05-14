@@ -613,32 +613,38 @@ export interface RenderWebGLOptions {
 }
 
 export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
-  if (!WEBGL_EFFECTS.ready) return;
-
   const gl = WEBGL_EFFECTS.gl;
+  const mainGl = WEBGL_EFFECTS.mainGl;
+  const useMain = !!mainGl;
+
+  if (!WEBGL_EFFECTS.ready && !useMain) return;
+
   const particles = WEBGL_EFFECTS.particles;
-  const uniforms = WEBGL_EFFECTS.uniforms;
   const visible = options.visible !== false;
-  const renderCanvas = options.targetCanvas ?? WEBGL_EFFECTS.canvas;
 
-  if (!gl || !uniforms?.resolution || !renderCanvas) {
-    return;
+  if (gl && WEBGL_EFFECTS.ready) {
+    const renderCanvas = options.targetCanvas ?? WEBGL_EFFECTS.canvas;
+    if (renderCanvas) {
+      gl.viewport(0, 0, renderCanvas.width, renderCanvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
   }
-
-  gl.viewport(0, 0, renderCanvas.width, renderCanvas.height);
-  gl.clear(gl.COLOR_BUFFER_BIT);
 
   if (!visible) {
     return;
   }
 
-  const useMain = !!WEBGL_EFFECTS.mainGl;
-  const bGl = WEBGL_EFFECTS.mainGl || gl;
-  renderProgressBarGlow(bGl, bGl.canvas.width, bGl.canvas.height, useMain);
-  renderLiquidBubbles(bGl, bGl.canvas.width, bGl.canvas.height, useMain);
+  const currentGl = mainGl || gl;
+  if (!currentGl) return;
 
-  const lGl = WEBGL_EFFECTS.mainGl || gl;
-  renderLaserBursts(lGl, lGl.canvas.width, lGl.canvas.height, useMain);
+  if (useMain) {
+    currentGl.viewport(0, 0, currentGl.canvas.width, currentGl.canvas.height);
+  }
+
+  renderProgressBarGlow(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
+  renderLiquidBubbles(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
+
+  renderLaserBursts(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
 
   if (particles.length === 0) {
     return;
@@ -820,7 +826,7 @@ export interface GpuClickBurstOptions {
 }
 
 export function spawnGpuClickBurst(x: number, y: number, options: GpuClickBurstOptions = {}) {
-  if (!WEBGL_EFFECTS.ready) {
+  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
     return false;
   }
 

@@ -34,7 +34,7 @@ import {
 } from "../features/progress-bar/interactions";
 import { renderProgressBar, renderProgressBarForeground } from "../features/progress-bar/render";
 import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
-import { updateWebGLEffects, renderWebGLEffects } from "../render/webgl-effects";
+import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
 import { 
   createFloatingTextState, 
   renderFloatingTexts, 
@@ -388,6 +388,9 @@ export class GameClient {
 
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
+    if (input.clicked && input.pointer) {
+      spawnGpuClickBurst(input.pointer.x, input.pointer.y);
+    }
 
     // Advance client-side estimation of progress bar fill
     updateProjectedFill(dt);
