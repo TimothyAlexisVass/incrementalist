@@ -13,6 +13,8 @@ import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "..
 import { BigNum, ZERO, add, sub, compare } from "../../core/bignum";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 
+import { ChargeCrystalsState } from "../../net/protocol";
+
 let nextLevelUpNoticeGroupId = 1;
 
 export type ResourceAmounts = {
@@ -21,6 +23,7 @@ export type ResourceAmounts = {
   coins: BigNum;
   shards: BigNum;
   cores: BigNum;
+  charge_crystals: ChargeCrystalsState;
 };
 
 type RewardEntry = {
@@ -34,7 +37,8 @@ const POPUP_OFFSET = Object.freeze({
   exp: { x: -55, y: -20 },
   coins: { x: 55, y: -20 },
   shards: { x: -55, y: 12 },
-  cores: { x: 55, y: 12 }
+  cores: { x: 55, y: 12 },
+  sisu: { x: 0, y: 44 }
 });
 
 export function spawnProgressClaimRewardEffects(
@@ -66,6 +70,30 @@ export function spawnProgressClaimRewardEffects(
 
   if (compare(coreGain, ZERO) > 0) {
     rewardGroupEntries.push({ text: coreText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.cores.x, offsetY: POPUP_OFFSET.cores.y });
+  }
+
+  // Check for Sisu crystal gains
+  const gainedCrystals: { text: string, color: string }[] = [];
+  if (newAmounts.charge_crystals.azure > currentAmounts.charge_crystals.azure) {
+    gainedCrystals.push({ text: "AZURE", color: COLORS.sisu.azure });
+  }
+  if (newAmounts.charge_crystals.aether > currentAmounts.charge_crystals.aether) {
+    gainedCrystals.push({ text: "AETHER", color: COLORS.sisu.aether });
+  }
+  if (newAmounts.charge_crystals.lucent > currentAmounts.charge_crystals.lucent) {
+    gainedCrystals.push({ text: "LUCENE", color: COLORS.sisu.lucent });
+  }
+  if (newAmounts.charge_crystals.transcendent > currentAmounts.charge_crystals.transcendent) {
+    gainedCrystals.push({ text: "TRANSCENDENT", color: COLORS.sisu.transcendent });
+  }
+
+  for (let i = 0; i < gainedCrystals.length; i++) {
+    rewardGroupEntries.push({
+      text: gainedCrystals[i].text,
+      font: REWARD_POPUP_FONT,
+      offsetX: POPUP_OFFSET.sisu.x,
+      offsetY: POPUP_OFFSET.sisu.y + (i * 24)
+    });
   }
 
   const barLayout = getProgressBarLayout(canvas);
@@ -121,6 +149,19 @@ export function spawnProgressClaimRewardEffects(
       anchor.y + POPUP_OFFSET.cores.y,
       COLORS.rewards.cores,
       "cores"
+    );
+  }
+
+  // Spawn Sisu crystal popups
+  for (let i = 0; i < gainedCrystals.length; i++) {
+    spawnRewardPopup(
+      floatingTexts,
+      canvas,
+      gainedCrystals[i].text,
+      anchor.x + POPUP_OFFSET.sisu.x,
+      anchor.y + POPUP_OFFSET.sisu.y + (i * 24),
+      gainedCrystals[i].color,
+      "sisu"
     );
   }
 }

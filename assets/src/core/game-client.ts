@@ -282,7 +282,8 @@ export class GameClient {
       level: snapshot.state.level,
       coins: snapshot.state.coins,
       shards: snapshot.state.shards,
-      cores: snapshot.state.cores
+      cores: snapshot.state.cores,
+      charge_crystals: snapshot.state.charge_crystals
     };
   }
 

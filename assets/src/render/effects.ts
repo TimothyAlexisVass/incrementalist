@@ -12,6 +12,7 @@ import {
   TOP_HUD_COINS_COUNTER_RIGHT,
   CANVAS_WIDTH,
   REWARD_POPUP_FONT,
+  PROGRESS_BAR_WIDTH,
 } from '../config';
 import { COLORS } from '../colors';
 import { parseFontSizePx } from '../utils';
@@ -124,6 +125,16 @@ export function spawnFloatingText(
 export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   const canvasWidth = canvas?.width ?? CANVAS_WIDTH;
 
+  // Sisu position is derived from the progress bar layout:
+  // x: canvas.width - 100
+  // y: 120
+  // width: PROGRESS_BAR_WIDTH
+  // height: 418
+  // Sisu center is barX + barWidth/2, barY + barHeight + 120
+  const barX = canvasWidth - 100;
+  const sisuX = barX + PROGRESS_BAR_WIDTH / 2;
+  const sisuY = 120 + 418 + 120;
+
   return {
     exp: {
       x: TOP_HUD_EXP_COUNTER_X,
@@ -131,7 +142,8 @@ export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
     },
     coins: { x: canvasWidth - TOP_HUD_COINS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
     shards: { x: canvasWidth - TOP_HUD_SHARDS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
-    cores: { x: canvasWidth - TOP_HUD_CORES_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y }
+    cores: { x: canvasWidth - TOP_HUD_CORES_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
+    sisu: { x: sisuX, y: sisuY }
   };
 }
 
@@ -142,7 +154,7 @@ export function spawnRewardPopup(
   x: number,
   y: number,
   color: string,
-  targetKey: 'exp' | 'coins' | 'shards' | 'cores'
+  targetKey: 'exp' | 'coins' | 'shards' | 'cores' | 'sisu'
 ) {
   const targets = getHudRewardTargets(canvas);
   const target = targets[targetKey] || targets.coins;

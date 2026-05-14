@@ -235,7 +235,8 @@ export function applyProgressResult(
         level: result.level,
         coins: result.coins,
         shards: result.shards,
-        cores: result.cores
+        cores: result.cores,
+        charge_crystals: result.charge_crystals
       }, effects.popupPoint);
     }
 
