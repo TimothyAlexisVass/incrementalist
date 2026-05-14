@@ -11,11 +11,6 @@ export type HudViewModel = {
   
   // Level up visual state
   collectionGlowStartedAt: number;
-  particles: {
-    x: number; y: number; vx: number; vy: number; drag: number;
-    radius: number; lineWidth: number; color: string; gravity: number;
-    elapsedMs: number; lifeMs: number;
-  }[];
 };
 
 const state: HudViewModel = {
@@ -24,8 +19,7 @@ const state: HudViewModel = {
   displayedCoins: ZERO,
   displayedShards: ZERO,
   displayedCores: ZERO,
-  collectionGlowStartedAt: 0,
-  particles: []
+  collectionGlowStartedAt: 0
 };
 
 let queuedLevelUps = 0;

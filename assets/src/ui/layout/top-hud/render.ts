@@ -15,7 +15,6 @@ import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { resolveUpdatingText } from "../../../utils/text";
 
-const MAX_EXP_BAR_LEVEL_UP_PARTICLES = 228;
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
 const EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER = 2;
 const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
@@ -34,10 +33,8 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
 
   const queued = getAndClearQueuedLevelUps();
   if (queued > 0) {
-    spawnExpBarLevelUpBurst(model);
+    spawnExpBarLevelUpBurst();
   }
-
-  updateExpBarLevelUpParticles(model, dtMs);
 
   renderer.drawRect({
     x: 0,
@@ -163,8 +160,8 @@ function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, 
   );
 }
 
-function spawnExpBarLevelUpBurst(model: ReturnType<typeof getHudViewModel>) {
-  if (spawnGpuProgressCompletionBurst(
+function spawnExpBarLevelUpBurst() {
+  spawnGpuProgressCompletionBurst(
     TOP_HUD_EXP_BAR_X,
     TOP_HUD_EXP_BAR_Y,
     TOP_HUD_EXP_BAR_WIDTH,
@@ -175,82 +172,5 @@ function spawnExpBarLevelUpBurst(model: ReturnType<typeof getHudViewModel>) {
       gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
       lifeMultiplier: EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
     }
-  )) {
-    return;
-  }
-
-  const centerX = TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH / 2;
-  const centerY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT / 2;
-
-  for (let i = 0; i < 126; i += 1) {
-    const originX = TOP_HUD_EXP_BAR_X + Math.random() * TOP_HUD_EXP_BAR_WIDTH;
-    const originY = TOP_HUD_EXP_BAR_Y + Math.random() * TOP_HUD_EXP_BAR_HEIGHT;
-    const outwardAngle = Math.atan2(originY - centerY, originX - centerX);
-    const angle = outwardAngle + (Math.random() - 0.5) * 0.8;
-    const speed = 90 + Math.random() * 240;
-    const color = EXP_BAR_LEVEL_UP_COLORS[Math.floor(Math.random() * EXP_BAR_LEVEL_UP_COLORS.length)] as string;
-
-    model.particles.push({
-      x: originX,
-      y: originY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      drag: 0.93 + Math.random() * 0.04,
-      radius: 1.2 + Math.random() * 2.6,
-      lineWidth: 1 + Math.random() * 1.2,
-      color,
-      gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
-      elapsedMs: 0,
-      lifeMs: (480 + Math.random() * 460) * EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
-    });
-  }
-
-  for (let i = 0; i < 42; i += 1) {
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.35;
-    const speed = 120 + Math.random() * 220;
-    const color = EXP_BAR_LEVEL_UP_COLORS[Math.floor(Math.random() * EXP_BAR_LEVEL_UP_COLORS.length)] as string;
-
-    model.particles.push({
-      x: TOP_HUD_EXP_BAR_X + Math.random() * TOP_HUD_EXP_BAR_WIDTH,
-      y: TOP_HUD_EXP_BAR_Y + Math.random() * 6,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      drag: 0.92 + Math.random() * 0.04,
-      radius: 1 + Math.random() * 2.1,
-      lineWidth: 0.9 + Math.random() * 1.1,
-      color,
-      gravity: EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY,
-      elapsedMs: 0,
-      lifeMs: (440 + Math.random() * 420) * EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER
-    });
-  }
-
-  if (model.particles.length > MAX_EXP_BAR_LEVEL_UP_PARTICLES) {
-    model.particles.splice(0, model.particles.length - MAX_EXP_BAR_LEVEL_UP_PARTICLES);
-  }
-}
-
-function updateExpBarLevelUpParticles(model: ReturnType<typeof getHudViewModel>, deltaTime: number) {
-  const particles = model.particles;
-  if (particles.length === 0) return;
-
-  const deltaSeconds = deltaTime / 1000;
-  let writeIndex = 0;
-
-  for (let i = 0; i < particles.length; i += 1) {
-    const particle = particles[i];
-    particle.elapsedMs += deltaTime;
-
-    if (particle.elapsedMs >= particle.lifeMs) continue;
-
-    const drag = Math.pow(particle.drag, deltaTime / 16.67);
-    particle.vx *= drag;
-    particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
-    particle.x += particle.vx * deltaSeconds;
-    particle.y += particle.vy * deltaSeconds;
-    particles[writeIndex] = particle;
-    writeIndex += 1;
-  }
-
-  particles.length = writeIndex;
+  );
 }
