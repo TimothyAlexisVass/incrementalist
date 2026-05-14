@@ -57,6 +57,9 @@ export function getShopItemCost(itemId: ShopPricedItemId) {
   return SHOP_ITEM_COSTS[itemId];
 }
 
-export function formatUnlockRequirement(requiredLevel: number) {
+export function formatUnlockRequirement(requiredLevel: number, currentLevel?: number) {
+  if (currentLevel !== undefined && currentLevel >= requiredLevel) {
+    return "Unlock";
+  }
   return `Requires Level ${requiredLevel}`;
 }

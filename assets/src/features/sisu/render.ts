@@ -61,7 +61,7 @@ export function renderSisuControl(
   if (!isUnlocked) {
     drawLockedElement(canvas, input, controlRect, drawNative, {
       font: SISU_METER_FONT,
-      criteria: formatUnlockRequirement(sisuRequiredLevel),
+      criteria: formatUnlockRequirement(sisuRequiredLevel, snapshot.state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
       showNoticePing: true,
       shape: "circle",

@@ -13,6 +13,7 @@ import {
 export function renderBottomHUD(
   canvas: HTMLCanvasElement, 
   input: InteractionState, 
+  level: number,
   isMainMenuOpen: boolean,
   onMenuClick: () => void,
   onAreaSelect?: (areaKey: string) => void,
@@ -47,7 +48,7 @@ export function renderBottomHUD(
   // Draw Area selection dropdown on the left
   renderAreaDropdown(canvas, input, (areaKey) => {
     if (onAreaSelect) onAreaSelect(areaKey);
-  }, isMainMenuOpen, channel, runCommand);
+  }, isMainMenuOpen, level, channel, runCommand);
 }
 
 function cssToRgba(color: string): [number, number, number, number] {

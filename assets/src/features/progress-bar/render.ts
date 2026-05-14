@@ -17,7 +17,6 @@ import { notices } from '../../ui/managers/notices';
 import { pointInRect } from '../../ui/managers/interactions';
 import { SHOP_UNLOCK_REQUIRED_LEVELS, formatUnlockRequirement } from "../requirements";
 import {
-  setGpuProgressBarGlow,
   updateGpuProgressLiquidBubbles,
   spawnGpuProgressCollectionLaserBurst,
   spawnGpuProgressCompletionBurst,
@@ -250,27 +249,7 @@ function renderProgressBarDirect(
     ? clampNumber(collectionPulse / FULL_PULSE_MAX, 0, 1)
     : 0;
   const glowColor = idleMode ? IDLE_GLOW : YELLOW_GLOW;
-  const gpuGlowFillY = hasCollectionGlow ? barY : fillY;
-  const gpuGlowFillHeight = hasCollectionGlow ? barHeight : fillHeight;
   const gpuFillCharge = Math.pow(displayedFillRatio, 0.85);
-  const gpuBaseIntensity = isFull
-    ? 0.34 + pulse * 0.14
-    : gpuFillCharge * 0.08 + displayedFillRatio * 0.1;
-  const gpuCollectionIntensity = hasCollectionGlow
-    ? collectionGlowFade * 0.34 + collectionPulse * 0.14
-    : 0;
-  const gpuBaseRadius = isFull ? 26 + pulse * 6 : 14 + displayedFillRatio * 10;
-  const gpuCollectionRadius = hasCollectionGlow ? 26 + FULL_PULSE_MAX * 6 : 0;
-  setGpuProgressBarGlow({
-    active: hasCollectionGlow ? collectionGlowFade > 0 : displayedFillRatio > 0,
-    x: barX,
-    y: gpuGlowFillY,
-    width: barWidth,
-    height: gpuGlowFillHeight,
-    color: glowColor,
-    radius: Math.max(gpuBaseRadius, gpuCollectionRadius),
-    intensity: hasCollectionGlow ? gpuCollectionIntensity : gpuBaseIntensity
-  });
 
   // Liquid Fill
   if (displayedFillRatio > 0) {
@@ -372,8 +351,12 @@ function renderProgressBarDirect(
     });
   }
 
+  // Draw the foreground frame/glass BEFORE the UI elements so they stay on top.
+  renderProgressBarForeground(canvas);
+
   renderIdleModeToggle(canvas, input, {
     idleMode: state.idleMode,
+    level: state.level,
     features: {
       idleModePurchased: state.idleModePurchased
     },
@@ -519,7 +502,7 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
 export function renderIdleModeToggle(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  state: { idleMode: boolean; features?: { idleModePurchased?: boolean }; idleModeRequiredLevel?: number }
+  state: { idleMode: boolean; level?: number; features?: { idleModePurchased?: boolean }; idleModeRequiredLevel?: number }
 ) {
   const toggleRect = getIdleModeToggleRect(canvas);
   const drawToggle = () => drawButton(toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
@@ -537,7 +520,7 @@ export function renderIdleModeToggle(
     const requiredLevel = state.idleModeRequiredLevel ?? SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode;
 
     drawLockedElement(canvas, input, toggleRect, drawToggle, {
-      criteria: formatUnlockRequirement(requiredLevel),
+      criteria: formatUnlockRequirement(requiredLevel, state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
       showNoticePing: true,
       padding: 3

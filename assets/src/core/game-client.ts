@@ -32,7 +32,7 @@ import {
   getPendingClaimPopupPoint,
   clearPendingClaimPopupPoint
 } from "../features/progress-bar/interactions";
-import { renderProgressBar, renderProgressBarForeground } from "../features/progress-bar/render";
+import { renderProgressBar } from "../features/progress-bar/render";
 import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
 import { 
@@ -415,7 +415,6 @@ export class GameClient {
     this.sisuControlLayout = this.store.state.snapshot
       ? renderSisuControl(this.canvas, input, this.store.state)
       : null;
-    renderProgressBarForeground(this.canvas);
     renderSisuGlassBallOverlay(this.canvas, this.store.state);
     this.openSisuModalByDefault();
 
@@ -496,7 +495,7 @@ export class GameClient {
     // Render BottomHUD before overlays so its buttons can consume input and 
     // toggle overlays without being immediately countered by "click-outside" logic.
     const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
-    renderBottomHUD(this.canvas, input, isMainMenuOpen, () => {
+    renderBottomHUD(this.canvas, input, amounts?.level ?? 1, isMainMenuOpen, () => {
       this.handleMenuButtonPress();
     }, (areaKey) => {
       if (this.channel) {
@@ -512,7 +511,7 @@ export class GameClient {
         if (this.channel) {
           this.runCommand(() => selectArea(this.channel!, areaKey));
         }
-      }, this.channel || undefined, (cmd) => this.runCommand(cmd));
+      }, amounts?.level ?? 1, this.channel || undefined, (cmd) => this.runCommand(cmd));
     }
     renderQueuedTooltips();
   }

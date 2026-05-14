@@ -6,6 +6,7 @@ import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
 import { queueTooltip } from "../../ui/components/tooltip";
 import { drawLockedElement } from "../../ui/components/locked-element";
+import { formatUnlockRequirement } from "../requirements";
 import {
   NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
   NOTICE_PARENT_AREA_DROPDOWN,
@@ -76,6 +77,7 @@ export function renderAreaDropdown(
   input: InteractionState, 
   onSelect: (areaKey: string) => void,
   isMainMenuOpen: boolean,
+  level: number,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
@@ -101,7 +103,7 @@ export function renderAreaDropdown(
       );
 
       if (!isMainMenuOpen) {
-        renderDropdownItems(canvas, input, layout, onSelect, channel, runCommand);
+        renderDropdownItems(canvas, input, layout, onSelect, level, channel, runCommand);
       }
     }
   }
@@ -118,13 +120,14 @@ export function renderAreaDropdownAboveMenu(
   canvas: HTMLCanvasElement,
   input: InteractionState,
   onSelect: (areaKey: string) => void,
+  level: number,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
   if (!isDropdownOpen) return;
 
   const layout = getAreaDropdownLayout(canvas);
-  renderDropdownItems(canvas, input, layout, onSelect, channel, runCommand);
+  renderDropdownItems(canvas, input, layout, onSelect, level, channel, runCommand);
 }
 
 function getAreaDropdownLayout(canvas: HTMLCanvasElement) {
@@ -157,6 +160,7 @@ function renderDropdownItems(
   input: InteractionState,
   layout: ReturnType<typeof getAreaDropdownLayout>,
   onSelect: (areaKey: string) => void,
+  level: number,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
@@ -200,7 +204,7 @@ function renderDropdownItems(
       // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
       drawLockedElement(canvas, input, itemRect, renderItem, {
         opacity: 0,
-        criteria: `Requires Level ${area.unlock_level}`,
+        criteria: formatUnlockRequirement(area.unlock_level, level),
         showNotice: hasNotice,
         showNoticePing: true
       });
