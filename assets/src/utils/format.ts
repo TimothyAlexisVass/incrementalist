@@ -17,6 +17,10 @@ export function toFiniteNumber(value: any, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function formatIntegerWithSpaces(value: number): string {
+  return Math.floor(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
 export function formatBigNum(value: BigNum): string {
   if (value.m === 0) return '0';
 
@@ -39,6 +43,11 @@ export function formatBigNum(value: BigNum): string {
       }
       return `${sign}${Math.floor(Math.abs(num))}`;
     }
+  }
+
+  // Do not use the K suffix: render thousands as full numbers.
+  if (e < 6) {
+    return `${sign}${formatIntegerWithSpaces(Math.abs(toNumber(value)))}`;
   }
 
   // Suffixed mode
@@ -69,7 +78,7 @@ export function formatNumber(value: number | BigNum, fallback = 0): string {
 
 function getSuffix(tier: number): string {
   const base = [
-    '', 'K', 'M', 'B', 'T',
+    '', '', 'M', 'B', 'T',
     'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'
   ];
 
