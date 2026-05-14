@@ -28,6 +28,7 @@ type LaserRectOptions = {
   travelX?: number;
   travelY?: number;
   color?: ColorInput;
+  targetColor?: ColorInput;
   alpha?: number;
   delayMs?: number;
   growDurationScale?: number;
@@ -60,6 +61,7 @@ type GpuLaserRect = {
   travelX: number;
   travelY: number;
   color: Rgb;
+  targetColor: Rgb;
   alpha: number;
   delayMs: number;
   elapsedMs: number;
@@ -251,11 +253,15 @@ const LASER_RECT_FRAGMENT_SHADER_SOURCE = `
   varying vec4 v_color;
 
   void main() {
-    float edgeDistance = max(abs(v_local.x), abs(v_local.y));
-    float edge = smoothstep(0.62, 1.0, edgeDistance);
-    float body = 1.0 - smoothstep(0.0, 1.0, edgeDistance);
-    float alpha = (body * 0.44 + edge * 0.74) * v_color.a;
-    vec3 color = v_color.rgb * (1.18 + edge * 1.1);
+    float dist = max(abs(v_local.x), abs(v_local.y));
+    
+    // Narrower smoothing for a more defined beam
+    float beam = smoothstep(1.0, 0.72, dist);
+    float core = smoothstep(0.42, 0.0, dist);
+    float bloom = exp(-dist * dist * 3.2);
+    
+    float alpha = (beam * 0.4 + core * 0.5 + bloom * 0.1) * v_color.a;
+    vec3 color = v_color.rgb * (1.1 + core * 1.0 + beam * 0.1);
 
     gl_FragColor = vec4(color, alpha);
   }
@@ -311,6 +317,10 @@ const WEBGL_EFFECTS: {
   mainBuffer: WebGLBuffer | null;
   mainAttributes: AttributeLocations<"position" | "size" | "color"> | null;
   mainUniforms: UniformLocations<"resolution"> | null;
+  mainLaserRectProgram: WebGLProgram | null;
+  mainLaserRectBuffer: WebGLBuffer | null;
+  mainLaserRectAttributes: AttributeLocations<"center" | "axis" | "perp" | "local" | "color"> | null;
+  mainLaserRectUniforms: UniformLocations<"resolution"> | null;
   ready: boolean;
 } = {
   canvas: null,
@@ -346,23 +356,46 @@ const WEBGL_EFFECTS: {
   mainBuffer: null,
   mainAttributes: null,
   mainUniforms: null,
+  mainLaserRectProgram: null,
+  mainLaserRectBuffer: null,
+  mainLaserRectAttributes: null,
+  mainLaserRectUniforms: null,
   ready: false
 };
 
 export function initMainCanvasParticles(gl: WebGLRenderingContext) {
-  const program = createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-  if (!program) return false;
+  const particleProgram = createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+  if (!particleProgram) return false;
+
+  const laserProgram = createProgram(gl, LASER_RECT_VERTEX_SHADER_SOURCE, LASER_RECT_FRAGMENT_SHADER_SOURCE);
+  if (!laserProgram) return false;
 
   WEBGL_EFFECTS.mainGl = gl;
-  WEBGL_EFFECTS.mainProgram = program;
+
+  // Particles
+  WEBGL_EFFECTS.mainProgram = particleProgram;
   WEBGL_EFFECTS.mainBuffer = gl.createBuffer();
   WEBGL_EFFECTS.mainAttributes = {
-    position: gl.getAttribLocation(program, 'a_position'),
-    size: gl.getAttribLocation(program, 'a_size'),
-    color: gl.getAttribLocation(program, 'a_color')
+    position: gl.getAttribLocation(particleProgram, 'a_position'),
+    size: gl.getAttribLocation(particleProgram, 'a_size'),
+    color: gl.getAttribLocation(particleProgram, 'a_color')
   };
   WEBGL_EFFECTS.mainUniforms = {
-    resolution: gl.getUniformLocation(program, 'u_resolution')
+    resolution: gl.getUniformLocation(particleProgram, 'u_resolution')
+  };
+
+  // Lasers
+  WEBGL_EFFECTS.mainLaserRectProgram = laserProgram;
+  WEBGL_EFFECTS.mainLaserRectBuffer = gl.createBuffer();
+  WEBGL_EFFECTS.mainLaserRectAttributes = {
+    center: gl.getAttribLocation(laserProgram, 'a_center'),
+    axis: gl.getAttribLocation(laserProgram, 'a_axis'),
+    perp: gl.getAttribLocation(laserProgram, 'a_perp'),
+    local: gl.getAttribLocation(laserProgram, 'a_local'),
+    color: gl.getAttribLocation(laserProgram, 'a_color')
+  };
+  WEBGL_EFFECTS.mainLaserRectUniforms = {
+    resolution: gl.getUniformLocation(laserProgram, 'u_resolution')
   };
 
   return true;
@@ -553,13 +586,15 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
 
   renderProgressBarGlow(gl, renderCanvas.width, renderCanvas.height);
   renderLiquidBubbles(gl, renderCanvas.width, renderCanvas.height);
-  renderLaserBursts(gl, renderCanvas.width, renderCanvas.height);
+
+  const useMain = !!WEBGL_EFFECTS.mainGl;
+  const lGl = WEBGL_EFFECTS.mainGl || gl;
+  renderLaserBursts(lGl, lGl.canvas.width, lGl.canvas.height, useMain);
 
   if (particles.length === 0) {
     return;
   }
 
-  const useMain = !!WEBGL_EFFECTS.mainGl;
   const pGl = WEBGL_EFFECTS.mainGl || gl;
   const pProgram = useMain ? WEBGL_EFFECTS.mainProgram : WEBGL_EFFECTS.program;
   const pBuffer = useMain ? WEBGL_EFFECTS.mainBuffer : WEBGL_EFFECTS.buffer;
@@ -829,15 +864,17 @@ export function spawnGpuProgressCollectionLaserBurst(
   barY: number,
   barWidth: number,
   barHeight: number,
-  colors: readonly ColorInput[]
+  color: ColorInput,
+  targetColor?: ColorInput
 ) {
-  if (!WEBGL_EFFECTS.ready || !WEBGL_EFFECTS.laserRectProgram) {
+  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
     return false;
   }
 
-  const colorList = Array.isArray(colors) && colors.length > 0
-    ? colors
-    : [[255, 255, 255]];
+  if (!WEBGL_EFFECTS.laserRectProgram && !WEBGL_EFFECTS.mainLaserRectProgram) {
+    return false;
+  }
+
   const centerX = Number(barX) + Number(barWidth) / 2;
   const centerY = Number(barY) + Number(barHeight) / 2;
   const burstHeight = Math.max(1, Number(barHeight) || 1);
@@ -848,14 +885,15 @@ export function spawnGpuProgressCollectionLaserBurst(
     originY: centerY,
     angle: -Math.PI / 2,
     baseLength: burstHeight,
-    growLength: burstHeight * 0.28,
+    growLength: burstHeight * 0.48,
     baseThickness: burstWidth,
-    growThickness: burstWidth * 4.64,
-    travel: 0,
-    color: normalizeColor(colorList[0]),
-    alpha: 0.24,
-    growDurationScale: 2.2,
-    lifeMs: 882
+    growThickness: burstWidth * 2.84,
+    travel: 1,
+    color,
+    targetColor: targetColor || color,
+    alpha: 0.47,
+    growDurationScale: 1.8,
+    lifeMs: 899
   });
 
   trimGpuLaserBursts();
@@ -1003,13 +1041,18 @@ function updateGpuLaserBursts(deltaTime: number) {
   laserBursts.length = writeIndex;
 }
 
-function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number) {
+function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number, useMain = false) {
   const laserBursts = WEBGL_EFFECTS.laserBursts;
-  const laserRectUniforms = WEBGL_EFFECTS.laserRectUniforms;
+  const program = useMain ? WEBGL_EFFECTS.mainLaserRectProgram : WEBGL_EFFECTS.laserRectProgram;
+  const buffer = useMain ? WEBGL_EFFECTS.mainLaserRectBuffer : WEBGL_EFFECTS.laserRectBuffer;
+  const uniforms = useMain ? WEBGL_EFFECTS.mainLaserRectUniforms : WEBGL_EFFECTS.laserRectUniforms;
+  const attributes = useMain ? WEBGL_EFFECTS.mainLaserRectAttributes : WEBGL_EFFECTS.laserRectAttributes;
 
   if (
-    !WEBGL_EFFECTS.laserRectProgram ||
-    !laserRectUniforms?.resolution ||
+    !program ||
+    !uniforms?.resolution ||
+    !buffer ||
+    !attributes ||
     laserBursts.length === 0
   ) {
     return;
@@ -1052,6 +1095,10 @@ function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canva
         break;
       }
 
+      const r = rect.color[0] + (rect.targetColor[0] - rect.color[0]) * grow;
+      const g = rect.color[1] + (rect.targetColor[1] - rect.color[1]) * grow;
+      const b = rect.color[2] + (rect.targetColor[2] - rect.color[2]) * grow;
+
       const localOffset = vertex * 2;
       data[offset] = centerX;
       data[offset + 1] = centerY;
@@ -1061,9 +1108,9 @@ function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canva
       data[offset + 5] = perpY;
       data[offset + 6] = LASER_RECT_LOCAL_POINTS[localOffset];
       data[offset + 7] = LASER_RECT_LOCAL_POINTS[localOffset + 1];
-      data[offset + 8] = rect.color[0];
-      data[offset + 9] = rect.color[1];
-      data[offset + 10] = rect.color[2];
+      data[offset + 8] = r;
+      data[offset + 9] = g;
+      data[offset + 10] = b;
       data[offset + 11] = alpha;
       offset += LASER_RECT_FLOATS;
       vertexCount += 1;
@@ -1076,17 +1123,27 @@ function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canva
 
   if (vertexCount === 0) return;
 
-  gl.useProgram(WEBGL_EFFECTS.laserRectProgram);
-  gl.bindBuffer(gl.ARRAY_BUFFER, WEBGL_EFFECTS.laserRectBuffer);
+  if (useMain) {
+    gl.enable(gl.BLEND);
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
+
+  gl.useProgram(program);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, offset), gl.DYNAMIC_DRAW);
 
-  bindLaserRectAttributes(gl);
+  bindLaserRectAttributes(gl, attributes);
   gl.uniform2f(
-    laserRectUniforms.resolution,
+    uniforms.resolution,
     canvasWidth,
     canvasHeight
   );
   gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+
+  if (useMain) {
+    // Restore default blend mode for main renderer
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
 }
 
 function spawnGpuLiquidBubble(
@@ -1184,9 +1241,8 @@ function bindBubbleAttributes(gl: WebGLRenderingContext) {
   gl.vertexAttribPointer(attributes.alpha, 1, gl.FLOAT, false, stride, 3 * Float32Array.BYTES_PER_ELEMENT);
 }
 
-function bindLaserRectAttributes(gl: WebGLRenderingContext) {
+function bindLaserRectAttributes(gl: WebGLRenderingContext, attributes: AttributeLocations<"center" | "axis" | "perp" | "local" | "color"> | null) {
   const stride = LASER_RECT_FLOATS * Float32Array.BYTES_PER_ELEMENT;
-  const attributes = WEBGL_EFFECTS.laserRectAttributes;
   if (!attributes) return;
 
   gl.enableVertexAttribArray(attributes.center);
@@ -1206,7 +1262,7 @@ function bindLaserRectAttributes(gl: WebGLRenderingContext) {
 }
 
 function pushGpuParticle(options: ParticleOptions) {
-  const color = toRgbTuple(options.color);
+  const color = normalizeColor(options.color);
 
   WEBGL_EFFECTS.particles.push({
     x: options.x,
@@ -1227,7 +1283,8 @@ function pushGpuParticle(options: ParticleOptions) {
 }
 
 function pushGpuLaserRect(options: LaserRectOptions) {
-  const color = toRgbTuple(options.color);
+  const color = normalizeColor(options.color);
+  const targetColor = normalizeColor(options.targetColor || options.color);
 
   WEBGL_EFFECTS.laserBursts.push({
     originX: Number(options.originX) || 0,
@@ -1244,6 +1301,7 @@ function pushGpuLaserRect(options: LaserRectOptions) {
       ? Number(options.travelY)
       : Math.sin(Number(options.angle) || 0) * (Number(options.travel) || 0),
     color,
+    targetColor,
     alpha: Math.min(Math.max(Number(options.alpha) || 0, 0), 1.4),
     delayMs: Math.max(0, Number(options.delayMs) || 0),
     elapsedMs: 0,
@@ -1268,10 +1326,19 @@ function trimGpuLaserBursts() {
 
 function normalizeColor(color: any): Rgb {
   if (Array.isArray(color)) {
+    const r = Number(color[0]) || 0;
+    const g = Number(color[1]) || 0;
+    const b = Number(color[2]) || 0;
+
+    // If any component is > 1.0, assume it's 0-255 range and normalize it.
+    // Otherwise, assume it's already in the 0.0-1.0 range.
+    const isHighRange = r > 1.0 || g > 1.0 || b > 1.0;
+    const factor = isHighRange ? 255 : 1;
+
     return [
-      clampColorChannel(color[0] / 255),
-      clampColorChannel(color[1] / 255),
-      clampColorChannel(color[2] / 255)
+      clampColorChannel(r / factor),
+      clampColorChannel(g / factor),
+      clampColorChannel(b / factor)
     ];
   }
 
@@ -1289,19 +1356,6 @@ function normalizeColor(color: any): Rgb {
         (value & 255) / 255
       ];
     }
-  }
-
-  return [1, 1, 1];
-}
-
-function toRgbTuple(color: ColorInput | undefined): Rgb {
-  if (Array.isArray(color)) {
-    return [color[0], color[1], color[2]];
-  }
-
-  if (typeof color === 'string') {
-    const normalized = normalizeColor(color);
-    return [normalized[0] * 255, normalized[1] * 255, normalized[2] * 255];
   }
 
   return [1, 1, 1];

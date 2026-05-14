@@ -85,12 +85,16 @@ export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | n
     height: barHeight
   } = getProgressBarLayout(canvas);
 
+  const vm = getViewModel();
+  const palette = getProgressPalette(vm.idleMode);
+
   spawnGpuProgressCollectionLaserBurst(
     barX,
     barY,
     barWidth,
     barHeight,
-    COLLECTION_LASER_BURST_COLORS
+    palette.fillStart,
+    palette.fillEnd
   );
 }
 
