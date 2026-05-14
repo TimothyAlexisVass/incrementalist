@@ -25,7 +25,6 @@ body {
 }
 
 #incrementalist,
-#effects-canvas,
 #tooltip-canvas {
   position: absolute;
   inset: 0;
@@ -38,10 +37,6 @@ body {
   background: transparent;
 }
 
-#effects-canvas {
-  background: transparent;
-  mix-blend-mode: screen;
-}
 
 #tooltip-canvas {
   background: transparent;

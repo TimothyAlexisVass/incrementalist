@@ -268,7 +268,6 @@ const LASER_RECT_FRAGMENT_SHADER_SOURCE = `
 `;
 
 const WEBGL_EFFECTS: {
-  canvas: HTMLCanvasElement | null;
   gl: WebGLRenderingContext | null;
   program: WebGLProgram | null;
   bubbleProgram: WebGLProgram | null;
@@ -312,26 +311,8 @@ const WEBGL_EFFECTS: {
   bubbleUniforms: UniformLocations<"resolution"> | null;
   glowUniforms: UniformLocations<"resolution" | "rect" | "color" | "intensity" | "radius"> | null;
   laserRectUniforms: UniformLocations<"resolution"> | null;
-  mainGl: WebGLRenderingContext | null;
-  mainProgram: WebGLProgram | null;
-  mainBuffer: WebGLBuffer | null;
-  mainAttributes: AttributeLocations<"position" | "size" | "color"> | null;
-  mainUniforms: UniformLocations<"resolution"> | null;
-  mainLaserRectProgram: WebGLProgram | null;
-  mainLaserRectBuffer: WebGLBuffer | null;
-  mainLaserRectAttributes: AttributeLocations<"center" | "axis" | "perp" | "local" | "color"> | null;
-  mainLaserRectUniforms: UniformLocations<"resolution"> | null;
-  mainBubbleProgram: WebGLProgram | null;
-  mainBubbleBuffer: WebGLBuffer | null;
-  mainBubbleAttributes: AttributeLocations<"position" | "size" | "alpha"> | null;
-  mainBubbleUniforms: UniformLocations<"resolution"> | null;
-  mainGlowProgram: WebGLProgram | null;
-  mainGlowBuffer: WebGLBuffer | null;
-  mainGlowAttributes: AttributeLocations<"position"> | null;
-  mainGlowUniforms: UniformLocations<"resolution" | "rect" | "color" | "intensity" | "radius"> | null;
   ready: boolean;
 } = {
-  canvas: null,
   gl: null,
   program: null,
   bubbleProgram: null,
@@ -359,23 +340,6 @@ const WEBGL_EFFECTS: {
   bubbleUniforms: null,
   glowUniforms: null,
   laserRectUniforms: null,
-  mainGl: null,
-  mainProgram: null,
-  mainBuffer: null,
-  mainAttributes: null,
-  mainUniforms: null,
-  mainLaserRectProgram: null,
-  mainLaserRectBuffer: null,
-  mainLaserRectAttributes: null,
-  mainLaserRectUniforms: null,
-  mainBubbleProgram: null,
-  mainBubbleBuffer: null,
-  mainBubbleAttributes: null,
-  mainBubbleUniforms: null,
-  mainGlowProgram: null,
-  mainGlowBuffer: null,
-  mainGlowAttributes: null,
-  mainGlowUniforms: null,
   ready: false
 };
 
@@ -386,45 +350,45 @@ export function initMainCanvasParticles(gl: WebGLRenderingContext) {
   const laserProgram = createProgram(gl, LASER_RECT_VERTEX_SHADER_SOURCE, LASER_RECT_FRAGMENT_SHADER_SOURCE);
   if (!laserProgram) return false;
 
-  WEBGL_EFFECTS.mainGl = gl;
+  WEBGL_EFFECTS.gl = gl;
 
   // Particles
-  WEBGL_EFFECTS.mainProgram = particleProgram;
-  WEBGL_EFFECTS.mainBuffer = gl.createBuffer();
-  WEBGL_EFFECTS.mainAttributes = {
+  WEBGL_EFFECTS.program = particleProgram;
+  WEBGL_EFFECTS.buffer = gl.createBuffer();
+  WEBGL_EFFECTS.attributes = {
     position: gl.getAttribLocation(particleProgram, 'a_position'),
     size: gl.getAttribLocation(particleProgram, 'a_size'),
     color: gl.getAttribLocation(particleProgram, 'a_color')
   };
-  WEBGL_EFFECTS.mainUniforms = {
+  WEBGL_EFFECTS.uniforms = {
     resolution: gl.getUniformLocation(particleProgram, 'u_resolution')
   };
 
   // Lasers
-  WEBGL_EFFECTS.mainLaserRectProgram = laserProgram;
-  WEBGL_EFFECTS.mainLaserRectBuffer = gl.createBuffer();
-  WEBGL_EFFECTS.mainLaserRectAttributes = {
+  WEBGL_EFFECTS.laserRectProgram = laserProgram;
+  WEBGL_EFFECTS.laserRectBuffer = gl.createBuffer();
+  WEBGL_EFFECTS.laserRectAttributes = {
     center: gl.getAttribLocation(laserProgram, 'a_center'),
     axis: gl.getAttribLocation(laserProgram, 'a_axis'),
     perp: gl.getAttribLocation(laserProgram, 'a_perp'),
     local: gl.getAttribLocation(laserProgram, 'a_local'),
     color: gl.getAttribLocation(laserProgram, 'a_color')
   };
-  WEBGL_EFFECTS.mainLaserRectUniforms = {
+  WEBGL_EFFECTS.laserRectUniforms = {
     resolution: gl.getUniformLocation(laserProgram, 'u_resolution')
   };
 
   // Bubbles
   const bubbleProgram = createProgram(gl, BUBBLE_VERTEX_SHADER_SOURCE, BUBBLE_FRAGMENT_SHADER_SOURCE);
   if (bubbleProgram) {
-    WEBGL_EFFECTS.mainBubbleProgram = bubbleProgram;
-    WEBGL_EFFECTS.mainBubbleBuffer = gl.createBuffer();
-    WEBGL_EFFECTS.mainBubbleAttributes = {
+    WEBGL_EFFECTS.bubbleProgram = bubbleProgram;
+    WEBGL_EFFECTS.bubbleBuffer = gl.createBuffer();
+    WEBGL_EFFECTS.bubbleAttributes = {
       position: gl.getAttribLocation(bubbleProgram, 'a_position'),
       size: gl.getAttribLocation(bubbleProgram, 'a_size'),
       alpha: gl.getAttribLocation(bubbleProgram, 'a_alpha')
     };
-    WEBGL_EFFECTS.mainBubbleUniforms = {
+    WEBGL_EFFECTS.bubbleUniforms = {
       resolution: gl.getUniformLocation(bubbleProgram, 'u_resolution')
     };
   }
@@ -432,12 +396,12 @@ export function initMainCanvasParticles(gl: WebGLRenderingContext) {
   // Glow
   const glowProgram = createProgram(gl, GLOW_VERTEX_SHADER_SOURCE, GLOW_FRAGMENT_SHADER_SOURCE);
   if (glowProgram) {
-    WEBGL_EFFECTS.mainGlowProgram = glowProgram;
-    WEBGL_EFFECTS.mainGlowBuffer = gl.createBuffer();
-    WEBGL_EFFECTS.mainGlowAttributes = {
+    WEBGL_EFFECTS.glowProgram = glowProgram;
+    WEBGL_EFFECTS.glowBuffer = gl.createBuffer();
+    WEBGL_EFFECTS.glowAttributes = {
       position: gl.getAttribLocation(glowProgram, 'a_position')
     };
-    WEBGL_EFFECTS.mainGlowUniforms = {
+    WEBGL_EFFECTS.glowUniforms = {
       resolution: gl.getUniformLocation(glowProgram, 'u_resolution'),
       rect: gl.getUniformLocation(glowProgram, 'u_rect'),
       color: gl.getUniformLocation(glowProgram, 'u_color'),
@@ -446,128 +410,8 @@ export function initMainCanvasParticles(gl: WebGLRenderingContext) {
     };
   }
 
-  return true;
-}
-
-export function initWebGLEffectsLayer(canvas: HTMLCanvasElement | null, width: number, height: number) {
-  if (!canvas) {
-    return false;
-  }
-
-  WEBGL_EFFECTS.canvas = canvas;
-  resizeWebGLEffectsLayer(width, height);
-
-  const gl = canvas.getContext('webgl2', {
-    alpha: true,
-    antialias: false,
-    depth: false,
-    premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
-    stencil: false
-  });
-
-  if (!gl) {
-    canvas.hidden = true;
-    return false;
-  }
-
-  const program = createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-  if (!program) {
-    canvas.hidden = true;
-    return false;
-  }
-
-  const bubbleProgram = createProgram(gl, BUBBLE_VERTEX_SHADER_SOURCE, BUBBLE_FRAGMENT_SHADER_SOURCE);
-  const glowProgram = createProgram(gl, GLOW_VERTEX_SHADER_SOURCE, GLOW_FRAGMENT_SHADER_SOURCE);
-  const laserRectProgram = createProgram(gl, LASER_RECT_VERTEX_SHADER_SOURCE, LASER_RECT_FRAGMENT_SHADER_SOURCE);
-
-  WEBGL_EFFECTS.gl = gl;
-  WEBGL_EFFECTS.program = program;
-  WEBGL_EFFECTS.bubbleProgram = bubbleProgram;
-  WEBGL_EFFECTS.glowProgram = glowProgram;
-  WEBGL_EFFECTS.laserRectProgram = laserRectProgram;
-  WEBGL_EFFECTS.buffer = gl.createBuffer();
-  WEBGL_EFFECTS.bubbleBuffer = gl.createBuffer();
-  WEBGL_EFFECTS.glowBuffer = gl.createBuffer();
-  WEBGL_EFFECTS.laserRectBuffer = gl.createBuffer();
-  WEBGL_EFFECTS.attributes = {
-    position: gl.getAttribLocation(program, 'a_position'),
-    size: gl.getAttribLocation(program, 'a_size'),
-    color: gl.getAttribLocation(program, 'a_color')
-  };
-  WEBGL_EFFECTS.uniforms = {
-    resolution: gl.getUniformLocation(program, 'u_resolution')
-  };
-  WEBGL_EFFECTS.bubbleAttributes = bubbleProgram
-    ? {
-      position: gl.getAttribLocation(bubbleProgram, 'a_position'),
-      size: gl.getAttribLocation(bubbleProgram, 'a_size'),
-      alpha: gl.getAttribLocation(bubbleProgram, 'a_alpha')
-    }
-    : null;
-  WEBGL_EFFECTS.bubbleUniforms = bubbleProgram
-    ? {
-      resolution: gl.getUniformLocation(bubbleProgram, 'u_resolution')
-    }
-    : null;
-  WEBGL_EFFECTS.glowAttributes = glowProgram
-    ? {
-      position: gl.getAttribLocation(glowProgram, 'a_position')
-    }
-    : null;
-  WEBGL_EFFECTS.glowUniforms = glowProgram
-    ? {
-      resolution: gl.getUniformLocation(glowProgram, 'u_resolution'),
-      rect: gl.getUniformLocation(glowProgram, 'u_rect'),
-      color: gl.getUniformLocation(glowProgram, 'u_color'),
-      intensity: gl.getUniformLocation(glowProgram, 'u_intensity'),
-      radius: gl.getUniformLocation(glowProgram, 'u_radius')
-    }
-    : null;
-  WEBGL_EFFECTS.laserRectAttributes = laserRectProgram
-    ? {
-      center: gl.getAttribLocation(laserRectProgram, 'a_center'),
-      axis: gl.getAttribLocation(laserRectProgram, 'a_axis'),
-      perp: gl.getAttribLocation(laserRectProgram, 'a_perp'),
-      local: gl.getAttribLocation(laserRectProgram, 'a_local'),
-      color: gl.getAttribLocation(laserRectProgram, 'a_color')
-    }
-    : null;
-  WEBGL_EFFECTS.laserRectUniforms = laserRectProgram
-    ? {
-      resolution: gl.getUniformLocation(laserRectProgram, 'u_resolution')
-    }
-    : null;
   WEBGL_EFFECTS.ready = true;
-  canvas.hidden = false;
-
-  gl.disable(gl.DEPTH_TEST);
-  gl.enable(gl.BLEND);
-  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  gl.clearColor(0, 0, 0, 0);
-  gl.viewport(0, 0, canvas.width, canvas.height);
-
   return true;
-}
-
-export function resizeWebGLEffectsLayer(width: number, height: number) {
-  const canvas = WEBGL_EFFECTS.canvas;
-  if (!canvas) return;
-
-  const nextWidth = Math.max(1, Math.floor(Number(width) || canvas.width || 1));
-  const nextHeight = Math.max(1, Math.floor(Number(height) || canvas.height || 1));
-
-  if (canvas.width !== nextWidth) {
-    canvas.width = nextWidth;
-  }
-
-  if (canvas.height !== nextHeight) {
-    canvas.height = nextHeight;
-  }
-
-  if (WEBGL_EFFECTS.gl) {
-    WEBGL_EFFECTS.gl.viewport(0, 0, nextWidth, nextHeight);
-  }
 }
 
 export function hasWebGLEffectsLayer() {
@@ -614,49 +458,31 @@ export interface RenderWebGLOptions {
 
 export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
   const gl = WEBGL_EFFECTS.gl;
-  const mainGl = WEBGL_EFFECTS.mainGl;
-  const useMain = !!mainGl;
-
-  if (!WEBGL_EFFECTS.ready && !useMain) return;
+  if (!gl || !WEBGL_EFFECTS.ready) return;
 
   const particles = WEBGL_EFFECTS.particles;
   const visible = options.visible !== false;
-
-  if (gl && WEBGL_EFFECTS.ready) {
-    const renderCanvas = options.targetCanvas ?? WEBGL_EFFECTS.canvas;
-    if (renderCanvas) {
-      gl.viewport(0, 0, renderCanvas.width, renderCanvas.height);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-    }
-  }
 
   if (!visible) {
     return;
   }
 
-  const currentGl = mainGl || gl;
-  if (!currentGl) return;
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  if (useMain) {
-    currentGl.viewport(0, 0, currentGl.canvas.width, currentGl.canvas.height);
-  }
-
-  renderProgressBarGlow(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
-  renderLiquidBubbles(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
-
-  renderLaserBursts(currentGl, currentGl.canvas.width, currentGl.canvas.height, useMain);
+  renderProgressBarGlow(gl, gl.canvas.width, gl.canvas.height);
+  renderLiquidBubbles(gl, gl.canvas.width, gl.canvas.height);
+  renderLaserBursts(gl, gl.canvas.width, gl.canvas.height);
 
   if (particles.length === 0) {
     return;
   }
 
-  const pGl = WEBGL_EFFECTS.mainGl || gl;
-  const pProgram = useMain ? WEBGL_EFFECTS.mainProgram : WEBGL_EFFECTS.program;
-  const pBuffer = useMain ? WEBGL_EFFECTS.mainBuffer : WEBGL_EFFECTS.buffer;
-  const pUniforms = useMain ? WEBGL_EFFECTS.mainUniforms : WEBGL_EFFECTS.uniforms;
-  const pAttributes = useMain ? WEBGL_EFFECTS.mainAttributes : WEBGL_EFFECTS.attributes;
+  const pProgram = WEBGL_EFFECTS.program;
+  const pBuffer = WEBGL_EFFECTS.buffer;
+  const pUniforms = WEBGL_EFFECTS.uniforms;
+  const pAttributes = WEBGL_EFFECTS.attributes;
 
-  if (!pGl || !pProgram || !pBuffer || !pUniforms || !pAttributes) {
+  if (!pProgram || !pBuffer || !pUniforms || !pAttributes) {
     return;
   }
 
@@ -680,27 +506,23 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
     offset += PARTICLE_FLOATS;
   }
 
-  if (useMain) {
-    pGl.enable(pGl.BLEND);
-    pGl.blendFuncSeparate(pGl.SRC_ALPHA, pGl.ONE, pGl.ONE, pGl.ONE_MINUS_SRC_ALPHA);
-  }
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-  pGl.useProgram(pProgram);
-  pGl.bindBuffer(pGl.ARRAY_BUFFER, pBuffer);
-  pGl.bufferData(pGl.ARRAY_BUFFER, data.subarray(0, drawCount * PARTICLE_FLOATS), pGl.DYNAMIC_DRAW);
+  gl.useProgram(pProgram);
+  gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, drawCount * PARTICLE_FLOATS), gl.DYNAMIC_DRAW);
 
-  bindParticleAttributes(pGl, pAttributes);
-  pGl.uniform2f(
+  bindParticleAttributes(gl, pAttributes);
+  gl.uniform2f(
     pUniforms.resolution,
-    pGl.canvas.width,
-    pGl.canvas.height
+    gl.canvas.width,
+    gl.canvas.height
   );
-  pGl.drawArrays(pGl.POINTS, 0, drawCount);
+  gl.drawArrays(gl.POINTS, 0, drawCount);
 
-  if (useMain) {
-    // Restore default blend mode for main renderer
-    pGl.blendFunc(pGl.ONE, pGl.ONE_MINUS_SRC_ALPHA);
-  }
+  // Restore default blend mode for main renderer
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 export interface LiquidBubbleOptions {
@@ -714,11 +536,11 @@ export interface LiquidBubbleOptions {
 }
 
 export function updateGpuProgressLiquidBubbles(deltaTime: number, options: LiquidBubbleOptions = {}) {
-  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
+  if (!WEBGL_EFFECTS.ready) {
     return false;
   }
 
-  if (!WEBGL_EFFECTS.bubbleProgram && !WEBGL_EFFECTS.mainBubbleProgram) {
+  if (!WEBGL_EFFECTS.bubbleProgram) {
     return false;
   }
 
@@ -793,11 +615,11 @@ export interface ProgressBarGlowOptions {
 }
 
 export function setGpuProgressBarGlow(options: ProgressBarGlowOptions = {}) {
-  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
+  if (!WEBGL_EFFECTS.ready) {
     return false;
   }
 
-  if (!WEBGL_EFFECTS.glowProgram && !WEBGL_EFFECTS.mainGlowProgram) {
+  if (!WEBGL_EFFECTS.glowProgram) {
     return false;
   }
 
@@ -826,7 +648,7 @@ export interface GpuClickBurstOptions {
 }
 
 export function spawnGpuClickBurst(x: number, y: number, options: GpuClickBurstOptions = {}) {
-  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
+  if (!WEBGL_EFFECTS.ready) {
     return false;
   }
 
@@ -930,11 +752,7 @@ export function spawnGpuProgressCollectionLaserBurst(
   color: ColorInput,
   targetColor?: ColorInput
 ) {
-  if (!WEBGL_EFFECTS.ready && !WEBGL_EFFECTS.mainGl) {
-    return false;
-  }
-
-  if (!WEBGL_EFFECTS.laserRectProgram && !WEBGL_EFFECTS.mainLaserRectProgram) {
+  if (!WEBGL_EFFECTS.ready) {
     return false;
   }
 
@@ -959,17 +777,43 @@ export function spawnGpuProgressCollectionLaserBurst(
     lifeMs: 899
   });
 
+  const baseLength = 32;
+  const count = 10;
+
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * TWO_PI + Math.random() * 0.4;
+    const travel = 60 + Math.random() * 120;
+    const directionX = Math.cos(angle);
+    const directionY = Math.sin(angle);
+
+    pushGpuLaserRect({
+      originX: centerX,
+      originY: centerY,
+      angle,
+      baseLength,
+      growLength: 40 + Math.random() * 80,
+      baseThickness: 4,
+      growThickness: 6,
+      travelX: directionX * travel,
+      travelY: directionY * travel,
+      color,
+      targetColor: targetColor || color,
+      alpha: 1.0,
+      lifeMs: 450 + Math.random() * 300
+    });
+  }
+
   trimGpuLaserBursts();
   return true;
 }
 
-function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number, useMain = false) {
+function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number) {
   const bubbles = WEBGL_EFFECTS.liquidBubbles;
   const clipRect = WEBGL_EFFECTS.liquidClipRect;
-  const program = useMain ? WEBGL_EFFECTS.mainBubbleProgram : WEBGL_EFFECTS.bubbleProgram;
-  const buffer = useMain ? WEBGL_EFFECTS.mainBubbleBuffer : WEBGL_EFFECTS.bubbleBuffer;
-  const uniforms = useMain ? WEBGL_EFFECTS.mainBubbleUniforms : WEBGL_EFFECTS.bubbleUniforms;
-  const attributes = useMain ? WEBGL_EFFECTS.mainBubbleAttributes : WEBGL_EFFECTS.bubbleAttributes;
+  const program = WEBGL_EFFECTS.bubbleProgram;
+  const buffer = WEBGL_EFFECTS.bubbleBuffer;
+  const uniforms = WEBGL_EFFECTS.bubbleUniforms;
+  const attributes = WEBGL_EFFECTS.bubbleAttributes;
 
   if (
     !program ||
@@ -1021,12 +865,12 @@ function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, can
   gl.disable(gl.SCISSOR_TEST);
 }
 
-function renderProgressBarGlow(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number, useMain = false) {
+function renderProgressBarGlow(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number) {
   const glow = WEBGL_EFFECTS.progressBarGlow;
-  const program = useMain ? WEBGL_EFFECTS.mainGlowProgram : WEBGL_EFFECTS.glowProgram;
-  const buffer = useMain ? WEBGL_EFFECTS.mainGlowBuffer : WEBGL_EFFECTS.glowBuffer;
-  const uniforms = useMain ? WEBGL_EFFECTS.mainGlowUniforms : WEBGL_EFFECTS.glowUniforms;
-  const attributes = useMain ? WEBGL_EFFECTS.mainGlowAttributes : WEBGL_EFFECTS.glowAttributes;
+  const program = WEBGL_EFFECTS.glowProgram;
+  const buffer = WEBGL_EFFECTS.glowBuffer;
+  const uniforms = WEBGL_EFFECTS.glowUniforms;
+  const attributes = WEBGL_EFFECTS.glowAttributes;
 
   if (
     !program ||
@@ -1110,12 +954,12 @@ function updateGpuLaserBursts(deltaTime: number) {
   laserBursts.length = writeIndex;
 }
 
-function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number, useMain = false) {
+function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number) {
   const laserBursts = WEBGL_EFFECTS.laserBursts;
-  const program = useMain ? WEBGL_EFFECTS.mainLaserRectProgram : WEBGL_EFFECTS.laserRectProgram;
-  const buffer = useMain ? WEBGL_EFFECTS.mainLaserRectBuffer : WEBGL_EFFECTS.laserRectBuffer;
-  const uniforms = useMain ? WEBGL_EFFECTS.mainLaserRectUniforms : WEBGL_EFFECTS.laserRectUniforms;
-  const attributes = useMain ? WEBGL_EFFECTS.mainLaserRectAttributes : WEBGL_EFFECTS.laserRectAttributes;
+  const program = WEBGL_EFFECTS.laserRectProgram;
+  const buffer = WEBGL_EFFECTS.laserRectBuffer;
+  const uniforms = WEBGL_EFFECTS.laserRectUniforms;
+  const attributes = WEBGL_EFFECTS.laserRectAttributes;
 
   if (
     !program ||
@@ -1192,10 +1036,8 @@ function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canva
 
   if (vertexCount === 0) return;
 
-  if (useMain) {
-    gl.enable(gl.BLEND);
-    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  }
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -1209,10 +1051,8 @@ function renderLaserBursts(gl: WebGLRenderingContext, canvasWidth: number, canva
   );
   gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
-  if (useMain) {
-    // Restore default blend mode for main renderer
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  }
+  // Restore default blend mode for main renderer
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 function spawnGpuLiquidBubble(

@@ -1,11 +1,10 @@
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./config";
-import { initWebGLEffectsLayer, resizeWebGLEffectsLayer, initMainCanvasParticles } from "./render/webgl-effects";
+import { initMainCanvasParticles } from "./render/webgl-effects";
 import { GameClient } from "./core/game-client";
 import { createWebGLRenderer, setActiveWebGLRenderer } from "./renderer/webgl";
 import { setTooltipRenderTarget } from "./ui/components/tooltip";
 
 const incrementalistCanvas = requiredElement<HTMLCanvasElement>("#incrementalist");
-const effectsCanvas = requiredElement<HTMLCanvasElement>("#effects-canvas");
 const tooltipCanvas = requiredElement<HTMLCanvasElement>("#tooltip-canvas");
 const incrementalistRenderer = createCanvasRenderer(incrementalistCanvas);
 setActiveWebGLRenderer(incrementalistRenderer);
@@ -14,7 +13,6 @@ setTooltipRenderTarget(tooltipCanvas, tooltipRenderer);
 
 // Initialize canvas sizes and the WebGL effects layer.
 resizeGameCanvases();
-initWebGLEffectsLayer(effectsCanvas, effectsCanvas.width, effectsCanvas.height);
 initMainCanvasParticles(incrementalistRenderer.glContext);
 window.addEventListener("resize", resizeGameCanvases);
 
@@ -31,9 +29,6 @@ function resizeGameCanvases() {
   if (tooltipCanvas.width !== CANVAS_WIDTH) tooltipCanvas.width = CANVAS_WIDTH;
   if (tooltipCanvas.height !== CANVAS_HEIGHT) tooltipCanvas.height = CANVAS_HEIGHT;
   tooltipRenderer.resize(tooltipCanvas.width, tooltipCanvas.height);
-  if (effectsCanvas.width !== CANVAS_WIDTH) effectsCanvas.width = CANVAS_WIDTH;
-  if (effectsCanvas.height !== CANVAS_HEIGHT) effectsCanvas.height = CANVAS_HEIGHT;
-  resizeWebGLEffectsLayer(effectsCanvas.width, effectsCanvas.height);
 }
 
 function createCanvasRenderer(canvas: HTMLCanvasElement) {
