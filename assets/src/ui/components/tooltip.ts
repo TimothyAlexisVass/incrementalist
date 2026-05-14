@@ -1,5 +1,5 @@
 import { TINY_TEXT_FONT } from '../../config';
-import { getActiveWebGLRenderer, type WebGLRenderer } from '../../renderer/webgl';
+import { getActiveWebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
 import { resolveUpdatingText } from '../../utils/text';
 
@@ -25,21 +25,10 @@ interface TooltipRequest {
   options: TooltipOptions;
 }
 
-interface TooltipRenderTarget {
-  canvas: HTMLCanvasElement;
-  renderer: WebGLRenderer;
-}
-
 const queuedTooltips: TooltipRequest[] = [];
-let tooltipRenderTarget: TooltipRenderTarget | null = null;
-
-export function setTooltipRenderTarget(canvas: HTMLCanvasElement, renderer: WebGLRenderer) {
-  tooltipRenderTarget = { canvas, renderer };
-}
 
 export function beginTooltipFrame() {
   queuedTooltips.length = 0;
-  tooltipRenderTarget?.renderer.beginFrame([0, 0, 0, 0]);
 }
 
 export function queueTooltip(
@@ -51,38 +40,36 @@ export function queueTooltip(
 }
 
 export function renderQueuedTooltips() {
-  const target = tooltipRenderTarget;
-  if (!target || queuedTooltips.length === 0) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer || queuedTooltips.length === 0) {
     queuedTooltips.length = 0;
     return;
   }
 
-  const { canvas, renderer } = target;
-
   for (const request of queuedTooltips) {
-    drawTooltipInternal(renderer, canvas, request.anchorPoint, request.content, request.options);
+    drawTooltipInternal(renderer, request.anchorPoint, request.content, request.options);
   }
 
   queuedTooltips.length = 0;
 }
 
 export function drawTooltip(
-  canvas: HTMLCanvasElement,
   anchorPoint: { x: number; y: number },
   content: string | string[],
   options: TooltipOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
-  return drawTooltipInternal(renderer, canvas, anchorPoint, content, options);
+  if (!renderer) return null;
+  return drawTooltipInternal(renderer, anchorPoint, content, options);
 }
 
 function drawTooltipInternal(
-  renderer: WebGLRenderer,
-  canvas: HTMLCanvasElement,
+  renderer: import('../../renderer/webgl').WebGLRenderer,
   anchorPoint: { x: number; y: number },
   content: string | string[],
   options: TooltipOptions = {}
 ) {
+  const canvas = renderer.canvasElement;
   if (!canvas || !anchorPoint) {
     return null;
   }

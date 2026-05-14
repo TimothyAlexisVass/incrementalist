@@ -414,6 +414,10 @@ export class WebGLRenderer {
     return this.gl;
   }
 
+  public get canvasElement(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
   constructor(options: WebGLRendererOptions) {
     this.canvas = options.canvas;
     const gl =

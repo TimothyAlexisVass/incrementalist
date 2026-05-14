@@ -24,8 +24,7 @@ body {
   isolation: isolate;
 }
 
-#incrementalist,
-#tooltip-canvas {
+#incrementalist {
   position: absolute;
   inset: 0;
   display: block;
@@ -38,8 +37,3 @@ body {
 }
 
 
-#tooltip-canvas {
-  background: transparent;
-  pointer-events: none;
-  z-index: 3;
-}
