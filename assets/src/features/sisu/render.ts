@@ -38,7 +38,8 @@ const SISU_GLASS_BALL_RADIUS = 32;
 export function renderSisuControl(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  state: ServerState
+  state: ServerState,
+  blocked: boolean = false
 ): SisuControlLayout | null {
   const renderer = getActiveWebGLRenderer();
   const snapshot = state.snapshot;
@@ -55,11 +56,11 @@ export function renderSisuControl(
   const barRadius = SISU_METER_RADIUS;
 
   const drawNative = () => {
-    drawSisuControlNative(renderer, input, controlRect, snapshot, centerX, centerY, barRadius, displayCurrent);
+    drawSisuControlNative(renderer, input, controlRect, snapshot, centerX, centerY, barRadius, displayCurrent, blocked);
   };
 
   if (!isUnlocked) {
-    drawLockedElement(canvas, input, controlRect, drawNative, {
+    drawLockedElement(canvas, blocked ? { ...input, pointer: null, clicked: false } : input, controlRect, drawNative, {
       font: SISU_METER_FONT,
       criteria: formatUnlockRequirement(sisuRequiredLevel, snapshot.state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
@@ -168,7 +169,8 @@ function drawSisuControlNative(
   centerX: number,
   centerY: number,
   barRadius: number,
-  displayCurrent: number
+  displayCurrent: number,
+  blocked: boolean = false
 ) {
   const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
   const azureMax = getSisuTierTarget(maxBasic, "azure");
@@ -226,7 +228,7 @@ function drawSisuControlNative(
   }
 
   // Multiplier Tooltip
-  if (showSisuHoverInfo && input.pointer && pointInRect(input.pointer, controlRect)) {
+  if (!blocked && showSisuHoverInfo && input.pointer && pointInRect(input.pointer, controlRect)) {
     const tooltipText = `Sisu Multiplier: x${displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2)}`;
     queueTooltip(input.pointer, tooltipText, {
       widthMode: 'estimated',

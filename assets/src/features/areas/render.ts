@@ -57,11 +57,12 @@ export function renderAreaSpecifics(
   input: InteractionState,
   level: number,
   channel?: GameChannel,
-  runCommand?: (cmd: () => Promise<any>) => void
+  runCommand?: (cmd: () => Promise<any>) => void,
+  blocked: boolean = false
 ) {
   const model = getAreaViewModel();
   if (model.currentArea === 'sage') {
-    renderSageArea(canvas, input, level, channel, runCommand);
+    renderSageArea(canvas, input, level, channel, runCommand, blocked);
   }
 }
 

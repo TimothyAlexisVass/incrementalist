@@ -117,7 +117,8 @@ function getProgressBarForegroundImage() {
 
 export function renderProgressBar(
   canvas: HTMLCanvasElement | null,
-  input: InteractionState
+  input: InteractionState,
+  blocked: boolean = false
 ) {
   if (!canvas) return;
   const renderer = getActiveWebGLRenderer();
@@ -145,7 +146,7 @@ export function renderProgressBar(
     });
   }
 
-  renderProgressBarDirect(renderer, canvas, input);
+  renderProgressBarDirect(renderer, canvas, input, blocked);
 }
 
 export function renderProgressBarForeground(canvas: HTMLCanvasElement | null) {
@@ -173,7 +174,8 @@ import { WebGLRenderer } from '../../renderer/webgl';
 function renderProgressBarDirect(
   renderer: WebGLRenderer,
   canvas: HTMLCanvasElement,
-  input: InteractionState
+  input: InteractionState,
+  blocked: boolean = false
 ) {
   const state = getViewModel();
 
@@ -341,7 +343,7 @@ function renderProgressBarDirect(
     width: barWidth + 24,
     height: barHeight
   };
-  if (input.pointer && pointInRect(input.pointer, tooltipHoverRect)) {
+  if (!blocked && input.pointer && pointInRect(input.pointer, tooltipHoverRect)) {
     queueTooltip(input.pointer, `Progress: ${fillValue.toFixed(0)}%\nTime left: ${getProgressTimeLeftSeconds(state).toFixed(1)}`, {
       font: TINY_TEXT_FONT,
       textColor: '#f4f7ff',
@@ -361,7 +363,7 @@ function renderProgressBarDirect(
       idleModePurchased: state.idleModePurchased
     },
     idleModeRequiredLevel: state.idleModeRequiredLevel
-  });
+  }, blocked);
 }
 
 function getProgressTimeLeftSeconds(state: ReturnType<typeof getViewModel>): number {
@@ -502,7 +504,8 @@ export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
 export function renderIdleModeToggle(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  state: { idleMode: boolean; level?: number; features?: { idleModePurchased?: boolean }; idleModeRequiredLevel?: number }
+  state: { idleMode: boolean; level?: number; features?: { idleModePurchased?: boolean }; idleModeRequiredLevel?: number },
+  blocked: boolean = false
 ) {
   const toggleRect = getIdleModeToggleRect(canvas);
   const drawToggle = () => drawButton(toggleRect, state.idleMode ? 'IDLE' : 'ACTIVE', {
@@ -519,7 +522,7 @@ export function renderIdleModeToggle(
   if (!state.features?.idleModePurchased) {
     const requiredLevel = state.idleModeRequiredLevel ?? SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode;
 
-    drawLockedElement(canvas, input, toggleRect, drawToggle, {
+    drawLockedElement(canvas, blocked ? { ...input, pointer: null, clicked: false } : input, toggleRect, drawToggle, {
       criteria: formatUnlockRequirement(requiredLevel, state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
       showNoticePing: true,

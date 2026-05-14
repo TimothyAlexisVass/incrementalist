@@ -388,6 +388,11 @@ export class GameClient {
 
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
+
+    const modalOpen = this.ui.modals.isOpen();
+    const overlayOpen = this.ui.overlays.isOpen();
+    const uiBlocked = modalOpen || overlayOpen;
+
     if (input.clicked && input.pointer) {
       spawnGpuClickBurst(input.pointer.x, input.pointer.y);
     }
@@ -411,9 +416,9 @@ export class GameClient {
 
     renderAreaBackground(this.canvas);
     
-    renderProgressBar(this.canvas, input);
+    renderProgressBar(this.canvas, input, uiBlocked);
     this.sisuControlLayout = this.store.state.snapshot
-      ? renderSisuControl(this.canvas, input, this.store.state)
+      ? renderSisuControl(this.canvas, input, this.store.state, uiBlocked)
       : null;
     renderSisuGlassBallOverlay(this.canvas, this.store.state);
     this.openSisuModalByDefault();
@@ -437,7 +442,7 @@ export class GameClient {
     }
     
     if (this.store.state.snapshot) {
-      renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd));
+      renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
 
     const amounts = this.snapshotAmounts();
@@ -455,9 +460,7 @@ export class GameClient {
     renderFloatingTexts(this.floatingTexts);
 
     // 2. Handle specific UI element clicks before general activity collection.
-    const modalOpen = this.ui.modals.isOpen();
-
-    if (!modalOpen && input.clicked && input.pointer && this.channel) {
+    if (!uiBlocked && input.clicked && input.pointer && this.channel) {
       if (handleProgressClick(
         this.channel, 
         this.canvas, 
@@ -469,7 +472,7 @@ export class GameClient {
       }
     }
 
-    if (!modalOpen && input.clicked && input.pointer && this.sisuControlLayout && pointInRect(input.pointer, this.sisuControlLayout.controlRect)) {
+    if (!uiBlocked && input.clicked && input.pointer && this.sisuControlLayout && pointInRect(input.pointer, this.sisuControlLayout.controlRect)) {
       input.consumed = true;
       if (this.store.state.snapshot?.state.features.sisu_generator_purchased && this.channel) {
         this.ui.modals.open(

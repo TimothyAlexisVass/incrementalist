@@ -48,7 +48,8 @@ export function renderSageArea(
   input: InteractionState,
   level: number,
   channel?: GameChannel,
-  runCommand?: (cmd: () => Promise<any>) => void
+  runCommand?: (cmd: () => Promise<any>) => void,
+  blocked: boolean = false
 ) {
   const renderer = getActiveWebGLRenderer();
   const visibleTipLevels = getVisibleTipLevels(level);
@@ -135,7 +136,7 @@ export function renderSageArea(
       height: tip.buttonRect.height
     };
 
-    renderTipPanel(input, tip, channel, runCommand, renderer);
+    renderTipPanel(input, tip, channel, runCommand, renderer, blocked);
     currentY += tip.boxHeight + PANEL_GAP;
   }
 
@@ -147,7 +148,8 @@ function renderTipPanel(
   tip: SageTipRender,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void,
-  renderer = getActiveWebGLRenderer()
+  renderer = getActiveWebGLRenderer(),
+  blocked: boolean = false
 ) {
   if (!renderer) return;
   const { boxX, boxY, boxWidth, boxHeight, fullLines, visibleCharCounts, buttonLabel, buttonRect, leafId } = tip;
@@ -228,7 +230,7 @@ function renderTipPanel(
     });
   }
 
-  const buttonClicked = doButton(input, buttonRect, buttonLabel, {
+  const buttonClicked = !blocked && doButton(input, buttonRect, buttonLabel, {
     font: BOTTOM_HUD_BUTTON_FONT,
     showNotice: notices.hasLeafNotice(leafId),
     showNoticePing: true
