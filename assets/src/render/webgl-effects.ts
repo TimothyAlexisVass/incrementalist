@@ -458,7 +458,7 @@ export function updateWebGLEffects(deltaTime: number) {
       particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
       particle.x += particle.vx * deltaSeconds;
       particle.y += particle.vy * deltaSeconds;
-      if (particle.elapsedMs > 500) {
+      if (particle.elapsedMs > 300) {
         particle.sisuState = 'homing';
       }
     } else if (particle.sisuState === 'homing') {
@@ -467,16 +467,31 @@ export function updateWebGLEffects(deltaTime: number) {
       const dx = tx - particle.x;
       const dy = ty - particle.y;
       const distSq = dx * dx + dy * dy;
+      
       if (distSq < 100) {
         particle.sisuState = 'orbiting';
         particle.orbitRadius = 15 + Math.random() * 25;
         particle.orbitAngle = Math.random() * TWO_PI;
         particle.orbitSpeed = (1.5 + Math.random() * 2.5) * (Math.random() > 0.5 ? 1 : -1);
       } else {
-        const dist = Math.sqrt(distSq);
-        const speed = 400;
-        particle.vx = (dx / dist) * speed;
-        particle.vy = (dy / dist) * speed;
+        const targetAngle = Math.atan2(dy, dx);
+        const currentAngle = Math.atan2(particle.vy, particle.vx);
+        
+        let diff = targetAngle - currentAngle;
+        while (diff > Math.PI) diff -= TWO_PI;
+        while (diff < -Math.PI) diff += TWO_PI;
+        
+        // Rotate the direction vector towards the target
+        const rotationSpeed = 5.5; 
+        const step = rotationSpeed * deltaSeconds;
+        const newAngle = currentAngle + Math.max(-step, Math.min(step, diff));
+        
+        const currentSpeed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+        const targetSpeed = 700;
+        const nextSpeed = currentSpeed + (targetSpeed - currentSpeed) * 3.0 * deltaSeconds;
+        
+        particle.vx = Math.cos(newAngle) * nextSpeed;
+        particle.vy = Math.sin(newAngle) * nextSpeed;
         particle.x += particle.vx * deltaSeconds;
         particle.y += particle.vy * deltaSeconds;
       }
@@ -871,17 +886,18 @@ export function spawnGpuSisuParticleBurst(
 ) {
   if (!WEBGL_EFFECTS.ready) return false;
 
-  const count = 16 + Math.floor(Math.random() * 8);
+  const count = 20 + Math.floor(Math.random() * 12);
   for (let i = 0; i < count; i++) {
-    const angle = Math.random() * TWO_PI;
-    const speed = 60 + Math.random() * 120;
+    // Burst upwards (-PI/2) with a ~1.6 radian spread
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
+    const speed = 140 + Math.random() * 320;
     pushGpuParticle({
       x: originX,
       y: originY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       drag: 0.94 + Math.random() * 0.02,
-      size: 14 + Math.random() * 12,
+      size: 15 + Math.random() * 15,
       color,
       alpha: 1,
       lifeMs: 120000, // Very long life to stay orbiting
