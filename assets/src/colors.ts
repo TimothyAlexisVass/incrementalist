@@ -34,12 +34,10 @@ export const COLORS = Object.freeze({
     }
   },
   sisu: {
-    darkBlue: '#0B1F4D',
-    blue: '#1E90FF',
-    purple: '#9932CC',
-    orange: '#FF8C1A',
-    white: '#F5F7FA',
-    yellow: '#FFD700'
+    azure: '#1E90FF',
+    aether: '#9932CC',
+    lucent: '#FF8C1A',
+    transcendent: '#F5F7FA'
   },
   button: {
     surface: {

@@ -17,7 +17,6 @@ export type TierId = "azure" | "aether" | "lucent" | "transcendent";
 export type SisuRefillTier = {
   id: TierId;
   label: string;
-  colorKey: "blue" | "purple" | "orange" | "white";
   multiplier: number;
   cycleDecay: number;
 };
@@ -33,7 +32,6 @@ const SISU_REFILL_TIERS_BY_ID: Record<TierId, SisuRefillTier> = Object.freeze(
       {
         id: tier.id,
         label: tier.label,
-        colorKey: tier.color_key,
         multiplier: tier.multiplier,
         cycleDecay: tier.cycle_decay
       } satisfies SisuRefillTier

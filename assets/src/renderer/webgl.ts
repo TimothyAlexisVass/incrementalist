@@ -49,6 +49,9 @@ export interface DrawImageOptions {
   width: number;
   height: number;
   alpha?: number;
+  mixImage?: TexImageSource;
+  mixAmount?: number;
+  sourceAlphaMode?: "straight" | "premultiplied";
 }
 
 export interface DrawThreeSceneOptions {
@@ -315,13 +318,25 @@ void main() {
 const TEXT_FRAGMENT_SHADER_SOURCE = `
 precision mediump float;
 uniform sampler2D u_texture;
+uniform sampler2D u_mixTexture;
 uniform float u_alpha;
+uniform float u_sourcePremultiplied;
+uniform float u_hasMixTexture;
+uniform float u_mixAmount;
 varying vec2 v_texcoord;
 
 void main() {
   vec4 sampled = texture2D(u_texture, v_texcoord);
-  float alpha = sampled.a * u_alpha;
-  gl_FragColor = vec4(sampled.rgb * alpha, alpha);
+  if (u_hasMixTexture > 0.5) {
+    vec4 mixedSample = texture2D(u_mixTexture, v_texcoord);
+    sampled.rgb = mix(sampled.rgb, mixedSample.rgb, clamp(u_mixAmount, 0.0, 1.0));
+  }
+  float outAlpha = sampled.a * u_alpha;
+  vec3 outRgb = sampled.rgb * outAlpha;
+  if (u_sourcePremultiplied > 0.5) {
+    outRgb = sampled.rgb * u_alpha;
+  }
+  gl_FragColor = vec4(outRgb, outAlpha);
 }
 `;
 
@@ -340,6 +355,10 @@ export class WebGLRenderer {
   private readonly textTexcoordLocation: number;
   private readonly textResolutionLocation: WebGLUniformLocation;
   private readonly textAlphaLocation: WebGLUniformLocation;
+  private readonly textSourcePremultipliedLocation: WebGLUniformLocation;
+  private readonly textMixTextureLocation: WebGLUniformLocation;
+  private readonly textHasMixTextureLocation: WebGLUniformLocation;
+  private readonly textMixAmountLocation: WebGLUniformLocation;
   private readonly textTextureLocation: WebGLUniformLocation;
   private readonly textPositionBuffer: WebGLBuffer;
   private readonly textTexcoordBuffer: WebGLBuffer;
@@ -421,6 +440,10 @@ export class WebGLRenderer {
     this.textTexcoordLocation = gl.getAttribLocation(this.textProgram, "a_texcoord");
     this.textResolutionLocation = mustGetUniform(gl, this.textProgram, "u_resolution");
     this.textAlphaLocation = mustGetUniform(gl, this.textProgram, "u_alpha");
+    this.textSourcePremultipliedLocation = mustGetUniform(gl, this.textProgram, "u_sourcePremultiplied");
+    this.textMixTextureLocation = mustGetUniform(gl, this.textProgram, "u_mixTexture");
+    this.textHasMixTextureLocation = mustGetUniform(gl, this.textProgram, "u_hasMixTexture");
+    this.textMixAmountLocation = mustGetUniform(gl, this.textProgram, "u_mixAmount");
     this.textTextureLocation = mustGetUniform(gl, this.textProgram, "u_texture");
     this.textPositionBuffer = mustCreateBuffer(gl);
     this.textTexcoordBuffer = mustCreateBuffer(gl);
@@ -807,8 +830,13 @@ export class WebGLRenderer {
     const { image, x, y, width, height } = options;
     if (width <= 0 || height <= 0 || !isRenderableImage(image)) return;
 
-    const texture = this.getOrCreateImageTexture(image);
+    const sourceAlphaMode = options.sourceAlphaMode ?? "straight";
+    const texture = this.getOrCreateImageTexture(image, sourceAlphaMode);
     if (!texture) return;
+    const mixTexture =
+      options.mixImage && isRenderableImage(options.mixImage)
+        ? this.getOrCreateImageTexture(options.mixImage, "straight")
+        : null;
 
     const x2 = x + width;
     const y2 = y + height;
@@ -843,9 +871,18 @@ export class WebGLRenderer {
     gl.uniform2f(this.textResolutionLocation, this.canvas.width, this.canvas.height);
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform1f(this.textAlphaLocation, alpha);
+    gl.uniform1f(this.textSourcePremultipliedLocation, sourceAlphaMode === "premultiplied" ? 1 : 0);
+    gl.uniform1f(this.textHasMixTextureLocation, mixTexture ? 1 : 0);
+    gl.uniform1f(this.textMixAmountLocation, clamp01(options.mixAmount ?? 0));
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(this.textTextureLocation, 0);
+    if (mixTexture) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, mixTexture);
+      gl.uniform1i(this.textMixTextureLocation, 1);
+      gl.activeTexture(gl.TEXTURE0);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
@@ -1153,14 +1190,14 @@ export class WebGLRenderer {
     }
   }
 
-  private getOrCreateImageTexture(image: TexImageSource) {
+  private getOrCreateImageTexture(image: TexImageSource, sourceAlphaMode: "straight" | "premultiplied") {
     const key = image as object;
     const cached = this.imageCache.get(key);
     const texture = cached ?? this.gl.createTexture();
     if (!texture) return null;
 
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-    this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
+    this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, sourceAlphaMode === "premultiplied" ? 1 : 0);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
 
     if (!cached) {

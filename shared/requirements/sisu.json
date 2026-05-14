@@ -5,28 +5,24 @@
     {
       "id": "azure",
       "label": "Azure",
-      "color_key": "blue",
       "multiplier": 1,
       "cycle_decay": 5
     },
     {
       "id": "aether",
       "label": "Aether",
-      "color_key": "purple",
       "multiplier": 1.3,
       "cycle_decay": 4.5
     },
     {
       "id": "lucent",
       "label": "Lucent",
-      "color_key": "orange",
       "multiplier": 1.7,
       "cycle_decay": 4
     },
     {
       "id": "transcendent",
       "label": "Transcendent",
-      "color_key": "white",
       "multiplier": 3,
       "cycle_decay": 3.5
     }

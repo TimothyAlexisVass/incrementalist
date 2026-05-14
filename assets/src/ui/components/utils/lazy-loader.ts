@@ -34,7 +34,7 @@ export function drawLazyLoader(
     y: centerY - 40 + 8,
     width: 16,
     height: 16,
-    color: cssToRgba(COLORS.sisu.blue || '#1E90FF'),
+    color: cssToRgba(COLORS.sisu.azure || '#1E90FF'),
     alpha: pulse
   });
 

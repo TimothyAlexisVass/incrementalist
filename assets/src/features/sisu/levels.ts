@@ -7,7 +7,6 @@ type SharedSisuRequirements = {
   refill_tiers: {
     id: "azure" | "aether" | "lucent" | "transcendent";
     label: string;
-    color_key: "blue" | "purple" | "orange" | "white";
     multiplier: number;
     cycle_decay: number;
   }[];

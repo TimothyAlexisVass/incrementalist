@@ -74,6 +74,7 @@ export class GameClient {
   private readonly mainMenu = new MainMenu();
   private readonly interactions: Interactions;
   private sisuControlLayout: SisuControlLayout | null = null;
+  private shouldAutoOpenSisuModal = true;
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -144,6 +145,7 @@ export class GameClient {
 
       synchronize(result.server_time);
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
+      this.shouldAutoOpenSisuModal = true;
 
       if (this.store.state.snapshot) {
         // Ensure the bar projection is up to date even if the snapshot was cached
@@ -218,6 +220,7 @@ export class GameClient {
 
     if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
       this.closeAllTransientUi();
+      this.shouldAutoOpenSisuModal = true;
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
         syncHudInstantly(this.store.state.snapshot.state);
@@ -249,6 +252,7 @@ export class GameClient {
       this.applyProgressEffects(next, previousAmounts);
       if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
         this.closeAllTransientUi();
+        this.shouldAutoOpenSisuModal = true;
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
           syncHudInstantly(this.store.state.snapshot.state);
@@ -410,6 +414,7 @@ export class GameClient {
       : null;
     renderProgressBarForeground(this.canvas);
     renderSisuGlassBallOverlay(this.canvas, this.store.state);
+    this.openSisuModalByDefault();
 
     if (this.store.state.snapshot && !this.store.state.snapshot.state.features.idle_mode_purchased) {
       notices.reportLeafVisible(
@@ -546,6 +551,22 @@ export class GameClient {
     }
 
     return true;
+  }
+
+  private openSisuModalByDefault() {
+    if (!this.shouldAutoOpenSisuModal || !this.channel || this.ui.modals.isOpen()) return;
+    const snapshot = this.store.state.snapshot;
+    if (!snapshot?.state.features.sisu_generator_purchased) return;
+
+    this.ui.modals.open(
+      createSisuGeneratorModal(
+        () => this.store.state,
+        this.channel,
+        (cmd) => this.runCommand(cmd),
+        () => this.ui.modals.close()
+      )
+    );
+    this.shouldAutoOpenSisuModal = false;
   }
 }
 

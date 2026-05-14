@@ -7,14 +7,12 @@ defmodule Incrementalist.Game.Features.Progress.Sisu.Levels do
   @refill_tiers Enum.map(@sisu["refill_tiers"], fn %{
                     "id" => id,
                     "label" => label,
-                    "color_key" => color_key,
                     "multiplier" => multiplier,
                     "cycle_decay" => cycle_decay
                   } ->
                     %{
                       id: id,
                       label: label,
-                      color_key: color_key,
                       multiplier: multiplier,
                       cycle_decay: cycle_decay
                     }
