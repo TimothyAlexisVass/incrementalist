@@ -306,6 +306,11 @@ const WEBGL_EFFECTS: {
   bubbleUniforms: UniformLocations<"resolution"> | null;
   glowUniforms: UniformLocations<"resolution" | "rect" | "color" | "intensity" | "radius"> | null;
   laserRectUniforms: UniformLocations<"resolution"> | null;
+  mainGl: WebGLRenderingContext | null;
+  mainProgram: WebGLProgram | null;
+  mainBuffer: WebGLBuffer | null;
+  mainAttributes: AttributeLocations<"position" | "size" | "color"> | null;
+  mainUniforms: UniformLocations<"resolution"> | null;
   ready: boolean;
 } = {
   canvas: null,
@@ -336,8 +341,32 @@ const WEBGL_EFFECTS: {
   bubbleUniforms: null,
   glowUniforms: null,
   laserRectUniforms: null,
+  mainGl: null,
+  mainProgram: null,
+  mainBuffer: null,
+  mainAttributes: null,
+  mainUniforms: null,
   ready: false
 };
+
+export function initMainCanvasParticles(gl: WebGLRenderingContext) {
+  const program = createProgram(gl, VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+  if (!program) return false;
+
+  WEBGL_EFFECTS.mainGl = gl;
+  WEBGL_EFFECTS.mainProgram = program;
+  WEBGL_EFFECTS.mainBuffer = gl.createBuffer();
+  WEBGL_EFFECTS.mainAttributes = {
+    position: gl.getAttribLocation(program, 'a_position'),
+    size: gl.getAttribLocation(program, 'a_size'),
+    color: gl.getAttribLocation(program, 'a_color')
+  };
+  WEBGL_EFFECTS.mainUniforms = {
+    resolution: gl.getUniformLocation(program, 'u_resolution')
+  };
+
+  return true;
+}
 
 export function initWebGLEffectsLayer(canvas: HTMLCanvasElement | null, width: number, height: number) {
   if (!canvas) {
@@ -530,6 +559,17 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
     return;
   }
 
+  const useMain = !!WEBGL_EFFECTS.mainGl;
+  const pGl = WEBGL_EFFECTS.mainGl || gl;
+  const pProgram = useMain ? WEBGL_EFFECTS.mainProgram : WEBGL_EFFECTS.program;
+  const pBuffer = useMain ? WEBGL_EFFECTS.mainBuffer : WEBGL_EFFECTS.buffer;
+  const pUniforms = useMain ? WEBGL_EFFECTS.mainUniforms : WEBGL_EFFECTS.uniforms;
+  const pAttributes = useMain ? WEBGL_EFFECTS.mainAttributes : WEBGL_EFFECTS.attributes;
+
+  if (!pGl || !pProgram || !pBuffer || !pUniforms || !pAttributes) {
+    return;
+  }
+
   const drawCount = Math.min(particles.length, MAX_GPU_PARTICLES);
   const data = WEBGL_EFFECTS.data;
   let offset = 0;
@@ -550,17 +590,27 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
     offset += PARTICLE_FLOATS;
   }
 
-  gl.useProgram(WEBGL_EFFECTS.program);
-  gl.bindBuffer(gl.ARRAY_BUFFER, WEBGL_EFFECTS.buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, drawCount * PARTICLE_FLOATS), gl.DYNAMIC_DRAW);
+  if (useMain) {
+    pGl.enable(pGl.BLEND);
+    pGl.blendFuncSeparate(pGl.SRC_ALPHA, pGl.ONE, pGl.ONE, pGl.ONE_MINUS_SRC_ALPHA);
+  }
 
-  bindParticleAttributes(gl);
-  gl.uniform2f(
-    uniforms.resolution,
-    renderCanvas.width,
-    renderCanvas.height
+  pGl.useProgram(pProgram);
+  pGl.bindBuffer(pGl.ARRAY_BUFFER, pBuffer);
+  pGl.bufferData(pGl.ARRAY_BUFFER, data.subarray(0, drawCount * PARTICLE_FLOATS), pGl.DYNAMIC_DRAW);
+
+  bindParticleAttributes(pGl, pAttributes);
+  pGl.uniform2f(
+    pUniforms.resolution,
+    pGl.canvas.width,
+    pGl.canvas.height
   );
-  gl.drawArrays(gl.POINTS, 0, drawCount);
+  pGl.drawArrays(pGl.POINTS, 0, drawCount);
+
+  if (useMain) {
+    // Restore default blend mode for main renderer
+    pGl.blendFunc(pGl.ONE, pGl.ONE_MINUS_SRC_ALPHA);
+  }
 }
 
 export interface LiquidBubbleOptions {
@@ -1105,9 +1155,8 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string) {
   return shader;
 }
 
-function bindParticleAttributes(gl: WebGLRenderingContext) {
+function bindParticleAttributes(gl: WebGLRenderingContext, attributes: AttributeLocations<"position" | "size" | "color"> | null) {
   const stride = PARTICLE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
-  const attributes = WEBGL_EFFECTS.attributes;
   if (!attributes) return;
 
   gl.enableVertexAttribArray(attributes.position);

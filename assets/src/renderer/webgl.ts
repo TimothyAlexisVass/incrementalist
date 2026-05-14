@@ -409,6 +409,10 @@ export class WebGLRenderer {
   private readonly imageCache = new WeakMap<object, WebGLTexture>();
   private frameCounter = 0;
   private _globalAlpha = 1.0;
+  
+  public get glContext(): WebGLRenderingContext {
+    return this.gl;
+  }
 
   constructor(options: WebGLRendererOptions) {
     this.canvas = options.canvas;
