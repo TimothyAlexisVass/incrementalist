@@ -2,6 +2,9 @@ import { sisuRefill, sisuUpgradeMax } from "../../net/commands";
 import type { GameChannel } from "../../net/game-channel";
 import type { ServerResult } from "../../net/protocol";
 import { pointInRect, type InteractionState } from "../../ui/managers/interactions";
+import { COLORS } from "../../colors";
+import { getProgressBarLayout } from "../progress-bar/render";
+import { spawnGpuSisuParticleBurst } from "../../render/webgl-effects";
 
 import type { Rect, TierId } from "./view-model";
 
@@ -12,6 +15,7 @@ export type SisuRefillHitRect = {
 };
 
 export function handleSisuModalInteractions(
+  canvas: HTMLCanvasElement,
   input: InteractionState,
   modalRect: Rect | null,
   upgradeRect: Rect | null,
@@ -34,6 +38,18 @@ export function handleSisuModalInteractions(
 
   for (const refillRect of refillRects) {
     if (refillRect.enabled && consumeClick(input, refillRect.rect)) {
+      const progressBar = getProgressBarLayout(canvas);
+      const targetX = progressBar.x + progressBar.width / 2;
+      const targetY = progressBar.y + progressBar.height + 120;
+      
+      spawnGpuSisuParticleBurst(
+        refillRect.rect.x + refillRect.rect.width / 2,
+        refillRect.rect.y + refillRect.rect.height / 2,
+        targetX,
+        targetY,
+        COLORS.sisu[refillRect.tier]
+      );
+
       void runCommand(() => sisuRefill(channel, refillRect.tier));
       return;
     }

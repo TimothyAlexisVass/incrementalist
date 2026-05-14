@@ -282,6 +282,7 @@ class SisuGeneratorModalImpl implements Modal {
     }
 
     handleSisuModalInteractions(
+      canvas,
       input,
       this.modalRect,
       this.upgradeRect,

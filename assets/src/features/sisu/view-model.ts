@@ -44,7 +44,8 @@ export const SISU_REFILL_TIERS: readonly SisuRefillTier[] = Object.values(SISU_R
 const SISU_VISUAL_STATE = {
   displayCurrent: SISU_MIN_MULTIPLIER,
   initialized: false,
-  lastTimestampMs: 0
+  lastTimestampMs: 0,
+  displayedTier: null as TierId | null
 };
 
 export function getSisuControlRect(canvas: HTMLCanvasElement): Rect {
@@ -127,6 +128,17 @@ export function updateSisuVisualProjection(snapshot: NonNullable<ServerState["sn
   return {
     displayCurrent: SISU_VISUAL_STATE.displayCurrent
   };
+}
+
+export function syncSisuVisualTier(tierId: TierId) {
+  SISU_VISUAL_STATE.displayedTier = tierId;
+}
+
+export function getSisuVisualTier(snapshot: any): TierId {
+  if (!SISU_VISUAL_STATE.displayedTier) {
+    SISU_VISUAL_STATE.displayedTier = snapshot.state.sisu.active_tier || "azure";
+  }
+  return SISU_VISUAL_STATE.displayedTier as TierId;
 }
 
 function getNowMs() {

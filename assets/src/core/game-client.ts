@@ -453,12 +453,6 @@ export class GameClient {
 
     updateFloatingTexts(this.floatingTexts, dt);
 
-    // Update and render reward collection effects.
-    updateWebGLEffects(dt);
-    renderWebGLEffects();
-
-    renderFloatingTexts(this.floatingTexts);
-
     // 2. Handle specific UI element clicks before general activity collection.
     if (!uiBlocked && input.clicked && input.pointer && this.channel) {
       if (handleProgressClick(
@@ -509,6 +503,14 @@ export class GameClient {
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);
     this.ui.render(this.canvas, input, this.store.state);
+
+    // Update and render reward collection effects (including Sisu particles and click bursts)
+    // These are rendered AFTER the UI to appear on top of modals.
+    updateWebGLEffects(dt);
+    renderWebGLEffects();
+
+    renderFloatingTexts(this.floatingTexts);
+
     if (isMainMenuOpen) {
       renderAreaDropdownAboveMenu(this.canvas, input, (areaKey) => {
         if (this.channel) {

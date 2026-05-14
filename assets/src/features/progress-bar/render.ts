@@ -20,9 +20,11 @@ import {
   updateGpuProgressLiquidBubbles,
   spawnGpuProgressCollectionLaserBurst,
   spawnGpuProgressCompletionBurst,
+  releaseSisuParticles,
   ColorInput
 } from '../../render/webgl-effects';
 import { getViewModel } from './view-model';
+import { syncSisuVisualTier } from '../sisu/view-model';
 import { InteractionState } from '../../ui/managers/interactions';
 import { getServerNow } from '../../core/time';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
@@ -69,7 +71,7 @@ const COLLECTION_LASER_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillStart
 ]);
 const PROGRESS_TOOLTIP_TEXT_KEY = "progress.bar.hover";
-export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | null = null) {
+export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | null = null, sisuTier: string | null = null) {
   PROGRESS_VISUAL_STATE.displayedFillRatio = 1;
   PROGRESS_VISUAL_STATE.collectionGlowStartedAt = getNowMs();
 
@@ -95,6 +97,12 @@ export function triggerProgressBarCollectionEffect(canvas: HTMLCanvasElement | n
     palette.fillStart,
     palette.fillEnd
   );
+
+  releaseSisuParticles();
+  
+  if (sisuTier) {
+    syncSisuVisualTier(sisuTier as any);
+  }
 }
 
 let progressBarBackgroundImage: HTMLImageElement | null = null;

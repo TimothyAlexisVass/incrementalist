@@ -11,6 +11,7 @@ import { drawLockedElement } from "../../ui/components/locked-element";
 import { clampNumber } from "../../utils";
 import { formatUnlockRequirement, getShopItemRequiredLevel } from "../requirements";
 import { getProgressBarLayout } from "../progress-bar/render";
+import { updateGpuSisuTarget } from "../../render/webgl-effects";
 import { getActiveWebGLRenderer, WebGLRenderer } from "../../renderer/webgl";
 import { hexToRgba } from "../../utils/color";
 import { queueTooltip } from "../../ui/components/tooltip";
@@ -18,6 +19,7 @@ import { renderSisuCrystal, type SisuCrystalTier } from "./crystal";
 import {
   getSisuControlRect,
   getSisuTierTarget,
+  getSisuVisualTier,
   SISU_BASE_MAX,
   SISU_MIN_MULTIPLIER,
   toFiniteBigNumNumber,
@@ -56,6 +58,7 @@ export function renderSisuControl(
   const barRadius = SISU_METER_RADIUS;
 
   const drawNative = () => {
+    updateGpuSisuTarget(centerX, centerY);
     drawSisuControlNative(renderer, input, controlRect, snapshot, centerX, centerY, barRadius, displayCurrent, blocked);
   };
 
@@ -186,7 +189,7 @@ function drawSisuControlNative(
   };
 
   const showSisuHoverInfo = Boolean(snapshot.state.features.sisu_generator_purchased);
-  const activeTier = snapshot.state.sisu.active_tier;
+  const activeTier = getSisuVisualTier(snapshot);
   const crystalTier: SisuCrystalTier =
     activeTier === "aether" ||
       activeTier === "lucent" ||

@@ -40,8 +40,9 @@ export function claimRewardOnAnyInput(
 ) {
   if (!tryClaimReward(channel)) return;
 
+  const vm = getViewModel();
   pendingClaimPopupPoint = clickPoint;
-  triggerProgressBarCollectionEffect(canvas);
+  triggerProgressBarCollectionEffect(canvas, vm.activeTier);
   beginAsyncClaimResolution();
   void resolveClaimAsync(channel, runCommand);
 }
@@ -59,7 +60,7 @@ export function claimRewardInIdleMode(
     x: layout.x + layout.width / 2,
     y: layout.y + layout.height / 2
   };
-  triggerProgressBarCollectionEffect(canvas);
+  triggerProgressBarCollectionEffect(canvas, vm.activeTier);
   beginAsyncClaimResolution();
   void resolveClaimAsync(channel, runCommand);
 }

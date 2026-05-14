@@ -30,6 +30,7 @@ export type ProgressViewModel = {
   idleModeRequiredLevel: number;
   snapshotAtMs: number;
   snapshotFill: number;
+  activeTier: string;
 };
 
 let currentViewModel: ProgressViewModel = {
@@ -51,7 +52,8 @@ let currentViewModel: ProgressViewModel = {
   idleModePurchased: false,
   idleModeRequiredLevel: SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode,
   snapshotAtMs: 0,
-  snapshotFill: 0
+  snapshotFill: 0,
+  activeTier: "azure"
 };
 
 const IDLE_MODE_BUFFER = 3000;
@@ -139,6 +141,7 @@ export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.idleModeRequiredLevel = getShopItemRequiredLevel(snapshot.state.shop, "idle_mode");
   currentViewModel.snapshotAtMs = getServerNow();
   currentViewModel.snapshotFill = snapshot.state.projection_params.current_fill;
+  currentViewModel.activeTier = snapshot.state.sisu?.active_tier || "azure";
 }
 
 export function handleClaimInResult(result: ProgressClaimInResult) {
@@ -269,6 +272,7 @@ export function applyProgressResult(
 
   if (result.type === "sisu.refill.result" || result.type === "sisu.upgrade_max.result") {
     currentViewModel.sisu = result.sisu.current;
+    currentViewModel.activeTier = result.sisu.active_tier || currentViewModel.activeTier;
     applyProjectionData(result);
     currentViewModel.state = "projecting";
     return;

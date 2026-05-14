@@ -15,6 +15,9 @@ type ParticleOptions = {
   fadePower?: number;
   gravity?: number;
   lifeMs: number;
+  targetX?: number;
+  targetY?: number;
+  sisuState?: 'bursting' | 'homing' | 'orbiting';
 };
 type LaserRectOptions = {
   originX: number;
@@ -49,6 +52,12 @@ type GpuParticle = {
   gravity: number;
   elapsedMs: number;
   lifeMs: number;
+  targetX?: number;
+  targetY?: number;
+  orbitRadius?: number;
+  orbitAngle?: number;
+  orbitSpeed?: number;
+  sisuState?: 'bursting' | 'homing' | 'orbiting';
 };
 type GpuLaserRect = {
   originX: number;
@@ -299,6 +308,8 @@ const WEBGL_EFFECTS: {
     intensity: number;
     color: Rgb;
   } | null;
+  sisuTargetX: number;
+  sisuTargetY: number;
   data: Float32Array;
   bubbleData: Float32Array;
   glowData: Float32Array;
@@ -340,6 +351,8 @@ const WEBGL_EFFECTS: {
   bubbleUniforms: null,
   glowUniforms: null,
   laserRectUniforms: null,
+  sisuTargetX: 0,
+  sisuTargetY: 0,
   ready: false
 };
 
@@ -439,10 +452,47 @@ export function updateWebGLEffects(deltaTime: number) {
     }
 
     const drag = Math.pow(particle.drag, deltaTime / 16.67);
-    particle.vx *= drag;
-    particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
-    particle.x += particle.vx * deltaSeconds;
-    particle.y += particle.vy * deltaSeconds;
+
+    if (particle.sisuState === 'bursting') {
+      particle.vx *= drag;
+      particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
+      particle.x += particle.vx * deltaSeconds;
+      particle.y += particle.vy * deltaSeconds;
+      if (particle.elapsedMs > 500) {
+        particle.sisuState = 'homing';
+      }
+    } else if (particle.sisuState === 'homing') {
+      const tx = WEBGL_EFFECTS.sisuTargetX || particle.targetX || particle.x;
+      const ty = WEBGL_EFFECTS.sisuTargetY || particle.targetY || particle.y;
+      const dx = tx - particle.x;
+      const dy = ty - particle.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < 100) {
+        particle.sisuState = 'orbiting';
+        particle.orbitRadius = 15 + Math.random() * 25;
+        particle.orbitAngle = Math.random() * TWO_PI;
+        particle.orbitSpeed = (1.5 + Math.random() * 2.5) * (Math.random() > 0.5 ? 1 : -1);
+      } else {
+        const dist = Math.sqrt(distSq);
+        const speed = 400;
+        particle.vx = (dx / dist) * speed;
+        particle.vy = (dy / dist) * speed;
+        particle.x += particle.vx * deltaSeconds;
+        particle.y += particle.vy * deltaSeconds;
+      }
+    } else if (particle.sisuState === 'orbiting') {
+      const tx = WEBGL_EFFECTS.sisuTargetX || particle.targetX || particle.x;
+      const ty = WEBGL_EFFECTS.sisuTargetY || particle.targetY || particle.y;
+      particle.orbitAngle = (particle.orbitAngle ?? 0) + (particle.orbitSpeed ?? 0) * deltaSeconds;
+      const radius = particle.orbitRadius ?? 20;
+      particle.x = tx + Math.cos(particle.orbitAngle) * radius;
+      particle.y = ty + Math.sin(particle.orbitAngle) * radius;
+    } else {
+      particle.vx *= drag;
+      particle.vy = particle.vy * drag + (particle.gravity || 0) * deltaSeconds;
+      particle.x += particle.vx * deltaSeconds;
+      particle.y += particle.vy * deltaSeconds;
+    }
 
     particles[writeIndex] = particle;
     writeIndex += 1;
@@ -805,6 +855,61 @@ export function spawnGpuProgressCollectionLaserBurst(
 
   trimGpuLaserBursts();
   return true;
+}
+
+export function updateGpuSisuTarget(x: number, y: number) {
+  WEBGL_EFFECTS.sisuTargetX = x;
+  WEBGL_EFFECTS.sisuTargetY = y;
+}
+
+export function spawnGpuSisuParticleBurst(
+  originX: number,
+  originY: number,
+  targetX: number,
+  targetY: number,
+  color: ColorInput
+) {
+  if (!WEBGL_EFFECTS.ready) return false;
+
+  const count = 16 + Math.floor(Math.random() * 8);
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * TWO_PI;
+    const speed = 60 + Math.random() * 120;
+    pushGpuParticle({
+      x: originX,
+      y: originY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      drag: 0.94 + Math.random() * 0.02,
+      size: 14 + Math.random() * 12,
+      color,
+      alpha: 1,
+      lifeMs: 120000, // Very long life to stay orbiting
+      targetX,
+      targetY,
+      sisuState: 'bursting'
+    });
+  }
+
+  trimGpuParticles();
+  return true;
+}
+
+export function releaseSisuParticles() {
+  const particles = WEBGL_EFFECTS.particles;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (p.sisuState) {
+      const angle = Math.random() * TWO_PI;
+      const speed = 120 + Math.random() * 180;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed;
+      p.sisuState = undefined;
+      p.elapsedMs = 0;
+      p.lifeMs = 600 + Math.random() * 600;
+      p.drag = 0.92 + Math.random() * 0.03;
+    }
+  }
 }
 
 function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, canvasHeight: number) {
@@ -1186,7 +1291,10 @@ function pushGpuParticle(options: ParticleOptions) {
     fadePower: options.fadePower ?? 1,
     gravity: Math.max(0, Number(options.gravity) || 0),
     elapsedMs: 0,
-    lifeMs: options.lifeMs
+    lifeMs: options.lifeMs,
+    targetX: options.targetX,
+    targetY: options.targetY,
+    sisuState: options.sisuState
   });
 }
 
