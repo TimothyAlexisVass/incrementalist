@@ -28,17 +28,17 @@ export type ResourceAmounts = {
 
 type RewardEntry = {
   text: string;
+  color: string;
+  targetKey: "exp" | "coins" | "shards" | "cores" | "sisu";
   font: string;
   offsetX: number;
   offsetY: number;
 };
 
-const POPUP_OFFSET = Object.freeze({
-  exp: { x: -55, y: -20 },
-  coins: { x: 55, y: -20 },
-  shards: { x: -55, y: 12 },
-  cores: { x: 55, y: 12 },
-  sisu: { x: 0, y: 44 }
+const POPUP_LAYOUT = Object.freeze({
+  topRowY: -20,
+  rowGap: 32,
+  columnGap: 110
 });
 
 export function spawnProgressClaimRewardEffects(
@@ -59,17 +59,17 @@ export function spawnProgressClaimRewardEffects(
   const shardText = formatSignedNumber(shardGain);
   const coreText = formatSignedNumber(coreGain);
 
-  const rewardGroupEntries: RewardEntry[] = [
-    { text: expText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.exp.x, offsetY: POPUP_OFFSET.exp.y },
-    { text: coinText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.coins.x, offsetY: POPUP_OFFSET.coins.y }
+  const rewardItems: Omit<RewardEntry, "font" | "offsetX" | "offsetY">[] = [
+    { text: expText, color: COLORS.rewards.expGain, targetKey: "exp" },
+    { text: coinText, color: COLORS.rewards.coins, targetKey: "coins" }
   ];
 
   if (compare(shardGain, ZERO) > 0) {
-    rewardGroupEntries.push({ text: shardText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.shards.x, offsetY: POPUP_OFFSET.shards.y });
+    rewardItems.push({ text: shardText, color: COLORS.rewards.shards, targetKey: "shards" });
   }
 
   if (compare(coreGain, ZERO) > 0) {
-    rewardGroupEntries.push({ text: coreText, font: REWARD_POPUP_FONT, offsetX: POPUP_OFFSET.cores.x, offsetY: POPUP_OFFSET.cores.y });
+    rewardItems.push({ text: coreText, color: COLORS.rewards.cores, targetKey: "cores" });
   }
 
   // Check for Sisu crystal gains
@@ -88,13 +88,10 @@ export function spawnProgressClaimRewardEffects(
   }
 
   for (let i = 0; i < gainedCrystals.length; i++) {
-    rewardGroupEntries.push({
-      text: gainedCrystals[i].text,
-      font: REWARD_POPUP_FONT,
-      offsetX: POPUP_OFFSET.sisu.x,
-      offsetY: POPUP_OFFSET.sisu.y + (i * 24)
-    });
+    rewardItems.push({ text: gainedCrystals[i].text, color: gainedCrystals[i].color, targetKey: "sisu" });
   }
+
+  const rewardGroupEntries = buildRewardPopupEntries(rewardItems);
 
   const barLayout = getProgressBarLayout(canvas);
   const rawAnchor = anchorPoint ?? {
@@ -109,61 +106,67 @@ export function spawnProgressClaimRewardEffects(
     spawnLevelUpEffects(floatingTexts, canvas, levelUps);
   }
 
-  spawnRewardPopup(
-    floatingTexts,
-    canvas,
-    expText,
-    anchor.x + POPUP_OFFSET.exp.x,
-    anchor.y + POPUP_OFFSET.exp.y,
-    COLORS.rewards.expGain,
-    "exp"
-  );
-  spawnRewardPopup(
-    floatingTexts,
-    canvas,
-    coinText,
-    anchor.x + POPUP_OFFSET.coins.x,
-    anchor.y + POPUP_OFFSET.coins.y,
-    COLORS.rewards.coins,
-    "coins"
-  );
-
-  if (compare(shardGain, ZERO) > 0) {
+  for (const entry of rewardGroupEntries) {
     spawnRewardPopup(
       floatingTexts,
       canvas,
-      shardText,
-      anchor.x + POPUP_OFFSET.shards.x,
-      anchor.y + POPUP_OFFSET.shards.y,
-      COLORS.rewards.shards,
-      "shards"
+      entry.text,
+      anchor.x + entry.offsetX,
+      anchor.y + entry.offsetY,
+      entry.color,
+      entry.targetKey
     );
+  }
+}
+
+function buildRewardPopupEntries(rewardItems: Omit<RewardEntry, "font" | "offsetX" | "offsetY">[]): RewardEntry[] {
+  const rowSizes = getRewardPopupRowSizes(rewardItems.length);
+  const entries: RewardEntry[] = [];
+  let rewardIndex = 0;
+
+  for (let rowIndex = 0; rowIndex < rowSizes.length; rowIndex += 1) {
+    const rowSize = rowSizes[rowIndex];
+    const offsetY = POPUP_LAYOUT.topRowY + (rowIndex * POPUP_LAYOUT.rowGap);
+
+    for (let columnIndex = 0; columnIndex < rowSize; columnIndex += 1) {
+      const reward = rewardItems[rewardIndex];
+      if (!reward) break;
+
+      entries.push({
+        ...reward,
+        font: REWARD_POPUP_FONT,
+        offsetX: (columnIndex - ((rowSize - 1) / 2)) * POPUP_LAYOUT.columnGap,
+        offsetY
+      });
+
+      rewardIndex += 1;
+    }
   }
 
-  if (compare(coreGain, ZERO) > 0) {
-    spawnRewardPopup(
-      floatingTexts,
-      canvas,
-      coreText,
-      anchor.x + POPUP_OFFSET.cores.x,
-      anchor.y + POPUP_OFFSET.cores.y,
-      COLORS.rewards.cores,
-      "cores"
-    );
+  return entries;
+}
+
+function getRewardPopupRowSizes(rewardCount: number): number[] {
+  if (rewardCount <= 0) return [];
+
+  const rowCount = getRewardPopupRowCount(rewardCount);
+  const baseRowSize = Math.floor(rewardCount / rowCount);
+  const remainder = rewardCount % rowCount;
+  const rowSizes: number[] = [];
+
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    rowSizes.push(baseRowSize + (rowIndex < remainder ? 1 : 0));
   }
 
-  // Spawn Sisu crystal popups
-  for (let i = 0; i < gainedCrystals.length; i++) {
-    spawnRewardPopup(
-      floatingTexts,
-      canvas,
-      gainedCrystals[i].text,
-      anchor.x + POPUP_OFFSET.sisu.x,
-      anchor.y + POPUP_OFFSET.sisu.y + (i * 24),
-      gainedCrystals[i].color,
-      "sisu"
-    );
-  }
+  return rowSizes;
+}
+
+function getRewardPopupRowCount(rewardCount: number) {
+  if (rewardCount <= 2) return 1;
+  if (rewardCount <= 6) return 2;
+  if (rewardCount <= 9) return 3;
+  if (rewardCount <= 16) return 4;
+  return Math.ceil(rewardCount / 4);
 }
 
 function calculateClaimExpGain(
