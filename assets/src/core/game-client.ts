@@ -385,9 +385,10 @@ export class GameClient {
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
 
-    const modalOpen = this.ui.modals.isOpen();
+    const activeModal = this.ui.modals.getActiveModal();
+    const modalBlocking = activeModal?.isBlocking ?? (activeModal !== null);
     const overlayOpen = this.ui.overlays.isOpen();
-    const uiBlocked = modalOpen || overlayOpen;
+    const uiBlocked = modalBlocking || overlayOpen;
 
     if (input.clicked && input.pointer) {
       spawnGpuClickBurst(input.pointer.x, input.pointer.y);

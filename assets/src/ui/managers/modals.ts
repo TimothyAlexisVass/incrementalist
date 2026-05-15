@@ -5,6 +5,7 @@ import { getActiveWebGLRenderer } from '../../renderer/webgl';
 export interface Modal {
   render(canvas: HTMLCanvasElement, input: InteractionState): void;
   tick(dt: number, input: InteractionState): void;
+  isBlocking: boolean;
   backdropAlpha?: number;
   closeOnMenuButton?: boolean;
 }
@@ -33,12 +34,14 @@ export class Modals {
 
     const renderer = getActiveWebGLRenderer();
 
+    const alpha = this.activeModal.isBlocking ? 0.4 : 0;
+
     renderer.drawRect({
       x: 0,
       y: 0,
       width: canvas.width,
       height: canvas.height,
-      color: cssToRgba(COLORS.overlay.backdrop, this.activeModal.backdropAlpha)
+      color: cssToRgba(COLORS.overlay.backdrop, alpha)
     });
 
     this.activeModal.render(canvas, input);

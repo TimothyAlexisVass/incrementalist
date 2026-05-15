@@ -6,6 +6,7 @@ import { drawButton, doButton } from '../button';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 export class ResetConfirmationModal implements Modal {
+  public readonly isBlocking = true;
   private holdTime = 0;
   private readonly requiredHoldTime = 3000;
   private okRect: { x: number; y: number; width: number; height: number } | null = null;
@@ -120,6 +121,7 @@ export class ResetConfirmationModal implements Modal {
 }
 
 export class LoadingModal implements Modal {
+    public readonly isBlocking = true;
     private angle = 0;
 
     constructor(private message: string = 'Loading authoritative state...') {}

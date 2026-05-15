@@ -149,7 +149,7 @@ class SisuGeneratorModalImpl implements Modal {
   };
   private modalRect: Rect | null = null;
   private upgradeRect: Rect | null = null;
-  public readonly backdropAlpha = 0;
+  public readonly isBlocking = false;
   public readonly closeOnMenuButton = true;
 
   constructor(
@@ -191,12 +191,11 @@ class SisuGeneratorModalImpl implements Modal {
       drawRectOutline(renderer, this.modalRect, 2, hexToRgba(COLORS.overlay.panelBorder));
     }
 
-    const { displayCurrent } = updateSisuVisualProjection(snapshot);
     const authoritativeSisu = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(snapshot.state.sisu.current, SISU_MIN_MULTIPLIER));
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
     const chargeCrystals = snapshot.state.charge_crystals;
     const sisuAtClaim = toFiniteBigNumNumber(snapshot.state.projection_params.sisu_at_claim, authoritativeSisu);
-    const isPending = sisuAtClaim >= authoritativeSisu;
+    const isPending = sisuAtClaim > authoritativeSisu;
 
     this.refillRects.length = 0;
     for (const tierId of SISU_TIER_IDS) {

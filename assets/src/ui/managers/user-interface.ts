@@ -16,13 +16,20 @@ export class UserInterface {
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState) {
     getActiveWebGLRenderer();
 
-    // Render order: Overlays first, Modals on top. 
-    // Modals block input to lower layers.
+    const modal = this.modals.getActiveModal();
+    const isBlocking = modal?.isBlocking ?? false;
+
+    // Render overlays first (behind modals).
+    // If a blocking modal is open, we pass a "swallowed" input to overlays 
+    // so they stay visible but don't respond to clicks.
+    const overlayInput = isBlocking ? { ...input, clicked: false, isPressed: false, consumed: true } : input;
+    this.overlays.render(canvas, overlayInput, state);
+
     if (this.modals.isOpen()) {
       this.modals.render(canvas, input);
-      input.consumed = true;
-    } else {
-      this.overlays.render(canvas, input, state);
+      if (isBlocking) {
+        input.consumed = true;
+      }
     }
   }
 
