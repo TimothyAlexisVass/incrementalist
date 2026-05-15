@@ -8,14 +8,17 @@ defmodule Incrementalist.Game.Constants do
   @sage_tip_levels_path Path.join(@requirements_dir, "sage-tip-levels.json")
   @shop_items_path Path.join(@requirements_dir, "shop-items.json")
   @quests_path Path.join(@requirements_dir, "quests.json")
+  @achievements_path Path.join(@requirements_dir, "achievements.json")
   @external_resource @areas_path
   @external_resource @sage_tip_levels_path
   @external_resource @shop_items_path
   @external_resource @quests_path
+  @external_resource @achievements_path
   @areas @areas_path |> File.read!() |> Jason.decode!()
   @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
   @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
+  @achievements @achievements_path |> File.read!() |> Jason.decode!()
 
   def max_save_slots, do: 4
   def valid_slot_indexes, do: 0..(max_save_slots() - 1)
@@ -37,6 +40,10 @@ defmodule Incrementalist.Game.Constants do
     end
   end
 
+  def achievement_defs do
+    Enum.map(@achievements, &normalize_achievement/1)
+  end
+
   # Progress Bar Constants
   def progress_bar_max_fill, do: 100.0
   def progress_bar_new_player_bonus_fill_multiplier, do: 2.5
@@ -47,10 +54,10 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
 
-  def charge_crystal_azure_claim_interval, do: 8
-  def charge_crystal_aether_claim_interval, do: 50
-  def charge_crystal_lucent_level_interval, do: 30
-  def charge_crystal_transcendent_level_interval, do: 200
+  def charge_crystal_azure_claim_interval, do: 4
+  def charge_crystal_aether_claim_interval, do: 20
+  def charge_crystal_lucent_level_interval, do: 10
+  def charge_crystal_transcendent_level_interval, do: 100
 
   # Notice IDs
   def notice_parent_menu_main, do: "parent.menu.main"
@@ -113,5 +120,14 @@ defmodule Incrementalist.Game.Constants do
 
   defp normalize_quest_requirement(id, value) when id in ["coins", "shards", "cores"], do: BigNum.from_number(value)
   defp normalize_quest_requirement(_id, value), do: value
+
+  defp normalize_achievement(%{"id" => id, "name" => name, "stars" => stars, "condition" => condition}) do
+    %{
+      id: id,
+      name: name,
+      stars: stars,
+      condition: condition
+    }
+  end
 
 end

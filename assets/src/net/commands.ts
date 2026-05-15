@@ -12,6 +12,7 @@ import type {
   SisuUpgradeMaxResult,
   AreaSelectResult,
   ShopPurchaseResult,
+  StatsUpdateResult,
   NoticeEventResult,
   NoticeEventKind
 } from "./protocol";
@@ -66,6 +67,16 @@ export function noticeEvent(channel: GameChannel, event: NoticeEventKind, leafId
     event,
     leaf_id: leafId
   });
+}
+
+export function markViewed(channel: GameChannel, screenId: string) {
+  return channel.pushCommand<CommandPushResult<StatsUpdateResult | CommandErrorResult>>("stats.mark_viewed", {
+    screen_id: screenId
+  });
+}
+
+export function graduateTutorial(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<StatsUpdateResult | CommandErrorResult>>("stats.graduate_tutorial");
 }
 
 export async function ackAppliedResult(

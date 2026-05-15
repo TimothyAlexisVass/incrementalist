@@ -8,6 +8,7 @@ import type {
   NoticeEventResult,
   SisuState,
   QuestState,
+  AchievementState,
   StatsState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
@@ -82,7 +83,8 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     result.type === "shop.purchase.result" ||
     result.type === "sisu.refill.result" ||
     result.type === "sisu.upgrade_max.result" ||
-    result.type === "quest.claim.result"
+    result.type === "quest.claim.result" ||
+    result.type === "stats.update.result"
   ) {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result);
@@ -116,6 +118,7 @@ export function applyAuthoritativeData(
     item_id?: string;
     sisu?: SisuState;
     quests?: Record<string, QuestState>;
+    achievements?: Record<string, AchievementState>;
     stats?: StatsState;
     [key: string]: any;
   }
@@ -145,6 +148,7 @@ export function applyAuthoritativeData(
   if (data.charge_crystals !== undefined) state.snapshot.state.charge_crystals = data.charge_crystals;
   if (data.sisu !== undefined) state.snapshot.state.sisu = data.sisu;
   if (data.quests !== undefined) state.snapshot.state.quests = data.quests;
+  if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
 
   if (data.item_id !== undefined) {

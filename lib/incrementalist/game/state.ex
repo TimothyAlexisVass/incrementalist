@@ -144,6 +144,10 @@ defmodule Incrementalist.Game.State do
       field :total_progress_claims, :integer, default: 0
       field :total_days_played, :integer, default: 0
       field :total_level_ups_daily, :integer, default: 0
+      field :screens_viewed_stats, :boolean, default: false
+      field :screens_viewed_quests, :boolean, default: false
+      field :screens_viewed_achievements, :boolean, default: false
+      field :tutorial_graduated, :boolean, default: false
       field :last_reset_at, :string
 
       # Currencies are BigNum
@@ -159,6 +163,10 @@ defmodule Incrementalist.Game.State do
         :total_progress_claims,
         :total_days_played,
         :total_level_ups_daily,
+        :screens_viewed_stats,
+        :screens_viewed_quests,
+        :screens_viewed_achievements,
+        :tutorial_graduated,
         :last_reset_at
       ])
       |> cast_embed(:total_coins_earned)
@@ -194,6 +202,7 @@ defmodule Incrementalist.Game.State do
 
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
+    field :achievements, :map, default: %{}
   end
 
   # State schema follows
@@ -211,7 +220,8 @@ defmodule Incrementalist.Game.State do
       :last_claimed_at,
       :cycle_started_at,
       :can_claim_at,
-      :saved_at
+      :saved_at,
+      :achievements
     ])
     |> cast_embed(:exp)
     |> cast_embed(:required_exp)
@@ -321,6 +331,7 @@ defmodule Incrementalist.Game.State do
         projected_at: timestamp
       },
       quests: [],
+      achievements: %{},
       stats: %Stats{
         total_coins_earned: BigNum.zero(),
         total_shards_earned: BigNum.zero(),
@@ -433,6 +444,7 @@ defmodule Incrementalist.Game.State do
           |> Map.put(:can_purchase, !is_purchased && projected_state.level >= def.required_level)
         end),
       "quests" => visible_quests(projected_state.quests),
+      "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
       "projection_params" =>
         projection_params(projected_state, now)
@@ -451,6 +463,20 @@ defmodule Incrementalist.Game.State do
          "max_rank" => Enum.max(Map.keys(quest_def.ranks)),
          "progress" => if(q, do: q.progress, else: 0.0),
          "claimed_rank" => if(q, do: q.claimed_rank, else: 0)
+       }}
+    end
+  end
+
+  def visible_achievements(achievements) do
+    defs = Incrementalist.Game.Constants.achievement_defs()
+    for achievement_def <- defs, into: %{} do
+      unlocked_at = Map.get(achievements || %{}, achievement_def.id)
+      {achievement_def.id,
+       %{
+         "name" => achievement_def.name,
+         "stars" => achievement_def.stars,
+         "condition" => achievement_def.condition,
+         "unlocked_at" => unlocked_at
        }}
     end
   end

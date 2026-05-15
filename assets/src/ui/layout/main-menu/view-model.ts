@@ -5,6 +5,7 @@ import { renderSaveFilesTab } from './panels/save-files';
 import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
 import { renderQuestsTab } from './panels/quests/render';
 import { renderAchievementsTab } from './panels/achievements/render';
+import { renderStatsTab } from './panels/stats/render';
 import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
@@ -71,7 +72,7 @@ export function getTabMenu(): TabMenu {
       {
         id: 'stats',
         label: 'Stats',
-        renderContent: renderPlaceholder('Stats')
+        renderContent: renderStatsTab
       },
       {
         id: 'save',

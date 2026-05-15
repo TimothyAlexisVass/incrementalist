@@ -5,7 +5,7 @@ defmodule Incrementalist.Game.SessionsTest do
   alias Incrementalist.Game.Sessions
   alias Incrementalist.Repo
 
-  @now ~U[2026-05-04 12:00:00Z]
+  @now ~U[2026-05-04 12:00:00.000000Z]
 
   test "authenticate_player creates a player with a generated username and four slots" do
     player = Sessions.authenticate_player(nil, @now)

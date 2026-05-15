@@ -64,12 +64,23 @@ export type QuestState = {
   claimed_rank: number;
 };
 
+export type AchievementState = {
+  name: string;
+  stars: number;
+  condition: string;
+  unlocked_at: string | null;
+};
+
 export type StatsState = {
   total_achievements: number;
   total_quests_claimed: number;
   total_progress_claims: number;
   total_days_played: number;
   total_level_ups_daily: number;
+  screens_viewed_stats: boolean;
+  screens_viewed_quests: boolean;
+  screens_viewed_achievements: boolean;
+  tutorial_graduated: boolean;
   total_coins_earned: BigNum;
   total_shards_earned: BigNum;
   total_cores_earned: BigNum;
@@ -112,6 +123,7 @@ export type GameSnapshot = {
     };
     shop: ShopItemDefinition[];
     quests: Record<string, QuestState>;
+    achievements: Record<string, AchievementState>;
     stats: StatsState;
     projection_params: ProjectionParams;
   };
@@ -232,9 +244,19 @@ export type QuestClaimResult = {
   quest_id: string;
   coins: BigNum;
   quests: Record<string, QuestState>;
+  achievements: Record<string, AchievementState>;
   stats: StatsState;
   notices: NoticeState;
 } & ProjectionParams;
+
+export type StatsUpdateResult = {
+  type: "stats.update.result";
+  status: "ok";
+  command_id: number;
+  stats: StatsState;
+  achievements: Record<string, AchievementState>;
+  notices: NoticeState;
+};
 
 
 export type NoticeEventKind = "child_shown" | "child_clicked";
@@ -270,7 +292,9 @@ export type CommandErrorReason =
   | "quest_id_required"
   | "quest_not_found"
   | "no_rewards_to_claim"
-  | "rank_definition_not_found";
+  | "rank_definition_not_found"
+  | "screen_id_required"
+  | "unknown_screen";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -296,6 +320,7 @@ export type AckableCommandResult =
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
   | QuestClaimResult
+  | StatsUpdateResult
   | NoticeEventResult
   | CommandErrorResult;
 
@@ -350,6 +375,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||
     result.type === "quest.claim.result" ||
+    result.type === "stats.update.result" ||
     result.type === "notice.event.result" ||
     result.type === "command.error"
   );

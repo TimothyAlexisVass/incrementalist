@@ -7,7 +7,9 @@ import { Rect, TabDefinition, TabMenu } from '../../../../components/tab-menu/ta
 import { InteractionState } from '../../../../managers/interactions';
 import { getQuestViewModel } from './view-model';
 import { handleQuestInteractions } from './interactions';
-import { QuestState } from '../../../../../net/protocol';
+import { QuestState, GameSnapshot } from '../../../../../net/protocol';
+import { getNetwork } from '../../view-model';
+import { markViewed } from '../../../../../net/commands';
 
 const CARD_HEIGHT_PX = 92;
 const CARD_GAP_PX = 12;
@@ -16,6 +18,7 @@ const CARD_SCROLLBAR_GUTTER_PX = 12;
 let questSubTabs: TabMenu | null = null;
 let dailyScrollingPanel: ScrollingPanel | null = null;
 let mainScrollingPanel: ScrollingPanel | null = null;
+let lastViewedSnapshot: GameSnapshot | null = null;
 
 export function renderQuestsTab(
   canvas: HTMLCanvasElement,
@@ -23,6 +26,15 @@ export function renderQuestsTab(
   state: ServerState,
   rect: Rect
 ) {
+  const snapshot = state.snapshot;
+  if (snapshot && snapshot !== lastViewedSnapshot && !snapshot.state.stats.screens_viewed_quests) {
+    lastViewedSnapshot = snapshot;
+    const { channel } = getNetwork();
+    if (channel) {
+      markViewed(channel, 'quests');
+    }
+  }
+
   drawQuestPanelFrame(rect);
   const viewModel = getQuestViewModel(state);
   getQuestSubTabs(viewModel).render(canvas, input, state, rect);

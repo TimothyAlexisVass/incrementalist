@@ -66,7 +66,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
     updated_progress_bar = %{progress_bar | rewards_claimed: rewards_claimed}
     updated_charge_crystals = ChargeCrystals.grant_claim(state.charge_crystals, rewards_claimed)
 
-    updated_stats = %{state.stats | total_progress_claims: state.stats.total_progress_claims + 1}
+    stats = state.stats || %State.Stats{}
+    updated_stats = %{stats | total_progress_claims: stats.total_progress_claims + 1}
 
     %{
       state
@@ -116,10 +117,11 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         {exp, coin, shard, core}
       end
 
-    new_stats = %{state.stats |
-      total_coins_earned: BigNum.add(state.stats.total_coins_earned, coin_gain),
-      total_shards_earned: BigNum.add(state.stats.total_shards_earned, shard_gain),
-      total_cores_earned: BigNum.add(state.stats.total_cores_earned, core_gain)
+    stats = state.stats || %State.Stats{}
+    new_stats = %{stats |
+      total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), coin_gain),
+      total_shards_earned: BigNum.add(stats.total_shards_earned || BigNum.zero(), shard_gain),
+      total_cores_earned: BigNum.add(stats.total_cores_earned || BigNum.zero(), core_gain)
     }
 
     %{

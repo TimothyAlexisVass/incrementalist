@@ -18,12 +18,14 @@ defmodule Incrementalist.Game.Rewards do
       do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals, 0, BigNum.zero(),
         BigNum.zero(), BigNum.zero())
 
+    stats = state.stats || %State.Stats{}
+
     new_stats = %{
-      state.stats
-      | total_level_ups_daily: state.stats.total_level_ups_daily + level_ups,
-        total_coins_earned: BigNum.add(state.stats.total_coins_earned, gained_coins),
-        total_shards_earned: BigNum.add(state.stats.total_shards_earned, gained_shards),
-        total_cores_earned: BigNum.add(state.stats.total_cores_earned, gained_cores)
+      stats
+      | total_level_ups_daily: stats.total_level_ups_daily + level_ups,
+        total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), gained_coins),
+        total_shards_earned: BigNum.add(stats.total_shards_earned || BigNum.zero(), gained_shards),
+        total_cores_earned: BigNum.add(stats.total_cores_earned || BigNum.zero(), gained_cores)
     }
 
     %{
