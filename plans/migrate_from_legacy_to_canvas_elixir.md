@@ -180,24 +180,21 @@ Canvas-only UI contract:
 ## Migration Phases
 Phases 1-8 are completed and therefore removed from this plan.
 
-### Phase 9: Quests and Achievements
+### Phase 9: Quests
 
-- Port quest and achievement definitions to Elixir.
-- Implement server-side evaluation after relevant commands.
-- Implement `quest.claim` and `quest.claim_all`.
-- Render Quests and Achievements tabs inside the Canvas menu overlay.
-- Return achievement-unlocked and quest-claimed events for animation.
-- Integrate Quests/Achievements notice behavior into the centralized notice system (do not add feature-local notice logic).
-- Register all quest/achievement notice IDs in the server-owned notice registry (no ad-hoc UI string IDs).
-- Define parent chains in the server registry (for example quest/achievement leaves -> tab parent -> main menu parent).
-- Use semantic notice events only (`child_shown`, `child_clicked`) and idempotent handling.
-- Parent clear must occur on child shown (visible/active), child clear on child click.
-- Client must emit notice events only for currently active noticed children; no per-frame spam.
-- Snapshot/result payloads must include authoritative `active_leaf_ids` and `active_parent_ids` so Quest/Achievement tabs render notice state without client-derived heuristics.
+Implementation of the Quests system, including backend evaluation and UI panels.
+- **[9.1: Scrolling Panel Component](phase_9/9_1_scrolling_panel.md)**: Infrastructure for long lists.
+- **[9.2: Quests Backend](phase_9/9_2_quests_backend.md)**: Rules, evaluation, and commands.
+- **[9.3: Quests UI](phase_9/9_3_quests_ui.md)**: Cards and Main Menu panel.
 
-Deliverable: reward multiplier is server-derived from quest and achievement state.
+### Phase 10: Achievements
 
-### Phase 10: Daily Bonus
+Implementation of the Achievements system.
+- **[10.1: Achievements Backend](phase_9/10_1_achievements_backend.md)**: Rules and unlock conditions.
+- **[10.2: Achievements UI](phase_9/10_2_achievements_ui.md)**: Cards and Main Menu panel.
+- **[10.3: Centralized Notice Integration](phase_9/10_3_notices.md)**: Notification bubbling for both features.
+
+### Phase 11: Daily Bonus
 
 - Port daily token rotation, streaks, reward counts, and one-shot games.
 - Implement `daily_bonus.open`, `daily_bonus.play`, and game-specific commands.
@@ -206,7 +203,7 @@ Deliverable: reward multiplier is server-derived from quest and achievement stat
 
 Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
 
-### Phase 11: Card Pick
+### Phase 12: Card Pick
 
 - Replace the legacy client-board model.
 - Server stores session state.
