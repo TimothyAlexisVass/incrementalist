@@ -1,5 +1,5 @@
 import { COLORS } from "../../colors";
-import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT } from "../../config";
+import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT, HUD_LEFT_PADDING } from "../../config";
 import { renderSageArea } from "./sage/render";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
@@ -136,7 +136,7 @@ function getAreaDropdownLayout(canvas: HTMLCanvasElement) {
   const buttonWidth = 140;
   const buttonHeight = 34;
   const paddingBottom = (BOTTOM_HUD_HEIGHT - buttonHeight) / 2;
-  const buttonX = 20;
+  const buttonX = HUD_LEFT_PADDING + GO_TO_AREA_BUTTON_PADDING;
   const buttonY = canvas.height - buttonHeight - paddingBottom;
   const currentArea = model.availableAreas.find(a => a.key === model.currentArea);
   const buttonLabel = currentArea ? currentArea.name : 'Unknown Area';

@@ -3,6 +3,7 @@ export interface InteractionState {
   pressStartPointer: { x: number; y: number } | null;
   clicked: boolean;
   isPressed: boolean;
+  wheelDelta: number;
   consumed: boolean;
 }
 
@@ -12,6 +13,7 @@ export function createInteractionState(): InteractionState {
     pressStartPointer: null,
     clicked: false,
     isPressed: false,
+    wheelDelta: 0,
     consumed: false
   };
 }
@@ -30,11 +32,13 @@ export class Interactions {
   private pressStartPointer: { x: number; y: number } | null = null;
   private isPointerPressed = false;
   private pendingClick = false;
+  private pendingWheelDelta = 0;
   private hasActivityThisFrame = false;
 
   private readonly onMouseDownBound = (e: MouseEvent) => this.onMouseDown(e);
   private readonly onMouseUpBound = (e: MouseEvent) => this.onMouseUp(e);
   private readonly onMouseMoveBound = (e: MouseEvent) => this.onMouseMove(e);
+  private readonly onWheelBound = (e: WheelEvent) => this.onWheel(e);
   private readonly onKeydownBound = (e: KeyboardEvent) => this.onKeydown(e);
   private readonly onMouseLeaveBound = () => { this.isPointerPressed = false; };
 
@@ -48,6 +52,7 @@ export class Interactions {
     document.addEventListener("mouseup", this.onMouseUpBound);
     document.addEventListener("mousemove", this.onMouseMoveBound);
     document.addEventListener("keydown", this.onKeydownBound);
+    this.canvas.addEventListener("wheel", this.onWheelBound, { passive: false });
     this.canvas.addEventListener("mouseleave", this.onMouseLeaveBound);
   }
 
@@ -56,6 +61,7 @@ export class Interactions {
     document.removeEventListener("mouseup", this.onMouseUpBound);
     document.removeEventListener("mousemove", this.onMouseMoveBound);
     document.removeEventListener("keydown", this.onKeydownBound);
+    this.canvas.removeEventListener("wheel", this.onWheelBound);
     this.canvas.removeEventListener("mouseleave", this.onMouseLeaveBound);
   }
 
@@ -68,6 +74,7 @@ export class Interactions {
       pressStartPointer: this.pressStartPointer,
       clicked: this.pendingClick,
       isPressed: this.isPointerPressed,
+      wheelDelta: this.pendingWheelDelta,
       consumed: false
     };
 
@@ -75,6 +82,7 @@ export class Interactions {
 
     // Reset one-shots
     this.pendingClick = false;
+    this.pendingWheelDelta = 0;
     this.hasActivityThisFrame = false;
 
     // Reset pressStartPointer after the click frame, or if the pointer is no longer pressed.
@@ -102,6 +110,13 @@ export class Interactions {
   private onMouseMove(event: MouseEvent) {
     this.currentPointer = this.getCanvasPoint(event);
     this.hasActivityThisFrame = true;
+  }
+
+  private onWheel(event: WheelEvent) {
+    this.currentPointer = this.getCanvasPoint(event);
+    this.pendingWheelDelta += event.deltaY;
+    this.hasActivityThisFrame = true;
+    event.preventDefault();
   }
 
   private onKeydown(event: KeyboardEvent) {

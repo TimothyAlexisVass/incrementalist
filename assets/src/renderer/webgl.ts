@@ -1,4 +1,4 @@
-import { Camera, OrthographicCamera, Scene, WebGLRenderer as ThreeWebGLRenderer } from "three";
+import { Camera, OrthographicCamera, Scene, Vector4, WebGLRenderer as ThreeWebGLRenderer } from "three";
 import { Text } from "troika-three-text";
 
 export type RGBA = readonly [number, number, number, number];
@@ -61,6 +61,19 @@ export interface DrawThreeSceneOptions {
   y: number;
   width: number;
   height: number;
+}
+
+interface ClipRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface ScissorSnapshot {
+  scissorEnabled: boolean;
+  scissorBox: ClipRect;
+  viewport: ClipRect;
 }
 
 interface ParsedFontSpec {
@@ -555,6 +568,21 @@ export class WebGLRenderer {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
   }
 
+  public withScissorRect(rect: ClipRect, draw: () => void) {
+    const normalizedRect = this.normalizeClipRect(rect);
+    const snapshot = this.captureScissorState();
+    const nextRect = snapshot.scissorEnabled
+      ? intersectClipRects(this.fromBottomLeftRect(snapshot.scissorBox), normalizedRect)
+      : normalizedRect;
+
+    this.applyScissorRect(nextRect);
+    try {
+      draw();
+    } finally {
+      this.restoreScissorState(snapshot);
+    }
+  }
+
   drawRect(options: DrawRectOptions) {
     const gl = this.gl;
     const { x, y, width, height, color } = options;
@@ -584,6 +612,127 @@ export class WebGLRenderer {
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform4f(this.colorUniformLocation, color[0] * alpha, color[1] * alpha, color[2] * alpha, color[3] * alpha);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  private captureScissorState(): ScissorSnapshot {
+    const gl = this.gl;
+    const scissorEnabled = gl.isEnabled(gl.SCISSOR_TEST);
+    const scissorBox = gl.getParameter(gl.SCISSOR_BOX) as Int32Array;
+    const viewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
+
+    return {
+      scissorEnabled,
+      scissorBox: {
+        x: scissorBox[0],
+        y: scissorBox[1],
+        width: scissorBox[2],
+        height: scissorBox[3]
+      },
+      viewport: {
+        x: viewport[0],
+        y: viewport[1],
+        width: viewport[2],
+        height: viewport[3]
+      }
+    };
+  }
+
+  private restoreScissorState(snapshot: ScissorSnapshot) {
+    const gl = this.gl;
+    this.threeRenderer.setViewport(
+      new Vector4(
+        snapshot.viewport.x,
+        snapshot.viewport.y,
+        snapshot.viewport.width,
+        snapshot.viewport.height
+      )
+    );
+
+    if (snapshot.scissorEnabled) {
+      this.threeRenderer.setScissorTest(true);
+      this.threeRenderer.setScissor(snapshot.scissorBox.x, snapshot.scissorBox.y, snapshot.scissorBox.width, snapshot.scissorBox.height);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(snapshot.scissorBox.x, snapshot.scissorBox.y, snapshot.scissorBox.width, snapshot.scissorBox.height);
+    } else {
+      this.threeRenderer.setScissorTest(false);
+      gl.disable(gl.SCISSOR_TEST);
+    }
+
+    gl.viewport(snapshot.viewport.x, snapshot.viewport.y, snapshot.viewport.width, snapshot.viewport.height);
+  }
+
+  private applyScissorRect(rect: ClipRect | null) {
+    const gl = this.gl;
+    const fullCanvasViewport = new Vector4(0, 0, this.canvas.width, this.canvas.height);
+    this.threeRenderer.setViewport(fullCanvasViewport);
+
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      this.threeRenderer.setScissorTest(true);
+      this.threeRenderer.setScissor(0, 0, 0, 0);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, 0, 0, 0);
+      return;
+    }
+
+    const bottomLeftRect = this.toBottomLeftRect(rect);
+    this.threeRenderer.setScissorTest(true);
+    this.threeRenderer.setScissor(
+      bottomLeftRect.x,
+      bottomLeftRect.y,
+      bottomLeftRect.width,
+      bottomLeftRect.height
+    );
+
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(
+      bottomLeftRect.x,
+      bottomLeftRect.y,
+      bottomLeftRect.width,
+      bottomLeftRect.height
+    );
+  }
+
+  private normalizeClipRect(rect: ClipRect): ClipRect | null {
+    const x = Number(rect.x);
+    const y = Number(rect.y);
+    const width = Number(rect.width);
+    const height = Number(rect.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+
+    const x1 = Math.max(0, Math.floor(x));
+    const y1 = Math.max(0, Math.floor(y));
+    const x2 = Math.min(this.canvas.width, Math.ceil(x + width));
+    const y2 = Math.min(this.canvas.height, Math.ceil(y + height));
+    if (x2 <= x1 || y2 <= y1) {
+      return null;
+    }
+
+    return {
+      x: x1,
+      y: y1,
+      width: x2 - x1,
+      height: y2 - y1
+    };
+  }
+
+  private toBottomLeftRect(rect: ClipRect): ClipRect {
+    return {
+      x: rect.x,
+      y: this.canvas.height - rect.y - rect.height,
+      width: rect.width,
+      height: rect.height
+    };
+  }
+
+  private fromBottomLeftRect(rect: ClipRect): ClipRect {
+    return {
+      x: rect.x,
+      y: this.canvas.height - rect.y - rect.height,
+      width: rect.width,
+      height: rect.height
+    };
   }
 
   public drawLiquidRect(options: {
@@ -921,8 +1070,50 @@ export class WebGLRenderer {
     const s = options.scale ?? 1;
     mesh.scale.set(s, s, 1);
     this.textScene.add(mesh);
+
+    const gl = this.gl;
+    const hadScissor = gl.isEnabled(gl.SCISSOR_TEST);
+    const scissorBoxRaw = gl.getParameter(gl.SCISSOR_BOX) as Int32Array;
+    const viewportRaw = gl.getParameter(gl.VIEWPORT) as Int32Array;
+    const scissorBox = {
+      x: scissorBoxRaw[0],
+      y: scissorBoxRaw[1],
+      width: scissorBoxRaw[2],
+      height: scissorBoxRaw[3]
+    };
+    const viewport = {
+      x: viewportRaw[0],
+      y: viewportRaw[1],
+      width: viewportRaw[2],
+      height: viewportRaw[3]
+    };
+
     this.threeRenderer.resetState();
+    this.threeRenderer.setViewport(new Vector4(viewport.x, viewport.y, viewport.width, viewport.height));
+    if (hadScissor) {
+      this.threeRenderer.setScissorTest(true);
+      this.threeRenderer.setScissor(scissorBox.x, scissorBox.y, scissorBox.width, scissorBox.height);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(scissorBox.x, scissorBox.y, scissorBox.width, scissorBox.height);
+    } else {
+      this.threeRenderer.setScissorTest(false);
+      gl.disable(gl.SCISSOR_TEST);
+    }
+
     this.threeRenderer.render(this.textScene, this.textCamera);
+
+    this.threeRenderer.setViewport(new Vector4(viewport.x, viewport.y, viewport.width, viewport.height));
+    gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+    if (hadScissor) {
+      this.threeRenderer.setScissorTest(true);
+      this.threeRenderer.setScissor(scissorBox.x, scissorBox.y, scissorBox.width, scissorBox.height);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(scissorBox.x, scissorBox.y, scissorBox.width, scissorBox.height);
+    } else {
+      this.threeRenderer.setScissorTest(false);
+      gl.disable(gl.SCISSOR_TEST);
+    }
+
     this.textScene.remove(mesh);
   }
 
@@ -1301,6 +1492,26 @@ function mustCreateBuffer(gl: WebGLRenderingContext) {
     throw new Error("Failed to create WebGL buffer");
   }
   return buffer;
+}
+
+function intersectClipRects(a: ClipRect | null, b: ClipRect | null): ClipRect | null {
+  if (!a || !b) return null;
+
+  const x1 = Math.max(a.x, b.x);
+  const y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width);
+  const y2 = Math.min(a.y + a.height, b.y + b.height);
+
+  if (x2 <= x1 || y2 <= y1) {
+    return null;
+  }
+
+  return {
+    x: x1,
+    y: y1,
+    width: x2 - x1,
+    height: y2 - y1
+  };
 }
 
 function clamp01(value: number) {

@@ -32,6 +32,7 @@ export interface TabMenuConfig {
   tabHeight?: number;
   tabPadding?: number;
   gap?: number;
+  contentGap?: number;
   font?: string;
 }
 
@@ -83,6 +84,7 @@ export class TabMenu {
     const tabHeight = this.config.tabHeight || 30;
     const tabPadding = this.config.tabPadding || 16;
     const gap = this.config.gap || 4;
+    const contentGap = this.config.contentGap || 0;
     const font = this.config.font || 'bold 14px Arial';
 
     // Calculate text widths including optional hotkeys
@@ -136,16 +138,16 @@ export class TabMenu {
       if (position === 'top-left' || position === 'top-right') {
         contentRect = {
           x: containerRect.x,
-          y: containerRect.y + tabHeight,
+          y: containerRect.y + tabHeight + contentGap,
           width: containerRect.width,
-          height: containerRect.height - tabHeight
+          height: containerRect.height - tabHeight - contentGap
         };
       } else {
         contentRect = {
           x: containerRect.x,
           y: containerRect.y,
           width: containerRect.width,
-          height: containerRect.height - tabHeight
+          height: containerRect.height - tabHeight - contentGap
         };
       }
     } else {
@@ -178,16 +180,16 @@ export class TabMenu {
       // Calculate content rect
       if (position === 'top-left' || position === 'bottom-left') {
         contentRect = {
-          x: containerRect.x + uniformTabWidth,
+          x: containerRect.x + uniformTabWidth + contentGap,
           y: containerRect.y,
-          width: containerRect.width - uniformTabWidth,
+          width: containerRect.width - uniformTabWidth - contentGap,
           height: containerRect.height
         };
       } else {
         contentRect = {
           x: containerRect.x,
           y: containerRect.y,
-          width: containerRect.width - uniformTabWidth,
+          width: containerRect.width - uniformTabWidth - contentGap,
           height: containerRect.height
         };
       }
@@ -205,6 +207,7 @@ export class TabMenu {
       }
 
       const clicked = doButton(input, rect, label, {
+        padding: 0,
         active: isActive || undefined,
         activeSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
         inactiveSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,

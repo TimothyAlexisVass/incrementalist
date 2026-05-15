@@ -8,6 +8,7 @@ import {
   BOTTOM_HUD_HEIGHT,
   DISPLAY_AREA_X,
   DISPLAY_AREA_WIDTH,
+  HUD_LEFT_PADDING
 } from '../../../config';
 import { getTabMenu, setSaveSlotActions, setShopActions, getNetwork } from './view-model';
 import { ShopActions } from './panels/basic-shop/index';
@@ -51,13 +52,11 @@ export class MainMenu implements Overlay {
       color: cssToRgba(COLORS.panel.bg)
     });
 
-    // Render TabMenu
-    // We give it a slightly inset rect so it's not flush with the very edges
     const menuRect = {
-      x: x + 16,
-      y: y + 16,
-      width: width - 32,
-      height: height - 32
+      x: shellRect.x + HUD_LEFT_PADDING,
+      y: shellRect.y,
+      width: shellRect.width - HUD_LEFT_PADDING,
+      height: shellRect.height
     };
     
     const { channel, runCommand } = getNetwork();

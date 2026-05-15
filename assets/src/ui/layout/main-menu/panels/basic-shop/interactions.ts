@@ -18,9 +18,9 @@ export function handleShopInteractions(
     onInteraction();
   }
 
-  const startX = rect.x + 32;
-  const startY = rect.y + 32;
-  const itemWidth = rect.width - 64;
+  const startX = rect.x;
+  const startY = rect.y;
+  const itemWidth = rect.width;
   const itemHeight = 100;
   const itemGap = 16;
 

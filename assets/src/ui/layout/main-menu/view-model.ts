@@ -3,6 +3,8 @@ import { SaveSlotActions } from '../../components/cards/save-slot';
 import { COLORS } from '../../../colors';
 import { renderSaveFilesTab } from './panels/save-files';
 import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
+import { renderQuestsTab } from './panels/quests/render';
+import { renderAchievementsTab } from './panels/achievements/render';
 import { drawLazyLoader } from '../../components/utils/lazy-loader';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
@@ -57,14 +59,14 @@ export function getTabMenu(): TabMenu {
         label: 'Quest',
         hotkey: 'Q',
         noticeLeafId: NOTICE_LEAF_TAB_QUEST_BUTTON,
-        renderContent: renderPlaceholder('Quest')
+        renderContent: renderQuestsTab
       },
       {
         id: 'achievements',
         label: 'Achievements',
         hotkey: 'A',
         noticeLeafId: NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
-        renderContent: renderPlaceholder('Achievements')
+        renderContent: renderAchievementsTab
       },
       {
         id: 'stats',
@@ -100,6 +102,7 @@ export function getTabMenu(): TabMenu {
       position: 'top-left',
       tabHeight: 36,
       tabPadding: 24,
+      contentGap: 4,
       font: 'bold 16px Arial'
     });
   }
