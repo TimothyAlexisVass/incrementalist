@@ -1318,7 +1318,7 @@ export class WebGLRenderer {
       mesh.outlineColor = style.shadowColor;
       mesh.outlineBlur = style.shadowBlur;
       mesh.outlineOffsetX = style.shadowOffsetX;
-      mesh.outlineOffsetY = -style.shadowOffsetY;
+      mesh.outlineOffsetY = style.shadowOffsetY;
       mesh.outlineOpacity = alpha;
     } else {
       mesh.outlineWidth = 0;

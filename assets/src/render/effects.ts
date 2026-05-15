@@ -14,19 +14,9 @@ import {
   REWARD_POPUP_FONT,
   PROGRESS_BAR_WIDTH,
 } from '../config';
-import { COLORS } from '../colors';
 import { parseFontSizePx } from '../utils';
 import { getActiveWebGLRenderer } from '../renderer/webgl';
 
-const TWO_PI = Math.PI * 2;
-const CLICK_BURST_COLORS = Object.freeze([
-  COLORS.rewards.coins,
-  COLORS.rewards.shards,
-  COLORS.rewards.cores,
-  COLORS.rewards.achievement,
-  COLORS.rewards.questSummary
-]);
-const MAX_CLICK_PARTICLES = 120;
 const MAX_FLOATING_TEXTS = 72;
 const REWARD_POPUP_MIN_RENDER_SIZE_PX = 1;
 
@@ -55,13 +45,9 @@ export interface FloatingText {
   stackIndex: number | null;
 }
 
-
-
 export function createFloatingTextState(): FloatingText[] {
   return [];
 }
-
-
 
 export interface FloatingTextOptions {
   type?: string;
@@ -119,8 +105,6 @@ export function spawnFloatingText(
     floatingTexts.splice(0, floatingTexts.length - MAX_FLOATING_TEXTS);
   }
 }
-
-
 
 export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   const canvasWidth = canvas?.width ?? CANVAS_WIDTH;
@@ -198,10 +182,6 @@ export function updateFloatingTexts(floatingTexts: FloatingText[], deltaTime: nu
   floatingTexts.length = writeIndex;
 }
 
-
-
-
-
 export function renderFloatingTexts(floatingTexts: FloatingText[]) {
   if (!Array.isArray(floatingTexts) || floatingTexts.length === 0) return;
   const renderer = getActiveWebGLRenderer();
@@ -215,9 +195,26 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
     const drawY = Math.round(ft.y);
 
     // Layer order (outer -> inner) is built back-to-front:
-    // 1) white outer outline + shadow
-    // 2) black inner outline
-    // 3) colored fill text
+    // 1) drop shadow
+    // 2) white outer outline
+    // 3) black inner outline
+    // 4) colored fill text
+    renderer.drawText({
+      text: ft.text,
+      x: drawX,
+      y: drawY,
+      font: ft.font,
+      color: 'rgba(0, 0, 0, 0)',
+      align: ft.textAlign,
+      baseline: 'alphabetic',
+      alpha: ft.alpha,
+      scale: scale,
+      shadowColor: 'rgba(0, 0, 0, 0.8)',
+      shadowBlur: 6,
+      shadowOffsetX: 4,
+      shadowOffsetY: 4
+    });
+
     renderer.drawText({
       text: ft.text,
       x: drawX,
@@ -229,11 +226,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       alpha: ft.alpha,
       scale: scale,
       strokeColor: '#ffffff',
-      strokeWidth: 8,
-      shadowColor: 'rgba(0, 0, 0, 0.6)',
-      shadowBlur: 4,
-      shadowOffsetX: 2,
-      shadowOffsetY: 2
+      strokeWidth: 4
     });
 
     renderer.drawText({
@@ -247,11 +240,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       alpha: ft.alpha,
       scale: scale,
       strokeColor: 'rgba(0, 0, 0, 0.8)',
-      strokeWidth: 3,
-      shadowColor: 'transparent',
-      shadowBlur: 0,
-      shadowOffsetX: 0,
-      shadowOffsetY: 0
+      strokeWidth: 1
     });
 
     renderer.drawText({
@@ -263,13 +252,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
-      scale: scale,
-      strokeColor: 'transparent',
-      strokeWidth: 0,
-      shadowColor: 'transparent',
-      shadowBlur: 0,
-      shadowOffsetX: 0,
-      shadowOffsetY: 0
+      scale: scale
     });
   }
 }
