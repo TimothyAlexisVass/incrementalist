@@ -195,6 +195,8 @@ class SisuGeneratorModalImpl implements Modal {
     const authoritativeSisu = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(snapshot.state.sisu.current, SISU_MIN_MULTIPLIER));
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
     const chargeCrystals = snapshot.state.charge_crystals;
+    const sisuAtClaim = toFiniteBigNumNumber(snapshot.state.projection_params.sisu_at_claim, authoritativeSisu);
+    const isPending = sisuAtClaim >= authoritativeSisu;
 
     this.refillRects.length = 0;
     for (const tierId of SISU_TIER_IDS) {
@@ -205,7 +207,10 @@ class SisuGeneratorModalImpl implements Modal {
       const target = getSisuTierTarget(maxBasic, tier.id);
       const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
       const hasCrystals = availableCount > 0;
-      const canRefill = hasCrystals && authoritativeSisu < target;
+
+      const threshold = target * 0.9;
+      const isAlreadyHigher = authoritativeSisu >= threshold;
+      const canRefill = hasCrystals && !isPending && !isAlreadyHigher;
 
       const rect = getTierButtonRect(modalX, modalY, tier.id);
       const isHovered = Boolean(input.pointer && pointInRect(input.pointer, rect));
@@ -217,8 +222,11 @@ class SisuGeneratorModalImpl implements Modal {
         ];
         const lineColors: string[] = [COLORS.hud.textPrimary, COLORS.hud.textPrimary];
 
-        if (authoritativeSisu >= target) {
-          tooltipLines.push("Sisu charge is already higher");
+        if (isPending) {
+          tooltipLines.push("Sisu is charging");
+          lineColors.push(COLORS.hud.textWarning);
+        } else if (isAlreadyHigher) {
+          tooltipLines.push("Charge is above threshold");
           lineColors.push(COLORS.hud.textWarning);
         }
 

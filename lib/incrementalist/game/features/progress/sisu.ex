@@ -91,13 +91,22 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
     projected = project_state(state, now)
     tier = tier(tier_id)
     target = tier_target_for_level(projected, tier.id)
-    # Use target_current if available, otherwise current
-    current = projected.sisu.target_current || current_sisu(projected, now)
+    authoritative_current = current_sisu(projected, now)
+    target_current = projected.sisu.target_current || authoritative_current
     effective_max = max_effective_from_state(projected)
 
-    if BigNum.compare(current, BigNum.from_number(target)) >= 0 do
-      {:error, "sisu_already_higher"}
-    else
+    # A charge is pending if the target for the next cycle is higher than current
+    is_pending = BigNum.compare(target_current, authoritative_current) > 0
+    threshold = target * 0.8
+
+    cond do
+      is_pending ->
+        {:error, "sisu_charge_pending"}
+
+      BigNum.compare(authoritative_current, BigNum.from_number(threshold)) >= 0 ->
+        {:error, "sisu_already_higher"}
+
+      true ->
       with {:ok, updated_charge_crystals} <- ChargeCrystals.spend(projected.charge_crystals, tier.id) do
         next_sisu = BigNum.from_number(min(effective_max, target))
 

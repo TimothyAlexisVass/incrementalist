@@ -228,6 +228,7 @@ export type CommandErrorReason =
   | "insufficient_shards"
   | "insufficient_charge_crystals"
   | "sisu_already_higher"
+  | "sisu_charge_pending"
   | "upgrade_cost_missing"
   | "notice_event_required"
   | "invalid_notice_event"
