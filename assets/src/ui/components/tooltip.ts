@@ -17,6 +17,7 @@ export interface TooltipOptions {
   widthMode?: 'measured' | 'estimated';
   estimatedWidthFactor?: number;
   textUpdateKey?: string;
+  lineColors?: string[];
 }
 
 interface TooltipRequest {
@@ -146,12 +147,13 @@ function drawTooltipInternal(
   drawRectOutline(renderer, x, y, width, height, 1, cssToRgba(borderColor));
 
   for (let i = 0; i < lines.length; i += 1) {
+    const lineColor = (options.lineColors && options.lineColors[i]) || textColor;
     renderer.drawText({
       text: lines[i],
       x: x + paddingX,
       y: y + paddingY + (i * lineHeight),
       font,
-      color: textColor,
+      color: lineColor,
       align: 'left',
       baseline: 'top'
     });

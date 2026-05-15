@@ -16,6 +16,7 @@ import { drawCurrencyAmount, measureCurrencyAmount } from "../../render/currency
 import { getActiveWebGLRenderer, type RGBA, type WebGLRenderer } from "../../renderer/webgl";
 import { drawButton } from "../../ui/components/button";
 import { drawLazyLoader } from "../../ui/components/utils/lazy-loader";
+import { queueTooltip } from "../../ui/components/tooltip";
 import { pointInRect, type InteractionState } from "../../ui/managers/interactions";
 import type { Modal } from "../../ui/managers/modals";
 import { hexToRgba } from "../../utils/color";
@@ -191,7 +192,7 @@ class SisuGeneratorModalImpl implements Modal {
     }
 
     const { displayCurrent } = updateSisuVisualProjection(snapshot);
-    const currentSisu = Math.max(SISU_MIN_MULTIPLIER, displayCurrent);
+    const authoritativeSisu = Math.max(SISU_MIN_MULTIPLIER, toFiniteBigNumNumber(snapshot.state.sisu.current, SISU_MIN_MULTIPLIER));
     const maxBasic = Math.max(SISU_BASE_MAX, toFiniteBigNumNumber(snapshot.state.sisu.max_basic, SISU_BASE_MAX));
     const chargeCrystals = snapshot.state.charge_crystals;
 
@@ -204,10 +205,25 @@ class SisuGeneratorModalImpl implements Modal {
       const target = getSisuTierTarget(maxBasic, tier.id);
       const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
       const hasCrystals = availableCount > 0;
-      const canRefill = hasCrystals && currentSisu < target;
+      const canRefill = hasCrystals && authoritativeSisu < target;
 
       const rect = getTierButtonRect(modalX, modalY, tier.id);
       const isHovered = Boolean(input.pointer && pointInRect(input.pointer, rect));
+
+      if (isHovered) {
+        const tooltipLines = [
+          `Multiplier: ${formatSisuMultiplier(target)}`,
+          `Decay: ${getDecayLabel(tier.id)}`
+        ];
+        const lineColors = [COLORS.hud.textPrimary, COLORS.hud.textPrimary];
+
+        if (authoritativeSisu >= target) {
+          tooltipLines.push("Sisu charge is already higher");
+          lineColors.push("#ff0000");
+        }
+
+        queueTooltip(input.pointer!, tooltipLines, { lineColors });
+      }
 
       this.hoverTargetByTier[tier.id] = hasCrystals && isHovered;
       if (!hasCrystals) {
@@ -487,4 +503,14 @@ function drawSisuRefillSprite(
     return;
   }
 
+}
+
+function getDecayLabel(tierId: TierId): string {
+  switch (tierId) {
+    case "azure": return "Fastest";
+    case "aether": return "Fast";
+    case "lucent": return "Medium";
+    case "transcendent": return "Slow";
+    default: return "Unknown";
+  }
 }
