@@ -157,7 +157,7 @@ class SisuGeneratorModalImpl implements Modal {
     private readonly channel: GameChannel,
     private readonly runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>,
     private readonly onClose: () => void
-  ) {}
+  ) { }
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
@@ -251,7 +251,7 @@ class SisuGeneratorModalImpl implements Modal {
       };
     } else {
       this.upgradeRect = {
-        x: modalX + modalWidth - 180 - 22,
+        x: modalX + modalWidth - 158,
         y: modalY + 156,
         width: 180,
         height: 36
@@ -259,11 +259,11 @@ class SisuGeneratorModalImpl implements Modal {
     }
 
     const maxUpgradeLevel = snapshot.state.sisu.max_upgrade_level || 0;
-    const maxSisuText = `Base ${formatSisuMultiplier(maxBasic)}(Level ${formatCountRatio(maxUpgradeLevel, SISU_MAX_UPGRADE_LEVEL)})`;
+    const maxSisuText = `Base ${formatSisuMultiplier(maxBasic)} (Level ${String(maxUpgradeLevel)})`;
 
     renderer.drawText({
       text: maxSisuText,
-      x: modalX + 40,
+      x: modalX + 60,
       y: modalY + 385,
       font: SISU_MAX_FONT,
       color: COLORS.hud.textPrimary,
@@ -432,7 +432,7 @@ function drawSisuRefillControl(
 ) {
   drawSisuRefillSprite(renderer, rect, tierId, availableCount, hoverBlend);
 
-  if(availableCount > 0) {
+  if (availableCount > 0) {
     renderer.drawText({
       text: `${formatNumber(availableCount)}`,
       x: rect.x + rect.width / 2,

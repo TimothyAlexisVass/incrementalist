@@ -35,9 +35,9 @@ export const COLORS = Object.freeze({
   },
   sisu: {
     azure: '#1e90ff',
-    aether: '#9932CC',
-    lucent: '#FF8C1A',
-    transcendent: '#F5F7FA'
+    aether: '#9932cc',
+    lucent: '#ff8c1a',
+    transcendent: '#f5f7fa'
   },
   button: {
     surface: {
@@ -55,7 +55,7 @@ export const COLORS = Object.freeze({
       text: '#dbe8ff'
     },
     toggle: {
-      on: '#4CAF50',
+      on: '#4caf50',
       off: '#2c1d6e'
     }
   },
@@ -63,36 +63,36 @@ export const COLORS = Object.freeze({
     bg: '#16213e',
     border: '#3a5273',
     highlight: 'rgba(255, 255, 255, 0.12)',
-    textPrimary: '#FFFFFF',
-    textSecondary: '#A0AEC0',
+    textPrimary: '#ffffff',
+    textSecondary: '#a0aec0',
     textDisabled: '#718096',
-    coins: '#FFD700',
-    shards: '#FF8C1A',
-    cores: '#FF4D4D',
-    whiteCoins: '#1E90FF',
-    questTokens: '#FF6B6B',
-    bonusText: '#6BC2FF'
+    coins: '#ffd700',
+    shards: '#ff8c1a',
+    cores: '#ff4d4d',
+    whiteCoins: '#1e90ff',
+    questTokens: '#ff6b6b',
+    bonusText: '#6bc2ff'
   },
   rewards: {
-    achievement: '#6BC2FF',
+    achievement: '#6bc2ff',
     expGain: '#c951f8',
-    coins: '#FFD700',
-    shards: '#FF8C1A',
-    cores: '#FF4D4D',
-    whiteCoins: '#1E90FF',
-    totalBonus: '#6BC2FF',
-    questSummary: '#FF9B6A',
-    questSummaryOverflow: '#D2DEF0',
-    questTokenGain: '#FF6B6B',
-    eventTokenGain: '#6BC2FF',
-    saveNotice: '#7CE89A'
+    coins: '#ffd700',
+    shards: '#ff8c1a',
+    cores: '#ff4d4d',
+    whiteCoins: '#1e90ff',
+    totalBonus: '#6bc2ff',
+    questSummary: '#ff9b6a',
+    questSummaryOverflow: '#d2def0',
+    questTokenGain: '#ff6b6b',
+    eventTokenGain: '#6bc2ff',
+    saveNotice: '#7ce89a'
   },
   coinRain: {
-    bucket: '#8B4513',
-    itemCoins: '#FFD700',
-    itemReward: '#FF00FF',
-    timerText: '#FFFFFF',
-    countdownText: '#FFFFFF'
+    bucket: '#8b4513',
+    itemCoins: '#ffd700',
+    itemReward: '#ff00ff',
+    timerText: '#ffffff',
+    countdownText: '#ffffff'
   },
   overlay: {
     backdrop: 'rgba(0, 0, 0, 0.1)',
@@ -116,10 +116,10 @@ export const COLORS = Object.freeze({
     optionsDropdownBorder: '#4d678f'
   },
   hud: {
-    coins: '#FFD700',
-    shards: '#FF8C1A',
-    cores: '#FF4D4D',
-    textPrimary: '#FFFFFF',
+    coins: '#ffd700',
+    shards: '#ff8c1a',
+    cores: '#ff4d4d',
+    textPrimary: '#ffffff',
     textWarning: '#ff0000'
   }
 } as const);

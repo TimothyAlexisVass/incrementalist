@@ -109,7 +109,7 @@ interface CachedTextMeasurement {
 }
 
 const DEFAULT_FONT = "bold 16px Inter";
-const DEFAULT_TEXT_COLOR = "#ffffff";
+const DEFAULT_TEXT_COLOR = '#ffffff';
 const INTER_REGULAR_FONT_URL = "/fonts/Inter-Regular.woff";
 const INTER_BOLD_FONT_URL = "/fonts/Inter-Bold.woff";
 const MAX_TEXT_CACHE_SIZE = 384;
