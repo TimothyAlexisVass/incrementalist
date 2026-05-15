@@ -1,16 +1,17 @@
 import { COLORS } from '../../../../../colors';
 import { ServerState } from '../../../../../net/snapshots';
 import { getActiveWebGLRenderer } from '../../../../../renderer/webgl';
-import { drawQuestCardPlaceholder } from '../../../../components/cards/quest';
+import { drawQuestCard } from '../../../../components/cards/quest';
 import { ScrollingPanel } from '../../../../components/scrolling-panel';
 import { Rect, TabDefinition, TabMenu } from '../../../../components/tab-menu/tab-menu';
 import { InteractionState } from '../../../../managers/interactions';
+import { getQuestViewModel } from './view-model';
+import { handleQuestInteractions } from './interactions';
+import { QuestState } from '../../../../../net/protocol';
 
 const CARD_HEIGHT_PX = 92;
 const CARD_GAP_PX = 12;
-const CARD_SCROLLBAR_GUTTER_PX = 10;
-const DAILY_CARD_COUNT = 24;
-const MAIN_CARD_COUNT = 28;
+const CARD_SCROLLBAR_GUTTER_PX = 12;
 
 let questSubTabs: TabMenu | null = null;
 let dailyScrollingPanel: ScrollingPanel | null = null;
@@ -19,30 +20,33 @@ let mainScrollingPanel: ScrollingPanel | null = null;
 export function renderQuestsTab(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  _state: ServerState,
+  state: ServerState,
   rect: Rect
 ) {
   drawQuestPanelFrame(rect);
-  getQuestSubTabs().render(canvas, input, _state, rect);
+  const viewModel = getQuestViewModel(state);
+  getQuestSubTabs(viewModel).render(canvas, input, state, rect);
 }
 
-function getQuestSubTabs(): TabMenu {
+function getQuestSubTabs(viewModel: any): TabMenu {
   if (!questSubTabs) {
     const tabs: TabDefinition[] = [
       {
-        id: 'daily',
-        label: 'Daily',
-        renderContent: (_canvas, input, _state, rect) => {
-          renderQuestPlaceholderList(input, rect, DAILY_CARD_COUNT, 'daily');
+        id: 'main',
+        label: 'Main',
+        renderContent: (_canvas, input, state, rect) => {
+          const vm = getQuestViewModel(state);
+          renderQuestList(input, rect, vm.mainQuests, 'main');
         }
       },
       {
-        id: 'main',
-        label: 'Main',
-        renderContent: (_canvas, input, _state, rect) => {
-          renderQuestPlaceholderList(input, rect, MAIN_CARD_COUNT, 'main');
+        id: 'daily',
+        label: 'Daily',
+        renderContent: (_canvas, input, state, rect) => {
+          const vm = getQuestViewModel(state);
+          renderQuestList(input, rect, vm.dailyQuests, 'daily');
         }
-      }
+      },
     ];
 
     questSubTabs = new TabMenu(tabs, {
@@ -53,19 +57,21 @@ function getQuestSubTabs(): TabMenu {
       gap: 6,
       contentGap: 4,
       font: 'bold 14px Arial'
-    }, 'daily');
+    }, 'main');
   }
 
   return questSubTabs;
 }
 
-function renderQuestPlaceholderList(
+function renderQuestList(
   input: InteractionState,
   rect: Rect,
-  count: number,
+  quests: QuestState[],
   panelKey: 'daily' | 'main'
 ) {
   const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
+
   const listRect = {
     x: rect.x,
     y: rect.y,
@@ -74,26 +80,35 @@ function renderQuestPlaceholderList(
   };
 
   const cardWidth = Math.max(1, listRect.width - CARD_SCROLLBAR_GUTTER_PX);
-  const contentHeight = (count * CARD_HEIGHT_PX) + (Math.max(0, count - 1) * CARD_GAP_PX);
+  const contentHeight = (quests.length * CARD_HEIGHT_PX) + (Math.max(0, quests.length - 1) * CARD_GAP_PX);
   const scrollingPanel = getScrollingPanel(panelKey, listRect, contentHeight);
 
   scrollingPanel.update(input);
-  scrollingPanel.drawClippedContent(renderer, (scrollOffsetY) => {
-    const startY = listRect.y - scrollOffsetY;
-    for (let i = 0; i < count; i++) {
+  const scrollOffsetY = scrollingPanel.getScrollOffset();
+
+  handleQuestInteractions(input, quests, listRect, scrollOffsetY, cardWidth, CARD_HEIGHT_PX, CARD_GAP_PX);
+
+  scrollingPanel.drawClippedContent(renderer, (offsetY) => {
+    const startY = listRect.y - offsetY;
+    for (let i = 0; i < quests.length; i++) {
+      const quest = quests[i];
       const cardY = startY + (i * (CARD_HEIGHT_PX + CARD_GAP_PX));
 
       if (cardY >= listRect.y + listRect.height) break;
       if (cardY + CARD_HEIGHT_PX <= listRect.y) continue;
 
-      drawQuestCardPlaceholder({
-        x: listRect.x,
-        y: cardY,
-        width: cardWidth,
-        height: CARD_HEIGHT_PX
-      }, i + 1);
+      drawQuestCard({
+        quest,
+        rect: {
+          x: listRect.x,
+          y: cardY,
+          width: cardWidth,
+          height: CARD_HEIGHT_PX
+        }
+      });
     }
   });
+
   scrollingPanel.drawScrollBar(renderer);
 }
 
@@ -117,6 +132,7 @@ function getScrollingPanel(panelKey: 'daily' | 'main', rect: Rect, contentHeight
 
 function drawQuestPanelFrame(rect: Rect) {
   const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
   renderer.drawRect({
     x: rect.x,
     y: rect.y,

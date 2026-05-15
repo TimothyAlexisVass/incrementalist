@@ -29,7 +29,6 @@ Implement the server-side logic for Quests, including definition loading, evalua
 
 ### 4. Commands
 - `quest.claim`: Claims the reward for a specific quest rank.
-- `quest.claim_all`: Claims all pending quest rewards.
 
 ## Deliverable
 Server successfully tracks quest progress and handles claim commands.

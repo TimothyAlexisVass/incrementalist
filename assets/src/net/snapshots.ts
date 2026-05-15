@@ -6,7 +6,9 @@ import type {
   ServerResult,
   AreaSelectResult,
   NoticeEventResult,
-  SisuState
+  SisuState,
+  QuestState,
+  StatsState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -61,6 +63,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   if (result.type === "progress.claim_reward.result") {
     applyAuthoritativeData(state, result);
+    applyProjectionData(state, result);
   }
 
   if (result.type === "progress.claim_in.result" || result.type === "progress.set_idle_mode.result") {
@@ -75,7 +78,12 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyAreaResult(state, result);
   }
 
-  if (result.type === "shop.purchase.result" || result.type === "sisu.refill.result" || result.type === "sisu.upgrade_max.result") {
+  if (
+    result.type === "shop.purchase.result" ||
+    result.type === "sisu.refill.result" ||
+    result.type === "sisu.upgrade_max.result" ||
+    result.type === "quest.claim.result"
+  ) {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result);
   }
@@ -107,6 +115,9 @@ export function applyAuthoritativeData(
     charge_crystals?: ChargeCrystalsState;
     item_id?: string;
     sisu?: SisuState;
+    quests?: Record<string, QuestState>;
+    stats?: StatsState;
+    [key: string]: any;
   }
 ) {
   if (!state.snapshot) return;
@@ -133,6 +144,8 @@ export function applyAuthoritativeData(
   if (data.cores !== undefined) state.snapshot.state.cores = data.cores;
   if (data.charge_crystals !== undefined) state.snapshot.state.charge_crystals = data.charge_crystals;
   if (data.sisu !== undefined) state.snapshot.state.sisu = data.sisu;
+  if (data.quests !== undefined) state.snapshot.state.quests = data.quests;
+  if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -166,6 +179,7 @@ export function applyProjectionData(
     sisu_at_claim?: BigNum;
     sisu_decay_at_claim?: number;
     sisu?: SisuState;
+    color?: readonly [number, number, number, number];
   }
 ) {
   if (!state.snapshot) return;

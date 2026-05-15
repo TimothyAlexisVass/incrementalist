@@ -7,12 +7,15 @@ defmodule Incrementalist.Game.Constants do
   @areas_path Path.join(@requirements_dir, "areas.json")
   @sage_tip_levels_path Path.join(@requirements_dir, "sage-tip-levels.json")
   @shop_items_path Path.join(@requirements_dir, "shop-items.json")
+  @quests_path Path.join(@requirements_dir, "quests.json")
   @external_resource @areas_path
   @external_resource @sage_tip_levels_path
   @external_resource @shop_items_path
+  @external_resource @quests_path
   @areas @areas_path |> File.read!() |> Jason.decode!()
   @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
   @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
+  @quests @quests_path |> File.read!() |> Jason.decode!()
 
   def max_save_slots, do: 4
   def valid_slot_indexes, do: 0..(max_save_slots() - 1)
@@ -26,6 +29,12 @@ defmodule Incrementalist.Game.Constants do
 
   def shop_item_defs do
     Enum.map(@shop_items, &normalize_shop_item/1)
+  end
+
+  def quest_defs do
+    for {category, quests} <- @quests, {id, quest} <- quests, into: %{} do
+      {id, normalize_quest(id, quest, category)}
+    end
   end
 
   # Progress Bar Constants
@@ -82,5 +91,27 @@ defmodule Incrementalist.Game.Constants do
   defp normalize_shop_currency("shards"), do: :shards
   defp normalize_shop_currency("cores"), do: :cores
   defp normalize_shop_currency(currency), do: raise(ArgumentError, "unknown shop currency #{inspect(currency)}")
+
+  defp normalize_quest(id, quest, category) do
+    %{
+      id: id,
+      name: quest["name"],
+      category: String.to_atom(category),
+      ranks: normalize_quest_ranks(id, quest["ranks"])
+    }
+  end
+
+  defp normalize_quest_ranks(id, ranks) do
+    for {rank_str, data} <- ranks, into: %{} do
+      rank = String.to_integer(rank_str)
+      {rank, %{
+        requirement: normalize_quest_requirement(id, data["requirement"]),
+        reward: BigNum.from_number(data["reward"])
+      }}
+    end
+  end
+
+  defp normalize_quest_requirement(id, value) when id in ["coins", "shards", "cores"], do: BigNum.from_number(value)
+  defp normalize_quest_requirement(_id, value), do: value
 
 end

@@ -55,6 +55,26 @@ export type ProjectionParams = {
   sisu_decay_at_claim: number;
 };
 
+export type QuestState = {
+  name: string;
+  category: "main" | "daily";
+  rank: number;
+  max_rank: number;
+  progress: number;
+  claimed_rank: number;
+};
+
+export type StatsState = {
+  total_achievements: number;
+  total_quests_claimed: number;
+  total_progress_claims: number;
+  total_days_played: number;
+  total_level_ups_daily: number;
+  total_coins_earned: BigNum;
+  total_shards_earned: BigNum;
+  total_cores_earned: BigNum;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -91,6 +111,8 @@ export type GameSnapshot = {
       bonus_time_purchased: boolean;
     };
     shop: ShopItemDefinition[];
+    quests: Record<string, QuestState>;
+    stats: StatsState;
     projection_params: ProjectionParams;
   };
   notices: NoticeState;
@@ -203,6 +225,18 @@ export type ProgressSetIdleModeResult = {
   notices: NoticeState;
 } & ProjectionParams;
 
+export type QuestClaimResult = {
+  type: "quest.claim.result";
+  status: "ok";
+  command_id: number;
+  quest_id: string;
+  coins: BigNum;
+  quests: Record<string, QuestState>;
+  stats: StatsState;
+  notices: NoticeState;
+} & ProjectionParams;
+
+
 export type NoticeEventKind = "child_shown" | "child_clicked";
 
 export type NoticeEventResult = {
@@ -232,7 +266,11 @@ export type CommandErrorReason =
   | "upgrade_cost_missing"
   | "notice_event_required"
   | "invalid_notice_event"
-  | "leaf_id_required";
+  | "leaf_id_required"
+  | "quest_id_required"
+  | "quest_not_found"
+  | "no_rewards_to_claim"
+  | "rank_definition_not_found";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -257,6 +295,7 @@ export type AckableCommandResult =
   | AreaSelectResult
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
+  | QuestClaimResult
   | NoticeEventResult
   | CommandErrorResult;
 
@@ -310,6 +349,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "area.select.result" ||
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||
+    result.type === "quest.claim.result" ||
     result.type === "notice.event.result" ||
     result.type === "command.error"
   );

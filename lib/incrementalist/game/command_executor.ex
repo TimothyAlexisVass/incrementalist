@@ -11,6 +11,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlot, SaveSlots}
   alias Incrementalist.Game.{Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
+  alias Incrementalist.Game.Features.Quests.Rules, as: Quests
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -76,6 +77,7 @@ defmodule Incrementalist.Game.CommandExecutor do
             |> Incrementalist.Game.Rewards.apply_level_ups()
             |> Sisu.advance_cycle(now)
             |> Bar.finalize_claim(now)
+            |> Quests.evaluate()
 
           next_notices =
             Notices.refresh_for_state_transition(
@@ -103,6 +105,8 @@ defmodule Incrementalist.Game.CommandExecutor do
              "cores" => new_state.cores,
              "charge_crystals" => new_state.charge_crystals,
              "sisu" => new_state.sisu,
+             "quests" => State.visible_quests(new_state.quests),
+             "stats" => new_state.stats,
              "notices" => Notices.payload(next_notices)
            }, active_slot.id}
         else
@@ -244,6 +248,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                "tier_id" => tier_id,
                "charge_crystals" => next_state.charge_crystals,
                "sisu" => next_state.sisu,
+               "quests" => State.visible_quests(next_state.quests),
+               "stats" => next_state.stats,
                "notices" => Notices.payload(next_notices)
              },
              State.projection_params(next_state, now)
@@ -280,6 +286,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                "command_id" => command.command_id,
                "sisu" => next_state.sisu,
                "shards" => next_state.shards,
+               "quests" => State.visible_quests(next_state.quests),
+               "stats" => next_state.stats,
                "notices" => Notices.payload(next_notices)
              },
              State.projection_params(next_state, now)
@@ -330,6 +338,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                "shards" => next_state.shards,
                "cores" => next_state.cores,
                "sisu" => next_state.sisu,
+               "quests" => State.visible_quests(next_state.quests),
+               "stats" => next_state.stats,
                "notices" => Notices.payload(next_notices)
              },
              State.projection_params(next_state, now)
@@ -338,6 +348,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
         end
+
 
       "notice.event" ->
         active_slot = active_slot(player, now)
@@ -373,6 +384,46 @@ defmodule Incrementalist.Game.CommandExecutor do
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
         end
+
+      "quest.claim" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, quest_id} <- fetch_quest_id(command.intent),
+             {:ok, next_state} <- Quests.claim(active_slot.state, quest_id) do
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
+
+          Repo.update!(
+            SaveSlot.changeset(active_slot, %{
+              state: next_state,
+              notices: next_notices,
+              last_saved_at: now
+            })
+          )
+
+          {"succeeded",
+           Map.merge(
+             %{
+               "type" => "quest.claim.result",
+               "status" => "ok",
+               "command_id" => command.command_id,
+               "quest_id" => quest_id,
+               "coins" => next_state.coins,
+               "quests" => State.visible_quests(next_state.quests),
+               "stats" => next_state.stats,
+               "notices" => Notices.payload(next_notices)
+             },
+             State.projection_params(next_state, now)
+           ), active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+        end
+
 
       _unknown ->
         active_slot = active_slot(player, now)
@@ -442,7 +493,22 @@ defmodule Incrementalist.Game.CommandExecutor do
     # Commands such as slot switching can update the active pointer in this
     # transaction; reloading avoids using a stale struct for follow-up snapshots.
     player = Repo.get!(Player, player.id)
-    SaveSlots.determine_active_slot(player, now)
+    slot = SaveSlots.determine_active_slot(player, now)
+
+    if slot && slot.state do
+      new_state =
+        slot.state
+        |> State.check_daily_reset(now)
+        |> Quests.evaluate()
+
+      if new_state != slot.state do
+        Repo.update!(SaveSlot.changeset(slot, %{state: new_state, last_saved_at: now}))
+      else
+        slot
+      end
+    else
+      slot
+    end
   end
 
   defp clear_commands_after_save_boundary!(player_id, boundary_sequence, now) do
@@ -504,6 +570,10 @@ defmodule Incrementalist.Game.CommandExecutor do
       _ -> {:error, "#{key}_boolean_required"}
     end
   end
+
+  defp fetch_quest_id(%{"quest_id" => quest_id}) when is_binary(quest_id), do: {:ok, quest_id}
+  defp fetch_quest_id(%{quest_id: quest_id}) when is_binary(quest_id), do: {:ok, quest_id}
+  defp fetch_quest_id(_intent), do: {:error, "quest_id_required"}
 
   defp normalize_slot_index(slot_index)
        when is_integer(slot_index) do

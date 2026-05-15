@@ -13,8 +13,18 @@ defmodule Incrementalist.Game.Rewards do
     cores = state.cores || BigNum.zero()
     charge_crystals = ChargeCrystals.normalize(state.charge_crystals)
 
-    {new_level, new_exp, new_coins, new_shards, new_cores, new_charge_crystals} =
-      do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals)
+    {new_level, new_exp, new_coins, new_shards, new_cores, new_charge_crystals, level_ups,
+     gained_coins, gained_shards, gained_cores} =
+      do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals, 0, BigNum.zero(),
+        BigNum.zero(), BigNum.zero())
+
+    new_stats = %{
+      state.stats
+      | total_level_ups_daily: state.stats.total_level_ups_daily + level_ups,
+        total_coins_earned: BigNum.add(state.stats.total_coins_earned, gained_coins),
+        total_shards_earned: BigNum.add(state.stats.total_shards_earned, gained_shards),
+        total_cores_earned: BigNum.add(state.stats.total_cores_earned, gained_cores)
+    }
 
     %{
       state
@@ -24,11 +34,13 @@ defmodule Incrementalist.Game.Rewards do
         shards: new_shards,
         cores: new_cores,
         charge_crystals: new_charge_crystals,
-        required_exp: calculate_required_exp(new_level)
+        required_exp: calculate_required_exp(new_level),
+        stats: new_stats
     }
   end
 
-  defp do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals) do
+  defp do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals, level_ups,
+         gained_coins, gained_shards, gained_cores) do
     required_exp = calculate_required_exp(level)
 
     if BigNum.compare(exp, required_exp) >= 0 do
@@ -43,10 +55,15 @@ defmodule Incrementalist.Game.Rewards do
         BigNum.add(coins, reward_coins),
         BigNum.add(shards, reward_shards),
         BigNum.add(cores, reward_cores),
-        new_charge_crystals
+        new_charge_crystals,
+        level_ups + 1,
+        BigNum.add(gained_coins, reward_coins),
+        BigNum.add(gained_shards, reward_shards),
+        BigNum.add(gained_cores, reward_cores)
       )
     else
-      {level, exp, coins, shards, cores, charge_crystals}
+      {level, exp, coins, shards, cores, charge_crystals, level_ups, gained_coins, gained_shards,
+       gained_cores}
     end
   end
 

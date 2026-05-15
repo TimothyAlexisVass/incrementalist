@@ -113,6 +113,60 @@ defmodule Incrementalist.Game.State do
     end
   end
 
+  defmodule QuestState do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :id, :string
+      field :rank, :integer, default: 0
+      field :progress, :float, default: 0.0
+      field :claimed_rank, :integer, default: 0
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:id, :rank, :progress, :claimed_rank])
+      |> validate_required([:id])
+    end
+  end
+
+  defmodule Stats do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :total_achievements, :integer, default: 0
+      field :total_quests_claimed, :integer, default: 0
+      field :total_progress_claims, :integer, default: 0
+      field :total_days_played, :integer, default: 0
+      field :total_level_ups_daily, :integer, default: 0
+      field :last_reset_at, :string
+
+      # Currencies are BigNum
+      embeds_one :total_coins_earned, BigNum, on_replace: :update
+      embeds_one :total_shards_earned, BigNum, on_replace: :update
+      embeds_one :total_cores_earned, BigNum, on_replace: :update
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [
+        :total_achievements,
+        :total_quests_claimed,
+        :total_progress_claims,
+        :total_days_played,
+        :total_level_ups_daily,
+        :last_reset_at
+      ])
+      |> cast_embed(:total_coins_earned)
+      |> cast_embed(:total_shards_earned)
+      |> cast_embed(:total_cores_earned)
+    end
+  end
+
   @primary_key false
   @derive Jason.Encoder
   embedded_schema do
@@ -137,7 +191,12 @@ defmodule Incrementalist.Game.State do
     embeds_one :charge_crystals, ChargeCrystals, on_replace: :update
     embeds_one :features, Features, on_replace: :update
     embeds_one :sisu, Sisu, on_replace: :update
+
+    embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
+    embeds_one :stats, __MODULE__.Stats, on_replace: :update
   end
+
+  # State schema follows
 
   def changeset(state \\ %__MODULE__{}, attrs) do
     attrs_map = normalize_attrs(attrs)
@@ -163,6 +222,8 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:charge_crystals)
     |> cast_embed(:features)
     |> cast_embed(:sisu)
+    |> cast_embed(:quests)
+    |> cast_embed(:stats)
   end
 
   defp normalize_attrs(%__MODULE__{} = attrs) do
@@ -195,6 +256,8 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:charge_crystals)
     |> maybe_put_embed(:features)
     |> maybe_put_embed(:sisu)
+    |> maybe_put_embed(:quests)
+    |> maybe_put_embed(:stats)
   end
 
   defp maybe_put_embed(attrs, key) do
@@ -212,6 +275,7 @@ defmodule Incrementalist.Game.State do
 
     case value do
       %_{} = struct -> Map.put(attrs, lookup_key, to_map(struct))
+      list when is_list(list) -> Map.put(attrs, lookup_key, to_map(list))
       _ -> attrs
     end
   end
@@ -255,8 +319,33 @@ defmodule Incrementalist.Game.State do
         max_upgrade_level: 0,
         cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         projected_at: timestamp
+      },
+      quests: [],
+      stats: %Stats{
+        total_coins_earned: BigNum.zero(),
+        total_shards_earned: BigNum.zero(),
+        total_cores_earned: BigNum.zero(),
+        last_reset_at: timestamp
       }
     }
+  end
+
+  def check_daily_reset(%__MODULE__{} = state, now) do
+    last_reset_str = state.stats.last_reset_at || state.first_played_at
+    case Time.from_iso8601(last_reset_str) do
+      {:ok, last_reset} ->
+        if Date.compare(DateTime.to_date(last_reset), DateTime.to_date(now)) == :lt do
+          new_stats = %{state.stats |
+            total_level_ups_daily: 0,
+            total_days_played: state.stats.total_days_played + 1,
+            last_reset_at: Time.iso8601(now)
+          }
+          %{state | stats: new_stats}
+        else
+          state
+        end
+      _ -> state
+    end
   end
 
   def touch_saved_at(nil, now), do: new(now)
@@ -343,9 +432,27 @@ defmodule Incrementalist.Game.State do
           |> Map.put(:is_purchased, is_purchased)
           |> Map.put(:can_purchase, !is_purchased && projected_state.level >= def.required_level)
         end),
+      "quests" => visible_quests(projected_state.quests),
+      "stats" => projected_state.stats,
       "projection_params" =>
         projection_params(projected_state, now)
     }
+  end
+
+  def visible_quests(quests) do
+    defs = Incrementalist.Game.Constants.quest_defs()
+    for {id, quest_def} <- defs, into: %{} do
+      q = Enum.find(quests, &(&1.id == id))
+      {id,
+       %{
+         "name" => quest_def.name,
+         "category" => quest_def.category,
+         "rank" => if(q, do: q.rank, else: 0),
+         "max_rank" => Enum.max(Map.keys(quest_def.ranks)),
+         "progress" => if(q, do: q.progress, else: 0.0),
+         "claimed_rank" => if(q, do: q.claimed_rank, else: 0)
+       }}
+    end
   end
 
   def projection_params(state, now) do
