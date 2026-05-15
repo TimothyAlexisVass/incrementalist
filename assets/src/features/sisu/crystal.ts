@@ -39,15 +39,15 @@ const CRYSTAL_PALETTES: Record<SisuCrystalTier, CrystalPalette> = {
     keyLight: 0xffffff
   },
   lucent: {
-    color: 0xff8c1a,
-    emissive: 0xffff00,
-    attenuation: 0xffff00,
+    color: 0xffffff,
+    emissive: 0xff8c1a,
+    attenuation: 0xff8c1a,
     sparkleA: 0xffffff,
-    sparkleB: 0xffff66,
+    sparkleB: 0xffff00,
     fillLight: 0xff0000,
     backLight: 0xff0000,
-    hemiSky: 0xff8c1a,
-    keyLight: 0xffffff
+    hemiSky: 0xff0000,
+    keyLight: 0xff0000
   },
   transcendent: {
     color: 0xf5f7fa,
@@ -290,9 +290,10 @@ export function renderSisuCrystal(
     child.rotation.y += dt * (0.55 + index * 0.012);
   });
 
-  nextRuntime.keyLight.intensity = 0.9 + Math.sin(t * 2.2) * -8.0;
-  nextRuntime.fillLight.intensity = 0.4 + Math.cos(t * 1.35) * -6.6;
-  nextRuntime.crystalMaterial.emissiveIntensity = 2.88 + Math.sin(t * 0.85) * 2.4;
+  nextRuntime.keyLight.intensity = 0.9 + Math.sin(t * 2.2) * 1.3;
+  nextRuntime.fillLight.intensity = 0.4 + Math.cos(t * 1.35) * 1.6;
+  let baseIntensity = tier == "lucent" ? 1.28 : 1.88;
+  nextRuntime.crystalMaterial.emissiveIntensity = baseIntensity + Math.sin(t * 0.85) * (baseIntensity / 1.3);
 
   const size = Math.max(1, Math.round(sizePx));
   renderer.drawThreeScene({
