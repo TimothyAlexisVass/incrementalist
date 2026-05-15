@@ -34,7 +34,7 @@ export const COLORS = Object.freeze({
     }
   },
   sisu: {
-    azure: '#1E90FF',
+    azure: '#1e90ff',
     aether: '#9932CC',
     lucent: '#FF8C1A',
     transcendent: '#F5F7FA'
@@ -119,7 +119,8 @@ export const COLORS = Object.freeze({
     coins: '#FFD700',
     shards: '#FF8C1A',
     cores: '#FF4D4D',
-    textPrimary: '#FFFFFF'
+    textPrimary: '#FFFFFF',
+    textWarning: '#ff0000'
   }
 } as const);
 

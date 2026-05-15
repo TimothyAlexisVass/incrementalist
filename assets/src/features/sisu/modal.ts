@@ -215,11 +215,11 @@ class SisuGeneratorModalImpl implements Modal {
           `Multiplier: ${formatSisuMultiplier(target)}`,
           `Decay: ${getDecayLabel(tier.id)}`
         ];
-        const lineColors = [COLORS.hud.textPrimary, COLORS.hud.textPrimary];
+        const lineColors: string[] = [COLORS.hud.textPrimary, COLORS.hud.textPrimary];
 
         if (authoritativeSisu >= target) {
           tooltipLines.push("Sisu charge is already higher");
-          lineColors.push("#ff0000");
+          lineColors.push(COLORS.hud.textWarning);
         }
 
         queueTooltip(input.pointer!, tooltipLines, { lineColors });
