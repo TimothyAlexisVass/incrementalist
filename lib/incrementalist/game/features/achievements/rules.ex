@@ -24,9 +24,26 @@ defmodule Incrementalist.Game.Features.Achievements.Rules do
         end
       end)
 
-    if updated_achievements != state.achievements or unlocked_count != state.stats.total_achievements do
+    total_multiplier =
+      Enum.reduce(updated_achievements, 0.0, fn {id, _unlocked_at}, acc ->
+        achievement_def = Enum.find(defs, &(&1.id == id))
+        if achievement_def, do: acc + achievement_def.multiplier, else: acc
+      end)
+
+    reward_multiplier = 1.0 + total_multiplier
+
+    if updated_achievements != state.achievements or
+         unlocked_count != state.stats.total_achievements or
+         reward_multiplier != state.progress_bar.reward_multiplier do
       new_stats = %{state.stats | total_achievements: unlocked_count}
-      %{state | achievements: updated_achievements, stats: new_stats}
+      new_progress_bar = %{state.progress_bar | reward_multiplier: reward_multiplier}
+
+      %{
+        state
+        | achievements: updated_achievements,
+          stats: new_stats,
+          progress_bar: new_progress_bar
+      }
     else
       state
     end

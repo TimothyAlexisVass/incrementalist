@@ -66,7 +66,7 @@ export type QuestState = {
 
 export type AchievementState = {
   name: string;
-  stars: number;
+  multiplier: number;
   condition: string;
   unlocked_at: string | null;
 };

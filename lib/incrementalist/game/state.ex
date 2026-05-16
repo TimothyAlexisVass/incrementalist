@@ -474,7 +474,7 @@ defmodule Incrementalist.Game.State do
       {achievement_def.id,
        %{
          "name" => achievement_def.name,
-         "stars" => achievement_def.stars,
+         "multiplier" => achievement_def.multiplier,
          "condition" => achievement_def.condition,
          "unlocked_at" => unlocked_at
        }}

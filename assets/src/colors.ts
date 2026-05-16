@@ -98,7 +98,7 @@ export const COLORS = Object.freeze({
     backdrop: 'rgba(0, 0, 0, 0.1)',
     panelBorder: '#3a5273',
     titleText: '#dbe8ff',
-    starsText: '#ffd966',
+    multiplierText: '#ffd966',
     unlockedStateText: '#dbe8ff',
     statusUnlocked: '#7fe38e',
     statusLocked: '#ff8c8c',

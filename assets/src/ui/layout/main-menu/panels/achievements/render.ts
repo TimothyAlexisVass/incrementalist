@@ -10,6 +10,7 @@ import { getAchievementViewModel } from './view-model';
 import { getNetwork } from '../../view-model';
 import { markViewed } from '../../../../../net/commands';
 import { hexToRgba } from '../../../../../utils/color';
+import { doCheckbox } from '../../../../components/checkbox';
 
 const CARD_HEIGHT_PX = 80;
 const CARD_GAP_PX = 8;
@@ -17,6 +18,7 @@ const CARD_SCROLLBAR_GUTTER_PX = 12;
 
 let achievementsScrollingPanel: ScrollingPanel | null = null;
 let lastViewedSnapshot: GameSnapshot | null = null;
+let hideCompleted = false;
 
 export function renderAchievementsTab(
   _canvas: HTMLCanvasElement,
@@ -47,12 +49,54 @@ export function renderAchievementsTab(
     color: hexToRgba(COLORS.panel.bg)
   });
 
-  const achievements = getAchievementViewModel(snapshot);
+  const allAchievements = getAchievementViewModel(snapshot);
+  const totalMultiplier = allAchievements
+    .filter(a => a.unlocked_at)
+    .reduce((sum, a) => sum + a.multiplier, 0);
+
+  // Header area
+  const headerHeight = 40;
+  const headerY = rect.y + 10;
+  
+  // Draw Checkbox
+  const checkboxSize = 20;
+  const checkboxLabel = "Hide completed";
+  const checkboxX = rect.x + rect.width - 150; 
+  
+  if (doCheckbox(input, checkboxX, headerY + (headerHeight - checkboxSize) / 2, checkboxSize, hideCompleted)) {
+    hideCompleted = !hideCompleted;
+  }
+
+  renderer.drawText({
+    text: checkboxLabel,
+    x: checkboxX + checkboxSize + 8,
+    y: headerY + headerHeight / 2,
+    font: '400 14px "Inter"',
+    color: COLORS.panel.textPrimary,
+    align: 'left',
+    baseline: 'middle'
+  });
+
+  // Draw Multiplier to the left of the checkbox
+  renderer.drawText({
+    text: `Multiplier: ${(totalMultiplier * 100).toFixed(2)}%`,
+    x: checkboxX - 20,
+    y: headerY + headerHeight / 2,
+    font: '600 16px "Outfit"',
+    color: COLORS.panel.textPrimary,
+    align: 'right',
+    baseline: 'middle'
+  });
+
+  const achievements = hideCompleted 
+    ? allAchievements.filter(a => !a.unlocked_at)
+    : allAchievements;
+
   const listRect = {
     x: rect.x,
-    y: rect.y,
+    y: rect.y + headerHeight + 10,
     width: Math.max(1, rect.width),
-    height: Math.max(1, rect.height)
+    height: Math.max(1, rect.height - headerHeight - 10)
   };
 
   const cardWidth = Math.max(1, listRect.width - CARD_SCROLLBAR_GUTTER_PX);

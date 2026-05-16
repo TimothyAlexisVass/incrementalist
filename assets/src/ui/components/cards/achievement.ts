@@ -57,10 +57,10 @@ export function drawAchievementCard(
     baseline: 'top'
   });
 
-  // Star reward
-  const starText = `+${(achievement.stars * 100).toFixed(2)}% Stars`;
+  // Multiplier reward
+  const multiplierText = `+${(achievement.multiplier * 100).toFixed(2)}% Multiplier`;
   renderer.drawText({
-    text: starText,
+    text: multiplierText,
     x: rect.x + rect.width - 15,
     y: rect.y + rect.height / 2,
     font: '500 14px "Inter"',

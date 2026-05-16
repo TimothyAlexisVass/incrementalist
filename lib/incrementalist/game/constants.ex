@@ -124,11 +124,11 @@ defmodule Incrementalist.Game.Constants do
   defp normalize_quest_requirement(id, value) when id in ["coins", "shards", "cores"], do: BigNum.from_number(value)
   defp normalize_quest_requirement(_id, value), do: value
 
-  defp normalize_achievement(%{"id" => id, "name" => name, "stars" => stars, "condition" => condition}) do
+  defp normalize_achievement(%{"id" => id, "name" => name, "multiplier" => multiplier, "condition" => condition}) do
     %{
       id: id,
       name: name,
-      stars: stars,
+      multiplier: multiplier,
       condition: condition
     }
   end

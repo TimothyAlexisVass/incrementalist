@@ -2,91 +2,91 @@
   {
     "id": "tutorial_graduated",
     "name": "Graduated",
-    "stars": 0.20,
+    "multiplier": 0.20,
     "condition": "tutorial_graduated"
   },
   {
     "id": "level_10",
     "name": "Newbie Incrementalist",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "level_10"
   },
   {
     "id": "level_20",
     "name": "Good Incrementalist",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "level_20"
   },
   {
     "id": "level_40",
     "name": "Better Incrementalist",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "level_40"
   },
   {
     "id": "rewards_50",
     "name": "First Rewards",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "rewards_50"
   },
   {
     "id": "rewards_250",
     "name": "More Rewards",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "rewards_250"
   },
   {
     "id": "rewards_500",
     "name": "Moar Rewards",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "rewards_500"
   },
   {
     "id": "rewards_1000",
     "name": "Even More Rewards",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "rewards_1000"
   },
   {
     "id": "coins_50000",
     "name": "High Roller",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "coins_50000"
   },
   {
     "id": "coins_100000",
     "name": "New Digit Unlocked!",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "coins_100000"
   },
   {
     "id": "shards_2500",
     "name": "First Shards",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "shards_2500"
   },
   {
     "id": "cores_100",
     "name": "First Cores",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "cores_100"
   },
   {
     "id": "screens_viewed_stats",
     "name": "This Screen Is Boring",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "screens_viewed_stats"
   },
   {
     "id": "screens_viewed_quests",
     "name": "More Tasks, YAY!",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "screens_viewed_quests"
   },
   {
     "id": "screens_viewed_achievements",
     "name": "This is An Achievement!",
-    "stars": 0.0005,
+    "multiplier": 0.0005,
     "condition": "screens_viewed_achievements"
   }
 ]
