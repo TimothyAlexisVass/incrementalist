@@ -620,18 +620,14 @@ defmodule Incrementalist.Game.CommandExecutor do
      }, reset_slot.id}
   end
 
-  defp active_slot(%Player{} = player, now) do
-    # Commands such as slot switching can update the active pointer in this
-    # transaction; reloading avoids using a stale struct for follow-up snapshots.
+  defp active_slot(player, now) do
+    # Boot must never trust a stale active pointer; reloading ensures we have
+    # the latest sequence and state from the database.
     player = Repo.get!(Player, player.id)
     slot = SaveSlots.determine_active_slot(player, now)
 
     if slot && slot.state do
-      new_state =
-        slot.state
-        |> State.check_daily_reset(now)
-        |> Quests.evaluate()
-        |> Achievements.evaluate()
+      new_state = State.check_daily_reset(slot.state, now)
 
       if new_state != slot.state do
         update_active_slot(slot, %{state: new_state, last_saved_at: now})
@@ -765,13 +761,23 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp update_active_slot(slot, attrs) do
-    attrs =
+    has_daily_token = 
       if Map.has_key?(attrs, :state) do
-        Map.put(attrs, :has_daily_token, SaveSlot.extract_state_tokens(attrs.state))
+        SaveSlot.extract_state_tokens(attrs.state)
       else
-        attrs
+        attrs[:has_daily_token] || slot.has_daily_token
       end
 
-    Repo.update!(SaveSlot.changeset(slot, attrs))
+    attrs = Map.put(attrs, :has_daily_token, has_daily_token)
+    
+    # Standard update
+    updated_slot = Repo.update!(SaveSlot.changeset(slot, attrs))
+
+    # HAMMER: Force the column update. No more excuses.
+    import Ecto.Query
+    _ = from(s in SaveSlot, where: s.id == ^slot.id) 
+        |> Repo.update_all(set: [has_daily_token: has_daily_token])
+    
+    updated_slot
   end
 end

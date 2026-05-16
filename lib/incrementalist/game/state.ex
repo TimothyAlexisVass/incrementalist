@@ -433,7 +433,8 @@ defmodule Incrementalist.Game.State do
             total_days_played: state.stats.total_days_played + 1,
             last_reset_at: Time.iso8601(now)
           }
-          %{state | stats: new_stats}
+          # Authoritatively grant a new daily token on the day roll-over
+          %{state | stats: new_stats, has_daily_token: true}
         else
           state
         end

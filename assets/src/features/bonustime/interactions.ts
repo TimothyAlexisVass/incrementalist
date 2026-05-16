@@ -38,22 +38,5 @@ export function handleBonusTimeInteractions(
     }
   }
 
-  // 2. LAST REWARD Button
-  if (db.last_result) {
-    const lastBtnWidth = 140;
-    const lastBtnHeight = 32;
-    const lastBtnX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - lastBtnWidth - 20;
-    const lastBtnY = DISPLAY_AREA_Y + 20;
-
-    const isHover = input.pointer &&
-                    input.pointer.x >= lastBtnX && input.pointer.x <= lastBtnX + lastBtnWidth &&
-                    input.pointer.y >= lastBtnY && input.pointer.y <= lastBtnY + lastBtnHeight;
-
-    if (isHover && input.clicked && !input.consumed) {
-      input.consumed = true;
-      return { type: 'open_last_reward' };
-    }
-  }
-
   return { type: 'none' };
 }

@@ -49,24 +49,6 @@ export function renderBonusTimeOverview(
     });
   }
 
-  // LAST REWARD Button
-  if (db.last_result) {
-    const lastBtnWidth = 140;
-    const lastBtnHeight = 32;
-    const lastBtnX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - lastBtnWidth - 20;
-    const lastBtnY = DISPLAY_AREA_Y + 20;
-
-    renderer.drawRect({
-      x: lastBtnX, y: lastBtnY, width: lastBtnWidth, height: lastBtnHeight,
-      color: hexToRgba("#1a202c")
-    });
-
-    renderer.drawText({
-      text: "LAST REWARD", x: lastBtnX + lastBtnWidth / 2, y: lastBtnY + lastBtnHeight / 2,
-      font: MODAL_BODY_FONT, color: "#cbd5e0", align: 'center', baseline: 'middle'
-    });
-  }
-
   // Reward Modal
   if (activeRewardModal && activeRewardModal.open) {
     renderRewardModal(canvas, activeRewardModal);

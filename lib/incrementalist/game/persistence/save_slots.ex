@@ -76,7 +76,6 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
         Enum.find(slots, &(&1.slot_index == 0))
 
     selected_slot = initialize_if_empty(selected_slot, now) |> SaveSlot.inject_state_tokens()
-    selected_slot = %{selected_slot | has_daily_token: true} # DEBUG: Give token
 
     if selected_slot.slot_index != player.active_save_slot do
       player

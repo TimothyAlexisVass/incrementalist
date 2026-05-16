@@ -63,7 +63,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
   end
 
   def inject_state_tokens(%__MODULE__{state: %State{}} = slot) do
-    %{slot | state: %{slot.state | has_daily_token: slot.has_daily_token || false}}
+    %{slot | state: %{slot.state | has_daily_token: slot.has_daily_token}}
   end
 
   def inject_state_tokens(slot), do: slot

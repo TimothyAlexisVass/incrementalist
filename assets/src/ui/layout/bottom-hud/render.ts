@@ -1,5 +1,5 @@
 import { COLORS } from "../../../colors";
-import { BOTTOM_HUD_HEIGHT } from "../../../config";
+import { BOTTOM_HUD_HEIGHT, DISPLAY_AREA_X, DISPLAY_AREA_WIDTH } from "../../../config";
 import { doButton } from '../../components/button';
 import { InteractionState } from '../../managers/interactions';
 import { renderAreaDropdown } from '../../../features/areas/render';
@@ -51,9 +51,9 @@ export function renderBottomHUD(
     onMenuClick();
   }
 
-  // Draw BONUSTIME button in the center
+  // Draw BONUSTIME button centered in DISPLAY_AREA
   const bonusWidth = 240;
-  const bonusX = (canvas.width - bonusWidth) / 2;
+  const bonusX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH - bonusWidth) / 2;
   const bonusRect = { x: bonusX, y: buttonY, width: bonusWidth, height: buttonHeight };
 
   if (isUnlocked) {

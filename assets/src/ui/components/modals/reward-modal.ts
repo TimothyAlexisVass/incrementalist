@@ -7,6 +7,12 @@ import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { drawButton } from '../button';
 import { BigNum } from '../../../core/bignum';
 import { formatBigNum } from '../../../utils/format';
+import dailyBonusConfig from '../../../../../shared/requirements/daily-bonus.json';
+
+function getTierColor(tier: number): string {
+  const tierConfig = (dailyBonusConfig.reward_tiers as any)[`tier_${tier}`];
+  return tierConfig?.color || "#ffffff";
+}
 
 export interface RewardModalState {
   open: boolean;
@@ -27,15 +33,6 @@ export interface RewardModalLayout {
   okRect: ModalRect;
 }
 
-const RARITY_COLORS: Record<number, string> = {
-  1: "#9aa7b5", // Common
-  2: "#56a8ff", // Rare
-  3: "#52df87", // Elite
-  4: "#ba77ff", // Excellent
-  5: "#ffbe4d", // Unique
-  6: "#ff5b8f", // Exotic
-  7: "#ffffff"  // Ultimate
-};
 
 export function getRewardModalLayout(_canvas: { width: number, height: number }): RewardModalLayout {
   const modalWidth = 360;
@@ -71,7 +68,7 @@ export function renderRewardModal(
   const layout = getRewardModalLayout(canvas);
   const { modalRect, okRect } = layout;
 
-  const rarityColor = RARITY_COLORS[state.tier] || "#ffffff";
+  const rarityColor = getTierColor(state.tier);
 
   // Backdrop
   renderer.drawRect({
@@ -94,42 +91,19 @@ export function renderRewardModal(
   // Color-coded Border
   drawRectOutline(renderer, modalRect.x, modalRect.y, modalRect.width, modalRect.height, 3, cssToRgba(rarityColor));
 
-  // Title
+  // Title - Simplified to just the tier reward
   renderer.drawText({
-    text: "REWARD UNLOCKED",
+    text: `TIER ${state.tier} REWARD`,
     x: modalRect.x + (modalRect.width / 2),
-    y: modalRect.y + 36,
+    y: modalRect.y + (modalRect.height / 2) - 10,
     font: MODAL_TITLE_FONT,
     color: rarityColor,
     align: 'center',
-    baseline: 'alphabetic'
-  });
-
-  // Rarity Label
-  renderer.drawText({
-    text: state.rarity.toUpperCase(),
-    x: modalRect.x + (modalRect.width / 2),
-    y: modalRect.y + 64,
-    font: MODAL_BODY_FONT,
-    color: rarityColor,
-    align: 'center',
-    baseline: 'alphabetic'
-  });
-
-  // Reward Amount
-  const amountText = `+ ${formatBigNum(state.rewardAmount)} COINS`;
-  renderer.drawText({
-    text: amountText,
-    x: modalRect.x + (modalRect.width / 2),
-    y: modalRect.y + 120,
-    font: MODAL_TITLE_FONT,
-    color: COLORS.overlay.bodyText,
-    align: 'center',
-    baseline: 'alphabetic'
+    baseline: 'middle'
   });
 
   // OK Button
-  drawButton(okRect, 'COLLECT', {
+  drawButton(okRect, 'OK', {
     active: true,
     activeSurface: COLORS.button.surface.active,
     inactiveSurface: COLORS.button.surface.inactive,
