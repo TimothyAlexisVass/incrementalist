@@ -1,7 +1,6 @@
 import { InteractionState, pointInRect } from '../managers/interactions';
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { queueTooltip } from "./tooltip";
-import { pushGpuBonusTimeGlow } from "../../render/webgl-effects";
 
 import { BONUSTIME_BUTTON_FONT } from "../../config";
 import { COLORS } from "../../colors";
@@ -67,18 +66,6 @@ function drawBonusTimeButton(
 
   const hueShift = ((now % HUE_ROTATION_MS) / HUE_ROTATION_MS) * 360;
   const pulse = Math.sin(now / 400) * 0.5 + 0.5;
-
-  // 1. Beautiful pulsating glow
-  const glowColor = hslToRgb(hueShift, 90, 60);
-  pushGpuBonusTimeGlow({
-    x: rect.x,
-    y: rect.y,
-    width: rect.width,
-    height: rect.height,
-    color: glowColor,
-    intensity: 0.4 + pulse * 0.3,
-    radius: 30 + pulse * 20
-  });
 
   // 2. Per-letter rainbow — color is a material uniform so the Troika mesh
   //    is reused across color changes without needing a re-sync.

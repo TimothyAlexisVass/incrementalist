@@ -809,26 +809,6 @@ export function spawnGpuProgressCompletionBurst(
   return true;
 }
 
-export function pushGpuBonusTimeGlow(options: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color?: [number, number, number];
-  intensity: number;
-  radius: number;
-}) {
-  const color = normalizeColor(options.color || [255, 255, 255]);
-  WEBGL_EFFECTS.progressGlow = {
-    x: options.x,
-    y: options.y,
-    width: options.width,
-    height: options.height,
-    color: [color[0], color[1], color[2]],
-    intensity: options.intensity,
-    radius: options.radius
-  };
-}
 
 export function spawnGpuProgressCollectionLaserBurst(
   barX: number,

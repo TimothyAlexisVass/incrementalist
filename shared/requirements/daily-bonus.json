@@ -1,5 +1,6 @@
 {
   "rotation_slot_count": 9,
+  "rotation_anchor": "2026-01-10T12:00:00Z",
   "rotation": {
     "1": "chest_draw",
     "2": "prize_wheel",
@@ -12,57 +13,198 @@
     "9": "bonus_time"
   },
   "games": {
-    "chest_draw": { "name": "Chest Draw", "slot": 1 },
-    "prize_wheel": { "name": "Prize Wheel", "slot": 2 },
-    "resource_checklist": { "name": "Resource Checklist", "slot": 3, "checklist_key": "resource" },
-    "coin_rain": { "name": "Coin Rain", "slot": 4 },
-    "item_checklist": { "name": "Item Checklist", "slot": 5, "checklist_key": "item" },
-    "hammer_smash": { "name": "Hammer Smash", "slot": 6 },
-    "plinko_drop": { "name": "Plinko Drop", "slot": 7 },
-    "jackpot_meter": { "name": "Jackpot Meter", "slot": 8 },
-    "bonus_time": { "name": "Bonus Time", "slot": 9 }
+    "chest_draw": {
+      "name": "Chest Draw",
+      "slot": 1
+    },
+    "prize_wheel": {
+      "name": "Prize Wheel",
+      "slot": 2
+    },
+    "resource_checklist": {
+      "name": "Resource Checklist",
+      "slot": 3,
+      "checklist_key": "resource"
+    },
+    "coin_rain": {
+      "name": "Coin Rain",
+      "slot": 4
+    },
+    "item_checklist": {
+      "name": "Item Checklist",
+      "slot": 5,
+      "checklist_key": "item"
+    },
+    "hammer_smash": {
+      "name": "Hammer Smash",
+      "slot": 6
+    },
+    "plinko_drop": {
+      "name": "Plinko Drop",
+      "slot": 7
+    },
+    "jackpot_meter": {
+      "name": "Jackpot Meter",
+      "slot": 8
+    },
+    "bonus_time": {
+      "name": "Bonus Time",
+      "slot": 9
+    }
   },
   "reward_tiers": {
-    "tier_1": { "tier": 1, "rarity": "Common", "color": "#9aa7b5" },
-    "tier_2": { "tier": 2, "rarity": "Rare", "color": "#56a8ff" },
-    "tier_3": { "tier": 3, "rarity": "Elite", "color": "#52df87" },
-    "tier_4": { "tier": 4, "rarity": "Excellent", "color": "#ba77ff" },
-    "tier_5": { "tier": 5, "rarity": "Unique", "color": "#ffbe4d" },
-    "tier_6": { "tier": 6, "rarity": "Exotic", "color": "#ff5b8f" },
-    "tier_7": { "tier": 7, "rarity": "Ultimate", "color": "#ffffff" }
+    "tier_1": {
+      "tier": 1,
+      "rarity": "Common",
+      "color": "#ffffff"
+    },
+    "tier_2": {
+      "tier": 2,
+      "rarity": "Rare",
+      "color": "#56a8ff"
+    },
+    "tier_3": {
+      "tier": 3,
+      "rarity": "Excellent",
+      "color": "#52df87"
+    },
+    "tier_4": {
+      "tier": 4,
+      "rarity": "Supreme",
+      "color": "#ba77ff"
+    },
+    "tier_5": {
+      "tier": 5,
+      "rarity": "Legendary",
+      "color": "#ffbe4d"
+    },
+    "tier_6": {
+      "tier": 6,
+      "rarity": "Celestial",
+      "color": "#ff5b8f"
+    },
+    "tier_7": {
+      "tier": 7,
+      "rarity": "Divine",
+      "color": "#40e0d0"
+    }
   },
   "game_rules": {
     "chest_draw": {
-      "chances": [0.5, 0.35, 0.1, 0.04, 0.009, 0.0009, 0.0001],
-      "streak_scaling": { "interval": 60, "max_bonus": 2 }
+      "chances": [
+        0.5,
+        0.35,
+        0.1,
+        0.04,
+        0.009,
+        0.0009,
+        0.0001
+      ],
+      "streak_scaling": {
+        "interval": 60,
+        "max_bonus": 2
+      }
     },
     "prize_wheel": {
-      "chances": [0.5, 0.3, 0.12, 0.05, 0.02, 0.0097, 0.0003],
-      "streak_scaling": { "interval": 30, "max_bonus": 2 }
+      "chances": [
+        0.5,
+        0.3,
+        0.12,
+        0.05,
+        0.02,
+        0.0097,
+        0.0003
+      ],
+      "streak_scaling": {
+        "interval": 30,
+        "max_bonus": 2
+      }
     },
     "coin_rain": {
-      "chances": [0.55, 0.25, 0.12, 0.05, 0.02, 0.009, 0.001],
-      "streak_scaling": { "interval": 45, "max_bonus": 3 }
+      "chances": [
+        0.55,
+        0.25,
+        0.12,
+        0.05,
+        0.02,
+        0.009,
+        0.001
+      ],
+      "streak_scaling": {
+        "interval": 45,
+        "max_bonus": 3
+      }
     },
     "hammer_smash": {
-      "min_power": { "base": 5, "streak_divisor": 15, "streak_cap": 15 },
-      "smash_power_variance": { "min": 0.3, "max": 2.0 },
-      "tiers": [0.15, 0.30, 0.60, 0.75, 0.90, 1.0],
-      "bell_break_chances": [0.5, 0.25, 0.15, 0.1]
+      "min_power": {
+        "base": 5,
+        "streak_divisor": 15,
+        "streak_cap": 15
+      },
+      "smash_power_variance": {
+        "min": 0.3,
+        "max": 2.0
+      },
+      "tiers": [
+        0.15,
+        0.30,
+        0.60,
+        0.75,
+        0.90,
+        1.0
+      ],
+      "bell_break_chances": [
+        0.5,
+        0.25,
+        0.15,
+        0.1
+      ]
     },
     "plinko_drop": {
-      "chances": [0.386719, 0.225586, 0.241699, 0.107422, 0.032227, 0.005859, 0.000488],
-      "drop_count": { "base": 1, "streak_divisor": 45, "max": 3 }
+      "chances": [
+        0.386719,
+        0.225586,
+        0.241699,
+        0.107422,
+        0.032227,
+        0.005859,
+        0.000488
+      ],
+      "drop_count": {
+        "base": 1,
+        "streak_divisor": 45,
+        "max": 3
+      }
     },
     "jackpot_meter": {
       "base_chance": 0.005,
-      "streak_bonus": { "divisor": 100, "cap": 0.01 },
+      "streak_bonus": {
+        "divisor": 100,
+        "cap": 0.01
+      },
       "miss_increment": 0.005,
-      "consolation_chances": [0.55, 0.25, 0.10, 0.06, 0.03, 0.01]
+      "consolation_chances": [
+        0.55,
+        0.25,
+        0.10,
+        0.06,
+        0.03,
+        0.01
+      ]
     },
     "bonus_time": {
-      "chances": [0.56, 0.25, 0.1, 0.06, 0.03, 0.01],
-      "flip_count": { "streak_divisor": 30, "streak_max": 5 }
+      "chances": [
+        0.56,
+        0.25,
+        0.1,
+        0.06,
+        0.03,
+        0.01
+      ],
+      "flip_count": {
+        "streak_divisor": 30,
+        "streak_max": 5
+      }
     }
   }
 }

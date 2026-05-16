@@ -50,6 +50,9 @@ import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
 import { renderBonusTimeOverview } from "../features/bonustime/render";
+import { handleBonusTimeInteractions } from "../features/bonustime/interactions";
+import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
+import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
 import {
@@ -75,6 +78,7 @@ export class GameClient {
   private readonly mainMenu = new MainMenu();
   private readonly interactions: Interactions;
   private sisuControlLayout: SisuControlLayout | null = null;
+  private bonusRewardModal: RewardModalState | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -290,6 +294,9 @@ export class GameClient {
     if (cachedSnapshot) {
       this.store.state.snapshot = cachedSnapshot;
       getStateFromSnapshot(cachedSnapshot);
+    } else {
+      // Clear the stale snapshot from the previous slot
+      this.store.state.snapshot = null;
     }
   }
 
@@ -420,7 +427,30 @@ export class GameClient {
     renderAreaBackground(this.canvas);
 
     if (this.store.state.currentView === View.BONUSTIME) {
-      renderBonusTimeOverview(this.canvas, input, this.store.state);
+      if (this.bonusRewardModal?.open && input.clicked && input.pointer) {
+        const layout = getRewardModalLayout(this.canvas);
+        if (resolveRewardModalAction(layout, input.pointer.x, input.pointer.y)) {
+          this.bonusRewardModal.open = false;
+          input.consumed = true;
+        }
+      }
+
+      if (!input.consumed) {
+        const interactionResult = handleBonusTimeInteractions(input, this.store.state, this.channel || undefined);
+        if (interactionResult.type === 'open_last_reward' || interactionResult.type === 'open_chest_reward') {
+          const db = this.store.state.snapshot?.state.daily_bonus;
+          if (db?.last_result) {
+            this.bonusRewardModal = {
+              open: true,
+              tier: db.last_result.tier,
+              rarity: interactionResult.type === 'open_last_reward' ? "Last Reward" : "Result",
+              rewardAmount: db.last_result.reward_amount
+            };
+          }
+        }
+      }
+
+      renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal);
     }
     
     renderProgressBar(this.canvas, input, uiBlocked);
@@ -471,7 +501,7 @@ export class GameClient {
       }
     }, this.channel || undefined, 
     this.store.state.snapshot?.state.has_daily_token,
-    this.store.state.snapshot?.state.daily_bonus,
+    getBonusTimeTooltipData(this.store.state) || undefined,
     this.store.state.snapshot?.state.features.bonus_time_purchased,
     (cmd) => this.runCommand(cmd));
 

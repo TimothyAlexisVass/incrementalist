@@ -386,7 +386,7 @@ defmodule Incrementalist.Game.State do
         idle_mode_purchased: false,
         world_map_unlocked: false,
         sisu_generator_purchased: false,
-        bonus_time_purchased: true
+        bonus_time_purchased: false
       },
       sisu: %Sisu{
         current: BigNum.one(),
@@ -529,7 +529,7 @@ defmodule Incrementalist.Game.State do
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
       "has_daily_token" => projected_state.has_daily_token,
-      "daily_bonus" => if(projected_state.daily_bonus, do: Map.from_struct(projected_state.daily_bonus), else: nil),
+      "daily_bonus" => if(projected_state.daily_bonus, do: Map.merge(Map.from_struct(projected_state.daily_bonus), %{"rotation_anchor" => Incrementalist.Game.Constants.daily_bonus_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601()}), else: nil),
       "projection_params" =>
         projection_params(projected_state, now)
     }

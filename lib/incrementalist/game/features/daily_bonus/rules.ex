@@ -76,6 +76,12 @@ defmodule Incrementalist.Game.Features.DailyBonus.Rules do
   end
 
   def get_active_game(now \\ Time.now()) do
+    game_id = get_active_game_id(now)
+    games = Constants.daily_bonus_games()
+    games[game_id]
+  end
+
+  def get_active_game_id(now \\ Time.now()) do
     anchor_ms = Time.to_unix_ms(Constants.daily_bonus_rotation_anchor_at())
     now_ms = Time.to_unix_ms(now)
 
@@ -84,11 +90,8 @@ defmodule Incrementalist.Game.Features.DailyBonus.Rules do
 
     slot_count = Constants.daily_bonus_rotation_slot_count()
     active_slot_index = rem(boundary_index, slot_count) + 1
-    
+
     rotation = Constants.daily_bonus_rotation()
-    game_id = rotation[to_string(active_slot_index)]
-    
-    games = Constants.daily_bonus_games()
-    games[game_id]
+    rotation[to_string(active_slot_index)]
   end
 end

@@ -102,4 +102,34 @@ defmodule Incrementalist.Game.Rewards do
     coins = BigNum.mul(BigNum.from_number(200), BigNum.from_number(level))
     {coins, shards, cores}
   end
+
+  def grant_bonus_reward(%State{} = state, tier_index) do
+    # Tiers are 1-7.
+    # Formula: level * 1000 * tier_multiplier
+    level = state.level || 1
+    multiplier = case tier_index do
+      1 -> 1.0
+      2 -> 2.5
+      3 -> 6.0
+      4 -> 15.0
+      5 -> 40.0
+      6 -> 100.0
+      7 -> 500.0
+      _ -> 1.0
+    end
+
+    amount_f = level * 1000 * multiplier
+    reward_coins = BigNum.from_number(amount_f)
+
+    new_coins = BigNum.add(state.coins || BigNum.zero(), reward_coins)
+    
+    stats = state.stats || %State.Stats{}
+    new_stats = %{
+      stats |
+      total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), reward_coins)
+    }
+
+    new_state = %{state | coins: new_coins, stats: new_stats}
+    {new_state, reward_coins}
+  end
 end

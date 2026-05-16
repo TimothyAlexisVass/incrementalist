@@ -271,6 +271,17 @@ export type StatsUpdateResult = {
   notices: NoticeState;
 };
 
+export type DailyBonusPlayResult = {
+  type: "daily_bonus.play.result";
+  status: "ok";
+  command_id: number;
+  coins?: BigNum;
+  has_daily_token?: boolean;
+  daily_bonus?: DailyBonusState;
+  achievements?: Record<string, AchievementState>;
+  notices: NoticeState;
+};
+
 
 export type NoticeEventKind = "child_shown" | "child_clicked";
 
@@ -307,7 +318,11 @@ export type CommandErrorReason =
   | "no_rewards_to_claim"
   | "rank_definition_not_found"
   | "screen_id_required"
-  | "unknown_screen";
+  | "unknown_screen"
+  | "no_tokens"
+  | "game_not_available"
+  | "game_id_required"
+  | "invalid_request";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -335,6 +350,7 @@ export type AckableCommandResult =
   | QuestClaimResult
   | StatsUpdateResult
   | NoticeEventResult
+  | DailyBonusPlayResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -390,6 +406,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "quest.claim.result" ||
     result.type === "stats.update.result" ||
     result.type === "notice.event.result" ||
+    result.type === "daily_bonus.play.result" ||
     result.type === "command.error"
   );
 }

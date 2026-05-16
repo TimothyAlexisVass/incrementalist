@@ -91,7 +91,8 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     result.type === "sisu.refill.result" ||
     result.type === "sisu.upgrade_max.result" ||
     result.type === "quest.claim.result" ||
-    result.type === "stats.update.result"
+    result.type === "stats.update.result" ||
+    result.type === "daily_bonus.play.result"
   ) {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result as any);

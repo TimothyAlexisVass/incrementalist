@@ -57,9 +57,10 @@ defmodule Incrementalist.Game.Constants do
 
   def daily_bonus_slot_ms, do: 43_200_000
   def daily_bonus_rotation_slot_count, do: @daily_bonus["rotation_slot_count"]
+  def daily_bonus_game_rules, do: @daily_bonus["game_rules"]
 
   def daily_bonus_rotation_anchor_at do
-    {:ok, dt, _} = DateTime.from_iso8601("2024-01-01T00:00:00Z")
+    {:ok, dt, _} = DateTime.from_iso8601(@daily_bonus["rotation_anchor"])
     dt
   end
 

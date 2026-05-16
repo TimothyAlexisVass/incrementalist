@@ -14,7 +14,8 @@ import type {
   ShopPurchaseResult,
   StatsUpdateResult,
   NoticeEventResult,
-  NoticeEventKind
+  NoticeEventKind,
+  DailyBonusPlayResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -77,6 +78,12 @@ export function markViewed(channel: GameChannel, screenId: string) {
 
 export function graduateTutorial(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<StatsUpdateResult | CommandErrorResult>>("stats.graduate_tutorial");
+}
+
+export function playDailyBonus(channel: GameChannel, gameId: string) {
+  return channel.pushCommand<CommandPushResult<DailyBonusPlayResult | CommandErrorResult>>("daily_bonus.play", {
+    game: gameId
+  });
 }
 
 export async function ackAppliedResult(

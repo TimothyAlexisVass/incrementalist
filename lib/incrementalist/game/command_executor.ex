@@ -13,6 +13,8 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
+  alias Incrementalist.Game.Features.DailyBonus.Rules, as: DailyBonus
+  alias Incrementalist.Game.Features.DailyBonus.Games.ChestDraw
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -49,7 +51,11 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
         if next_state != active_slot.state or next_notices != active_slot.notices do
-          update_active_slot(active_slot, %{state: next_state, notices: next_notices, last_saved_at: now})
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
         end
 
         {"succeeded",
@@ -180,6 +186,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, enabled} <- fetch_boolean(command.intent, "enabled"),
              {:ok, intermediate_state} <- Bar.set_idle_mode(active_slot.state, enabled) do
+          # TODO: Looks like we can remove the old, unused _can_claim_in from here
           {next_state, _can_claim_in} = Bar.ensure_can_claim_at(intermediate_state, now)
 
           next_notices =
@@ -220,6 +227,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         with {:ok, tier_id} <- fetch_tier_id(command.intent),
              {:ok, next_state} <- Sisu.refill(active_slot.state, tier_id, now) do
           next_state = Achievements.evaluate(next_state)
+
           next_notices =
             Notices.refresh_for_state_transition(
               active_slot.notices || Notices.new(active_slot.state),
@@ -259,6 +267,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, next_state} <- Sisu.upgrade_max(active_slot.state, now) do
           next_state = Achievements.evaluate(next_state)
+
           next_notices =
             Notices.refresh_for_state_transition(
               active_slot.notices || Notices.new(active_slot.state),
@@ -299,6 +308,7 @@ defmodule Incrementalist.Game.CommandExecutor do
              {:ok, intermediate_state} <-
                Incrementalist.Game.Features.Shop.purchase(active_slot.state, item_id) do
           intermediate_state = Achievements.evaluate(intermediate_state)
+
           intermediate_state =
             if item_id == "sisu_generator" do
               Sisu.initialize_generator(intermediate_state, now)
@@ -344,7 +354,6 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result(reason, command), active_slot.id}
         end
 
-
       "notice.event" ->
         active_slot = active_slot(player, now)
 
@@ -384,6 +393,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         with {:ok, quest_id} <- fetch_quest_id(command.intent),
              {:ok, next_state} <- Quests.claim(active_slot.state, quest_id) do
           next_state = Achievements.evaluate(next_state)
+
           next_notices =
             Notices.refresh_for_state_transition(
               active_slot.notices || Notices.new(active_slot.state),
@@ -416,7 +426,6 @@ defmodule Incrementalist.Game.CommandExecutor do
           {:error, reason} ->
             {"failed", error_result(reason, command), active_slot.id}
         end
-
 
       "stats.mark_viewed" ->
         active_slot = active_slot(player, now)
@@ -468,6 +477,84 @@ defmodule Incrementalist.Game.CommandExecutor do
            "achievements" => State.visible_achievements(next_state.achievements),
            "notices" => active_slot.notices
          }, active_slot.id}
+
+      "daily_bonus.play" ->
+        active_slot = active_slot(player, now)
+
+        with {:ok, next_state, token_type} <- DailyBonus.spend_token(active_slot.state),
+             active_game_id <- DailyBonus.get_active_game_id(now),
+             {:ok, game_id} <- fetch_game_id(command.intent),
+             true <- game_id == active_game_id do
+          # Execute game rules
+          {tier, rolls} =
+            case game_id do
+              "chest_draw" -> ChestDraw.roll_reward(next_state.daily_bonus.streak)
+              _ -> {1, [1]}
+            end
+
+          # Apply rewards
+          {next_state, reward_amount} =
+            Incrementalist.Game.Rewards.grant_bonus_reward(next_state, tier)
+
+          # Update streak and metadata
+          next_state = DailyBonus.advance_streak(next_state, now)
+
+          daily_bonus = next_state.daily_bonus
+          new_reward_counts = Map.update(daily_bonus.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+
+          last_result = %{
+            "game_id" => game_id,
+            "tier" => tier,
+            "rolls" => rolls,
+            "reward_amount" => reward_amount,
+            "token_type" => token_type,
+            "played_at" => Time.iso8601(now)
+          }
+
+          next_daily_bonus = %{
+            daily_bonus
+            | total_games_played: daily_bonus.total_games_played + 1,
+              reward_counts: new_reward_counts,
+              last_result: last_result
+          }
+
+          next_state = %{next_state | daily_bonus: next_daily_bonus}
+          next_state = Achievements.evaluate(next_state)
+
+          next_notices =
+            Notices.refresh_for_state_transition(
+              active_slot.notices || Notices.new(active_slot.state),
+              active_slot.state,
+              next_state
+            )
+
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
+
+          {"succeeded",
+           %{
+             "type" => "daily_bonus.play.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "coins" => next_state.coins,
+             "has_daily_token" => next_state.has_daily_token,
+             "daily_bonus" => next_state.daily_bonus,
+             "achievements" => State.visible_achievements(next_state.achievements),
+             "notices" => Notices.payload(next_notices)
+           }, active_slot.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), active_slot.id}
+
+          false ->
+            {"failed", error_result("game_not_available", command), active_slot.id}
+
+          _ ->
+            {"failed", error_result("invalid_request", command), active_slot.id}
+        end
 
       _unknown ->
         active_slot = active_slot(player, now)
@@ -652,6 +739,10 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp normalize_slot_index(_slot_index), do: {:error, "invalid_slot_index"}
+
+  defp fetch_game_id(%{"game" => game_id}) when is_binary(game_id), do: {:ok, game_id}
+  defp fetch_game_id(%{game: game_id}) when is_binary(game_id), do: {:ok, game_id}
+  defp fetch_game_id(_), do: {:error, "game_id_required"}
 
   defp cached_snapshot_hint?(%{"has_cached_snapshot" => true}), do: true
   defp cached_snapshot_hint?(%{has_cached_snapshot: true}), do: true
