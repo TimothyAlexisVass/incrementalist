@@ -149,8 +149,8 @@
     }
   },
   "daily": {
-    "attendance": {
-      "name": "Attendance Gift",
+    "streak": {
+      "name": "Streak Gift",
       "ranks": {
         "1": {
           "requirement": 2,

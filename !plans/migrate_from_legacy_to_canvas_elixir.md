@@ -178,43 +178,32 @@ Canvas-only UI contract:
 - DOM may host the canvas and non-game browser shell only. Gameplay display, menus, overlays, buttons, hit testing, hover state, and modal-like flows belong in Canvas/WebGL modules.
 
 ## Migration Phases
-Phases 1-8 are completed and therefore removed from this plan.
+Phases 1-10 are completed and therefore removed from this plan.
 
-### Phase 9: Quests
+### Phase 11: BONUSTIME
 
-Implementation of the Quests system, including backend evaluation and UI panels.
-- **[9.1: Scrolling Panel Component](phase_9/9_1_scrolling_panel.md)**: Infrastructure for long lists.
-- **[9.2: Quests Backend](phase_9/9_2_quests_backend.md)**: Rules, evaluation, and commands.
-- **[9.3: Quests UI](phase_9/9_3_quests_ui.md)**: Cards and Main Menu panel.
-
-### Phase 10: Achievements
-
-Implementation of the Achievements system.
-- **[10.1: Achievements Backend](phase_9/10_1_achievements_backend.md)**: Rules and unlock conditions.
-- **[10.2: Achievements UI](phase_9/10_2_achievements_ui.md)**: Cards and Main Menu panel.
-- **[10.3: Centralized Notice Integration](phase_9/10_3_notices.md)**: Notification bubbling for both features.
-
-### Phase 11: Daily Bonus
-
-- Port daily token rotation, streaks, reward counts, and one-shot games.
+- Port daily token rotation (12-hour slots), streaks (decrement by 3 on miss), and 13 daily mini-games.
+- Included Games: Chest Draw, Prize Wheel, Coin Rain, Resource/Item Checklists, Reward Labyrinth, Ladder Climb, Hammer Smash, Lucky Dice, Plinko Drop, Scratch Card, Jackpot Meter, and Bonus Time.
+- Implement dual-token system: `daily_tokens` (rotating) and `special_tokens` (persistent).
+- Enforce token grant rule: 1 `daily_token` granted at boundary ONLY IF total tokens is 0.
 - Implement `daily_bonus.open`, `daily_bonus.play`, and game-specific commands.
-- Render the Daily tab and daily bonus interactions in Canvas.
-- Keep client animations reveal-only.
+- Render the Daily tab and daily bonus interactions in Canvas/WebGL.
+- Keep client animations reveal-only and server-validated.
 
-Deliverable: daily bonus loop, one-shot games, and reveal animations are ported.
+Deliverable: daily bonus loop, dual-token mechanics, 13 one-shot games, and reveal animations are ported.
 
-### Phase 12: Card Pick
+### Phase 12: Card Pick & Match Pairs
 
-- Replace the legacy client-board model.
-- Server stores session state.
-- Client sends reveal intent with picked count only, not selected indexes.
-- Server accepts the picked count only if it matches the server-owned session phase.
+- Port the remaining complex mini-games: Card Pick and Match Pairs.
+- Replace the legacy client-board model with server-authoritative session state.
+- Client sends reveal intent with picked count only (Card Pick) or paired indexes (Match Pairs).
+- Server accepts picks only if they match the server-owned session phase.
 - Client may remember which visible card positions the player clicked as UI state, then map server reveal results onto those positions.
 - Server calculates reveal outcomes only when reveal is requested.
-- Reveal response includes all 36 results: picked results first, then missed results.
-- Bonus phases reveal only allowed information.
+- Reveal response includes all results: picked results first, then missed results (to show "what was where").
+- Bonus phases and multipliers reveal only allowed information.
 
-Deliverable: Card Pick session lifecycle and reveal flow are ported.
+Deliverable: Card Pick and Match Pairs session lifecycles and reveal flows are ported.
 
 ### Phase 13: Legacy Removal
 
