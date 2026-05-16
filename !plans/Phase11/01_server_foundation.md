@@ -19,15 +19,14 @@ Implementations for all mini-games in this phase must be **visually basic and re
 Add `daily_bonus` field to the `SaveSlot` state JSONB in `lib/incrementalist/game/state.ex` as an embedded schema:
 - `daily_tokens`: Integer (Attempts granted by daily rotation).
 - `special_tokens`: Integer (Persistent bonus attempts).
-- `rotation_anchor_at`: ISO8601 Timestamp (The base for rotation calculations).
 - `last_token_boundary_index`: Integer (Last boundary at which a token grant was evaluated).
 - `streak`: Integer (Consecutive days played).
 - `last_played_at`: ISO8601 Timestamp (To calculate streak gaps).
 - `total_games_played`: Integer.
-- `rewards_received`: Integer (Total count across all tiers).
 - `reward_counts`: Map (Tier ID -> Count).
 - `checklist_entry_indexes`: Map (Resource/Item -> Next index).
-- `last_result`: Map (Details of the most recent play for client display/replay).
+- `active_session`: Map (Polymorphic embed with type/data for multi-step games).
+- `last_result`: Map (Durable details of the most recent play, including reward_id and BigNum reward_amount).
 
 ### 2. Rules Implementation
 Create `lib/incrementalist/game/features/daily_bonus/rules.ex`:
@@ -35,20 +34,21 @@ Create `lib/incrementalist/game/features/daily_bonus/rules.ex`:
   - Calculate `boundary_index` (12-hour slots since anchor).
   - If `boundary_index > last_token_boundary_index`:
     - Update `last_token_boundary_index`.
-    - Grant 1 `daily_token` **ONLY IF** total tokens (`daily_tokens + special_tokens`) is 0.
+    - Grant 1 `daily_token` **ONLY IF** `daily_tokens` is 0.
 - **Spending Logic**: Implement `spend_token(state)`.
   - Prioritize spending `daily_tokens` before `special_tokens`.
 - **Streak Management**: Implement `advance_streak(state, now)`.
   - Increment if played on a new UTC day.
-  - Decrement by 3 if a day is skipped (legacy parity).
-  - **Quest Integration**: Update the `streak` quest progress (formerly `attendance`) in `shared/requirements/quests.json`.
+  - Decrement by 3 **per missed day** if a day is skipped.
+  - **Quest Integration**: Rename the `attendance` quest to `streak` in `shared/requirements/quests.json` and update its progress logic.
 - **Game Selection**: Map `boundary_index` to the rotating game from requirements.
 
 ### 3. Constants
 Update `lib/incrementalist/game/constants.ex` to provide accessors for the JSON data.
-Define hardcoded timing constants:
+Define hardcoded timing and rotation constants:
+- `daily_bonus_rotation_anchor_at`: Hardcoded global UTC boundary (e.g., 2024-01-01T00:00:00Z).
 - `daily_bonus_slot_ms`: 43_200_000 (12 hours).
-- `daily_bonus_rotation_slot_count`: 15.
+- `daily_bonus_rotation_slot_count`: 9.
 
 ## Verification
 - Unit tests for token grant logic (especially the "grant only if 0" rule).

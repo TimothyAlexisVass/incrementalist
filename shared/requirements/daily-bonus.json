@@ -1,38 +1,26 @@
 {
-  "rotation_slot_count": 15,
+  "rotation_slot_count": 9,
   "rotation": {
     "1": "chest_draw",
     "2": "prize_wheel",
     "3": "resource_checklist",
-    "4": "card_pick",
-    "5": "coin_rain",
-    "6": "reward_labyrinth",
-    "7": "ladder_climb",
-    "8": "match_pairs",
-    "9": "item_checklist",
-    "10": "hammer_smash",
-    "11": "lucky_dice",
-    "12": "plinko_drop",
-    "13": "scratch_card",
-    "14": "jackpot_meter",
-    "15": "bonus_time"
+    "4": "coin_rain",
+    "5": "item_checklist",
+    "6": "hammer_smash",
+    "7": "plinko_drop",
+    "8": "jackpot_meter",
+    "9": "bonus_time"
   },
   "games": {
     "chest_draw": { "name": "Chest Draw", "slot": 1 },
     "prize_wheel": { "name": "Prize Wheel", "slot": 2 },
     "resource_checklist": { "name": "Resource Checklist", "slot": 3, "checklist_key": "resource" },
-    "card_pick": { "name": "Card Pick", "slot": 4 },
-    "coin_rain": { "name": "Coin Rain", "slot": 5 },
-    "reward_labyrinth": { "name": "Reward Labyrinth", "slot": 6 },
-    "ladder_climb": { "name": "Ladder Climb", "slot": 7 },
-    "match_pairs": { "name": "Match Pairs", "slot": 8 },
-    "item_checklist": { "name": "Item Checklist", "slot": 9, "checklist_key": "item" },
-    "hammer_smash": { "name": "Hammer Smash", "slot": 10 },
-    "lucky_dice": { "name": "Lucky Dice", "slot": 11 },
-    "plinko_drop": { "name": "Plinko Drop", "slot": 12 },
-    "scratch_card": { "name": "Scratch Card", "slot": 13 },
-    "jackpot_meter": { "name": "Jackpot Meter", "slot": 14 },
-    "bonus_time": { "name": "Bonus Time", "slot": 15 }
+    "coin_rain": { "name": "Coin Rain", "slot": 4 },
+    "item_checklist": { "name": "Item Checklist", "slot": 5, "checklist_key": "item" },
+    "hammer_smash": { "name": "Hammer Smash", "slot": 6 },
+    "plinko_drop": { "name": "Plinko Drop", "slot": 7 },
+    "jackpot_meter": { "name": "Jackpot Meter", "slot": 8 },
+    "bonus_time": { "name": "Bonus Time", "slot": 9 }
   },
   "reward_tiers": {
     "tier_1": { "tier": 1, "rarity": "Common", "color": "#9aa7b5" },
@@ -52,19 +40,9 @@
       "chances": [0.5, 0.3, 0.12, 0.05, 0.02, 0.0097, 0.0003],
       "streak_scaling": { "interval": 30, "max_bonus": 2 }
     },
-    "card_pick": {
-      "chances": [0.613, 0.20, 0.10, 0.05, 0.025, 0.01, 0.002],
-      "pick_count": { "base": 2, "max": 9, "streak_interval": 7 },
-      "bonus_chance": { "base": 0.2, "streak_cap": 77, "second": 0.1, "consecutive": 0.05 }
-    },
-    "reward_labyrinth": {
+    "coin_rain": {
       "chances": [0.55, 0.25, 0.12, 0.05, 0.02, 0.009, 0.001],
-      "step_budget": { "base_min": 4, "base_max": 10, "streak_divisor": 15, "streak_cap": 20 },
-      "item_count": { "min": 5, "max": 10 }
-    },
-    "ladder_climb": {
-      "chances": [1.0, 0.8, 0.5, 0.25, 0.1, 0.05, 0.01],
-      "streak_bonus": { "divisor": 60, "cap": 1.0 }
+      "streak_scaling": { "interval": 45, "max_bonus": 3 }
     },
     "hammer_smash": {
       "min_power": { "base": 5, "streak_divisor": 15, "streak_cap": 15 },
@@ -72,17 +50,9 @@
       "tiers": [0.15, 0.30, 0.60, 0.75, 0.90, 1.0],
       "bell_break_chances": [0.5, 0.25, 0.15, 0.1]
     },
-    "lucky_dice": {
-      "roll_count": { "base": 1, "streak_divisor": 30, "max": 3 }
-    },
     "plinko_drop": {
       "chances": [0.386719, 0.225586, 0.241699, 0.107422, 0.032227, 0.005859, 0.000488],
       "drop_count": { "base": 1, "streak_divisor": 45, "max": 3 }
-    },
-    "scratch_card": {
-      "chances": [0.628995, 0.25, 0.08, 0.03, 0.008, 0.002, 0.001005],
-      "pixel_budget": { "base": 500000, "rand_min": 0.1, "rand_max": 0.2, "streak_multiplier": 0.01, "streak_cap": 0.15 },
-      "item_count": 10
     },
     "jackpot_meter": {
       "base_chance": 0.005,
@@ -96,4 +66,3 @@
     }
   }
 }
-

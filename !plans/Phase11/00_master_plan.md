@@ -11,12 +11,12 @@
 ## Rotation Logic
 
 - **Frequency**: Active game changes every 12 hours (`00:00 UTC` and `12:00 UTC`).
-- **Rotation Length**: 15 games (full rotation takes 7.5 days).
-- **Drift**: Because the 15-slot rotation (180 hours) is not a multiple of 24 hours, games drift between morning and evening slots across weeks.
+- **Rotation Length**: 9 games (full rotation takes 4.5 days).
+- **Drift**: Because the 9-slot rotation (108 hours) is not a multiple of 24 hours, games drift between morning (00:00-12:00) and evening (12:00-24:00) slots every 4.5 days.
 - **Anchor Calculation**:
   - `rotationAnchorUtc`: `00:00 UTC` boundary where slot 1 starts.
   - `boundaryIndex`: `floor((now - anchor) / 12 hours)`.
-  - `activeSlot`: `(boundaryIndex % 15) + 1`.
+  - `activeSlot`: `(boundaryIndex % 9) + 1`.
   - `nextChangeAt`: `anchor + ((boundaryIndex + 1) * 12 hours)`.
 
 ## Streak System
