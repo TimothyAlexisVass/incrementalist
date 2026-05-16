@@ -81,8 +81,6 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
   end
 
   def claim_reward(%State{} = state, random_fn \\ &rand/0) do
-    current_sisu = state.sisu.current || BigNum.one()
-    sisu = current_sisu |> BigNum.to_float() |> max(Constants.progress_bar_sisu_min_multiplier())
     level = state.level || 1
     reward_multiplier = state.progress_bar.reward_multiplier || 1.0
 
@@ -100,10 +98,10 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         {BigNum.from_number(4), BigNum.from_number(500), BigNum.from_number(100),
          BigNum.from_number(20)}
       else
-        exp = BigNum.from_number(trunc(exp_base * sisu * level_pow * reward_multiplier))
+        exp = BigNum.from_number(trunc(exp_base * level_pow * reward_multiplier))
 
         variance = 0.8 + random_fn.() * 0.4
-        coin = BigNum.from_number(trunc(35 * sisu * level_pow * reward_multiplier * variance))
+        coin = BigNum.from_number(trunc(35 * level_pow * reward_multiplier * variance))
 
         shard =
           BigNum.from_number(
