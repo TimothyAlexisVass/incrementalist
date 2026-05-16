@@ -15,11 +15,17 @@ import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
 import { synchronize } from "../core/time";
 
+export enum View {
+  GAME = "game",
+  BONUSTIME = "bonustime"
+}
+
 export type ServerState = {
   snapshot: GameSnapshot | null;
   slots: SaveSlotSummary[];
   status: string;
   statusTone: "ok" | "error" | "";
+  currentView: View;
   uiHints: {
     highlightedShopItemId: string | null;
   };
@@ -31,6 +37,7 @@ export function createServerState(): ServerState {
     slots: [],
     status: "Connecting...",
     statusTone: "",
+    currentView: View.GAME,
     uiHints: {
       highlightedShopItemId: null
     }
@@ -150,6 +157,8 @@ export function applyAuthoritativeData(
   if (data.quests !== undefined) state.snapshot.state.quests = data.quests;
   if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
+  if (data.has_daily_token !== undefined) state.snapshot.state.has_daily_token = data.has_daily_token;
+  if (data.daily_bonus !== undefined) state.snapshot.state.daily_bonus = data.daily_bonus;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);

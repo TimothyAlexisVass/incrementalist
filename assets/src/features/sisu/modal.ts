@@ -30,6 +30,7 @@ import {
   SISU_BASE_MAX,
   SISU_MAX_UPGRADE_LEVEL,
   SISU_MIN_MULTIPLIER,
+  SISU_REFILL_THRESHOLD_FACTOR,
   SISU_REFILL_TIERS,
   toFiniteBigNumNumber,
   updateSisuVisualProjection,
@@ -207,7 +208,7 @@ class SisuGeneratorModalImpl implements Modal {
       const availableCount = getChargeCrystalCount(chargeCrystals, tier.id);
       const hasCrystals = availableCount > 0;
 
-      const threshold = target * 0.9;
+      const threshold = target * SISU_REFILL_THRESHOLD_FACTOR;
       const isAlreadyHigher = authoritativeSisu >= threshold;
       const canRefill = hasCrystals && !isPending && !isAlreadyHigher;
 

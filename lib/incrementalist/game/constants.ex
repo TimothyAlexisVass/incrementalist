@@ -57,6 +57,7 @@ defmodule Incrementalist.Game.Constants do
 
   def daily_bonus_slot_ms, do: 43_200_000
   def daily_bonus_rotation_slot_count, do: @daily_bonus["rotation_slot_count"]
+
   def daily_bonus_rotation_anchor_at do
     {:ok, dt, _} = DateTime.from_iso8601("2024-01-01T00:00:00Z")
     dt
@@ -71,11 +72,11 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
-  def sisu_refill_threshold_factor, do: 0.8
+  def sisu_refill_threshold_factor, do: 0.9
 
-  def charge_crystal_azure_claim_interval, do: 4
-  def charge_crystal_aether_claim_interval, do: 20
-  def charge_crystal_lucent_level_interval, do: 10
+  def charge_crystal_azure_claim_interval, do: 12
+  def charge_crystal_aether_claim_interval, do: 40
+  def charge_crystal_lucent_level_interval, do: 24
   def charge_crystal_transcendent_level_interval, do: 100
 
   # Notice IDs
@@ -95,7 +96,12 @@ defmodule Incrementalist.Game.Constants do
     @sage_tip_levels
   end
 
-  defp normalize_area(%{"key" => key, "name" => name, "description" => description, "unlock_level" => unlock_level}) do
+  defp normalize_area(%{
+         "key" => key,
+         "name" => name,
+         "description" => description,
+         "unlock_level" => unlock_level
+       }) do
     %{
       key: key,
       name: name,
@@ -104,7 +110,14 @@ defmodule Incrementalist.Game.Constants do
     }
   end
 
-  defp normalize_shop_item(%{"id" => id, "name" => name, "description" => description, "cost" => cost, "currency" => currency, "required_level" => required_level}) do
+  defp normalize_shop_item(%{
+         "id" => id,
+         "name" => name,
+         "description" => description,
+         "cost" => cost,
+         "currency" => currency,
+         "required_level" => required_level
+       }) do
     %{
       id: id,
       name: name,
@@ -118,7 +131,9 @@ defmodule Incrementalist.Game.Constants do
   defp normalize_shop_currency("coins"), do: :coins
   defp normalize_shop_currency("shards"), do: :shards
   defp normalize_shop_currency("cores"), do: :cores
-  defp normalize_shop_currency(currency), do: raise(ArgumentError, "unknown shop currency #{inspect(currency)}")
+
+  defp normalize_shop_currency(currency),
+    do: raise(ArgumentError, "unknown shop currency #{inspect(currency)}")
 
   defp normalize_quest(id, quest, category) do
     %{
@@ -132,17 +147,26 @@ defmodule Incrementalist.Game.Constants do
   defp normalize_quest_ranks(id, ranks) do
     for {rank_str, data} <- ranks, into: %{} do
       rank = String.to_integer(rank_str)
-      {rank, %{
-        requirement: normalize_quest_requirement(id, data["requirement"]),
-        reward: BigNum.from_number(data["reward"])
-      }}
+
+      {rank,
+       %{
+         requirement: normalize_quest_requirement(id, data["requirement"]),
+         reward: BigNum.from_number(data["reward"])
+       }}
     end
   end
 
-  defp normalize_quest_requirement(id, value) when id in ["coins", "shards", "cores"], do: BigNum.from_number(value)
+  defp normalize_quest_requirement(id, value) when id in ["coins", "shards", "cores"],
+    do: BigNum.from_number(value)
+
   defp normalize_quest_requirement(_id, value), do: value
 
-  defp normalize_achievement(%{"id" => id, "name" => name, "multiplier" => multiplier, "condition" => condition}) do
+  defp normalize_achievement(%{
+         "id" => id,
+         "name" => name,
+         "multiplier" => multiplier,
+         "condition" => condition
+       }) do
     %{
       id: id,
       name: name,
@@ -150,5 +174,4 @@ defmodule Incrementalist.Game.Constants do
       condition: condition
     }
   end
-
 end

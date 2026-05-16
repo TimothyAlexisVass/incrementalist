@@ -24,6 +24,7 @@ export type SisuRefillTier = {
 export const SISU_BASE_MAX = 2;
 export const SISU_MIN_MULTIPLIER = 1;
 export const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
+export const SISU_REFILL_THRESHOLD_FACTOR = 0.9;
 
 const SISU_REFILL_TIERS_BY_ID: Record<TierId, SisuRefillTier> = Object.freeze(
   Object.fromEntries(

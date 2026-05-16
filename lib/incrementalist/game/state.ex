@@ -245,7 +245,7 @@ defmodule Incrementalist.Game.State do
     field :version, :integer, default: @current_version
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
-    field :has_daily_token, :boolean, virtual: true, default: false
+    field :has_daily_token, :boolean, virtual: true, default: true
 
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
@@ -365,6 +365,7 @@ defmodule Incrementalist.Game.State do
       version: @current_version,
       area: "sage",
       level: 1,
+      has_daily_token: true,
       exp: BigNum.zero(),
       required_exp: BigNum.from_number(20),
       coins: BigNum.zero(),
@@ -385,7 +386,7 @@ defmodule Incrementalist.Game.State do
         idle_mode_purchased: false,
         world_map_unlocked: false,
         sisu_generator_purchased: false,
-        bonus_time_purchased: false
+        bonus_time_purchased: true
       },
       sisu: %Sisu{
         current: BigNum.one(),

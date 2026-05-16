@@ -1,4 +1,4 @@
-import { TINY_TEXT_FONT } from '../../config';
+import { SMALL_TEXT_FONT } from '../../config';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
 import { resolveUpdatingText } from '../../utils/text';
@@ -76,7 +76,7 @@ function drawTooltipInternal(
   }
 
   const {
-    font = TINY_TEXT_FONT,
+    font = SMALL_TEXT_FONT,
     textColor = '#f4f7ff',
     backgroundColor = 'rgba(9, 14, 24, 0.94)',
     borderColor = '#6f88b4',
@@ -91,8 +91,8 @@ function drawTooltipInternal(
     textUpdateKey
   } = options;
 
-  const resolvedContent = (textUpdateKey && typeof content === 'string')
-    ? resolveUpdatingText(textUpdateKey, content, (candidate) => {
+  const resolvedContent = textUpdateKey
+    ? resolveUpdatingText(textUpdateKey, Array.isArray(content) ? content.join('\n') : content, (candidate) => {
       const candidateLines = normalizeTooltipLines(candidate);
       return candidateLines.every((line) => renderer.isTextReady({
         text: line,

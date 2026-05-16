@@ -57,6 +57,10 @@ export const COLORS = Object.freeze({
     toggle: {
       on: '#4caf50',
       off: '#2c1d6e'
+    },
+    bonusTime: {
+      textActive: '#aeb8c6',
+      textDisabled: '#566172'
     }
   },
   panel: {

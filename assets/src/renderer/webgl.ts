@@ -1242,6 +1242,11 @@ export class WebGLRenderer {
     anchorY: "top" | "top-baseline" | "middle" | "bottom" | "bottom-baseline",
     alpha: number
   ): CachedTextMesh {
+    // Color and outline-color are material uniforms, NOT geometry properties.
+    // They are applied via configureTroikaText on every use without needing
+    // a re-sync, so they must NOT be part of the cache key.  Including them
+    // caused cache misses on every color change, creating un-synced meshes
+    // that rendered as invisible text until the async sync completed.
     const key = [
       text,
       style.fontSpec.fontFamily,
@@ -1250,10 +1255,7 @@ export class WebGLRenderer {
       style.fontSpec.fontStyle,
       anchorX,
       anchorY,
-      style.color,
-      style.strokeColor,
       style.strokeWidth,
-      style.shadowColor,
       style.shadowBlur,
       style.shadowOffsetX,
       style.shadowOffsetY

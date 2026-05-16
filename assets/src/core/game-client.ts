@@ -10,7 +10,7 @@ import {
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
-import { applyResult, clearShopHighlight, createServerState, type ServerState } from "../net/snapshots";
+import { applyResult, clearShopHighlight, createServerState, type ServerState, View } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
 import {
   updateProjectedFill,
@@ -49,6 +49,7 @@ import { synchronize } from "./time";
 import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
+import { renderBonusTimeOverview } from "../features/bonustime/render";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
 import {
@@ -332,6 +333,11 @@ export class GameClient {
 
   private onKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
+      if (this.store.state.currentView === View.BONUSTIME) {
+        this.store.state.currentView = View.GAME;
+        event.preventDefault();
+        return;
+      }
       this.handleMenuButtonPress();
       event.preventDefault();
       return;
@@ -412,6 +418,10 @@ export class GameClient {
     }
 
     renderAreaBackground(this.canvas);
+
+    if (this.store.state.currentView === View.BONUSTIME) {
+      renderBonusTimeOverview(this.canvas, input, this.store.state);
+    }
     
     renderProgressBar(this.canvas, input, uiBlocked);
     this.sisuControlLayout = this.store.state.snapshot
@@ -437,7 +447,7 @@ export class GameClient {
       );
     }
     
-    if (this.store.state.snapshot) {
+    if (this.store.state.snapshot && this.store.state.currentView === View.GAME) {
       renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
 
@@ -448,6 +458,22 @@ export class GameClient {
     }
 
     updateFloatingTexts(this.floatingTexts, dt);
+
+    // Render BottomHUD before game-world click handlers so its buttons take precedence.
+    const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
+    renderBottomHUD(this.canvas, input, amounts?.level ?? 1, isMainMenuOpen, () => {
+      this.handleMenuButtonPress();
+    }, () => {
+      this.store.state.currentView = this.store.state.currentView === View.BONUSTIME ? View.GAME : View.BONUSTIME;
+    }, (areaKey) => {
+      if (this.channel) {
+        this.runCommand(() => selectArea(this.channel!, areaKey));
+      }
+    }, this.channel || undefined, 
+    this.store.state.snapshot?.state.has_daily_token,
+    this.store.state.snapshot?.state.daily_bonus,
+    this.store.state.snapshot?.state.features.bonus_time_purchased,
+    (cmd) => this.runCommand(cmd));
 
     // 2. Handle specific UI element clicks before general activity collection.
     if (!uiBlocked && input.clicked && input.pointer && this.channel) {
@@ -484,17 +510,6 @@ export class GameClient {
     if (activity && this.channel) {
       claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
     }
-
-    // Render BottomHUD before overlays so its buttons can consume input and 
-    // toggle overlays without being immediately countered by "click-outside" logic.
-    const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
-    renderBottomHUD(this.canvas, input, amounts?.level ?? 1, isMainMenuOpen, () => {
-      this.handleMenuButtonPress();
-    }, (areaKey) => {
-      if (this.channel) {
-        this.runCommand(() => selectArea(this.channel!, areaKey));
-      }
-    }, this.channel || undefined, (cmd) => this.runCommand(cmd));
 
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);

@@ -3,12 +3,15 @@ import { BOTTOM_HUD_HEIGHT } from "../../../config";
 import { doButton } from '../../components/button';
 import { InteractionState } from '../../managers/interactions';
 import { renderAreaDropdown } from '../../../features/areas/render';
+import { drawLockedElement } from '../../components/locked-element';
+import { doBonusTimeButton } from "../../components/bonustime-button";
 import { GameChannel } from "../../../net/game-channel";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import {
   NOTICE_PARENT_MENU_MAIN,
   notices
 } from "../../managers/notices";
+import { getActiveGameName, getTimeUntilNextTokenMs } from "../../../features/bonustime/render";
 
 export function renderBottomHUD(
   canvas: HTMLCanvasElement, 
@@ -16,8 +19,12 @@ export function renderBottomHUD(
   level: number,
   isMainMenuOpen: boolean,
   onMenuClick: () => void,
+  onBonusTimeClick: () => void,
   onAreaSelect?: (areaKey: string) => void,
   channel?: GameChannel,
+  hasDailyToken?: boolean,
+  dailyBonus?: { special_tokens: number; streak: number },
+  isUnlocked?: boolean,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
   const renderer = getActiveWebGLRenderer();
@@ -43,6 +50,43 @@ export function renderBottomHUD(
     showNotice: !isMainMenuOpen && notices.hasParentNotice(NOTICE_PARENT_MENU_MAIN)
   })) {
     onMenuClick();
+  }
+
+  // Draw BONUSTIME button in the center
+  const bonusWidth = 240;
+  const bonusX = (canvas.width - bonusWidth) / 2;
+  const bonusRect = { x: bonusX, y: buttonY, width: bonusWidth, height: buttonHeight };
+  const specialTokens = dailyBonus?.special_tokens ?? 0;
+  const streak = dailyBonus?.streak ?? 0;
+  const gameName = getActiveGameName();
+  
+  const bonusTooltip = [
+    `Current game: ${gameName}`,
+    `Special tokens: ${specialTokens}`,
+    `Streak: ${streak}`
+  ];
+
+  if (!hasDailyToken) {
+    const nextMs = getTimeUntilNextTokenMs();
+    const hours = Math.floor(nextMs / 3_600_000);
+    const mins = Math.floor((nextMs % 3_600_000) / 60_000);
+    const secs = Math.floor((nextMs % 60_000) / 1000);
+    const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    bonusTooltip.push(`Next entry in ${timeStr}`);
+  }
+
+  if (isUnlocked) {
+    if (doBonusTimeButton(input, bonusRect, hasDailyToken ?? false, bonusTooltip, "bonus-time-tooltip")) {
+      onBonusTimeClick();
+    }
+  } else {
+    drawLockedElement(canvas, input, bonusRect, () => {
+      doBonusTimeButton(input, bonusRect, false, undefined, "bonus-time-tooltip");
+    }, {
+      label: "LOCKED",
+      criteria: "Requires Bonus Time from Shop",
+      font: "bold 13px Arial"
+    });
   }
 
   // Draw Area selection dropdown on the left

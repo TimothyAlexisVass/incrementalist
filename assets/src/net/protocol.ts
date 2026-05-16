@@ -89,6 +89,17 @@ export type StatsState = {
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
+export type DailyBonusState = {
+  special_tokens: number;
+  last_token_boundary_index: number;
+  streak: number;
+  last_played_at: string | null;
+  total_games_played: number;
+  reward_counts: Record<string, number>;
+  checklist_entry_indexes: Record<string, number>;
+  last_result: any | null;
+};
+
 export type NoticeState = {
   active_leaf_ids: string[];
   active_parent_ids: string[];
@@ -125,6 +136,8 @@ export type GameSnapshot = {
     quests: Record<string, QuestState>;
     achievements: Record<string, AchievementState>;
     stats: StatsState;
+    daily_bonus: DailyBonusState | null;
+    has_daily_token: boolean;
     projection_params: ProjectionParams;
   };
   notices: NoticeState;

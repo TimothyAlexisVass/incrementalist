@@ -197,7 +197,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
     assert {:error, "sisu_charge_pending"} = Sisu.refill(state, "aether", @now)
   end
 
-  test "refill/3 rejects if current sisu is >= 80% of target" do
+  test "refill/3 rejects if current sisu is >= 90% of target" do
     state = %State{
       charge_crystals: %State.ChargeCrystals{azure: 1},
       features: %State.Features{sisu_generator_purchased: true},
@@ -205,8 +205,8 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
       first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
       sisu: %State.Sisu{
         # Target for Azure is base_max (2.0) * 1.0 = 2.0.
-        # 80% of 2.0 is 1.6.
-        current: BigNum.from_number(1.7),
+        # 90% of 2.0 is 1.8.
+        current: BigNum.from_number(1.9),
         max_basic: BigNum.from_number(2.0),
         max_upgrade_level: 0,
         cycle_decay: 5.0,
