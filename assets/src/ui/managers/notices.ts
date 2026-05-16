@@ -93,6 +93,14 @@ export class Notices {
     if (leafId === NOTICE_LEAF_TAB_QUEST_BUTTON) return NOTICE_PARENT_MENU_MAIN;
     if (leafId === NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON) return NOTICE_PARENT_MENU_MAIN;
     if (leafId === NOTICE_LEAF_TAB_MENU_ANY_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+
+    if (leafId.startsWith("leaf.quest.") && leafId.endsWith(".claim_button")) {
+      return NOTICE_PARENT_TAB_QUEST;
+    }
+    if (leafId.startsWith("leaf.achievement.") && leafId.endsWith(".unlocked")) {
+      return NOTICE_PARENT_TAB_ACHIEVEMENTS;
+    }
+
     return null;
   }
 }
@@ -101,6 +109,8 @@ export const notices = new Notices();
 export const NOTICE_PARENT_AREA_DROPDOWN = "parent.area.dropdown";
 export const NOTICE_PARENT_MENU_MAIN = "parent.menu.main";
 export const NOTICE_PARENT_TAB_SHOP = "parent.tab.shop";
+export const NOTICE_PARENT_TAB_QUEST = "parent.tab.quest";
+export const NOTICE_PARENT_TAB_ACHIEVEMENTS = "parent.tab.achievements";
 export const NOTICE_LEAF_AREA_DROPDOWN_BUTTON = "leaf.area_dropdown.button";
 export const NOTICE_LEAF_TAB_SHOP_BUTTON = "leaf.tab.shop.button";
 export const NOTICE_LEAF_TAB_QUEST_BUTTON = "leaf.tab.quest.button";

@@ -1,7 +1,7 @@
 import { AchievementState, GameSnapshot } from '../../../../../net/protocol';
 
 export function getAchievementViewModel(snapshot: GameSnapshot) {
-  const achievements = Object.values(snapshot.state.achievements);
+  const achievements = Object.entries(snapshot.state.achievements).map(([id, a]) => ({ id, ...a }));
   
   // Sort: Unlocked first (by date desc), then locked
   return achievements.sort((a, b) => {

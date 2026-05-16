@@ -87,7 +87,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     result.type === "stats.update.result"
   ) {
     applyAuthoritativeData(state, result);
-    applyProjectionData(state, result);
+    applyProjectionData(state, result as any);
   }
 
   if (result.type === "progress.set_idle_mode.result" && state.snapshot) {

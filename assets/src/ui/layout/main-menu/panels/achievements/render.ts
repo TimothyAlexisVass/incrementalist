@@ -69,12 +69,13 @@ export function renderAchievementsTab(
       if (cardY >= listRect.y + listRect.height) break;
       if (cardY + CARD_HEIGHT_PX <= listRect.y) continue;
 
+      const { channel, runCommand } = getNetwork();
       drawAchievementCard(achievement, {
         x: listRect.x,
         y: cardY,
         width: cardWidth,
         height: CARD_HEIGHT_PX
-      });
+      }, channel || undefined, runCommand || undefined);
     }
   });
   scrollingPanel.drawScrollBar(renderer);

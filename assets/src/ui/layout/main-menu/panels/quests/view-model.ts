@@ -2,8 +2,8 @@ import { ServerState } from '../../../../../net/snapshots';
 import { QuestState } from '../../../../../net/protocol';
 
 export interface QuestViewModel {
-  dailyQuests: QuestState[];
-  mainQuests: QuestState[];
+  dailyQuests: (QuestState & { id: string })[];
+  mainQuests: (QuestState & { id: string })[];
 }
 
 export function getQuestViewModel(state: ServerState): QuestViewModel {

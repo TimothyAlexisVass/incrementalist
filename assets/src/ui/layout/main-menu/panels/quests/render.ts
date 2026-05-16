@@ -109,6 +109,7 @@ function renderQuestList(
       if (cardY >= listRect.y + listRect.height) break;
       if (cardY + CARD_HEIGHT_PX <= listRect.y) continue;
 
+      const { channel, runCommand } = getNetwork();
       drawQuestCard({
         quest,
         rect: {
@@ -116,7 +117,9 @@ function renderQuestList(
           y: cardY,
           width: cardWidth,
           height: CARD_HEIGHT_PX
-        }
+        },
+        channel: channel || undefined,
+        runCommand: runCommand || undefined
       });
     }
   });

@@ -1,11 +1,16 @@
 import { AchievementState } from '../../../net/protocol';
+import { GameChannel } from '../../../net/game-channel';
 import { COLORS } from '../../../colors';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { hexToRgba } from '../../../utils/color';
+import { notices } from '../../managers/notices';
+import { drawNoticeDot } from '../button';
 
 export function drawAchievementCard(
   achievement: AchievementState,
-  rect: { x: number; y: number; width: number; height: number }
+  rect: { x: number; y: number; width: number; height: number },
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
 ) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
@@ -63,6 +68,20 @@ export function drawAchievementCard(
     align: 'right',
     baseline: 'middle'
   });
+
+  // Notification Dot
+  const leafId = `leaf.achievement.${(achievement as any).id}.unlocked`;
+  const hasNotice = notices.hasLeafNotice(leafId);
+  if (hasNotice) {
+    drawNoticeDot(
+      rect.x + rect.width - 8,
+      rect.y + 8,
+      5,
+      true
+    );
+
+    notices.reportLeafVisible(leafId, true, channel, runCommand);
+  }
 }
 
 function getConditionText(condition: string): string {

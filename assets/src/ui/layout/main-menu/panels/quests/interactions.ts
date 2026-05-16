@@ -2,6 +2,7 @@ import { InteractionState, pointInRect } from '../../../../managers/interactions
 import { QuestState } from '../../../../../net/protocol';
 import { isQuestClaimClicked } from '../../../../components/cards/quest';
 import { getNetwork } from '../../view-model';
+import { notices } from '../../../../managers/notices';
 
 export function handleQuestInteractions(
   input: InteractionState,
@@ -37,6 +38,7 @@ export function handleQuestInteractions(
     };
 
     if (quest.rank > quest.claimed_rank && pointer && isQuestClaimClicked(pointer, cardRect)) {
+      notices.reportLeafClicked(`leaf.quest.${(quest as any).id}.claim_button`, channel, runCommand);
       runCommand(() => channel.pushCommand("quest.claim", { quest_id: (quest as any).id }));
       input.consumed = true;
       return;

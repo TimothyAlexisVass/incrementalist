@@ -1,15 +1,20 @@
 import { COLORS } from '../../../colors';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { QuestState } from '../../../net/protocol';
+import { GameChannel } from '../../../net/game-channel';
+import { notices } from '../../managers/notices';
+import { drawNoticeDot } from '../button';
 
 export interface QuestCardOptions {
   quest: QuestState;
   rect: { x: number; y: number; width: number; height: number };
   onClaim?: () => void;
+  channel?: GameChannel;
+  runCommand?: (cmd: () => Promise<any>) => void;
 }
 
 export function drawQuestCard(options: QuestCardOptions) {
-  const { quest, rect, onClaim } = options;
+  const { quest, rect, onClaim, channel, runCommand } = options;
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
 
@@ -101,6 +106,20 @@ export function drawQuestCard(options: QuestCardOptions) {
       align: 'center',
       baseline: 'middle'
     });
+
+    // Notification Dot
+    const leafId = `leaf.quest.${(quest as any).id}.claim_button`;
+    const hasNotice = notices.hasLeafNotice(leafId);
+    if (hasNotice) {
+      drawNoticeDot(
+        btnX + btnWidth - 4,
+        btnY + 4,
+        5,
+        true
+      );
+
+      notices.reportLeafVisible(leafId, true, channel, runCommand);
+    }
   } else if (quest.claimed_rank >= quest.max_rank) {
     renderer.drawText({
       text: 'COMPLETED',

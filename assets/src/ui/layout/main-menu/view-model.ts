@@ -15,7 +15,9 @@ import {
   NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
   NOTICE_LEAF_TAB_QUEST_BUTTON,
   NOTICE_LEAF_TAB_SHOP_BUTTON,
-  NOTICE_PARENT_TAB_SHOP
+  NOTICE_PARENT_TAB_SHOP,
+  NOTICE_PARENT_TAB_QUEST,
+  NOTICE_PARENT_TAB_ACHIEVEMENTS
 } from '../../managers/notices';
 
 let tabMenu: TabMenu | null = null;
@@ -59,6 +61,7 @@ export function getTabMenu(): TabMenu {
         id: 'quest',
         label: 'Quest',
         hotkey: 'Q',
+        noticeParentId: NOTICE_PARENT_TAB_QUEST,
         noticeLeafId: NOTICE_LEAF_TAB_QUEST_BUTTON,
         renderContent: renderQuestsTab
       },
@@ -66,6 +69,7 @@ export function getTabMenu(): TabMenu {
         id: 'achievements',
         label: 'Achievements',
         hotkey: 'A',
+        noticeParentId: NOTICE_PARENT_TAB_ACHIEVEMENTS,
         noticeLeafId: NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
         renderContent: renderAchievementsTab
       },

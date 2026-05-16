@@ -63,6 +63,8 @@ defmodule Incrementalist.Game.Constants do
   # Notice IDs
   def notice_parent_menu_main, do: "parent.menu.main"
   def notice_parent_tab_shop, do: "parent.tab.shop"
+  def notice_parent_tab_quest, do: "parent.tab.quest"
+  def notice_parent_tab_achievements, do: "parent.tab.achievements"
   def notice_parent_area_dropdown, do: "parent.area.dropdown"
 
   def notice_leaf_area_dropdown_button, do: "leaf.area_dropdown.button"

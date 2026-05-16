@@ -75,6 +75,12 @@ defmodule Incrementalist.Game.Notices do
       {:shop_item, item_id} ->
         Enum.any?(Constants.shop_item_defs(), &(&1.id == item_id))
 
+      {:quest, quest_id} ->
+        Map.has_key?(Constants.quest_defs(), quest_id)
+
+      {:achievement, achievement_id} ->
+        Enum.any?(Constants.achievement_defs(), &(&1.id == achievement_id))
+
       {:feature_locked, feature_id} ->
         feature_id in ["idle_mode", "sisu_generator"]
 
@@ -161,6 +167,10 @@ defmodule Incrementalist.Game.Notices do
               # area leaf if it was only pointing the player back to that tip.
               Enum.reject(notices.active_leaf_ids, &(&1 == "leaf.area.sage.go_button"))
 
+            {:achievement, _achievement_id} ->
+              # Seeing an achievement card resolves the notification.
+              Enum.reject(notices.active_leaf_ids, &(&1 == leaf_id))
+
             _ ->
               notices.active_leaf_ids
           end
@@ -203,6 +213,8 @@ defmodule Incrementalist.Game.Notices do
   def leaf_area_id(area_key), do: "leaf.area.#{area_key}.go_button"
   def leaf_sage_tip_id(level), do: "leaf.sage_tip.#{level}.confirm_button"
   def leaf_shop_item_id(item_id), do: "leaf.shop_item.#{item_id}.purchase_button"
+  def leaf_quest_id(quest_id), do: "leaf.quest.#{quest_id}.claim_button"
+  def leaf_achievement_id(achievement_id), do: "leaf.achievement.#{achievement_id}.unlocked"
   def leaf_feature_locked_id(feature_id), do: "leaf.feature.#{feature_id}.locked_text"
 
   defp eligible_leaf_ids(%State{} = state, %__MODULE__{} = notices) do
@@ -252,6 +264,22 @@ defmodule Incrementalist.Game.Notices do
         end
       end)
 
+    quest_leaves =
+      state.quests
+      |> Enum.flat_map(fn quest ->
+        if quest.rank > quest.claimed_rank do
+          [leaf_quest_id(quest.id)]
+        else
+          []
+        end
+      end)
+
+    achievement_leaves =
+      state.achievements
+      |> Map.keys()
+      |> Enum.map(&leaf_achievement_id/1)
+      |> Enum.reject(&MapSet.member?(seen, &1))
+
     has_unconfirmed_sage_tip? =
       sage_tip_leaves
       |> Enum.any?(fn leaf_id ->
@@ -266,7 +294,9 @@ defmodule Incrementalist.Game.Notices do
       end
 
     (area_leaves ++
-       sage_tip_leaves ++ shop_item_leaves ++ locked_feature_leaves ++ sage_area_guidance_leaf)
+       sage_tip_leaves ++
+       shop_item_leaves ++
+       locked_feature_leaves ++ quest_leaves ++ achievement_leaves ++ sage_area_guidance_leaf)
     |> Enum.uniq()
   end
 
@@ -291,6 +321,12 @@ defmodule Incrementalist.Game.Notices do
     case parse_leaf_id(leaf_id) do
       {:shop_item, _item_id} ->
         [Constants.notice_parent_tab_shop(), Constants.notice_parent_menu_main()]
+
+      {:quest, _quest_id} ->
+        [Constants.notice_parent_tab_quest(), Constants.notice_parent_menu_main()]
+
+      {:achievement, _achievement_id} ->
+        [Constants.notice_parent_tab_achievements(), Constants.notice_parent_menu_main()]
 
       {:feature_locked, _feature_id} ->
         []
@@ -356,6 +392,22 @@ defmodule Incrementalist.Game.Notices do
           |> String.trim_trailing(".locked_text")
 
         {:feature_locked, feature_id}
+
+      String.starts_with?(leaf_id, "leaf.quest.") and String.ends_with?(leaf_id, ".claim_button") ->
+        quest_id =
+          leaf_id
+          |> String.trim_leading("leaf.quest.")
+          |> String.trim_trailing(".claim_button")
+
+        {:quest, quest_id}
+
+      String.starts_with?(leaf_id, "leaf.achievement.") and String.ends_with?(leaf_id, ".unlocked") ->
+        achievement_id =
+          leaf_id
+          |> String.trim_leading("leaf.achievement.")
+          |> String.trim_trailing(".unlocked")
+
+        {:achievement, achievement_id}
 
       leaf_id in [
         Constants.notice_leaf_area_dropdown_button(),
