@@ -20,6 +20,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     field :slot_index, :integer
     embeds_one :state, State, on_replace: :update
     embeds_one :notices, Notices, on_replace: :update
+    field :has_daily_token, :boolean, default: true
     field :last_saved_at, :utc_datetime_usec
 
     belongs_to :player, Player
@@ -31,7 +32,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     attrs = normalize_attrs(attrs)
 
     save_slot
-    |> cast(attrs, [:player_id, :slot_index, :last_saved_at])
+    |> cast(attrs, [:player_id, :slot_index, :last_saved_at, :has_daily_token])
     |> cast_embed(:state)
     |> cast_embed(:notices)
     |> validate_required([:player_id, :slot_index])
@@ -48,13 +49,26 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
 
   defp normalize_field(attrs, field, module) do
     field_str = Atom.to_string(field)
+
     cond do
       Map.has_key?(attrs, field) and is_struct(Map.get(attrs, field), module) ->
         Map.put(attrs, field, Map.from_struct(Map.get(attrs, field)))
+
       Map.has_key?(attrs, field_str) and is_struct(Map.get(attrs, field_str), module) ->
         Map.put(attrs, field_str, Map.from_struct(Map.get(attrs, field_str)))
+
       true ->
         attrs
     end
+  end
+
+  def inject_state_tokens(%__MODULE__{state: %State{}} = slot) do
+    %{slot | state: %{slot.state | has_daily_token: slot.has_daily_token || false}}
+  end
+
+  def inject_state_tokens(slot), do: slot
+
+  def extract_state_tokens(%State{} = state) do
+    state.has_daily_token || false
   end
 end

@@ -9,16 +9,19 @@ defmodule Incrementalist.Game.Constants do
   @shop_items_path Path.join(@requirements_dir, "shop-items.json")
   @quests_path Path.join(@requirements_dir, "quests.json")
   @achievements_path Path.join(@requirements_dir, "achievements.json")
+  @daily_bonus_path Path.join(@requirements_dir, "daily-bonus.json")
   @external_resource @areas_path
   @external_resource @sage_tip_levels_path
   @external_resource @shop_items_path
   @external_resource @quests_path
   @external_resource @achievements_path
+  @external_resource @daily_bonus_path
   @areas @areas_path |> File.read!() |> Jason.decode!()
   @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
   @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
+  @daily_bonus @daily_bonus_path |> File.read!() |> Jason.decode!()
 
   def max_save_slots, do: 4
   def valid_slot_indexes, do: 0..(max_save_slots() - 1)
@@ -44,6 +47,21 @@ defmodule Incrementalist.Game.Constants do
     Enum.map(@achievements, &normalize_achievement/1)
   end
 
+  def daily_bonus_rotation do
+    @daily_bonus["rotation"]
+  end
+
+  def daily_bonus_games do
+    @daily_bonus["games"]
+  end
+
+  def daily_bonus_slot_ms, do: 43_200_000
+  def daily_bonus_rotation_slot_count, do: @daily_bonus["rotation_slot_count"]
+  def daily_bonus_rotation_anchor_at do
+    {:ok, dt, _} = DateTime.from_iso8601("2024-01-01T00:00:00Z")
+    dt
+  end
+
   # Progress Bar Constants
   def progress_bar_max_fill, do: 100.0
   def progress_bar_new_player_bonus_fill_multiplier, do: 2.5
@@ -53,7 +71,7 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
-  def sisu_refill_threshold_factor, do: 0.9
+  def sisu_refill_threshold_factor, do: 0.8
 
   def charge_crystal_azure_claim_interval, do: 4
   def charge_crystal_aether_claim_interval, do: 20

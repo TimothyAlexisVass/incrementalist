@@ -202,6 +202,13 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
+  def handle_info(:daily_bonus_boundary_reached, state) do
+    Logger.debug("PlayerServer #{state.player_id} refreshing state for daily bonus boundary")
+    refreshed_state = refresh_player_and_active_slot(state, Time.now())
+    {:noreply, refreshed_state}
+  end
+
+  @impl true
   def terminate(reason, state) do
     Logger.info("PlayerServer #{state.player_id} terminating, reason: #{inspect(reason)}")
     save_active_slot(state)

@@ -18,6 +18,7 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       add(:slot_index, :integer, null: false)
       add(:state, :map)
       add(:notices, :map)
+      add(:has_daily_token, :boolean, null: false, default: true)
       add(:last_saved_at, :utc_datetime_usec)
 
       timestamps(type: :utc_datetime_usec)

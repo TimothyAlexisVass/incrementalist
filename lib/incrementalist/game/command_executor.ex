@@ -49,9 +49,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           )
 
         if next_state != active_slot.state or next_notices != active_slot.notices do
-          active_slot
-          |> SaveSlot.changeset(%{state: next_state, notices: next_notices, last_saved_at: now})
-          |> Repo.update!()
+          update_active_slot(active_slot, %{state: next_state, notices: next_notices, last_saved_at: now})
         end
 
         {"succeeded",
@@ -88,13 +86,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               new_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: new_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: new_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            %{
@@ -157,13 +153,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            %{
@@ -195,13 +189,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            Map.merge(
@@ -235,13 +227,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            Map.merge(
@@ -276,13 +266,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            Map.merge(
@@ -327,13 +315,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            Map.merge(
@@ -373,9 +359,7 @@ defmodule Incrementalist.Game.CommandExecutor do
               leaf_id
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{notices: next_notices, last_saved_at: now})
-          )
+          update_active_slot(active_slot, %{notices: next_notices, last_saved_at: now})
 
           {"succeeded",
            %{
@@ -407,13 +391,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               next_state
             )
 
-          Repo.update!(
-            SaveSlot.changeset(active_slot, %{
-              state: next_state,
-              notices: next_notices,
-              last_saved_at: now
-            })
-          )
+          update_active_slot(active_slot, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            Map.merge(
@@ -451,7 +433,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           next_state = %{active_slot.state | stats: new_stats} |> Achievements.evaluate()
 
           if next_state != active_slot.state do
-            Repo.update!(SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now}))
+            update_active_slot(active_slot, %{state: next_state, last_saved_at: now})
           end
 
           {"succeeded",
@@ -474,7 +456,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         next_state = %{active_slot.state | stats: new_stats} |> Achievements.evaluate()
 
         if next_state != active_slot.state do
-          Repo.update!(SaveSlot.changeset(active_slot, %{state: next_state, last_saved_at: now}))
+          update_active_slot(active_slot, %{state: next_state, last_saved_at: now})
         end
 
         {"succeeded",
@@ -565,7 +547,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         |> Achievements.evaluate()
 
       if new_state != slot.state do
-        Repo.update!(SaveSlot.changeset(slot, %{state: new_state, last_saved_at: now}))
+        update_active_slot(slot, %{state: new_state, last_saved_at: now})
       else
         slot
       end
@@ -689,5 +671,16 @@ defmodule Incrementalist.Game.CommandExecutor do
       "command_id" => command.command_id,
       "reason" => to_string(reason)
     })
+  end
+
+  defp update_active_slot(slot, attrs) do
+    attrs =
+      if Map.has_key?(attrs, :state) do
+        Map.put(attrs, :has_daily_token, SaveSlot.extract_state_tokens(attrs.state))
+      else
+        attrs
+      end
+
+    Repo.update!(SaveSlot.changeset(slot, attrs))
   end
 end

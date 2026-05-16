@@ -175,12 +175,77 @@ defmodule Incrementalist.Game.State do
     end
   end
 
+  defmodule ActiveSession do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :type, :string
+      field :data, :map, default: %{}
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      schema
+      |> cast(attrs, [:type, :data])
+      |> validate_required([:type, :data])
+    end
+  end
+
+  defmodule DailyBonus do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :special_tokens, :integer, default: 0
+      field :last_token_boundary_index, :integer, default: 0
+      field :streak, :integer, default: 0
+      field :last_played_at, :string
+      field :total_games_played, :integer, default: 0
+      field :reward_counts, :map, default: %{
+        "tier_1" => 0,
+        "tier_2" => 0,
+        "tier_3" => 0,
+        "tier_4" => 0,
+        "tier_5" => 0,
+        "tier_6" => 0,
+        "tier_7" => 0
+      }
+      field :checklist_entry_indexes, :map, default: %{
+        "resource" => 0,
+        "item" => 0
+      }
+      field :last_result, :map
+
+      embeds_one :active_session, Incrementalist.Game.State.ActiveSession, on_replace: :update
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      schema
+      |> cast(attrs, [
+        :special_tokens,
+        :last_token_boundary_index,
+        :streak,
+        :last_played_at,
+        :total_games_played,
+        :reward_counts,
+        :checklist_entry_indexes,
+        :last_result
+      ])
+      |> cast_embed(:active_session)
+    end
+  end
+
   @primary_key false
   @derive Jason.Encoder
   embedded_schema do
     field :version, :integer, default: @current_version
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
+    field :has_daily_token, :boolean, virtual: true, default: false
 
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
@@ -202,6 +267,7 @@ defmodule Incrementalist.Game.State do
 
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
+    embeds_one :daily_bonus, __MODULE__.DailyBonus, on_replace: :update
     field :achievements, :map, default: %{}
   end
 
@@ -234,6 +300,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:sisu)
     |> cast_embed(:quests)
     |> cast_embed(:stats)
+    |> cast_embed(:daily_bonus)
   end
 
   defp normalize_attrs(%__MODULE__{} = attrs) do
@@ -268,6 +335,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:sisu)
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
+    |> maybe_put_embed(:daily_bonus)
   end
 
   defp maybe_put_embed(attrs, key) do
@@ -337,6 +405,19 @@ defmodule Incrementalist.Game.State do
         total_shards_earned: BigNum.zero(),
         total_cores_earned: BigNum.zero(),
         last_reset_at: timestamp
+      },
+      daily_bonus: %DailyBonus{
+        special_tokens: 0,
+        last_token_boundary_index: 0,
+        streak: 0,
+        total_games_played: 0,
+        reward_counts: %{
+          "tier_1" => 0, "tier_2" => 0, "tier_3" => 0, "tier_4" => 0,
+          "tier_5" => 0, "tier_6" => 0, "tier_7" => 0
+        },
+        checklist_entry_indexes: %{
+          "resource" => 0, "item" => 0
+        }
       }
     }
   end
@@ -446,6 +527,8 @@ defmodule Incrementalist.Game.State do
       "quests" => visible_quests(projected_state.quests),
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
+      "has_daily_token" => projected_state.has_daily_token,
+      "daily_bonus" => if(projected_state.daily_bonus, do: Map.from_struct(projected_state.daily_bonus), else: nil),
       "projection_params" =>
         projection_params(projected_state, now)
     }

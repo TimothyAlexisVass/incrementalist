@@ -18,4 +18,8 @@ defmodule Incrementalist.Game.Time do
   def to_unix_ms(%DateTime{} = datetime) do
     DateTime.to_unix(datetime, :millisecond)
   end
+
+  def to_utc_day_index(%DateTime{} = datetime) do
+    div(to_unix_ms(datetime), 86_400_000)
+  end
 end

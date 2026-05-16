@@ -75,7 +75,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
         Enum.find(slots, &(&1.state != nil)) ||
         Enum.find(slots, &(&1.slot_index == 0))
 
-    selected_slot = initialize_if_empty(selected_slot, now)
+    selected_slot = initialize_if_empty(selected_slot, now) |> SaveSlot.inject_state_tokens()
 
     if selected_slot.slot_index != player.active_save_slot do
       player
@@ -97,6 +97,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: next_state,
+      has_daily_token: SaveSlot.extract_state_tokens(next_state),
       notices: Notices.new(next_state),
       last_saved_at: now
     })
@@ -150,6 +151,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: projected_state,
+      has_daily_token: if(projected_state, do: SaveSlot.extract_state_tokens(projected_state), else: save_slot.has_daily_token),
       notices: save_slot.notices,
       last_saved_at: now
     })
@@ -165,6 +167,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     save_slot
     |> SaveSlot.changeset(%{
       state: next_state,
+      has_daily_token: SaveSlot.extract_state_tokens(next_state),
       notices: Notices.new(next_state),
       last_saved_at: now
     })
@@ -189,7 +192,7 @@ defmodule Incrementalist.Game.Persistence.SaveSlots do
     # The target can be empty, but the old slot must be durable first.
     _current_slot = autosave(current_slot, now)
 
-    target_slot = initialize_if_empty(target_slot_initial, now)
+    target_slot = initialize_if_empty(target_slot_initial, now) |> SaveSlot.inject_state_tokens()
 
     player
     |> Player.changeset(%{active_save_slot: slot_index, last_seen_at: now})

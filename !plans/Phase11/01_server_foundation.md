@@ -16,8 +16,10 @@ Implementations for all mini-games in this phase must be **visually basic and re
 - **Constants**: Update `lib/incrementalist/game/constants.ex` to load and expose this data.
 
 ### 1. Schema Expansion
-Add `daily_bonus` field to the `SaveSlot` state JSONB in `lib/incrementalist/game/state.ex` as an embedded schema:
-- `daily_tokens`: Integer (Attempts granted by daily rotation).
+Modify the core database and Ecto schemas:
+- **Table**: Add `has_daily_token` (Boolean, default false) to the `save_slots` table in `priv/repo/migrations/*_create_game_schema.exs`.
+- **Ecto Schema**: Add `has_daily_token` to `lib/incrementalist/game/persistence/save_slot.ex`.
+- **State Schema**: Add `daily_bonus` field to the `SaveSlot` state JSONB in `lib/incrementalist/game/state.ex` as an embedded schema:
 - `special_tokens`: Integer (Persistent bonus attempts).
 - `last_token_boundary_index`: Integer (Last boundary at which a token grant was evaluated).
 - `streak`: Integer (Consecutive days played).
@@ -30,13 +32,11 @@ Add `daily_bonus` field to the `SaveSlot` state JSONB in `lib/incrementalist/gam
 
 ### 2. Rules Implementation
 Create `lib/incrementalist/game/features/daily_bonus/rules.ex`:
-- **Token Rotation**: Implement `refresh_daily_bonus_state(state, now)`.
-  - Calculate `boundary_index` (12-hour slots since anchor).
-  - If `boundary_index > last_token_boundary_index`:
-    - Update `last_token_boundary_index`.
-    - Grant 1 `daily_token` **ONLY IF** `daily_tokens` is 0.
-- **Spending Logic**: Implement `spend_token(state)`.
-  - Prioritize spending `daily_tokens` before `special_tokens`.
+- **Scheduled Grant Job**: Implement a scheduled task (e.g., via a GenServer or Quantum) that runs every 12 hours.
+  - Executes `UPDATE save_slots SET has_daily_token = true WHERE has_daily_token = false`.
+  - Broadcasts a "boundary_reached" event to all active `PlayerServer` processes to synchronize their in-memory `State`.
+- **Spending Logic**: Implement `spend_token(save_slot_or_state)`.
+  - Prioritize spending `has_daily_token` before `special_tokens`.
 - **Streak Management**: Implement `advance_streak(state, now)`.
   - Increment if played on a new UTC day.
   - Decrement by 3 **per missed day** if a day is skipped.
