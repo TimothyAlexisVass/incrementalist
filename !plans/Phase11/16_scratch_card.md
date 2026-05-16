@@ -1,18 +1,20 @@
 # Phase 11, Step 16: Scratch Card
 
 ## Objective
-Port the Huge Scratch Card mini-game to server-authoritative rules and WebGL rendering.
+Port the Scratch Card mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
 - **Server Rules**: Add `scratch_card.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
-  - Implement `generate_layout(streak)`: Places 10 hidden items and calculates pixel budget.
-  - Implement `claim_item(item_id, revealed_percentage)`: Validates if an item was sufficiently revealed to be claimed.
+  - Implement `generate_grid(streak)`: Generates a grid of hidden symbols.
 - **Client Render**: Add `scratch-card.ts` to `assets/src/features/daily-bonus/render/`.
-  - Use a dynamic texture or mask to handle the scratching effect in WebGL.
-  - Render the hidden items as they are uncovered.
-- **Client Interaction**: Dragging the "scratcher" across the card surface.
-- **Reveal**: Instant reveal of items as they meet the threshold; final reward summary at the end.
+  - Render a grid of "Hidden" boxes (colored rectangles).
+  - On click, immediately change box color/label to show the hidden symbol.
+- **Client Interaction**: Click-to-reveal on individual slots.
+- **Reveal**: Change revealed box labels to show reward tier or "Miss".
+
+## Aesthetic Note
+Implementations must be visually basic. Use representational colored boxes. No actual "scratching" texture effects.
 
 ## Verification
-- Pixel budget is correctly depleted by scratching and lifting the scratcher.
-- Multi-touch or fast scratching is handled without desync.
+- Grid symbols match server-provided data.
+- Matching logic correctly triggers reward grants.

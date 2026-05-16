@@ -7,11 +7,14 @@ Port the Plinko Drop mini-game to server-authoritative rules and WebGL rendering
 - **Server Rules**: Add `plinko_drop.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
   - Implement `generate_path(streak)`: Generates one or more paths through the 12-row peg board.
 - **Client Render**: Add `plinko-drop.ts` to `assets/src/features/daily-bonus/render/`.
-  - Render a peg board with 13 reward cups at the bottom.
-  - Animate the ball bouncing through the pins using the server-provided path.
+  - Render a basic peg board (grid of points) and reward boxes at the bottom.
+  - Move a small circle (ball) between peg positions based on the server path.
 - **Client Interaction**: `Drop` button starts the sequence.
-- **Reveal**: Display the final cup landed and the highest reward across all drops.
+- **Reveal**: Update the landed box label to show reward tier.
+
+## Aesthetic Note
+Implementations must be visually basic. Use representational points and circles. No complex physics or collisions.
 
 ## Verification
-- Ball physics/bounces match the server-authoritative path exactly.
+- Ball path matches the server-authoritative path exactly.
 - Streak bonuses correctly grant extra drops.

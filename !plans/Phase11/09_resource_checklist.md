@@ -7,11 +7,15 @@ Port the Resource Checklist daily task system to the server and Canvas UI.
 - **Server Rules**: Add `checklist_rules.ex` to `lib/incrementalist/game/features/daily_bonus/`.
   - Implement `check_off(state, checklist_key)`: Consumes a token and grants the reward at `checklist_entry_indexes[checklist_key]`.
   - Increment the entry index (modulo 36).
-- **Client Render**: Render the 36-item checklist grid using WebGL.
-  - Highlight the "Next" item to be checked off.
-- **Client Interaction**: Send `daily_bonus.play { game: "resource_checklist" }` to "Check Off" the next item.
-- **Reveal**: Play a checking animation on the specific item and show the reward.
+- **Client Render**: Add `resource-checklist.ts` to `assets/src/features/daily-bonus/render/`.
+  - Render a basic grid of representational boxes (e.g., 6x6 or scrollable list).
+  - Use simple "Collected" / "Locked" text labels or color changes.
+- **Client Interaction**: `daily_bonus.play` command updates the authoritative index.
+- **Reveal**: Highlight the newly checked box with a representational border or color change.
+
+## Aesthetic Note
+Implementations must be visually basic. Use representational boxes and text labels. No complex icons or particle effects.
 
 ## Verification
-- Grid displays all 36 items correctly.
+- Grid displays all 36 items correctly using basic shapes.
 - Clicking "Check Off" advances the index and persists the change on the server.

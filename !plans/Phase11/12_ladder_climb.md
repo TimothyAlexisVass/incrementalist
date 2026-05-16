@@ -5,13 +5,16 @@ Port the Ladder Climb mini-game to server-authoritative rules and WebGL renderin
 
 ## Implementation
 - **Server Rules**: Add `ladder_climb.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
-  - Implement `evaluate_climb(current_step, streak)`: Determines success/failure for a climb attempt based on base chances and streak bonus.
+  - Implement `climb_outcome(streak)`: Returns the highest rung reached before a "slip".
 - **Client Render**: Add `ladder-climb.ts` to `assets/src/features/daily-bonus/render/`.
-  - Display a 20-rung ladder with visual markers for current progress.
-  - Animate successful climbs and "slip" failures.
-- **Client Interaction**: `Climb` button sends command to server; server returns result of that specific step.
-- **Reveal**: Display the final rung reached and the corresponding reward.
+  - Render a representational vertical "ladder" (stack of boxes).
+  - Use a simple marker box to represent the player's current rung.
+- **Client Interaction**: `Climb` button trigger.
+- **Reveal**: Update the marker box position and rung label ("Rung 1", "Rung 2", etc.).
+
+## Aesthetic Note
+Implementations must be visually basic. Use representational boxes and text labels. No climbing animations.
 
 ## Verification
-- Climb chances correctly incorporate the streak bonus.
-- Ladder state persists across reconnects if the game is unfinished.
+- Slip logic correctly matches server outcomes.
+- Final rewards are applied correctly to the authoritative state.

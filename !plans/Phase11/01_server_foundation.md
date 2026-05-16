@@ -3,6 +3,9 @@
 ## Objective
 Establish the authoritative data structure and rules for the Daily Bonus (BONUSTIME) system on the server, ensuring parity with the legacy implementation's token mechanics, rotation, and stats tracking.
 
+## Aesthetic Principle (Phase 11)
+Implementations for all mini-games in this phase must be **visually basic and representational**. Use simple shapes (boxes, circles) and text labels rather than detailed sprites or complex animations. The goal is to claim layout space and prove logic before final visual polish.
+
 ## Implementation
 
 ### 0. Domain Data (Requirements)
