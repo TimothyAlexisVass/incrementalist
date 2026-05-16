@@ -97,13 +97,12 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
 
     # A charge is pending if the target for the next cycle is higher than current
     is_pending = BigNum.compare(target_current, authoritative_current) > 0
-    threshold = target * 0.8
 
     cond do
       is_pending ->
         {:error, "sisu_charge_pending"}
 
-      BigNum.compare(authoritative_current, BigNum.from_number(threshold)) >= 0 ->
+      BigNum.compare(authoritative_current, BigNum.from_number(target * Constants.sisu_refill_threshold_factor())) >= 0 ->
         {:error, "sisu_already_higher"}
 
       true ->

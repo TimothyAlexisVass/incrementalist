@@ -53,6 +53,7 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
+  def sisu_refill_threshold_factor, do: 0.9
 
   def charge_crystal_azure_claim_interval, do: 4
   def charge_crystal_aether_claim_interval, do: 20
