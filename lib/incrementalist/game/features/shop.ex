@@ -15,7 +15,7 @@ defmodule Incrementalist.Game.Features.Shop do
   end
 
   defp fetch_item(item_id) do
-    item = Enum.find(Constants.shop_item_defs(), fn item -> item.id == item_id end)
+    item = Constants.shop_item_def(item_id)
 
     if item do
       {:ok, item}

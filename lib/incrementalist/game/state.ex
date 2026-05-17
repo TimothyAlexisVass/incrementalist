@@ -205,19 +205,24 @@ defmodule Incrementalist.Game.State do
       field :streak, :integer, default: 0
       field :last_played_at, :string
       field :total_games_played, :integer, default: 0
-      field :reward_counts, :map, default: %{
-        "tier_1" => 0,
-        "tier_2" => 0,
-        "tier_3" => 0,
-        "tier_4" => 0,
-        "tier_5" => 0,
-        "tier_6" => 0,
-        "tier_7" => 0
-      }
-      field :checklist_entry_indexes, :map, default: %{
-        "resource" => 0,
-        "item" => 0
-      }
+
+      field :reward_counts, :map,
+        default: %{
+          "tier_1" => 0,
+          "tier_2" => 0,
+          "tier_3" => 0,
+          "tier_4" => 0,
+          "tier_5" => 0,
+          "tier_6" => 0,
+          "tier_7" => 0
+        }
+
+      field :checklist_entry_indexes, :map,
+        default: %{
+          "resource" => 0,
+          "item" => 0
+        }
+
       field :last_result, :map
 
       embeds_one :active_session, Incrementalist.Game.State.ActiveSession, on_replace: :update
@@ -394,9 +399,11 @@ defmodule Incrementalist.Game.State do
           BigNum.from_number(Incrementalist.Game.Features.Progress.Sisu.Levels.base_max()),
         target_current: BigNum.one(),
         active_tier: "azure",
-        target_cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
+        target_cycle_decay:
+          Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         max_upgrade_level: 0,
-        cycle_decay: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
+        cycle_decay:
+          Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         projected_at: timestamp
       },
       quests: [],
@@ -413,11 +420,17 @@ defmodule Incrementalist.Game.State do
         streak: 0,
         total_games_played: 0,
         reward_counts: %{
-          "tier_1" => 0, "tier_2" => 0, "tier_3" => 0, "tier_4" => 0,
-          "tier_5" => 0, "tier_6" => 0, "tier_7" => 0
+          "tier_1" => 0,
+          "tier_2" => 0,
+          "tier_3" => 0,
+          "tier_4" => 0,
+          "tier_5" => 0,
+          "tier_6" => 0,
+          "tier_7" => 0
         },
         checklist_entry_indexes: %{
-          "resource" => 0, "item" => 0
+          "resource" => 0,
+          "item" => 0
         }
       }
     }
@@ -425,20 +438,25 @@ defmodule Incrementalist.Game.State do
 
   def check_daily_reset(%__MODULE__{} = state, now) do
     last_reset_str = state.stats.last_reset_at || state.first_played_at
+
     case Time.from_iso8601(last_reset_str) do
       {:ok, last_reset} ->
         if Date.compare(DateTime.to_date(last_reset), DateTime.to_date(now)) == :lt do
-          new_stats = %{state.stats |
-            total_level_ups_daily: 0,
-            total_days_played: state.stats.total_days_played + 1,
-            last_reset_at: Time.iso8601(now)
+          new_stats = %{
+            state.stats
+            | total_level_ups_daily: 0,
+              total_days_played: state.stats.total_days_played + 1,
+              last_reset_at: Time.iso8601(now)
           }
+
           # Authoritatively grant a new daily token on the day roll-over
           %{state | stats: new_stats, has_bonustime_token: true}
         else
           state
         end
-      _ -> state
+
+      _ ->
+        state
     end
   end
 
@@ -498,8 +516,11 @@ defmodule Incrementalist.Game.State do
           if(projected_state.sisu, do: projected_state.sisu.active_tier || "azure", else: "azure"),
         "cycle_decay" =>
           if(projected_state.sisu,
-            do: projected_state.sisu.cycle_decay || Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
-            else: Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay
+            do:
+              projected_state.sisu.cycle_decay ||
+                Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
+            else:
+              Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay
           )
       },
       "areas" =>
@@ -530,16 +551,26 @@ defmodule Incrementalist.Game.State do
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
       "has_bonustime_token" => projected_state.has_bonustime_token,
-      "bonustime" => if(projected_state.bonustime, do: Map.merge(Map.from_struct(projected_state.bonustime), %{"rotation_anchor" => Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601()}), else: nil),
-      "projection_params" =>
-        projection_params(projected_state, now)
+      "bonustime" =>
+        if(projected_state.bonustime,
+          do:
+            Map.merge(Map.from_struct(projected_state.bonustime), %{
+              "rotation_anchor" =>
+                Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
+                |> Incrementalist.Game.Time.iso8601()
+            }),
+          else: nil
+        ),
+      "projection_params" => projection_params(projected_state, now)
     }
   end
 
   def visible_quests(quests) do
     defs = Incrementalist.Game.Constants.quest_defs()
+
     for {id, quest_def} <- defs, into: %{} do
       q = Enum.find(quests, &(&1.id == id))
+
       {id,
        %{
          "name" => quest_def.name,
@@ -554,8 +585,10 @@ defmodule Incrementalist.Game.State do
 
   def visible_achievements(achievements) do
     defs = Incrementalist.Game.Constants.achievement_defs()
+
     for achievement_def <- defs, into: %{} do
       unlocked_at = Map.get(achievements || %{}, achievement_def.id)
+
       {achievement_def.id,
        %{
          "name" => achievement_def.name,
@@ -572,7 +605,8 @@ defmodule Incrementalist.Game.State do
 
     current_fill =
       case {parse_iso_ms(cycle_started_at), parse_iso_ms(can_claim_at)} do
-        {start_ms, end_ms} when is_integer(start_ms) and is_integer(end_ms) and end_ms > start_ms ->
+        {start_ms, end_ms}
+        when is_integer(start_ms) and is_integer(end_ms) and end_ms > start_ms ->
           now_ms = Time.to_unix_ms(now)
           progress = (now_ms - start_ms) / (end_ms - start_ms)
           min(1.0, max(0.0, progress)) * 100.0
@@ -599,6 +633,4 @@ defmodule Incrementalist.Game.State do
   end
 
   defp parse_iso_ms(_), do: nil
-
-
 end

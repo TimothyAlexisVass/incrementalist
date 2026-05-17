@@ -125,6 +125,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     ps = PlayerStates.get!(player.id)
     unlocked_state = %{ps.state | level: 10, area: "sage"}
+
     other_tip_leaf_ids =
       Incrementalist.Game.Constants.sage_tip_levels()
       |> Enum.reject(&(&1 == 1))
@@ -291,7 +292,9 @@ defmodule Incrementalist.Game.CommandsTest do
     reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
     assert reset_result["type"] == "game.reset.result"
 
-    can_claim_at = get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
+    can_claim_at =
+      get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
+
     assert is_binary(can_claim_at)
 
     {:ok, claim_at, 0} = DateTime.from_iso8601(can_claim_at)
@@ -304,7 +307,7 @@ defmodule Incrementalist.Game.CommandsTest do
         "progress.claim_reward",
         intent(1),
         claim_at
-    )
+      )
 
     assert claim_result["type"] == "progress.claim_reward.result"
     assert claim_result["charge_crystals"].azure == 0

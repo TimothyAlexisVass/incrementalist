@@ -73,7 +73,7 @@ defmodule Incrementalist.Game.Notices do
         level in Constants.sage_tip_levels()
 
       {:shop_item, item_id} ->
-        Enum.any?(Constants.shop_item_defs(), &(&1.id == item_id))
+        !is_nil(Constants.shop_item_def(item_id))
 
       {:quest, quest_id} ->
         Map.has_key?(Constants.quest_defs(), quest_id)
@@ -401,7 +401,8 @@ defmodule Incrementalist.Game.Notices do
 
         {:quest, quest_id}
 
-      String.starts_with?(leaf_id, "leaf.achievement.") and String.ends_with?(leaf_id, ".unlocked") ->
+      String.starts_with?(leaf_id, "leaf.achievement.") and
+          String.ends_with?(leaf_id, ".unlocked") ->
         achievement_id =
           leaf_id
           |> String.trim_leading("leaf.achievement.")

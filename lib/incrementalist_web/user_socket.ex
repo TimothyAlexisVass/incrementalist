@@ -21,7 +21,9 @@ defmodule IncrementalistWeb.UserSocket do
             {:ok, id} -> id
             _ -> nil
           end
-        _ -> nil
+
+        _ ->
+          nil
       end
 
     player = Sessions.authenticate_player(player_id)
