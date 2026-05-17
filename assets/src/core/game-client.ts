@@ -61,7 +61,7 @@ import {
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
-import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from '../config';
+import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT, DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT } from '../config';
 import { COLORS } from '../colors';
 
 
@@ -304,12 +304,12 @@ export class GameClient {
         lifeMs: 5000,
         riseSpeed: 2,
         font: 'bold 24px "Outfit"',
-        textAlign: "left" as CanvasTextAlign,
+        textAlign: "center" as CanvasTextAlign,
         type: "achievement_unlock"
       };
 
-      const baseX = TOP_HUD_EXP_BAR_X + 8;
-      const baseY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 120; // Lower than level up to avoid immediate overlap
+      const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
+      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 4);
 
       spawnFloatingText(
         this.floatingTexts,
