@@ -21,7 +21,8 @@ export type SisuRefillTier = {
   cycleDecay: number;
 };
 
-export const SISU_BASE_MAX = 2;
+export { SISU_BASE_MAX, SISU_PER_LEVEL } from "./levels";
+
 export const SISU_MIN_MULTIPLIER = 1;
 export const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
 export const SISU_REFILL_THRESHOLD_FACTOR = 0.9;
@@ -182,7 +183,7 @@ export function getUpgradeButtonState(
   return {
     disabled: false,
     label: "",
-    prefix: formatMultiplierDelta(0.5),
+    prefix: formatMultiplierDelta(SISU_PER_LEVEL),
     cost
   };
 }
