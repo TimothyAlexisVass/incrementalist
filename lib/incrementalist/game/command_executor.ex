@@ -15,6 +15,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Rules, as: BonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
   alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
+  alias Incrementalist.Game.Features.BonusTime.Games.Checklist
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -502,11 +503,26 @@ defmodule Incrementalist.Game.CommandExecutor do
              {:ok, game_id} <- fetch_game_id(command.intent),
              true <- game_id == active_game_id do
           # Execute game rules
-          {tier, rolls} =
+          {tier, rolls, next_state} =
             case game_id do
-              "chest_draw" -> ChestDraw.roll_reward(next_state.bonustime.streak)
-              "prize_wheel" -> PrizeWheel.roll_reward(next_state.bonustime.streak)
-              _ -> {1, [1]}
+              "chest_draw" ->
+                {t, r} = ChestDraw.roll_reward(next_state.bonustime.streak)
+                {t, r, next_state}
+
+              "prize_wheel" ->
+                {t, r} = PrizeWheel.roll_reward(next_state.bonustime.streak)
+                {t, r, next_state}
+
+              "resource_checklist" ->
+                {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "resource")
+                {t, [idx], updated_state}
+
+              "item_checklist" ->
+                {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "item")
+                {t, [idx], updated_state}
+
+              _ ->
+                {1, [1], next_state}
             end
 
           # Apply rewards

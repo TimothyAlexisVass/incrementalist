@@ -52,6 +52,8 @@ import { renderBonusTimeOverview } from "../features/bonustime/render";
 import { handleBonusTimeInteractions } from "../features/bonustime/interactions";
 import { resetChestState } from "../features/bonustime/01-chest-draw/interactions";
 import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactions";
+import { resetResourceChecklistState } from "../features/bonustime/03-resource-checklist/interactions";
+import { resetItemChecklistState } from "../features/bonustime/05-item-checklist/interactions";
 import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
@@ -443,6 +445,8 @@ export class GameClient {
           this.bonusRewardModal.open = false;
           resetChestState();
           resetWheelState();
+          resetResourceChecklistState();
+          resetItemChecklistState();
           input.consumed = true;
         }
       }

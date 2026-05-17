@@ -18,6 +18,12 @@ import { InteractionState } from "../../ui/managers/interactions";
 
 import { getChestState, ChestState } from "./01-chest-draw/interactions";
 import { getWheelState, WheelState } from "./02-prize-wheel/interactions";
+import { renderResourceChecklist } from "./03-resource-checklist/render";
+import { getResourceChecklistData } from "./03-resource-checklist/view-model";
+import { getResourceChecklistState, ResourceChecklistState } from "./03-resource-checklist/interactions";
+import { renderItemChecklist } from "./05-item-checklist/render";
+import { getItemChecklistData } from "./05-item-checklist/view-model";
+import { getItemChecklistState, ItemChecklistState } from "./05-item-checklist/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -42,7 +48,9 @@ export function renderBonusTimeOverview(
   const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
   const activeGameId = getActiveGameId(state);
   const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
-                           (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE);
+                           (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE) ||
+                           (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
+                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -99,6 +107,16 @@ export function renderBonusTimeOverview(
     const data = getPrizeWheelData(state);
     if (data) {
       renderPrizeWheel(data, rect);
+    }
+  } else if (activeGameId === "resource_checklist") {
+    const data = getResourceChecklistData(state);
+    if (data) {
+      renderResourceChecklist(data, rect);
+    }
+  } else if (activeGameId === "item_checklist") {
+    const data = getItemChecklistData(state);
+    if (data) {
+      renderItemChecklist(data, rect);
     }
   } else {
     renderer.drawText({

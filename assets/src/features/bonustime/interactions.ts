@@ -6,6 +6,10 @@ import { handleChestDrawInteractions, getChestState, ChestState } from "./01-che
 import { getChestDrawData } from "./01-chest-draw/view-model";
 import { handlePrizeWheelInteractions, getWheelState, WheelState } from "./02-prize-wheel/interactions";
 import { getPrizeWheelData } from "./02-prize-wheel/view-model";
+import { handleResourceChecklistInteractions, getResourceChecklistState, ResourceChecklistState } from "./03-resource-checklist/interactions";
+import { getResourceChecklistData } from "./03-resource-checklist/view-model";
+import { handleItemChecklistInteractions, getItemChecklistState, ItemChecklistState } from "./05-item-checklist/interactions";
+import { getItemChecklistData } from "./05-item-checklist/view-model";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -25,7 +29,9 @@ export function handleBonusTimeInteractions(
   const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
   const activeGameId = getActiveGameId(state);
   const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
-                           (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE);
+                           (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE) ||
+                           (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
+                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -70,6 +76,24 @@ export function handleBonusTimeInteractions(
     const data = getPrizeWheelData(state);
     if (data) {
       const intent = handlePrizeWheelInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === 'open_modal') {
+        return { type: 'open_chest_reward' };
+      }
+    }
+  } else if (activeGameId === 'resource_checklist') {
+    const data = getResourceChecklistData(state);
+    if (data) {
+      const intent = handleResourceChecklistInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === 'open_modal') {
+        return { type: 'open_chest_reward' };
+      }
+    }
+  } else if (activeGameId === 'item_checklist') {
+    const data = getItemChecklistData(state);
+    if (data) {
+      const intent = handleItemChecklistInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === 'open_modal') {
         return { type: 'open_chest_reward' };
