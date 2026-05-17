@@ -79,8 +79,6 @@ export function drawAchievementCard(
       5,
       true
     );
-
-    notices.reportLeafVisible(leafId, true, channel, runCommand);
   }
 }
 

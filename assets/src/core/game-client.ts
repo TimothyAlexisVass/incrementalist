@@ -35,7 +35,8 @@ import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAre
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
 import { 
   createFloatingTextState, 
-  renderFloatingTexts, 
+  renderFloatingTexts,
+  spawnFloatingText,
   updateFloatingTexts, 
 } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress-bar/claim-effects";
@@ -60,6 +61,9 @@ import {
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
+import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from '../config';
+import { COLORS } from '../colors';
+
 
 // Cached snapshots are projection data. They make boot feel
 // instant, but server command results remain the only source of durable truth.
@@ -179,6 +183,7 @@ export class GameClient {
 
   private async applyAndAck(result: ServerResult) {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+    const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
       notices.setSnapshot(this.store.state.snapshot);
@@ -198,6 +203,7 @@ export class GameClient {
     }
 
     this.applyProgressEffects(result, previousAmounts);
+    this.applyAchievementEffects(result, previousAchievements);
 
     if (!isAckableCommandResult(result)) return;
 
@@ -207,12 +213,14 @@ export class GameClient {
     if (clearsCommandQueue(result)) this.channel!.clearCommandQueue();
     while (next) {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+      const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
         notices.setSnapshot(this.store.state.snapshot);
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
+      this.applyAchievementEffects(next, previousAchievements);
       if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
         if (this.store.state.snapshot) {
@@ -280,6 +288,38 @@ export class GameClient {
       popupPoint: getPendingClaimPopupPoint()
     });
     clearPendingClaimPopupPoint();
+  }
+
+  private applyAchievementEffects(result: ServerResult, previousAchievements: string[]) {
+    if (!this.store.state.snapshot) return;
+
+    const currentAchievements = Object.keys(this.store.state.snapshot.state.achievements).filter(
+      k => this.store.state.snapshot!.state.achievements[k].unlocked_at
+    );
+
+    const newlyUnlocked = currentAchievements.filter(id => !previousAchievements.includes(id));
+
+    if (newlyUnlocked.length > 0) {
+      const popupOptions = {
+        lifeMs: 5000,
+        riseSpeed: 2,
+        font: 'bold 24px "Outfit"',
+        textAlign: "left" as CanvasTextAlign,
+        type: "achievement_unlock"
+      };
+
+      const baseX = TOP_HUD_EXP_BAR_X + 8;
+      const baseY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 120; // Lower than level up to avoid immediate overlap
+
+      spawnFloatingText(
+        this.floatingTexts,
+        "Achievement Unlocked!",
+        baseX,
+        baseY,
+        COLORS.rewards.achievement,
+        popupOptions
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

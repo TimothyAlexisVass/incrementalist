@@ -9,6 +9,7 @@ import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { GameChannel } from '../../../net/game-channel';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
+import { markViewed } from '../../../net/commands';
 import {
   NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
   NOTICE_LEAF_TAB_QUEST_BUTTON,
@@ -54,7 +55,12 @@ export function getTabMenu(): TabMenu {
         hotkey: 'A',
         noticeParentId: NOTICE_PARENT_TAB_ACHIEVEMENTS,
         noticeLeafId: NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON,
-        renderContent: renderAchievementsTab
+        renderContent: renderAchievementsTab,
+        onLeave: () => {
+          if (channel && runCommand) {
+            runCommand(() => markViewed(channel!, 'achievements'));
+          }
+        }
       },
       {
         id: 'stats',

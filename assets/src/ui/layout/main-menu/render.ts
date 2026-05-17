@@ -57,7 +57,10 @@ export class MainMenu implements Overlay {
     const { channel, runCommand } = getNetwork();
     getTabMenu().render(canvas, input, state, menuRect, channel || undefined, runCommand || undefined);
 
-    handleMainMenuInteractions(input, shellRect, onClose);
+    handleMainMenuInteractions(input, shellRect, () => {
+      getTabMenu().triggerLeave();
+      onClose();
+    });
   }
 
   tick(dt: number) {

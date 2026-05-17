@@ -32,13 +32,8 @@ export function renderAchievementsTab(
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
 
-  // Track viewing for achievement
-  if (snapshot !== lastViewedSnapshot && !snapshot.state.stats.screens_viewed_achievements) {
+  if (snapshot !== lastViewedSnapshot) {
     lastViewedSnapshot = snapshot;
-    const { channel } = getNetwork();
-    if (channel) {
-      markViewed(channel, 'achievements');
-    }
   }
 
   renderer.drawRect({
