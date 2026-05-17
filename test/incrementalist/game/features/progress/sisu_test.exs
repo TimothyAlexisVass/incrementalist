@@ -186,7 +186,8 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
       first_played_at: DateTime.add(@now, -60, :second) |> DateTime.to_iso8601(),
       sisu: %State.Sisu{
         current: BigNum.from_number(1.0),
-        target_current: BigNum.from_number(1.5), # User already charged
+        # User already charged
+        target_current: BigNum.from_number(1.5),
         max_basic: BigNum.from_number(Levels.base_max()),
         max_upgrade_level: 0,
         cycle_decay: 5.0,

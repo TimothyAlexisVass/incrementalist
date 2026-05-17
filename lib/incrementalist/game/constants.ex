@@ -34,6 +34,14 @@ defmodule Incrementalist.Game.Constants do
     Enum.map(@shop_items, &normalize_shop_item/1)
   end
 
+  for item <- @shop_items do
+    def shop_item_def(unquote(item["id"])) do
+      normalize_shop_item(unquote(Macro.escape(item)))
+    end
+  end
+
+  def shop_item_def(_), do: nil
+
   def quest_defs do
     for {category, quests} <- @quests, {id, quest} <- quests, into: %{} do
       {id, normalize_quest(id, quest, category)}
