@@ -431,7 +431,7 @@ function getNowMs(): number {
     return performance.now();
   }
 
-  return getServerNow();
+  return Date.now();
 }
 
 function getProgressVisualDelta(now: number): number {
