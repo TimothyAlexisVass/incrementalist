@@ -12,8 +12,8 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
-  alias Incrementalist.Game.Features.DailyBonus.Rules, as: DailyBonus
-  alias Incrementalist.Game.Features.DailyBonus.Games.ChestDraw
+  alias Incrementalist.Game.Features.BonusTime.Rules, as: BonusTime
+  alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -472,17 +472,17 @@ defmodule Incrementalist.Game.CommandExecutor do
            "notices" => ps.notices
          }, ps.id}
 
-      "daily_bonus.play" ->
+      "bonustime.play" ->
         ps = player_state(player, now)
 
-        with {:ok, next_state, token_type} <- DailyBonus.spend_token(ps.state),
-             active_game_id <- DailyBonus.get_active_game_id(now),
+        with {:ok, next_state, token_type} <- BonusTime.spend_token(ps.state),
+             active_game_id <- BonusTime.get_active_game_id(now),
              {:ok, game_id} <- fetch_game_id(command.intent),
              true <- game_id == active_game_id do
           # Execute game rules
           {tier, rolls} =
             case game_id do
-              "chest_draw" -> ChestDraw.roll_reward(next_state.daily_bonus.streak)
+              "chest_draw" -> ChestDraw.roll_reward(next_state.bonustime.streak)
               _ -> {1, [1]}
             end
 
@@ -491,10 +491,10 @@ defmodule Incrementalist.Game.CommandExecutor do
             Incrementalist.Game.Rewards.grant_bonus_reward(next_state, tier)
 
           # Update streak and metadata
-          next_state = DailyBonus.advance_streak(next_state, now)
+          next_state = BonusTime.advance_streak(next_state, now)
 
-          daily_bonus = next_state.daily_bonus
-          new_reward_counts = Map.update(daily_bonus.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+          bonustime = next_state.bonustime
+          new_reward_counts = Map.update(bonustime.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
 
           last_result = %{
             "game_id" => game_id,
@@ -505,14 +505,14 @@ defmodule Incrementalist.Game.CommandExecutor do
             "played_at" => Time.iso8601(now)
           }
 
-          next_daily_bonus = %{
-            daily_bonus
-            | total_games_played: daily_bonus.total_games_played + 1,
+          next_bonustime = %{
+            bonustime
+            | total_games_played: bonustime.total_games_played + 1,
               reward_counts: new_reward_counts,
               last_result: last_result
           }
 
-          next_state = %{next_state | daily_bonus: next_daily_bonus}
+          next_state = %{next_state | bonustime: next_bonustime}
           next_state = Achievements.evaluate(next_state)
 
           next_notices =
@@ -530,12 +530,12 @@ defmodule Incrementalist.Game.CommandExecutor do
 
           {"succeeded",
            %{
-             "type" => "daily_bonus.play.result",
+             "type" => "bonustime.play.result",
              "status" => "ok",
              "command_id" => command.command_id,
              "coins" => next_state.coins,
-             "has_daily_token" => next_state.has_daily_token,
-             "daily_bonus" => next_state.daily_bonus,
+             "has_bonustime_token" => next_state.has_bonustime_token,
+             "bonustime" => next_state.bonustime,
              "achievements" => State.visible_achievements(next_state.achievements),
              "notices" => Notices.payload(next_notices)
            }, ps.id}
@@ -663,14 +663,14 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp update_player_state(ps, attrs) do
-    has_daily_token =
+    has_bonustime_token =
       if Map.has_key?(attrs, :state) do
         PlayerState.extract_state_tokens(attrs.state)
       else
-        attrs[:has_daily_token] || ps.has_daily_token
+        attrs[:has_bonustime_token] || ps.has_bonustime_token
       end
 
-    attrs = Map.put(attrs, :has_daily_token, has_daily_token)
+    attrs = Map.put(attrs, :has_bonustime_token, has_bonustime_token)
 
     # Standard update
     updated_ps = Repo.update!(PlayerState.changeset(ps, attrs))
@@ -678,7 +678,7 @@ defmodule Incrementalist.Game.CommandExecutor do
     # HAMMER: Force the column update. No more excuses.
     import Ecto.Query
     _ = from(s in PlayerState, where: s.id == ^ps.id)
-        |> Repo.update_all(set: [has_daily_token: has_daily_token])
+        |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
 
     updated_ps
   end

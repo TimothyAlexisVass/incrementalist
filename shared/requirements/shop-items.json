@@ -24,7 +24,7 @@
   {
     "id": "bonus_time",
     "name": "BONUSTIME",
-    "description": "Play daily bonus games when a daily token is ready!",
+    "description": "Play BonusTime games when a BonusTime token is ready!",
     "cost": {
       "m": 1,
       "e": 3

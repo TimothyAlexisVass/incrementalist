@@ -13,7 +13,7 @@ import type {
   StatsUpdateResult,
   NoticeEventResult,
   NoticeEventKind,
-  DailyBonusPlayResult
+  BonusTimePlayResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -67,8 +67,8 @@ export function graduateTutorial(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<StatsUpdateResult | CommandErrorResult>>("stats.graduate_tutorial");
 }
 
-export function playDailyBonus(channel: GameChannel, gameId: string) {
-  return channel.pushCommand<CommandPushResult<DailyBonusPlayResult | CommandErrorResult>>("daily_bonus.play", {
+export function playBonusTime(channel: GameChannel, gameId: string) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
     game: gameId
   });
 }

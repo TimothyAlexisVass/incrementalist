@@ -35,7 +35,7 @@ defmodule Incrementalist.Game.ConstantsTest do
              %{
                id: "bonus_time",
                name: "BONUSTIME",
-               description: "Play daily bonus games when a daily token is ready!",
+               description: "Play BonusTime games when a BonusTime token is ready!",
                cost: %BigNum{m: 1.0, e: 3},
                currency: :shards,
                required_level: 15

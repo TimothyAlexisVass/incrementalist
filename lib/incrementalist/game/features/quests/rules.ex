@@ -127,7 +127,7 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
   defp get_quest_value("shards", state), do: state.stats.total_shards_earned
   defp get_quest_value("cores", state), do: state.stats.total_cores_earned
   defp get_quest_value("progress_claim", state), do: state.stats.total_progress_claims
-  defp get_quest_value("streak", state), do: if(state.daily_bonus, do: state.daily_bonus.streak, else: 0)
+  defp get_quest_value("streak", state), do: if(state.bonustime, do: state.bonustime.streak, else: 0)
   defp get_quest_value("level_up_daily", state), do: state.stats.total_level_ups_daily
   defp get_quest_value(_, _), do: 0
 

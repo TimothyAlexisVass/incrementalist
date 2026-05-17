@@ -16,10 +16,10 @@ export function handleBonusTimeInteractions(
   channel?: GameChannel
 ): BonusTimeInteractionsResult {
   const snapshot = state.snapshot;
-  if (!snapshot || !snapshot.state.daily_bonus) return { type: 'none' };
+  if (!snapshot || !snapshot.state.bonustime) return { type: 'none' };
 
-  const db = snapshot.state.daily_bonus;
-  const hasToken = snapshot.state.has_daily_token || db.special_tokens > 0;
+  const db = snapshot.state.bonustime;
+  const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken) {

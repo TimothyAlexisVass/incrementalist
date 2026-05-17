@@ -21,7 +21,7 @@ export function renderBottomHUD(
   onBonusTimeClick: () => void,
   onAreaSelect?: (areaKey: string) => void,
   channel?: GameChannel,
-  hasDailyToken?: boolean,
+  hasBonusTimeToken?: boolean,
   bonusTooltip?: string[],
   isUnlocked?: boolean,
   runCommand?: (cmd: () => Promise<any>) => void
@@ -57,7 +57,7 @@ export function renderBottomHUD(
   const bonusRect = { x: bonusX, y: buttonY, width: bonusWidth, height: buttonHeight };
 
   if (isUnlocked) {
-    if (doBonusTimeButton(input, bonusRect, hasDailyToken ?? false, bonusTooltip, "bonus-time-tooltip")) {
+    if (doBonusTimeButton(input, bonusRect, hasBonusTimeToken ?? false, bonusTooltip, "bonus-time-tooltip")) {
       onBonusTimeClick();
     }
   } else {

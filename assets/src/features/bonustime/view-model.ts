@@ -1,6 +1,6 @@
 import { ServerState } from "../../net/snapshots";
 import { getServerNow } from "../../core/time";
-import dailyBonusConfig from "../../../../shared/requirements/daily-bonus.json";
+import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
 
 const SLOT_MS = 43_200_000; // 12 hours
 const SLOT_COUNT = 9;
@@ -19,9 +19,9 @@ const GAME_NAMES: Record<string, string> = {
 
 export function getActiveGameId(state?: ServerState): string {
   const now = getServerNow();
-  let anchorStr = state?.snapshot?.state.daily_bonus?.rotation_anchor;
+  let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
   if (!anchorStr) {
-    anchorStr = dailyBonusConfig.rotation_anchor;
+    anchorStr = bonustimeConfig.rotation_anchor;
   }
   if (!anchorStr) {
     return "chest_draw";
@@ -40,9 +40,9 @@ export function getActiveGameName(state?: ServerState): string {
 
 export function getTimeUntilNextTokenMs(state?: ServerState): number {
   const now = getServerNow();
-  let anchorStr = state?.snapshot?.state.daily_bonus?.rotation_anchor;
+  let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
   if (!anchorStr) {
-    anchorStr = dailyBonusConfig.rotation_anchor;
+    anchorStr = bonustimeConfig.rotation_anchor;
   }
   if (!anchorStr) {
     return SLOT_MS;
@@ -57,9 +57,9 @@ export function getTimeUntilNextTokenMs(state?: ServerState): number {
 
 export function getBonusTimeTooltipData(state: ServerState): string[] | null {
   const snapshot = state.snapshot;
-  if (!snapshot || !snapshot.state.daily_bonus) return null;
+  if (!snapshot || !snapshot.state.bonustime) return null;
 
-  const db = snapshot.state.daily_bonus;
+  const db = snapshot.state.bonustime;
   const gameName = getActiveGameName(state);
   
   const tooltip = [
@@ -68,7 +68,7 @@ export function getBonusTimeTooltipData(state: ServerState): string[] | null {
     `Streak: ${db.streak}`
   ];
 
-  if (!snapshot.state.has_daily_token) {
+  if (!snapshot.state.has_bonustime_token) {
     const nextMs = getTimeUntilNextTokenMs(state);
     const hours = Math.floor(nextMs / 3_600_000);
     const mins = Math.floor((nextMs % 3_600_000) / 60_000);

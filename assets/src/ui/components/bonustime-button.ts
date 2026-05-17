@@ -2,7 +2,7 @@ import { InteractionState, pointInRect } from '../managers/interactions';
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { queueTooltip } from "./tooltip";
 
-import { BONUSTIME_BUTTON_FONT } from "../../config";
+import { BONUSTIME_HUGE_BUTTON_FONT } from "../../config";
 import { COLORS } from "../../colors";
 
 const BONUS_TEXT = 'BONUSTIME';
@@ -60,7 +60,7 @@ function drawBonusTimeButton(
       text: BONUS_TEXT,
       x: textX,
       y: textY,
-      font: BONUSTIME_BUTTON_FONT,
+      font: BONUSTIME_HUGE_BUTTON_FONT,
       color: isHovered ? COLORS.button.bonusTime.textActive : COLORS.button.bonusTime.textDisabled,
       align: 'center',
       baseline: 'middle'
@@ -73,7 +73,7 @@ function drawBonusTimeButton(
 
   // 2. Per-letter rainbow — color is a material uniform so the Troika mesh
   //    is reused across color changes without needing a re-sync.
-  const font = BONUSTIME_BUTTON_FONT;
+  const font = BONUSTIME_HUGE_BUTTON_FONT;
   let currentX = textX - (TOTAL_WIDTH / 2);
   const chars = BONUS_TEXT.split('');
 

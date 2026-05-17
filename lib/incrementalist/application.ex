@@ -11,7 +11,7 @@ defmodule Incrementalist.Application do
       Incrementalist.Game.Persistence.CommandLog.Cleanup,
       {Registry, keys: :unique, name: Incrementalist.Game.Session.PlayerRegistry},
       Incrementalist.Game.Session.PlayerSupervisor,
-      Incrementalist.Workers.DailyBonusGrant,
+      Incrementalist.Workers.BonusTimeGrant,
       IncrementalistWeb.Endpoint
     ]
 

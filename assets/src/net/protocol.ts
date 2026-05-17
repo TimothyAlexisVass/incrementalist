@@ -79,7 +79,7 @@ export type StatsState = {
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
-export type DailyBonusState = {
+export type BonusTimeState = {
   special_tokens: number;
   last_token_boundary_index: number;
   streak: number;
@@ -126,8 +126,8 @@ export type GameSnapshot = {
     quests: Record<string, QuestState>;
     achievements: Record<string, AchievementState>;
     stats: StatsState;
-    daily_bonus: DailyBonusState | null;
-    has_daily_token: boolean;
+    bonustime: BonusTimeState | null;
+    has_bonustime_token: boolean;
     projection_params: ProjectionParams;
   };
   notices: NoticeState;
@@ -240,13 +240,13 @@ export type StatsUpdateResult = {
   notices: NoticeState;
 };
 
-export type DailyBonusPlayResult = {
-  type: "daily_bonus.play.result";
+export type BonusTimePlayResult = {
+  type: "bonustime.play.result";
   status: "ok";
   command_id: number;
   coins?: BigNum;
-  has_daily_token?: boolean;
-  daily_bonus?: DailyBonusState;
+  has_bonustime_token?: boolean;
+  bonustime?: BonusTimeState;
   achievements?: Record<string, AchievementState>;
   notices: NoticeState;
 };
@@ -314,7 +314,7 @@ export type AckableCommandResult =
   | QuestClaimResult
   | StatsUpdateResult
   | NoticeEventResult
-  | DailyBonusPlayResult
+  | BonusTimePlayResult
   | CommandErrorResult;
 
 export type CommandQueuedResult = {
@@ -366,7 +366,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "quest.claim.result" ||
     result.type === "stats.update.result" ||
     result.type === "notice.event.result" ||
-    result.type === "daily_bonus.play.result" ||
+    result.type === "bonustime.play.result" ||
     result.type === "command.error"
   );
 }

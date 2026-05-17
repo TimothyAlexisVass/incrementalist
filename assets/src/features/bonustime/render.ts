@@ -4,7 +4,7 @@ import { ServerState } from "../../net/snapshots";
 import { COLORS } from "../../colors";
 import { 
   DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT,
-  DAILY_BONUS_TITLE_FONT, DAILY_BONUS_TIMER_FONT, MODAL_BODY_FONT, DAILY_BONUS_BUTTON_FONT
+  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, MODAL_BODY_FONT, BONUSTIME_BUTTON_FONT
 } from "../../config";
 import { renderRewardModal, RewardModalState } from "../../ui/components/modals/reward-modal";
 import { getActiveGameId, getActiveGameName, getTimeUntilNextTokenMs } from "./view-model";
@@ -24,9 +24,9 @@ export function renderBonusTimeOverview(
   if (!renderer) return;
 
   const snapshot = state.snapshot;
-  if (!snapshot || !snapshot.state.daily_bonus) return;
+  if (!snapshot || !snapshot.state.bonustime) return;
 
-  const db = snapshot.state.daily_bonus;
+  const db = snapshot.state.bonustime;
 
   // Background
   renderer.drawRect({
@@ -34,7 +34,7 @@ export function renderBonusTimeOverview(
     color: hexToRgba(COLORS.panel.bg)
   });
 
-  const hasToken = snapshot.state.has_daily_token || db.special_tokens > 0;
+  const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -42,9 +42,9 @@ export function renderBonusTimeOverview(
     // Render the unified global cooldown screen instead of the active game!
     const remainingMs = getTimeUntilNextTokenMs(state);
     const countdownStr = formatCountdown(remainingMs);
-    const stableCountdown = resolveUpdatingText("daily_bonus_countdown", countdownStr, (text) => renderer.isTextReady({
+    const stableCountdown = resolveUpdatingText("bonustime_countdown", countdownStr, (text) => renderer.isTextReady({
       text,
-      font: DAILY_BONUS_TIMER_FONT,
+      font: BONUSTIME_TIMER_FONT,
       color: "#edf2f7",
       align: 'center',
       baseline: 'middle'
@@ -58,7 +58,7 @@ export function renderBonusTimeOverview(
 
     renderer.drawText({
       text: stableCountdown,
-      x: centerX, y: centerY, font: DAILY_BONUS_TIMER_FONT,
+      x: centerX, y: centerY, font: BONUSTIME_TIMER_FONT,
       color: "#edf2f7", align: 'center', baseline: 'middle'
     });
 
@@ -68,7 +68,7 @@ export function renderBonusTimeOverview(
                         input.pointer.x >= btnRect.x && input.pointer.x <= btnRect.x + btnRect.width &&
                         input.pointer.y >= btnRect.y && input.pointer.y <= btnRect.y + btnRect.height;
       drawButton(btnRect, "VIEW LAST REWARD", {
-        font: DAILY_BONUS_BUTTON_FONT,
+        font: BONUSTIME_BUTTON_FONT,
         active: !!isOverBtn
       });
     }
@@ -93,7 +93,7 @@ export function renderBonusTimeOverview(
       text: `[ ${getActiveGameName(state).toUpperCase()} COMING SOON ]`,
       x: centerX,
       y: centerY,
-      font: DAILY_BONUS_TITLE_FONT,
+      font: BONUSTIME_TITLE_FONT,
       color: "#ffffff",
       alpha: 0.4,
       align: 'center', baseline: 'middle'

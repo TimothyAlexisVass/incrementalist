@@ -3,10 +3,10 @@ import { hexToRgba, cssToRgba } from "../../../utils";
 import { ChestDrawData } from "./view-model";
 import { ChestState, getChestState } from "./interactions";
 import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from "../../../config";
-import dailyBonusConfig from "../../../../../shared/requirements/daily-bonus.json";
+import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 
 function getTierConfig(tier: number) {
-  return (dailyBonusConfig.reward_tiers as any)[`tier_${tier}`];
+  return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
 const DEFAULT_COLOR = "#4a5568";

@@ -57,15 +57,15 @@ export const ACHIEVEMENT_STARS_FONT = 'bold 18px Arial';
 export const ACHIEVEMENT_UNLOCKED_FONT = '14px Arial';
 export const ACHIEVEMENT_NAME_FONT = '13px Arial';
 
-// Daily bonus fonts
-export const DAILY_BONUS_ENTRANCE_FONT = 'bold 38px Arial';
-export const DAILY_BONUS_TITLE_FONT = 'bold 42px Arial';
-export const DAILY_BONUS_TIMER_FONT = 'bold 42px monospace';
-export const DAILY_BONUS_RESULT_FONT = 'bold 22px Arial';
-export const DAILY_BONUS_BODY_FONT = '15px Arial';
-export const DAILY_BONUS_LABEL_FONT = '12px Arial';
-export const DAILY_BONUS_BUTTON_FONT = 'bold 14px Arial';
-export const BONUSTIME_BUTTON_FONT = 'bold 40px "Outfit"';
+// BonusTime fonts
+export const BONUSTIME_ENTRANCE_FONT = 'bold 38px Arial';
+export const BONUSTIME_TITLE_FONT = 'bold 42px Arial';
+export const BONUSTIME_TIMER_FONT = 'bold 42px monospace';
+export const BONUSTIME_RESULT_FONT = 'bold 22px Arial';
+export const BONUSTIME_BODY_FONT = '15px Arial';
+export const BONUSTIME_LABEL_FONT = '12px Arial';
+export const BONUSTIME_BUTTON_FONT = 'bold 14px Arial';
+export const BONUSTIME_HUGE_BUTTON_FONT = 'bold 40px "Outfit"';
 
 // Coin Rain fonts
 export const COIN_RAIN_TIMER_FONT = '24px Arial';

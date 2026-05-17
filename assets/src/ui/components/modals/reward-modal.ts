@@ -7,10 +7,10 @@ import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { drawButton } from '../button';
 import { BigNum } from '../../../core/bignum';
 import { formatBigNum } from '../../../utils/format';
-import dailyBonusConfig from '../../../../../shared/requirements/daily-bonus.json';
+import bonustimeConfig from '../../../../../shared/requirements/bonustime.json';
 
 function getTierColor(tier: number): string {
-  const tierConfig = (dailyBonusConfig.reward_tiers as any)[`tier_${tier}`];
+  const tierConfig = (bonustimeConfig.reward_tiers as any)[`tier_${tier}`];
   return tierConfig?.color || "#ffffff";
 }
 

@@ -9,19 +9,19 @@ defmodule Incrementalist.Game.Constants do
   @shop_items_path Path.join(@requirements_dir, "shop-items.json")
   @quests_path Path.join(@requirements_dir, "quests.json")
   @achievements_path Path.join(@requirements_dir, "achievements.json")
-  @daily_bonus_path Path.join(@requirements_dir, "daily-bonus.json")
+  @bonustime_path Path.join(@requirements_dir, "bonustime.json")
   @external_resource @areas_path
   @external_resource @sage_tip_levels_path
   @external_resource @shop_items_path
   @external_resource @quests_path
   @external_resource @achievements_path
-  @external_resource @daily_bonus_path
+  @external_resource @bonustime_path
   @areas @areas_path |> File.read!() |> Jason.decode!()
   @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
   @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
-  @daily_bonus @daily_bonus_path |> File.read!() |> Jason.decode!()
+  @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
 
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
@@ -44,20 +44,20 @@ defmodule Incrementalist.Game.Constants do
     Enum.map(@achievements, &normalize_achievement/1)
   end
 
-  def daily_bonus_rotation do
-    @daily_bonus["rotation"]
+  def bonustime_rotation do
+    @bonustime["rotation"]
   end
 
-  def daily_bonus_games do
-    @daily_bonus["games"]
+  def bonustime_games do
+    @bonustime["games"]
   end
 
-  def daily_bonus_slot_ms, do: 43_200_000
-  def daily_bonus_rotation_slot_count, do: @daily_bonus["rotation_slot_count"]
-  def daily_bonus_game_rules, do: @daily_bonus["game_rules"]
+  def bonustime_slot_ms, do: 43_200_000
+  def bonustime_rotation_slot_count, do: @bonustime["rotation_slot_count"]
+  def bonustime_game_rules, do: @bonustime["game_rules"]
 
-  def daily_bonus_rotation_anchor_at do
-    {:ok, dt, _} = DateTime.from_iso8601(@daily_bonus["rotation_anchor"])
+  def bonustime_rotation_anchor_at do
+    {:ok, dt, _} = DateTime.from_iso8601(@bonustime["rotation_anchor"])
     dt
   end
 

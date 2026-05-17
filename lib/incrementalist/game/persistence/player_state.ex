@@ -18,7 +18,7 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
   schema "player_states" do
     embeds_one :state, State, on_replace: :update
     embeds_one :notices, Notices, on_replace: :update
-    field :has_daily_token, :boolean, default: true
+    field :has_bonustime_token, :boolean, default: true
     field :last_saved_at, :utc_datetime_usec
 
     belongs_to :player, Player
@@ -30,7 +30,7 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
     attrs = normalize_attrs(attrs)
 
     player_state
-    |> cast(attrs, [:player_id, :last_saved_at, :has_daily_token])
+    |> cast(attrs, [:player_id, :last_saved_at, :has_bonustime_token])
     |> cast_embed(:state)
     |> cast_embed(:notices)
     |> validate_required([:player_id])
@@ -60,12 +60,12 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
   end
 
   def inject_state_tokens(%__MODULE__{state: %State{}} = ps) do
-    %{ps | state: %{ps.state | has_daily_token: ps.has_daily_token}}
+    %{ps | state: %{ps.state | has_bonustime_token: ps.has_bonustime_token}}
   end
 
   def inject_state_tokens(ps), do: ps
 
   def extract_state_tokens(%State{} = state) do
-    state.has_daily_token || false
+    state.has_bonustime_token || false
   end
 end

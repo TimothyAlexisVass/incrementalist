@@ -81,7 +81,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     result.type === "sisu.upgrade_max.result" ||
     result.type === "quest.claim.result" ||
     result.type === "stats.update.result" ||
-    result.type === "daily_bonus.play.result"
+    result.type === "bonustime.play.result"
   ) {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result as any);
@@ -147,8 +147,8 @@ export function applyAuthoritativeData(
   if (data.quests !== undefined) state.snapshot.state.quests = data.quests;
   if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
-  if (data.has_daily_token !== undefined) state.snapshot.state.has_daily_token = data.has_daily_token;
-  if (data.daily_bonus !== undefined) state.snapshot.state.daily_bonus = data.daily_bonus;
+  if (data.has_bonustime_token !== undefined) state.snapshot.state.has_bonustime_token = data.has_bonustime_token;
+  if (data.bonustime !== undefined) state.snapshot.state.bonustime = data.bonustime;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);

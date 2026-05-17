@@ -9,11 +9,11 @@ export interface ChestDrawData {
 
 export function getChestDrawData(state: ServerState): ChestDrawData | null {
   const snapshot = state.snapshot;
-  if (!snapshot || !snapshot.state.daily_bonus) return null;
+  if (!snapshot || !snapshot.state.bonustime) return null;
 
-  const db = snapshot.state.daily_bonus;
+  const db = snapshot.state.bonustime;
   return {
-    hasToken: snapshot.state.has_daily_token || db.special_tokens > 0,
+    hasToken: snapshot.state.has_bonustime_token || db.special_tokens > 0,
     lastTier: db.last_result?.tier ?? null,
     lastRewardAmount: db.last_result?.reward_amount ?? null
   };

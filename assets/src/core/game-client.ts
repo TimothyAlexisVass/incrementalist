@@ -386,7 +386,7 @@ export class GameClient {
       if (!input.consumed) {
         const interactionResult = handleBonusTimeInteractions(input, this.store.state, this.channel || undefined);
         if (interactionResult.type === 'open_last_reward' || interactionResult.type === 'open_chest_reward') {
-          const db = this.store.state.snapshot?.state.daily_bonus;
+          const db = this.store.state.snapshot?.state.bonustime;
           if (db?.last_result) {
             this.bonusRewardModal = {
               open: true,
@@ -448,7 +448,7 @@ export class GameClient {
         this.runCommand(() => selectArea(this.channel!, areaKey));
       }
     }, this.channel || undefined, 
-    this.store.state.snapshot?.state.has_daily_token,
+    this.store.state.snapshot?.state.has_bonustime_token,
     getBonusTimeTooltipData(this.store.state) || undefined,
     this.store.state.snapshot?.state.features.bonus_time_purchased,
     (cmd) => this.runCommand(cmd));

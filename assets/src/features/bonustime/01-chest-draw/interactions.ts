@@ -1,6 +1,6 @@
 import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
-import { playDailyBonus } from "../../../net/commands";
+import { playBonusTime } from "../../../net/commands";
 import { ChestDrawData } from "./view-model";
 
 export enum ChestState {
@@ -29,7 +29,7 @@ export function handleChestDrawInteractions(
     if (internalState === ChestState.IDLE && data.hasToken && channel) {
       internalState = ChestState.REVEALING;
       revealStartTime = performance.now();
-      playDailyBonus(channel, "chest_draw");
+      playBonusTime(channel, "chest_draw");
       input.consumed = true;
     } else if (internalState === ChestState.REVEALED) {
       input.consumed = true;

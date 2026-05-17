@@ -1,11 +1,11 @@
-defmodule Incrementalist.Game.Features.DailyBonus.Games.ChestDraw do
+defmodule Incrementalist.Game.Features.BonusTime.Games.ChestDraw do
   @moduledoc """
   Chest Draw mini-game rules.
   """
   alias Incrementalist.Game.Constants
 
   def roll_reward(streak) do
-    rules = Constants.daily_bonus_game_rules()["chest_draw"]
+    rules = Constants.bonustime_game_rules()["chest_draw"]
     chances = rules["chances"]
     
     # Calculate number of rolls based on streak

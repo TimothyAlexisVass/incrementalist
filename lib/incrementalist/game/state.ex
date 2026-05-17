@@ -193,7 +193,7 @@ defmodule Incrementalist.Game.State do
     end
   end
 
-  defmodule DailyBonus do
+  defmodule BonusTime do
     use Ecto.Schema
     import Ecto.Changeset
 
@@ -245,7 +245,7 @@ defmodule Incrementalist.Game.State do
     field :version, :integer, default: @current_version
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
-    field :has_daily_token, :boolean, virtual: true, default: true
+    field :has_bonustime_token, :boolean, virtual: true, default: true
 
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
@@ -267,7 +267,7 @@ defmodule Incrementalist.Game.State do
 
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
-    embeds_one :daily_bonus, __MODULE__.DailyBonus, on_replace: :update
+    embeds_one :bonustime, __MODULE__.BonusTime, on_replace: :update
     field :achievements, :map, default: %{}
   end
 
@@ -300,7 +300,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:sisu)
     |> cast_embed(:quests)
     |> cast_embed(:stats)
-    |> cast_embed(:daily_bonus)
+    |> cast_embed(:bonustime)
   end
 
   defp normalize_attrs(%__MODULE__{} = attrs) do
@@ -335,7 +335,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:sisu)
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
-    |> maybe_put_embed(:daily_bonus)
+    |> maybe_put_embed(:bonustime)
   end
 
   defp maybe_put_embed(attrs, key) do
@@ -365,7 +365,7 @@ defmodule Incrementalist.Game.State do
       version: @current_version,
       area: "sage",
       level: 1,
-      has_daily_token: true,
+      has_bonustime_token: true,
       exp: BigNum.zero(),
       required_exp: BigNum.from_number(20),
       coins: BigNum.zero(),
@@ -407,7 +407,7 @@ defmodule Incrementalist.Game.State do
         total_cores_earned: BigNum.zero(),
         last_reset_at: timestamp
       },
-      daily_bonus: %DailyBonus{
+      bonustime: %BonusTime{
         special_tokens: 0,
         last_token_boundary_index: 0,
         streak: 0,
@@ -434,7 +434,7 @@ defmodule Incrementalist.Game.State do
             last_reset_at: Time.iso8601(now)
           }
           # Authoritatively grant a new daily token on the day roll-over
-          %{state | stats: new_stats, has_daily_token: true}
+          %{state | stats: new_stats, has_bonustime_token: true}
         else
           state
         end
@@ -529,8 +529,8 @@ defmodule Incrementalist.Game.State do
       "quests" => visible_quests(projected_state.quests),
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
-      "has_daily_token" => projected_state.has_daily_token,
-      "daily_bonus" => if(projected_state.daily_bonus, do: Map.merge(Map.from_struct(projected_state.daily_bonus), %{"rotation_anchor" => Incrementalist.Game.Constants.daily_bonus_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601()}), else: nil),
+      "has_bonustime_token" => projected_state.has_bonustime_token,
+      "bonustime" => if(projected_state.bonustime, do: Map.merge(Map.from_struct(projected_state.bonustime), %{"rotation_anchor" => Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601()}), else: nil),
       "projection_params" =>
         projection_params(projected_state, now)
     }
