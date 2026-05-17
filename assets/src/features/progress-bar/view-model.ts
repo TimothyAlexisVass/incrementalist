@@ -123,8 +123,7 @@ export function updateProjectedFill(deltaTimeMs: number) {
 export function getStateFromSnapshot(snapshot: GameSnapshot) {
   currentViewModel.state = "projecting";
   currentViewModel.projectedFill = snapshot.state.projection_params.current_fill;
-  // TODO(TimothyAlexisVass): Looks like we're getting current sisu twice here?
-  currentViewModel.sisu = snapshot.state.sisu.current;
+  currentViewModel.sisu = snapshot.state.projection_params.current_sisu;
   currentViewModel.currentSisu = snapshot.state.projection_params.current_sisu;
   currentViewModel.targetSisu = snapshot.state.projection_params.sisu_at_claim;
   currentViewModel.currentSisuDecay = snapshot.state.projection_params.current_sisu_decay;
