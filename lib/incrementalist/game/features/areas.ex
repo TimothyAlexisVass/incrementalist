@@ -4,6 +4,8 @@ defmodule Incrementalist.Game.Features.Areas do
   """
   alias Incrementalist.Game.{State, Constants}
 
+  @area_defs Map.new(Constants.area_defs(), &{&1.key, &1})
+
   def select_area(%State{} = state, area_key) do
     case find_area_def(area_key) do
       nil ->
@@ -19,6 +21,6 @@ defmodule Incrementalist.Game.Features.Areas do
   end
 
   defp find_area_def(key) do
-    Enum.find(Constants.area_defs(), fn def -> def.key == key end)
+    Map.get(@area_defs, key)
   end
 end
