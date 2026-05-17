@@ -67,13 +67,13 @@ defmodule Incrementalist.Game.Notices do
   def valid_leaf_id?(leaf_id) when is_binary(leaf_id) do
     case parse_leaf_id(leaf_id) do
       {:area, area_key} ->
-        Enum.any?(Constants.area_defs(), &(&1.key == area_key))
+        MapSet.member?(Constants.area_keys(), area_key)
 
       {:sage_tip, level} ->
         level in Constants.sage_tip_levels()
 
       {:shop_item, item_id} ->
-        Enum.any?(Constants.shop_item_defs(), &(&1.id == item_id))
+        MapSet.member?(Constants.shop_item_ids(), item_id)
 
       {:quest, quest_id} ->
         Map.has_key?(Constants.quest_defs(), quest_id)
