@@ -82,8 +82,8 @@ defmodule Incrementalist.Game.RewardsTest do
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 100
-      assert new_state.charge_crystals.lucent == 1
-      assert new_state.charge_crystals.transcendent == 1
+      assert new_state.charge_crystals.lucent == 0 # 100 is not mult of 24
+      assert new_state.charge_crystals.transcendent == 1 # 100 is mult of 100
       assert new_state.charge_crystals.azure == 0
       assert new_state.charge_crystals.aether == 0
     end

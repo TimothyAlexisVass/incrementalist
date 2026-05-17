@@ -331,35 +331,35 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
   end
 
   describe "finalize_claim/2" do
-    test "awards azure charge crystals on every fourth claim" do
+    test "awards azure charge crystals on every ninth claim" do
       now = ~U[2026-05-10 15:11:04Z]
 
       state = %State{
-        progress_bar: %State.ProgressBar{rewards_claimed: 3},
+        progress_bar: %State.ProgressBar{rewards_claimed: 8},
         charge_crystals: %State.ChargeCrystals{}
       }
 
       new_state = Bar.finalize_claim(state, now)
 
-      assert new_state.progress_bar.rewards_claimed == 4
+      assert new_state.progress_bar.rewards_claimed == 9
       assert new_state.charge_crystals.azure == 1
       assert new_state.charge_crystals.aether == 0
       assert new_state.charge_crystals.lucent == 0
       assert new_state.charge_crystals.transcendent == 0
     end
 
-    test "awards azure and aether charge crystals on every twentieth claim" do
+    test "awards aether charge crystals on every fortieth claim" do
       now = ~U[2026-05-10 15:11:04Z]
 
       state = %State{
-        progress_bar: %State.ProgressBar{rewards_claimed: 19},
+        progress_bar: %State.ProgressBar{rewards_claimed: 39},
         charge_crystals: %State.ChargeCrystals{}
       }
 
       new_state = Bar.finalize_claim(state, now)
 
-      assert new_state.progress_bar.rewards_claimed == 20
-      assert new_state.charge_crystals.azure == 1
+      assert new_state.progress_bar.rewards_claimed == 40
+      assert new_state.charge_crystals.azure == 0
       assert new_state.charge_crystals.aether == 1
       assert new_state.charge_crystals.lucent == 0
       assert new_state.charge_crystals.transcendent == 0

@@ -367,4 +367,54 @@ defmodule Incrementalist.Game.CommandsTest do
         select: command.status
     )
   end
+
+  describe "bonustime.play command" do
+    test "consumes token and returns reward" do
+      now = @now
+      player = create_player()
+
+      # Make sure the user has a token
+      ps = PlayerStates.load_or_create(player, now)
+
+      new_state = %{ps.state | has_bonustime_token: true}
+      new_state = put_in(new_state.features.bonus_time_purchased, true)
+
+      # Use the correct method to update an embedded schema state
+      Incrementalist.Game.Persistence.PlayerStates.initialize_if_empty(%{ps | state: new_state, has_bonustime_token: true}, now)
+
+      # Need to make sure the time is valid for "chest_draw" rotation slot
+      anchor = Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
+      now_modified = %{anchor | microsecond: {0, 6}}
+
+      # What is the active game at this anchor time?
+      active_game_id = Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id(now_modified)
+
+      cmd = %GameCommand{
+        player_id: player.id,
+        command_id: 1,
+        command_type: "bonustime.play",
+        intent: %{"type" => "bonustime.play", "game" => active_game_id}
+      }
+
+      {status, result, _} = Incrementalist.Game.CommandExecutor.execute(cmd, player, now_modified)
+      if status != "succeeded" do
+        IO.inspect(result, label: "Execution failed result")
+      end
+      assert status == "succeeded"
+      assert result["type"] == "bonustime.play.result"
+      assert result["status"] == "ok"
+      assert result["has_bonustime_token"] == false
+      assert result["bonustime"].last_result["tier"] != nil
+      assert result["bonustime"].last_result["game_id"] == "chest_draw"
+
+      # Verify hidden outcomes integrity: Unpicked rolls or unpicked outcomes are NOT sent.
+      # Only picked tier, rolls, and reward_amount should be available in `last_result`.
+      keys = Map.keys(result["bonustime"].last_result)
+      assert "tier" in keys
+      assert "rolls" in keys
+      assert "reward_amount" in keys
+      refute "chances" in keys
+      refute "unpicked_outcomes" in keys
+    end
+  end
 end
