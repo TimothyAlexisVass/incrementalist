@@ -55,6 +55,13 @@ defmodule BigNum do
       |> :erlang.float_to_binary(decimals: @precision_digits - 1)
       |> String.to_float()
 
+    {m, e} =
+      if abs(m) >= 10 do
+        {m / 10, e + 1}
+      else
+        {m, e}
+      end
+
     %BigNum{m: m, e: e}
   end
 
