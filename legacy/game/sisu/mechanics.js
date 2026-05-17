@@ -5,20 +5,33 @@ import {
 } from './state.js';
 import { SISU_BASE_MAX, SISU_PER_LEVEL, MAX_SISU_UPGRADE_LEVEL, UPGRADE_COST } from './levels.js';
 
-// TODO: It should be possible to upgrade sisus to lower diminishment
-// blue should be possible to upgrade at -0.03 each level until diminshment is 2
-// yellow should be possible to upgrade at -0.04 each level until diminishment is 3
-// purple should be possible to upgrade at -0.06 each level until diminishment is 4
 const SISU_DIMINISHMENT_BY_TIER = {
   blue: 5,
   yellow: 7,
   purple: 10
 };
 
+const SISU_DIMINISHMENT_MIN_BY_TIER = {
+  blue: 2,
+  yellow: 3,
+  purple: 4
+};
+
+const SISU_DIMINISHMENT_REDUCTION_PER_LEVEL_BY_TIER = {
+  blue: 0.03,
+  yellow: 0.04,
+  purple: 0.06
+};
+
 const SISU_DIMINISHMENT_REDUCTION_FACTOR_PER_SECOND = 0.98;
 
-export function getSisuDiminishmentForTier(tierId = 'blue') {
-  return SISU_DIMINISHMENT_BY_TIER[tierId] ?? SISU_DIMINISHMENT_BY_TIER.blue;
+export function getSisuDiminishmentForTier(tierId = 'blue', level = 0) {
+  const normalizedTierId = SISU_DIMINISHMENT_BY_TIER[tierId] ? tierId : 'blue';
+  const baseDiminishment = SISU_DIMINISHMENT_BY_TIER[normalizedTierId];
+  const minDiminishment = SISU_DIMINISHMENT_MIN_BY_TIER[normalizedTierId];
+  const reduction = SISU_DIMINISHMENT_REDUCTION_PER_LEVEL_BY_TIER[normalizedTierId] * normalizeUpgradeLevel(level);
+
+  return Math.max(minDiminishment, baseDiminishment - reduction);
 }
 
 export function getMaxSisuUpgradeCost(level) {
@@ -108,7 +121,7 @@ export function refillSisu(state, tierId = 'blue') {
 
   state.progressBar.sisu = nextSisu;
   state.sisu.current = nextSisu;
-  state.sisu.diminishmentPerSecond = getSisuDiminishmentForTier(normalizedTierId);
+  state.sisu.diminishmentPerSecond = getSisuDiminishmentForTier(normalizedTierId, state.sisu.maxUpgradeLevel);
 
   return {
     success: true,
@@ -130,7 +143,7 @@ export function initializeSisuGenerator(state) {
   state.progressBar.sisu = state.sisu.maxBasic;
   state.sisu.current = state.sisu.maxBasic;
   state.sisu.decayTickRemainderMs = 0;
-  state.sisu.diminishmentPerSecond = getSisuDiminishmentForTier('blue');
+  state.sisu.diminishmentPerSecond = getSisuDiminishmentForTier('blue', state.sisu.maxUpgradeLevel);
 }
 
 export function updateSisuDecay(state, deltaTime) {
@@ -165,7 +178,7 @@ export function updateSisuDecay(state, deltaTime) {
 
   let diminishment = Math.max(
     0,
-    Number(state.sisu.diminishmentPerSecond) || getSisuDiminishmentForTier('blue')
+    Number(state.sisu.diminishmentPerSecond) || getSisuDiminishmentForTier('blue', state.sisu?.maxUpgradeLevel)
   );
 
   for (let i = 0; i < wholeSeconds; i += 1) {
