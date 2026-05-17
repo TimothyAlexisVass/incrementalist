@@ -40,9 +40,9 @@ export function drawShopItemCard(
 
   let opacity = 1.0;
   if (isPurchased) {
-    opacity = 0.25; // Very reduced opacity for owned items
+    opacity = 0.4; // Reduced opacity for owned items
   } else if (!item.can_purchase) {
-    opacity = 0.7; // A little reduced opacity for locked items
+    opacity = 1.0; // Locked items keep normal opacity on the card background
   }
 
   renderer.drawRect({

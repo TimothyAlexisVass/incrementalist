@@ -7,7 +7,7 @@ import { drawNoticeDot } from "./button";
 
 export interface LockedElementOptions {
   label?: string;
-  opacity?: number;
+  dimmingFactor?: number;
   criteria?: string | string[];
   font?: string;
   showNotice?: boolean;
@@ -28,7 +28,7 @@ export function drawLockedElement(
 
   const {
     label = "LOCKED",
-    opacity = 0.7,
+    dimmingFactor = 0.9,
     criteria,
     font = "bold 13px Arial",
     showNotice = false,
@@ -37,7 +37,7 @@ export function drawLockedElement(
     padding = 0
   } = options;
 
-  withLockedAlpha(true, opacity, drawElement);
+  withLockedAlpha(true, dimmingFactor, drawElement);
   
   const textX = rect.x + rect.width / 2;
   const textY = rect.y + rect.height / 2;

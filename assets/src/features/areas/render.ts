@@ -204,7 +204,7 @@ function renderDropdownItems(
       // Keep the same full-size row visuals as unlocked items, then
       // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
       drawLockedElement(canvas, input, itemRect, renderItem, {
-        opacity: 0,
+        dimmingFactor: 0,
         criteria: formatUnlockRequirement(area.unlock_level, level),
         showNotice: hasNotice,
         showNoticePing: true
