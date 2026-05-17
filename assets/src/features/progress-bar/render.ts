@@ -2,7 +2,10 @@ import {
   BAR_COLLECTION_GLOW_FADE_MULTIPLIER,
   BAR_FULL_PULSE_SPEED,
   BAR_RESET_LERP_SPEED,
+  PROGRESS_BAR_X,
+  PROGRESS_BAR_Y,
   PROGRESS_BAR_WIDTH,
+  PROGRESS_BAR_HEIGHT,
   IDLE_TOGGLE_FONT,
   TINY_TEXT_FONT,
   TOP_HUD_HEIGHT,
@@ -488,14 +491,11 @@ function getCollectionGlowPulse(now: number): number {
 
 
 export function getProgressBarLayout(canvas: HTMLCanvasElement) {
-  const baseHeight = canvas.height - 120;
-  const barHeight = 418;
-
   return {
-    x: canvas.width - 100,
-    y: 120,
+    x: PROGRESS_BAR_X,
+    y: PROGRESS_BAR_Y,
     width: PROGRESS_BAR_WIDTH,
-    height: barHeight
+    height: PROGRESS_BAR_HEIGHT
   };
 }
 
