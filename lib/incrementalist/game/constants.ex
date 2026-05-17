@@ -44,6 +44,18 @@ defmodule Incrementalist.Game.Constants do
     Enum.map(@achievements, &normalize_achievement/1)
   end
 
+  @shop_item_ids Enum.map(@shop_items, & &1["id"])
+  def valid_shop_item_id?(id), do: id in @shop_item_ids
+
+  @area_ids Enum.map(@areas, & &1["key"])
+  def valid_area_id?(id), do: id in @area_ids
+
+  @achievement_ids Enum.map(@achievements, & &1["id"])
+  def valid_achievement_id?(id), do: id in @achievement_ids
+
+  @quest_ids for {_category, quests} <- @quests, {id, _quest} <- quests, do: id
+  def valid_quest_id?(id), do: id in @quest_ids
+
   def bonustime_rotation do
     @bonustime["rotation"]
   end

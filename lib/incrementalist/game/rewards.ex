@@ -14,9 +14,20 @@ defmodule Incrementalist.Game.Rewards do
     charge_crystals = ChargeCrystals.normalize(state.charge_crystals)
 
     {new_level, new_exp, new_coins, new_shards, new_cores, new_charge_crystals, level_ups,
-     gained_coins, gained_shards, gained_cores} =
-      do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals, 0, BigNum.zero(),
-        BigNum.zero(), BigNum.zero())
+     gained_coins, gained_shards,
+     gained_cores} =
+      do_apply_level_ups(
+        level,
+        exp,
+        coins,
+        shards,
+        cores,
+        charge_crystals,
+        0,
+        BigNum.zero(),
+        BigNum.zero(),
+        BigNum.zero()
+      )
 
     stats = state.stats || %State.Stats{}
 
@@ -24,7 +35,8 @@ defmodule Incrementalist.Game.Rewards do
       stats
       | total_level_ups_daily: stats.total_level_ups_daily + level_ups,
         total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), gained_coins),
-        total_shards_earned: BigNum.add(stats.total_shards_earned || BigNum.zero(), gained_shards),
+        total_shards_earned:
+          BigNum.add(stats.total_shards_earned || BigNum.zero(), gained_shards),
         total_cores_earned: BigNum.add(stats.total_cores_earned || BigNum.zero(), gained_cores)
     }
 
@@ -41,8 +53,18 @@ defmodule Incrementalist.Game.Rewards do
     }
   end
 
-  defp do_apply_level_ups(level, exp, coins, shards, cores, charge_crystals, level_ups,
-         gained_coins, gained_shards, gained_cores) do
+  defp do_apply_level_ups(
+         level,
+         exp,
+         coins,
+         shards,
+         cores,
+         charge_crystals,
+         level_ups,
+         gained_coins,
+         gained_shards,
+         gained_cores
+       ) do
     required_exp = calculate_required_exp(level)
 
     if BigNum.compare(exp, required_exp) >= 0 do
@@ -73,6 +95,7 @@ defmodule Incrementalist.Game.Rewards do
     # Sync with frontend: 10.1 * level^2 + 9
     base = BigNum.from_number(level)
     term1 = BigNum.mul(BigNum.from_number(10.1), BigNum.pow(base, 2))
+
     term1
     |> BigNum.add(BigNum.from_number(9))
     |> snap_small_required_exp()
@@ -107,26 +130,29 @@ defmodule Incrementalist.Game.Rewards do
     # Tiers are 1-7.
     # Formula: level * 1000 * tier_multiplier
     level = state.level || 1
-    multiplier = case tier_index do
-      1 -> 1.0
-      2 -> 2.5
-      3 -> 6.0
-      4 -> 15.0
-      5 -> 40.0
-      6 -> 100.0
-      7 -> 500.0
-      _ -> 1.0
-    end
+
+    multiplier =
+      case tier_index do
+        1 -> 1.0
+        2 -> 2.5
+        3 -> 6.0
+        4 -> 15.0
+        5 -> 40.0
+        6 -> 100.0
+        7 -> 500.0
+        _ -> 1.0
+      end
 
     amount_f = level * 1000 * multiplier
     reward_coins = BigNum.from_number(amount_f)
 
     new_coins = BigNum.add(state.coins || BigNum.zero(), reward_coins)
-    
+
     stats = state.stats || %State.Stats{}
+
     new_stats = %{
-      stats |
-      total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), reward_coins)
+      stats
+      | total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), reward_coins)
     }
 
     new_state = %{state | coins: new_coins, stats: new_stats}

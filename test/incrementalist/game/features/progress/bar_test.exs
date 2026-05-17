@@ -85,6 +85,7 @@ defmodule Incrementalist.Game.Features.Progress.BarTest do
       }
 
       idle_base = Constants.progress_bar_base_idle_mode_on_fill_rate()
+
       expected =
         idle_base * Constants.progress_bar_new_player_bonus_fill_multiplier() +
           Constants.progress_bar_new_player_bonus_fill_bonus()

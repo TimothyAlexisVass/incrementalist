@@ -5,6 +5,7 @@ defmodule Incrementalist.Game.Features.Quests.RulesTest do
 
   test "evaluate sets rank properly and claim grants all accumulated rewards" do
     state = State.new(Incrementalist.Game.Time.now())
+
     # 6000 levels is enough to satisfy rank 1 (2 levels), rank 2 (1000 levels), and rank 3 (5000 levels)
     # Rewards are 5, 15, and 30 respectively.
     state = %{state | level: 6000}

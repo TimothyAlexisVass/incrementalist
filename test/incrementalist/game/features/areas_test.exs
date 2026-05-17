@@ -4,14 +4,16 @@ defmodule Incrementalist.Game.Features.AreasTest do
   alias Incrementalist.Game.Features.Areas
 
   test "select_area/2 allows selecting an unlocked area" do
-    state = State.new() # level 1
+    # level 1
+    state = State.new()
     # Sage is unlock_level 1
     assert {:ok, next_state} = Areas.select_area(state, "sage")
     assert next_state.area == "sage"
   end
 
   test "select_area/2 rejects a locked area" do
-    state = State.new() # level 1
+    # level 1
+    state = State.new()
     # Cloverfield is unlock_level 10
     assert {:error, :area_locked} = Areas.select_area(state, "cloverfield")
   end
