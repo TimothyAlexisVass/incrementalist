@@ -1394,30 +1394,33 @@ export class WebGLRenderer {
   private getOrCreateImageTexture(image: TexImageSource, sourceAlphaMode: "straight" | "premultiplied") {
     const key = image as object;
     const cached = this.imageCache.get(key);
-    const texture = cached ?? this.gl.createTexture();
+    if (cached) {
+      return cached;
+    }
+
+    const texture = this.gl.createTexture();
     if (!texture) return null;
 
     this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
     this.gl.pixelStorei(this.gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, sourceAlphaMode === "premultiplied" ? 1 : 0);
+
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
 
-    if (!cached) {
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
 
-      const width = (image as any).width || (image as any).naturalWidth;
-      const height = (image as any).height || (image as any).naturalHeight;
+    const width = (image as any).width || (image as any).naturalWidth;
+    const height = (image as any).height || (image as any).naturalHeight;
 
-      if (isPowerOfTwo(width) && isPowerOfTwo(height)) {
-        this.gl.generateMipmap(this.gl.TEXTURE_2D);
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR_MIPMAP_LINEAR);
-      } else {
-        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-      }
-
-      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-      this.imageCache.set(key, texture);
+    if (isPowerOfTwo(width) && isPowerOfTwo(height)) {
+      this.gl.generateMipmap(this.gl.TEXTURE_2D);
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR_MIPMAP_LINEAR);
+    } else {
+      this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
     }
+
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+    this.imageCache.set(key, texture);
 
     return texture;
   }

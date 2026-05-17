@@ -91,7 +91,8 @@ export function renderBonusTimeOverview(
       x: centerX,
       y: centerY,
       font: DAILY_BONUS_TITLE_FONT,
-      color: "rgba(255, 255, 255, 0.4)",
+      color: "#ffffff",
+      alpha: 0.4,
       align: 'center', baseline: 'middle'
     });
   }

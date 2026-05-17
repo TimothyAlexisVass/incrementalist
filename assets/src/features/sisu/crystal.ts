@@ -85,7 +85,10 @@ type CrystalRuntime = {
 let runtime: CrystalRuntime | null = null;
 
 function createCrystalGeometry() {
-  const geometry = new THREE.IcosahedronGeometry(1.45, 3).toNonIndexed();
+  let geometry: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1.45, 3);
+  if (geometry.index) {
+    geometry = geometry.toNonIndexed();
+  }
   const pos = geometry.attributes.position;
   const v = new THREE.Vector3();
 

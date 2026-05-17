@@ -50,7 +50,7 @@ export function drawLockedElement(
     color: COLORS.panel.textPrimary,
     align: "center",
     baseline: "middle",
-    strokeColor: "rgba(0, 0, 0, 0.8)",
+    strokeColor: "#000000",
     strokeWidth: 3
   });
 

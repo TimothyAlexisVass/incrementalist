@@ -204,12 +204,12 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       x: drawX,
       y: drawY,
       font: ft.font,
-      color: 'rgba(0, 0, 0, 0)',
+      color: '#000000',
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
       scale: scale,
-      shadowColor: 'rgba(0, 0, 0, 0.8)',
+      shadowColor: '#000000',
       shadowBlur: 6,
       shadowOffsetX: 4,
       shadowOffsetY: 4
@@ -220,7 +220,7 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       x: drawX,
       y: drawY,
       font: ft.font,
-      color: 'rgba(0, 0, 0, 0)',
+      color: '#000000',
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
@@ -234,12 +234,12 @@ export function renderFloatingTexts(floatingTexts: FloatingText[]) {
       x: drawX,
       y: drawY,
       font: ft.font,
-      color: 'rgba(0, 0, 0, 0)',
+      color: '#000000',
       align: ft.textAlign,
       baseline: 'alphabetic',
       alpha: ft.alpha,
       scale: scale,
-      strokeColor: 'rgba(0, 0, 0, 0.8)',
+      strokeColor: '#000000',
       strokeWidth: 1
     });
 
