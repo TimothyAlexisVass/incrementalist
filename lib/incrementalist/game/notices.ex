@@ -67,19 +67,19 @@ defmodule Incrementalist.Game.Notices do
   def valid_leaf_id?(leaf_id) when is_binary(leaf_id) do
     case parse_leaf_id(leaf_id) do
       {:area, area_key} ->
-        Enum.any?(Constants.area_defs(), &(&1.key == area_key))
+        Constants.valid_area_id?(area_key)
 
       {:sage_tip, level} ->
         level in Constants.sage_tip_levels()
 
       {:shop_item, item_id} ->
-        Enum.any?(Constants.shop_item_defs(), &(&1.id == item_id))
+        Constants.valid_shop_item_id?(item_id)
 
       {:quest, quest_id} ->
-        Map.has_key?(Constants.quest_defs(), quest_id)
+        Constants.valid_quest_id?(quest_id)
 
       {:achievement, achievement_id} ->
-        Enum.any?(Constants.achievement_defs(), &(&1.id == achievement_id))
+        Constants.valid_achievement_id?(achievement_id)
 
       {:feature_locked, feature_id} ->
         feature_id in ["idle_mode", "sisu_generator"]
@@ -401,7 +401,8 @@ defmodule Incrementalist.Game.Notices do
 
         {:quest, quest_id}
 
-      String.starts_with?(leaf_id, "leaf.achievement.") and String.ends_with?(leaf_id, ".unlocked") ->
+      String.starts_with?(leaf_id, "leaf.achievement.") and
+          String.ends_with?(leaf_id, ".unlocked") ->
         achievement_id =
           leaf_id
           |> String.trim_leading("leaf.achievement.")

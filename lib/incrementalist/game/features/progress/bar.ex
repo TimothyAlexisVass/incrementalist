@@ -114,10 +114,12 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
       end
 
     stats = state.stats || %State.Stats{}
-    new_stats = %{stats |
-      total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), coin_gain),
-      total_shards_earned: BigNum.add(stats.total_shards_earned || BigNum.zero(), shard_gain),
-      total_cores_earned: BigNum.add(stats.total_cores_earned || BigNum.zero(), core_gain)
+
+    new_stats = %{
+      stats
+      | total_coins_earned: BigNum.add(stats.total_coins_earned || BigNum.zero(), coin_gain),
+        total_shards_earned: BigNum.add(stats.total_shards_earned || BigNum.zero(), shard_gain),
+        total_cores_earned: BigNum.add(stats.total_cores_earned || BigNum.zero(), core_gain)
     }
 
     %{

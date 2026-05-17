@@ -10,7 +10,12 @@ defmodule Incrementalist.Game.Features.Progress.ChargeCrystals do
 
   def normalize(nil), do: default()
   def normalize(%State.ChargeCrystals{} = crystals), do: crystals
-  def normalize(%{} = attrs), do: %State.ChargeCrystals{} |> State.ChargeCrystals.changeset(attrs) |> Ecto.Changeset.apply_changes()
+
+  def normalize(%{} = attrs),
+    do:
+      %State.ChargeCrystals{}
+      |> State.ChargeCrystals.changeset(attrs)
+      |> Ecto.Changeset.apply_changes()
 
   def visible_state(crystals), do: State.ChargeCrystals.visible_state(normalize(crystals))
 
@@ -26,11 +31,18 @@ defmodule Incrementalist.Game.Features.Progress.ChargeCrystals do
     end
   end
 
-  def grant_claim(crystals, rewards_claimed) when is_integer(rewards_claimed) and rewards_claimed > 0 do
+  def grant_claim(crystals, rewards_claimed)
+      when is_integer(rewards_claimed) and rewards_claimed > 0 do
     crystals
     |> normalize()
-    |> add(:azure, claim_reward_amount(rewards_claimed, Constants.charge_crystal_azure_claim_interval()))
-    |> add(:aether, claim_reward_amount(rewards_claimed, Constants.charge_crystal_aether_claim_interval()))
+    |> add(
+      :azure,
+      claim_reward_amount(rewards_claimed, Constants.charge_crystal_azure_claim_interval())
+    )
+    |> add(
+      :aether,
+      claim_reward_amount(rewards_claimed, Constants.charge_crystal_aether_claim_interval())
+    )
   end
 
   def grant_claim(crystals, _rewards_claimed), do: normalize(crystals)
@@ -39,7 +51,10 @@ defmodule Incrementalist.Game.Features.Progress.ChargeCrystals do
     crystals
     |> normalize()
     |> add(:lucent, milestone_reward(level, Constants.charge_crystal_lucent_level_interval()))
-    |> add(:transcendent, milestone_reward(level, Constants.charge_crystal_transcendent_level_interval()))
+    |> add(
+      :transcendent,
+      milestone_reward(level, Constants.charge_crystal_transcendent_level_interval())
+    )
   end
 
   def grant_level_up(crystals, _level), do: normalize(crystals)

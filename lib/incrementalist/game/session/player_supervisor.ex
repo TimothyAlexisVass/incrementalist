@@ -11,7 +11,10 @@ defmodule Incrementalist.Game.Session.PlayerSupervisor do
   end
 
   def ensure_started(player_id) do
-    case DynamicSupervisor.start_child(__MODULE__, {Incrementalist.Game.Session.PlayerServer, player_id}) do
+    case DynamicSupervisor.start_child(
+           __MODULE__,
+           {Incrementalist.Game.Session.PlayerServer, player_id}
+         ) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
       error -> error

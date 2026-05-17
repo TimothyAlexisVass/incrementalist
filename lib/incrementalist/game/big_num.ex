@@ -113,8 +113,12 @@ defmodule BigNum do
     diff = a.e - b.e
 
     cond do
-      diff > @add_cutoff -> a
-      diff < -@add_cutoff -> b
+      diff > @add_cutoff ->
+        a
+
+      diff < -@add_cutoff ->
+        b
+
       true ->
         {upper, lower, abs_diff} =
           if diff < 0 do

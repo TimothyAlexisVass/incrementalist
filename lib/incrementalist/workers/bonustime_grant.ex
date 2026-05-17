@@ -24,9 +24,9 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
   @impl true
   def handle_info(:run_grant, state) do
     Logger.info("Executing BonusTime Token Grant...")
-    
+
     import Ecto.Query
-    
+
     # Efficient bulk update
     Repo.update_all(
       from(s in PlayerState, where: s.has_bonustime_token == false),
@@ -34,7 +34,9 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
     )
 
     # Broadcast to active players
-    Registry.select(Incrementalist.Game.Session.PlayerRegistry, [{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    Registry.select(Incrementalist.Game.Session.PlayerRegistry, [
+      {{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}
+    ])
     |> Enum.each(fn {_player_id, pid} ->
       send(pid, :bonustime_boundary_reached)
     end)
@@ -50,8 +52,8 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
 
     elapsed = max(0, now - anchor)
     next_boundary_index = div(elapsed, slot_ms) + 1
-    next_boundary_ms = anchor + (next_boundary_index * slot_ms)
-    
+    next_boundary_ms = anchor + next_boundary_index * slot_ms
+
     delay_ms = max(1000, next_boundary_ms - now)
     Process.send_after(self(), :run_grant, delay_ms)
   end

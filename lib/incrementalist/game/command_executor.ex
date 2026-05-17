@@ -698,8 +698,10 @@ defmodule Incrementalist.Game.CommandExecutor do
 
     # HAMMER: Force the column update. No more excuses.
     import Ecto.Query
-    _ = from(s in PlayerState, where: s.id == ^ps.id)
-        |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
+
+    _ =
+      from(s in PlayerState, where: s.id == ^ps.id)
+      |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
 
     updated_ps
   end

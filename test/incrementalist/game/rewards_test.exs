@@ -36,7 +36,12 @@ defmodule Incrementalist.Game.RewardsTest do
     end
 
     test "keeps required_exp below 1000 on a multiple of 10" do
-      state = %State{level: 8, exp: BigNum.from_number(660), required_exp: BigNum.from_number(660)}
+      state = %State{
+        level: 8,
+        exp: BigNum.from_number(660),
+        required_exp: BigNum.from_number(660)
+      }
+
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 9
@@ -46,7 +51,16 @@ defmodule Incrementalist.Game.RewardsTest do
     test "level 100 rewards" do
       # Level 99 needs 10.1 * 99^2 + 9 = 10.1 * 9801 + 9 = 98999.1
       req = BigNum.from_number(98999.1)
-      state = %State{level: 99, exp: req, coins: BigNum.zero(), shards: BigNum.zero(), cores: BigNum.zero(), required_exp: req}
+
+      state = %State{
+        level: 99,
+        exp: req,
+        coins: BigNum.zero(),
+        shards: BigNum.zero(),
+        cores: BigNum.zero(),
+        required_exp: req
+      }
+
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 100
@@ -56,8 +70,17 @@ defmodule Incrementalist.Game.RewardsTest do
 
     test "level 1000 rewards" do
       # Level 999 needs 10.1 * 999^2 + 9 = 10.1 * 998001 + 9 = 10079810.1 + 9 = 10079819.1
-      req = BigNum.from_number(10079819.1)
-      state = %State{level: 999, exp: req, coins: BigNum.zero(), shards: BigNum.zero(), cores: BigNum.zero(), required_exp: req}
+      req = BigNum.from_number(10_079_819.1)
+
+      state = %State{
+        level: 999,
+        exp: req,
+        coins: BigNum.zero(),
+        shards: BigNum.zero(),
+        cores: BigNum.zero(),
+        required_exp: req
+      }
+
       new_state = Rewards.apply_level_ups(state)
 
       assert new_state.level == 1000
@@ -67,7 +90,7 @@ defmodule Incrementalist.Game.RewardsTest do
     end
 
     test "awards lucent and transcendent charge crystals on milestone levels" do
-      req = BigNum.from_number(3623899.1)
+      req = BigNum.from_number(3_623_899.1)
 
       state = %State{
         level: 599,
