@@ -32,37 +32,40 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
         {:error, "no_rewards_to_claim"}
 
       true ->
-        rank_to_claim = quest.claimed_rank + 1
-        rank_def = quest_def.ranks[rank_to_claim]
+        ranks_to_claim = (quest.claimed_rank + 1)..quest.rank
 
-        if rank_def do
-          reward = rank_def.reward
+        {total_reward, last_claimed_rank} =
+          Enum.reduce(ranks_to_claim, {BigNum.zero(), quest.claimed_rank}, fn rank_index, {acc, last_rank} ->
+            rank_def = quest_def.ranks[rank_index]
+            if rank_def do
+              {BigNum.add(acc, rank_def.reward), rank_index}
+            else
+              {acc, last_rank}
+            end
+          end)
 
-          # For now, all quest rewards are coins. 
-          # In the future, we might want to support different reward types.
-          # Based on quests.json, they are just numbers which we normalize to BigNum.
-          # We'll assume they are coins for now as per legacy behavior or typical incremental patterns.
-          # Actually, let's check quests.json again. They are just "reward": 5.
-          
-          new_coins = BigNum.add(state.coins, reward)
-          
+        if last_claimed_rank > quest.claimed_rank do
+          new_coins = BigNum.add(state.coins, total_reward)
+
           # Update quest state
           new_quests = Enum.map(state.quests, fn q ->
             if q.id == quest_id do
-              %{q | claimed_rank: rank_to_claim}
+              %{q | claimed_rank: last_claimed_rank}
             else
               q
             end
           end)
 
+          claims_count = last_claimed_rank - quest.claimed_rank
+
           # Update stats
-          new_stats = %{state.stats | 
-            total_quests_claimed: state.stats.total_quests_claimed + 1,
-            total_coins_earned: BigNum.add(state.stats.total_coins_earned, reward)
+          new_stats = %{state.stats |
+            total_quests_claimed: state.stats.total_quests_claimed + claims_count,
+            total_coins_earned: BigNum.add(state.stats.total_coins_earned, total_reward)
           }
 
           new_state = %{state | coins: new_coins, quests: new_quests, stats: new_stats}
-          
+
           # Re-evaluate in case claiming one quest affects another (e.g. quest_c_rank)
           {:ok, evaluate(new_state)}
         else

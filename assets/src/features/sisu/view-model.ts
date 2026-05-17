@@ -147,7 +147,7 @@ function getNowMs() {
     return performance.now();
   }
 
-  return getServerNow();
+  return Date.now();
 }
 
 export function getUpgradeButtonState(

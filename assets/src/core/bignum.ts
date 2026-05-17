@@ -36,6 +36,11 @@ export function normalize(n: BigNum): BigNum {
   // Keep roughly 15 significant digits
   m = Number(m.toPrecision(PRECISION_DIGITS))
 
+  if (Math.abs(m) >= 10) {
+    m /= 10
+    e += 1
+  }
+
   return { m, e }
 }
 

@@ -42,7 +42,7 @@ export function updateHudViewModel(dtMs: number, authoritative: {
     
     state.displayedLevel = authoritative.level;
     state.displayedExp = authoritative.exp;
-    state.collectionGlowStartedAt = typeof performance !== 'undefined' ? performance.now() : getServerNow();
+    state.collectionGlowStartedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
   // Simple instant sync for now to avoid complex BigNum lerping in UI.
