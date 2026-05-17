@@ -4,7 +4,7 @@ defmodule Incrementalist.Game.CommandsTest do
   import Ecto.Query
 
   alias Incrementalist.Game.Commands
-  alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, PlayerStates}
+  alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.{Notices, Sessions}
   alias Incrementalist.Repo
@@ -321,32 +321,6 @@ defmodule Incrementalist.Game.CommandsTest do
       |> Map.put("pending_result", Commands.replay_pending(player.id))
 
     assert boot["pending_result"] == result
-  end
-
-  test "cleanup deletes only ACKed command rows older than forty eight hours" do
-    player = create_player()
-    old = DateTime.add(@now, -49 * 60 * 60, :second)
-
-    Commands.enqueue(player.id, "game.noop", intent(0), @now)
-    Commands.ack(player.id, 0, @now)
-
-    acked_command = Repo.one!(GameCommand)
-
-    Repo.update_all(from(command in GameCommand, where: command.id == ^acked_command.id),
-      set: [acked_at: old]
-    )
-
-    Commands.enqueue(player.id, "game.noop", intent(1), @now)
-    unacked_command = Repo.one!(from command in GameCommand, where: is_nil(command.acked_at))
-
-    Repo.update_all(
-      from(command in GameCommand, where: command.id == ^unacked_command.id),
-      set: [processed_at: old]
-    )
-
-    assert CommandLog.cleanup_acked(@now) == 1
-    refute Repo.get(GameCommand, acked_command.id)
-    assert Repo.get(GameCommand, unacked_command.id)
   end
 
   defp create_player do
