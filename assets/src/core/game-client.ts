@@ -61,7 +61,7 @@ import {
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
-import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT, DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT } from '../config';
+import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT } from '../config';
 import { COLORS } from '../colors';
 
 
