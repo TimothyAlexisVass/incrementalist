@@ -112,6 +112,8 @@ const DEFAULT_FONT = "bold 16px Inter";
 const DEFAULT_TEXT_COLOR = '#ffffff';
 const INTER_REGULAR_FONT_URL = "/fonts/Inter-Regular.woff";
 const INTER_BOLD_FONT_URL = "/fonts/Inter-Bold.woff";
+const ROBOTOMONO_REGULAR_FONT_URL = "/fonts/RobotoMono-Regular.woff";
+const ROBOTOMONO_BOLD_FONT_URL = "/fonts/RobotoMono-Bold.woff";
 const MAX_TEXT_CACHE_SIZE = 384;
 const TEXT_CACHE_FRAME_TTL = 900;
 
@@ -1548,12 +1550,18 @@ function parseFontSpec(font: string): ParsedFontSpec {
     }
   }
 
+  let troikaFontUrl = fontWeight === "bold" ? INTER_BOLD_FONT_URL : INTER_REGULAR_FONT_URL;
+  const lowerFamily = fontFamily.toLowerCase();
+  if (lowerFamily === "monospace" || lowerFamily === "courier" || lowerFamily === "courier new" || lowerFamily === "roboto mono") {
+    troikaFontUrl = fontWeight === "bold" ? ROBOTOMONO_BOLD_FONT_URL : ROBOTOMONO_REGULAR_FONT_URL;
+  }
+
   return {
     fontFamily,
     fontSizePx,
     fontWeight,
     fontStyle,
-    troikaFontUrl: fontWeight === "bold" ? INTER_BOLD_FONT_URL : INTER_REGULAR_FONT_URL
+    troikaFontUrl
   };
 }
 

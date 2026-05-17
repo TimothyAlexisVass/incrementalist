@@ -60,6 +60,7 @@ export const ACHIEVEMENT_NAME_FONT = '13px Arial';
 // Daily bonus fonts
 export const DAILY_BONUS_ENTRANCE_FONT = 'bold 38px Arial';
 export const DAILY_BONUS_TITLE_FONT = 'bold 42px Arial';
+export const DAILY_BONUS_TIMER_FONT = 'bold 42px monospace';
 export const DAILY_BONUS_RESULT_FONT = 'bold 22px Arial';
 export const DAILY_BONUS_BODY_FONT = '15px Arial';
 export const DAILY_BONUS_LABEL_FONT = '12px Arial';

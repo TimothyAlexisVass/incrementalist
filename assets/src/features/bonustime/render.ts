@@ -4,7 +4,7 @@ import { ServerState } from "../../net/snapshots";
 import { COLORS } from "../../colors";
 import { 
   DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT,
-  DAILY_BONUS_TITLE_FONT, MODAL_BODY_FONT, DAILY_BONUS_BUTTON_FONT
+  DAILY_BONUS_TITLE_FONT, DAILY_BONUS_TIMER_FONT, MODAL_BODY_FONT, DAILY_BONUS_BUTTON_FONT
 } from "../../config";
 import { renderRewardModal, RewardModalState } from "../../ui/components/modals/reward-modal";
 import { getActiveGameId, getActiveGameName, getTimeUntilNextTokenMs } from "./view-model";
@@ -44,7 +44,10 @@ export function renderBonusTimeOverview(
     const countdownStr = formatCountdown(remainingMs);
     const stableCountdown = resolveUpdatingText("daily_bonus_countdown", countdownStr, (text) => renderer.isTextReady({
       text,
-      font: DAILY_BONUS_TITLE_FONT
+      font: DAILY_BONUS_TIMER_FONT,
+      color: "#edf2f7",
+      align: 'center',
+      baseline: 'middle'
     }));
 
     renderer.drawText({
@@ -55,7 +58,7 @@ export function renderBonusTimeOverview(
 
     renderer.drawText({
       text: stableCountdown,
-      x: centerX, y: centerY, font: DAILY_BONUS_TITLE_FONT,
+      x: centerX, y: centerY, font: DAILY_BONUS_TIMER_FONT,
       color: "#edf2f7", align: 'center', baseline: 'middle'
     });
 
