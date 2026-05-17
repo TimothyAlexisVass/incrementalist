@@ -14,6 +14,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
   alias Incrementalist.Game.Features.BonusTime.Rules, as: BonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
+  alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -504,6 +505,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           {tier, rolls} =
             case game_id do
               "chest_draw" -> ChestDraw.roll_reward(next_state.bonustime.streak)
+              "prize_wheel" -> PrizeWheel.roll_reward(next_state.bonustime.streak)
               _ -> {1, [1]}
             end
 

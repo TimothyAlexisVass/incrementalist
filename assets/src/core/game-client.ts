@@ -50,6 +50,8 @@ import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
 import { renderBonusTimeOverview } from "../features/bonustime/render";
 import { handleBonusTimeInteractions } from "../features/bonustime/interactions";
+import { resetChestState } from "../features/bonustime/01-chest-draw/interactions";
+import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactions";
 import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
@@ -439,12 +441,19 @@ export class GameClient {
         const layout = getRewardModalLayout(this.canvas);
         if (resolveRewardModalAction(layout, input.pointer.x, input.pointer.y)) {
           this.bonusRewardModal.open = false;
+          resetChestState();
+          resetWheelState();
           input.consumed = true;
         }
       }
 
       if (!input.consumed) {
-        const interactionResult = handleBonusTimeInteractions(input, this.store.state, this.channel || undefined);
+        const interactionResult = handleBonusTimeInteractions(
+          input,
+          this.store.state,
+          this.channel || undefined,
+          (cmd) => this.runCommand(cmd)
+        );
         if (interactionResult.type === 'open_last_reward' || interactionResult.type === 'open_chest_reward') {
           const db = this.store.state.snapshot?.state.bonustime;
           if (db?.last_result) {

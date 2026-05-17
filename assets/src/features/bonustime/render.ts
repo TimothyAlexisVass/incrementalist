@@ -10,9 +10,14 @@ import { renderRewardModal, RewardModalState } from "../../ui/components/modals/
 import { getActiveGameId, getActiveGameName, getTimeUntilNextTokenMs } from "./view-model";
 import { renderChestDraw } from "./01-chest-draw/render";
 import { getChestDrawData } from "./01-chest-draw/view-model";
+import { renderPrizeWheel } from "./02-prize-wheel/render";
+import { getPrizeWheelData } from "./02-prize-wheel/view-model";
 import { resolveUpdatingText } from "../../utils/text";
 import { drawButton } from "../../ui/components/button";
 import { InteractionState } from "../../ui/managers/interactions";
+
+import { getChestState, ChestState } from "./01-chest-draw/interactions";
+import { getWheelState, WheelState } from "./02-prize-wheel/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -35,10 +40,13 @@ export function renderBonusTimeOverview(
   });
 
   const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
+  const activeGameId = getActiveGameId(state);
+  const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
+                           (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
-  if (!hasToken) {
+  if (!hasToken && !isGameInProgress) {
     // Render the unified global cooldown screen instead of the active game!
     const remainingMs = getTimeUntilNextTokenMs(state);
     const countdownStr = formatCountdown(remainingMs);
@@ -80,13 +88,17 @@ export function renderBonusTimeOverview(
     return;
   }
 
-  const activeGameId = getActiveGameId(state);
   const rect = { x: DISPLAY_AREA_X, y: DISPLAY_AREA_Y, width: DISPLAY_AREA_WIDTH, height: DISPLAY_AREA_HEIGHT };
 
   if (activeGameId === "chest_draw") {
     const data = getChestDrawData(state);
     if (data) {
       renderChestDraw(data, rect);
+    }
+  } else if (activeGameId === "prize_wheel") {
+    const data = getPrizeWheelData(state);
+    if (data) {
+      renderPrizeWheel(data, rect);
     }
   } else {
     renderer.drawText({

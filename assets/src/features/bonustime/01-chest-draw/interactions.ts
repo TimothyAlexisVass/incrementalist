@@ -19,7 +19,8 @@ export function handleChestDrawInteractions(
   input: InteractionState,
   data: ChestDrawData,
   chestRect: { x: number; y: number; width: number; height: number },
-  channel?: GameChannel
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => void
 ) {
   const isHover = input.pointer &&
                   input.pointer.x >= chestRect.x && input.pointer.x <= chestRect.x + chestRect.width &&
@@ -29,11 +30,16 @@ export function handleChestDrawInteractions(
     if (internalState === ChestState.IDLE && data.hasToken && channel) {
       internalState = ChestState.REVEALING;
       revealStartTime = performance.now();
-      playBonusTime(channel, "chest_draw");
+      
+      if (runCommand) {
+        runCommand(() => playBonusTime(channel, "chest_draw"));
+      } else {
+        playBonusTime(channel, "chest_draw");
+      }
+      
       input.consumed = true;
     } else if (internalState === ChestState.REVEALED) {
       input.consumed = true;
-      internalState = ChestState.IDLE; // Reset for next time
       return { type: 'open_modal' as const };
     }
   }

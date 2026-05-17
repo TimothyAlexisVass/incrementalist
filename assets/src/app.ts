@@ -13,6 +13,7 @@ initMainCanvasParticles(incrementalistRenderer.glContext);
 window.addEventListener("resize", resizeGameCanvases);
 
 const app = new GameClient(incrementalistCanvas);
+(window as any).app = app;
 app.start();
 app.boot().catch(() => {
   // Boot errors are handled internally by GameClient.
