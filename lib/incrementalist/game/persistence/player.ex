@@ -1,10 +1,8 @@
 defmodule Incrementalist.Game.Persistence.Player do
   @moduledoc """
-  Player identity, contact details, and active save-slot pointer.
+  Player identity and contact details.
 
-  Gameplay state belongs to a player, not to a browser tab or request. The active
-  save slot lives here so clients cannot switch durable context by sending slot
-  claims with individual commands.
+  Gameplay state belongs to a player, not to a browser tab or request.
   """
 
   use Ecto.Schema
@@ -12,11 +10,8 @@ defmodule Incrementalist.Game.Persistence.Player do
   import Ecto.Changeset
   import Ecto.Query
 
-  alias Incrementalist.Game.Constants
-
   schema "players" do
     field :email, :string
-    field :active_save_slot, :integer, default: 0
     field :username, :string
     field :last_seen_at, :utc_datetime_usec
 
@@ -25,9 +20,8 @@ defmodule Incrementalist.Game.Persistence.Player do
 
   def changeset(player, attrs) do
     player
-    |> cast(attrs, [:username, :email, :active_save_slot, :last_seen_at])
-    |> validate_required([:username, :active_save_slot, :last_seen_at])
-    |> validate_inclusion(:active_save_slot, Constants.valid_slot_indexes())
+    |> cast(attrs, [:username, :email, :last_seen_at])
+    |> validate_required([:username, :last_seen_at])
     |> unique_constraint(:username)
   end
 

@@ -2,9 +2,7 @@ import type {
   AckableCommandResult,
   CommandErrorResult,
   CommandPushResult,
-  SaveSlotResetResult,
-  SaveSlotsListResult,
-  SaveSlotSwitchResult,
+  GameResetResult,
   ProgressClaimInResult,
   ProgressClaimRewardResult,
   ProgressSetIdleModeResult,
@@ -19,20 +17,9 @@ import type {
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
-// Save file commands
-export function listSaveSlots(channel: GameChannel) {
-  return channel.pushCommand<CommandPushResult<SaveSlotsListResult>>("save_slots.list");
-}
-
-export function switchSaveSlot(channel: GameChannel, slotIndex: number, hasCachedSnapshot: boolean) {
-  return channel.pushCommand<CommandPushResult<SaveSlotSwitchResult | CommandErrorResult>>("save_slot.switch", {
-    slot_index: slotIndex,
-    has_cached_snapshot: hasCachedSnapshot
-  });
-}
-
-export function resetSaveSlot(channel: GameChannel) {
-  return channel.pushCommand<CommandPushResult<SaveSlotResetResult>>("save_slot.reset");
+// Game reset
+export function resetGame(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<GameResetResult>>("game.reset");
 }
 
 export function progressClaimIn(channel: GameChannel) {

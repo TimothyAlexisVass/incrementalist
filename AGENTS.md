@@ -46,7 +46,7 @@ feature/
 `render.ts` draws only. `interactions.ts` converts hit tests to command intents. `view-model.ts` derives renderable data from server snapshots.
 
 ## Persistence Rules
-Use `save_slots` with `jsonb` game state. Players have 4 save slots. Use a `game_commands` table for idempotent command processing and auditability. During development, prefer resetting data and updating the current schema over adding backward-compatibility layers or preserving old save formats. Avoid over-normalizing gameplay state unless a stable query or integrity need justifies it.
+Use `player_states` with `jsonb` game state. Each player has exactly one game state row. Use a `game_commands` table for idempotent command processing and auditability. During development, prefer resetting data and updating the current schema over adding backward-compatibility layers or preserving old save formats. Avoid over-normalizing gameplay state unless a stable query or integrity need justifies it.
 Keep server-owned save-state coherent with the embedded-schema pattern: persist authoritative gameplay state as `Ecto.Schema` embeds, keep nested state as nested embeds rather than ad hoc maps, and project wire/client payloads from those structs. Use maps only at serialization/projection boundaries; do not keep parallel map-shaped and struct-shaped save-state models in application code.
 
 ## PlayerServer / DB Rules
@@ -56,16 +56,16 @@ Execution and queue rules:
 - Accept, dedupe, queue, execute, replay, and ACK-gating for live commands inside `PlayerServer`.
 - Keep FIFO order in `PlayerServer` in-memory state.
 - Never re-execute a completed command because of reconnect or missing ACK; replay the stored result instead.
-- Preserve save-boundary blocking behavior (`save_slot.switch`, `save_slot.reset`) in the `PlayerServer` flow.
+- Preserve save-boundary blocking behavior (`game.reset`) in the `PlayerServer` flow.
 
 Persistence boundary rules:
-- Treat `save_slots` as critical durable state and persist synchronously at required boundaries (disconnect, idle timeout shutdown, slot switch/reset, process termination).
+- Treat `player_states` as critical durable state and persist synchronously at required boundaries (disconnect, idle timeout shutdown, game reset, process termination).
 - Treat `game_commands` as command log/audit persistence that follows execution; it must not be the coordination primitive for live ordering.
 - Do not introduce `FOR UPDATE`/row-lock serialized gameplay command execution paths.
 - Keep DB writes aligned with server truth: save-state durability is authoritative; command rows support replay/audit semantics.
 
 ## Constants Rule
-Do not introduce backend gameplay magic numbers inline. Shared server-owned limits, thresholds, slot counts, queue sizes, timers, and other domain constants must live in `lib/incrementalist/game/constants.ex` and be referenced from there. Frontend presentation-only constants may live in `assets/src/config.ts` or nearby feature files, but they must mirror server-owned rules rather than invent their own authoritative values.
+Do not introduce backend gameplay magic numbers inline. Shared server-owned limits, thresholds, queue sizes, timers, and other domain constants must live in `lib/incrementalist/game/constants.ex` and be referenced from there. Frontend presentation-only constants may live in `assets/src/config.ts` or nearby feature files, but they must mirror server-owned rules rather than invent their own authoritative values.
 
 ## BigNum and High-Precision Math Rule
 Gameplay values that can exceed standard double-precision float limits (EXP, coins, shards, cores, sisu, required_exp, multipliers) MUST use the high-precision `BigNum` representation (`{m, e}` where `1 <= abs(m) < 10`). 
@@ -74,9 +74,9 @@ Gameplay values that can exceed standard double-precision float limits (EXP, coi
 - **Presentation**: Use the dual-mode formatting system in `assets/src/format.ts` to convert `BigNum` instances into human-readable suffixed strings or scientific notation. Do not write ad-hoc formatting logic in UI features.
 
 ## Client/Server Protocol Rules
-The only gameplay communication pattern is client command, server result. Client commands describe player intent, include only a client-generated integer `command_id`, and omit UI display details. The client command ids are the indexes of a 10-slot local boolean queue and must not be stored in LocalStorage. The server owns durable command sequencing, idempotent execution, active save slot, FIFO queue order, replay state, and persisted command results until ACK. Do not require active save slots, version markers, or generic payload envelopes from the client. Cache hints are allowed only to reduce snapshot payload size.
+The only gameplay communication pattern is client command, server result. Client commands describe player intent, include only a client-generated integer `command_id`, and omit UI display details. The client command ids are the indexes of a 10-slot local boolean queue and must not be stored in LocalStorage. The server owns durable command sequencing, idempotent execution, FIFO queue order, replay state, and persisted command results until ACK. Do not require version markers or generic payload envelopes from the client. Cache hints are allowed only to reduce snapshot payload size.
 
-Every client command must receive a server result. Server results should include only the minimum authoritative values needed for that command and must not include UI instructions, animation directives, popup semantics, layout anchors, or presentation-only events. Do not add speculative bookkeeping fields. Protocol types must be discriminated unions keyed by `type`. Queue acceptance returns `command.queued` with only `command_id`; queue acceptance, queue rejection, and ACK responses are not ACKed. Error reasons must be machine-readable fields on explicit error result types. `command.ack` carries only the applied client `command_id`. Use server snapshots for boot or reconnect, and prefer cached client snapshots for boot or save-slot loading when visible state already exists.
+Every client command must receive a server result. Server results should include only the minimum authoritative values needed for that command and must not include UI instructions, animation directives, popup semantics, layout anchors, or presentation-only events. Do not add speculative bookkeeping fields. Protocol types must be discriminated unions keyed by `type`. Queue acceptance returns `command.queued` with only `command_id`; queue acceptance, queue rejection, and ACK responses are not ACKed. Error reasons must be machine-readable fields on explicit error result types. `command.ack` carries only the applied client `command_id`. Use server snapshots for boot or reconnect, and prefer cached client snapshots for boot when visible state already exists.
 
 ## State Synchronization Rule
 When handling command results on the client, always use the centralized `applyAuthoritativeData(state, result)` handler in `assets/src/net/snapshots.ts` instead of writing ad-hoc inline mutations. This ensures all server-provided authoritative values (like `level`, `exp`, `coins`, `shards`, `cores`) are safely and consistently merged into the local snapshot across the entire application without duplicated logic. Do not add inline state mutations in feature modules when applying server results.

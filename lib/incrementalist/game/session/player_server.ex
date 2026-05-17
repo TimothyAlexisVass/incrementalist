@@ -4,7 +4,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   The server owns in-memory command sequencing and keeps only completed command
   results for reconnect replay. Durable command rows are written as async audit
-  side effects, while save-slot durability remains synchronous at save boundaries.
+  side effects, while player state durability remains synchronous at save boundaries.
   """
 
   use GenServer, restart: :transient
@@ -13,14 +13,14 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   import Ecto.Query
 
   alias Incrementalist.Game.{CommandExecutor, Constants, Snapshots, Time}
-  alias Incrementalist.Game.Persistence.{GameCommand, Player, SaveSlots}
+  alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerSupervisor
   alias Incrementalist.Repo
 
   @idle_timeout :timer.minutes(10)
   @buffer_size 10
   @processed_statuses ["succeeded", "failed"]
-  @save_boundary_types ["save_slot.switch", "save_slot.reset"]
+  @reset_command_type "game.reset"
   @async_command_persistence Mix.env() != :test
 
   def start_link(player_id) do
@@ -35,9 +35,9 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     PlayerSupervisor.ensure_started(player_id)
   end
 
-  def boot_player(player_id, cached_save_slots \\ MapSet.new(), now \\ Time.now()) do
+  def boot_player(player_id, has_cached_snapshot \\ false, now \\ Time.now()) do
     ensure_started(player_id)
-    GenServer.call(via_tuple(player_id), {:boot_player, cached_save_slots, now})
+    GenServer.call(via_tuple(player_id), {:boot_player, has_cached_snapshot, now})
   end
 
   def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now()) do
@@ -67,7 +67,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     state = %{
       player_id: player_id,
       player: nil,
-      active_slot: nil,
+      player_state: nil,
       idle_timer: Process.send_after(self(), :idle_timeout, @idle_timeout),
       queued_commands: [],
       recent_commands: [],
@@ -84,18 +84,16 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
-  def handle_call({:boot_player, cached_save_slots, now}, _from, state) do
-    active_slot = state.active_slot || SaveSlots.determine_active_slot(state.player, now)
-    snapshot = snapshot_unless_cached(active_slot, cached_save_slots, now)
+  def handle_call({:boot_player, has_cached_snapshot, now}, _from, state) do
+    player_state = state.player_state || PlayerStates.load_or_create(state.player, now)
+    snapshot = if has_cached_snapshot, do: nil, else: Snapshots.full(player_state, now)
 
     boot = %{
       "type" => "game.boot",
       "username" => state.player.username,
       "server_time" => Time.iso8601(now),
-      "active_save_slot" => active_slot.slot_index,
-      "save_slot" => Incrementalist.Game.State.summary(active_slot, active_slot.slot_index),
-      "idle_mode" => active_slot.state.idle_mode || false,
-      "projection_params" => Incrementalist.Game.State.projection_params(active_slot.state, now),
+      "idle_mode" => player_state.state.idle_mode || false,
+      "projection_params" => Incrementalist.Game.State.projection_params(player_state.state, now),
       "snapshot" => snapshot,
       "pending_result" => pending_result(state, nil)
     }
@@ -111,8 +109,8 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   @impl true
   def handle_call(:disconnect, _from, state) do
-    save_active_slot(state)
-    {:stop, :normal, :ok, %{state | active_slot: nil}}
+    save_player_state(state)
+    {:stop, :normal, :ok, %{state | player_state: nil}}
   end
 
   @impl true
@@ -128,7 +126,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
             {:reply, queued_result(command_id), state}
 
           :none ->
-            if queue_full?(state) or save_boundary_pending?(state) do
+            if queue_full?(state) or reset_pending?(state) do
               {:reply, :queue_full, state}
             else
               {command, next_state} =
@@ -176,8 +174,8 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   @impl true
   def handle_info(:idle_timeout, state) do
     Logger.info("PlayerServer #{state.player_id} shutting down due to idle timeout")
-    save_active_slot(state)
-    {:stop, :normal, %{state | active_slot: nil}}
+    save_player_state(state)
+    {:stop, :normal, %{state | player_state: nil}}
   end
 
   @impl true
@@ -204,19 +202,19 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   @impl true
   def handle_info(:daily_bonus_boundary_reached, state) do
     Logger.debug("PlayerServer #{state.player_id} refreshing state for daily bonus boundary")
-    refreshed_state = refresh_player_and_active_slot(state, Time.now())
+    refreshed_state = refresh_player_and_state(state, Time.now())
     {:noreply, refreshed_state}
   end
 
   @impl true
   def terminate(reason, state) do
     Logger.info("PlayerServer #{state.player_id} terminating, reason: #{inspect(reason)}")
-    save_active_slot(state)
+    save_player_state(state)
   end
 
   defp refresh_session_state(state, now) do
     player = Repo.get!(Player, state.player_id)
-    active_slot = SaveSlots.determine_active_slot(player, now)
+    player_state = PlayerStates.load_or_create(player, now)
     current_unacked = current_unacked_command(state.player_id)
 
     recent_commands =
@@ -232,7 +230,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     %{
       state
       | player: player,
-        active_slot: active_slot,
+        player_state: player_state,
         queued_commands: [],
         recent_commands: recent_commands,
         unacked_command: current_unacked,
@@ -261,19 +259,19 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   defp execute_next(state, command, now) do
-    {status, result, slot_id} = CommandExecutor.execute(command, state.player, now)
+    {status, result, ps_id} = CommandExecutor.execute(command, state.player, now)
 
     completed = %{
       command
       | status: status,
         result: result,
         processed_at: now,
-        save_slot_id: slot_id
+        player_state_id: ps_id
     }
 
     async_persist_completed_command(completed)
 
-    refreshed_state = refresh_player_and_active_slot(state, now)
+    refreshed_state = refresh_player_and_state(state, now)
     {result, %{refreshed_state | unacked_command: completed}}
   end
 
@@ -394,12 +392,12 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     is_nil(state.unacked_command) and Enum.empty?(state.queued_commands)
   end
 
-  defp save_boundary_pending?(state) do
+  defp reset_pending?(state) do
     pending_commands = [state.unacked_command | state.queued_commands]
 
     Enum.any?(pending_commands, fn
       nil -> false
-      command -> command.command_type in @save_boundary_types
+      command -> command.command_type == @reset_command_type
     end)
   end
 
@@ -412,18 +410,10 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     }
   end
 
-  defp snapshot_unless_cached(active_slot, cached_save_slots, now) do
-    if MapSet.member?(cached_save_slots, active_slot.slot_index) do
-      nil
-    else
-      Snapshots.full(active_slot, active_slot.slot_index, now)
-    end
-  end
-
-  defp refresh_player_and_active_slot(state, now) do
+  defp refresh_player_and_state(state, now) do
     player = Repo.get!(Player, state.player_id)
-    active_slot = SaveSlots.determine_active_slot(player, now)
-    %{state | player: player, active_slot: active_slot}
+    player_state = PlayerStates.load_or_create(player, now)
+    %{state | player: player, player_state: player_state}
   end
 
   defp current_unacked_command(player_id) do
@@ -445,10 +435,10 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     ) || 0
   end
 
-  defp save_active_slot(%{active_slot: nil}), do: :ok
+  defp save_player_state(%{player_state: nil}), do: :ok
 
-  defp save_active_slot(%{active_slot: active_slot}) do
-    SaveSlots.autosave(active_slot)
+  defp save_player_state(%{player_state: player_state}) do
+    PlayerStates.autosave(player_state)
     :ok
   end
 
@@ -519,7 +509,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   defp command_attrs(command) do
     %{
       player_id: command.player_id,
-      save_slot_id: command.save_slot_id,
+      player_state_id: command.player_state_id,
       command_id: command.command_id,
       sequence: command.sequence,
       command_type: command.command_type,

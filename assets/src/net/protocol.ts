@@ -9,16 +9,6 @@ export type ChargeCrystalsState = {
 
 export type SisuTierId = "azure" | "aether" | "lucent" | "transcendent";
 
-export type SaveSlotSummary = {
-  slot_index: number;
-  file_index: number;
-  is_current: boolean;
-  has_data: boolean;
-  level: number;
-  rewards_claimed: number;
-  saved_at: string | null;
-};
-
 export type AreaDefinition = {
   key: string;
   name: string;
@@ -108,7 +98,6 @@ export type NoticeState = {
 export type GameSnapshot = {
   type: "game.snapshot";
   server_time: string;
-  active_save_slot: number;
   state: {
     area: string;
   level: number;
@@ -141,7 +130,6 @@ export type GameSnapshot = {
     projection_params: ProjectionParams;
   };
   notices: NoticeState;
-  save_slot: SaveSlotSummary;
 };
 
 export type GameNoopResult = {
@@ -152,32 +140,12 @@ export type GameNoopResult = {
   events: unknown[];
 };
 
-export type SaveSlotsListResult = {
-  type: "save_slots.list.result";
-  status: "ok";
-  command_id: number;
-  server_time: string;
-  active_save_slot: number;
-  slots: SaveSlotSummary[];
-};
-
-export type SaveSlotSwitchResult = {
-  type: "save_slot.switch.result";
-  status: "ok";
-  command_id: number;
-  server_time: string;
-  active_save_slot: number;
-  save_slot: SaveSlotSummary;
-  slots: SaveSlotSummary[];
-} & ({ snapshot: GameSnapshot } | { snapshot?: null });
-
-export type SaveSlotResetResult = {
-  type: "save_slot.reset.result";
+export type GameResetResult = {
+  type: "game.reset.result";
   status: "ok";
   command_id: number;
   server_time: string;
   snapshot: GameSnapshot;
-  slots: SaveSlotSummary[];
 };
 
 export type ProgressClaimInResult = {
@@ -296,8 +264,6 @@ export type NoticeEventResult = {
 
 export type CommandErrorReason =
   | "unknown_command"
-  | "slot_index_required"
-  | "invalid_slot_index"
   | "claim_not_ready"
   | "area_locked"
   | "unknown_area"
@@ -329,7 +295,6 @@ export type CommandErrorResult = {
   status: "error";
   command_id: number;
   reason: CommandErrorReason;
-  active_save_slot?: number;
   can_claim_in?: number;
   sisu?: SisuState;
   can_claim_at?: string | null;
@@ -337,9 +302,7 @@ export type CommandErrorResult = {
 
 export type AckableCommandResult =
   | GameNoopResult
-  | SaveSlotsListResult
-  | SaveSlotSwitchResult
-  | SaveSlotResetResult
+  | GameResetResult
   | ProgressClaimInResult
   | ProgressClaimRewardResult
   | SisuRefillResult
@@ -382,8 +345,6 @@ export type BootResult = {
   username: string;
   token?: string;
   server_time: string;
-  active_save_slot: number;
-  save_slot: SaveSlotSummary;
   idle_mode: boolean;
   projection_params: ProjectionParams;
   snapshot?: GameSnapshot | null;
@@ -393,9 +354,7 @@ export type BootResult = {
 export function isAckableCommandResult(result: ServerResult): result is AckableCommandResult {
   return (
     result.type === "game.noop.result" ||
-    result.type === "save_slots.list.result" ||
-    result.type === "save_slot.switch.result" ||
-    result.type === "save_slot.reset.result" ||
+    result.type === "game.reset.result" ||
     result.type === "progress.claim_in.result" ||
     result.type === "progress.claim_reward.result" ||
     result.type === "sisu.refill.result" ||

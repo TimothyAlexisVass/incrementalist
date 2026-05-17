@@ -2,7 +2,6 @@ import type {
   GameSnapshot,
   ChargeCrystalsState,
   NoticeState,
-  SaveSlotSummary,
   ServerResult,
   AreaSelectResult,
   NoticeEventResult,
@@ -22,7 +21,6 @@ export enum View {
 
 export type ServerState = {
   snapshot: GameSnapshot | null;
-  slots: SaveSlotSummary[];
   status: string;
   statusTone: "ok" | "error" | "";
   currentView: View;
@@ -34,7 +32,6 @@ export type ServerState = {
 export function createServerState(): ServerState {
   return {
     snapshot: null,
-    slots: [],
     status: "Connecting...",
     statusTone: "",
     currentView: View.GAME,
@@ -59,14 +56,6 @@ export function applyResult(state: ServerState, result: ServerResult): void {
   if (snapshot) {
     state.snapshot = snapshot;
     updateAreaViewModel(snapshot.state);
-  }
-
-  if ("slots" in result) {
-    state.slots = result.slots;
-  } else if (snapshot) {
-    // Results are allowed to be partial. Keep previous slot summaries unless the
-    // server sends replacements, and only patch the slot covered by a full snapshot.
-    state.slots = upsertSlot(state.slots, snapshot.save_slot);
   }
 
   if (result.type === "progress.claim_reward.result") {
@@ -245,26 +234,18 @@ export function applyNoticeResult(state: ServerState, result: NoticeEventResult)
 }
 
 function snapshotFromResult(result: ServerResult): GameSnapshot | null {
-  if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+  if (result.type === "game.reset.result") {
     return result.snapshot ?? null;
   }
 
   return null;
 }
 
-function upsertSlot(slots: SaveSlotSummary[], slot: SaveSlotSummary) {
-  const next = slots.filter((candidate) => candidate.slot_index !== slot.slot_index);
-  next.push(slot);
-  return next.sort((a, b) => a.slot_index - b.slot_index);
-}
-
 function statusForResult(result: ServerResult): string {
   if (result.status === "error") return result.reason || "Command rejected";
   if (result.type === "command.queued") return "Queued";
   if (result.type === "game.noop.result") return "Synced";
-  if (result.type === "save_slots.list.result") return "Save files";
-  if (result.type === "save_slot.switch.result") return "Save file loaded";
-  if (result.type === "save_slot.reset.result") return "Save file reset";
+  if (result.type === "game.reset.result") return "Game reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";
   return "Ready";
 }

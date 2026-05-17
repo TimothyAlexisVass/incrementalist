@@ -1,7 +1,7 @@
 defmodule Incrementalist.Workers.DailyBonusGrant do
   @moduledoc """
   Scheduled job that triggers precisely on the 12-hour UTC boundaries.
-  Updates all save slots with daily_tokens = 0 to 1, and broadcasts an update
+  Updates all player states with daily_tokens = 0 to 1, and broadcasts an update
   to all active PlayerServer processes.
   """
   use GenServer
@@ -9,7 +9,7 @@ defmodule Incrementalist.Workers.DailyBonusGrant do
   alias Incrementalist.Repo
   alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Time
-  alias Incrementalist.Game.Persistence.SaveSlot
+  alias Incrementalist.Game.Persistence.PlayerState
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -29,7 +29,7 @@ defmodule Incrementalist.Workers.DailyBonusGrant do
     
     # Efficient bulk update
     Repo.update_all(
-      from(s in SaveSlot, where: s.has_daily_token == false),
+      from(s in PlayerState, where: s.has_daily_token == false),
       set: [has_daily_token: true]
     )
 

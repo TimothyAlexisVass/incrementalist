@@ -20,7 +20,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
   import Ecto.Changeset
 
   alias Incrementalist.Game.Constants
-  alias Incrementalist.Game.Persistence.{Player, SaveSlot}
+  alias Incrementalist.Game.Persistence.{Player, PlayerState}
 
   @statuses ~w(queued succeeded failed acked)
 
@@ -37,7 +37,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     field :replay_count, :integer, default: 0
 
     belongs_to :player, Player
-    belongs_to :save_slot, SaveSlot
+    belongs_to :player_state, PlayerState
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -46,7 +46,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     game_command
     |> cast(attrs, [
       :player_id,
-      :save_slot_id,
+      :player_state_id,
       :command_id,
       :sequence,
       :command_type,
@@ -72,7 +72,7 @@ defmodule Incrementalist.Game.Persistence.GameCommand do
     |> validate_number(:sequence, greater_than: 0)
     |> validate_number(:replay_count, greater_than_or_equal_to: 0)
     |> foreign_key_constraint(:player_id)
-    |> foreign_key_constraint(:save_slot_id)
+    |> foreign_key_constraint(:player_state_id)
     |> unique_constraint(:command_id, name: :game_commands_player_id_command_id_unacked_index)
     |> unique_constraint([:player_id, :sequence])
   end

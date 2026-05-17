@@ -4,82 +4,40 @@ defmodule Incrementalist.Game.CommandsTest do
   import Ecto.Query
 
   alias Incrementalist.Game.Commands
-  alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, SaveSlot, SaveSlots}
+  alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerServer
-  alias Incrementalist.Game.{Notices, Sessions, State, Time}
+  alias Incrementalist.Game.{Notices, Sessions}
   alias Incrementalist.Repo
 
   @now ~U[2026-05-04 12:00:00.000000Z]
 
-  test "anonymous sessions create four save slots and boot chooses slot zero when empty" do
+  test "anonymous sessions create one player state and boot returns a snapshot" do
     player = Sessions.authenticate_player(nil, @now)
 
-    slots = SaveSlots.get_slots(player.id)
-    assert Enum.map(slots, & &1.slot_index) == [0, 1, 2, 3]
+    ps = PlayerStates.get!(player.id)
+    assert ps.player_id == player.id
 
-    boot = Sessions.boot_player(player.id, MapSet.new(), @now)
+    boot = Sessions.boot_player(player.id, false, @now)
 
-    refute Map.has_key?(boot, "slots")
     assert boot["username"] == player.username
-    assert boot["snapshot"]["active_save_slot"] == 0
-    assert boot["snapshot"]["save_slot"]["has_data"]
-    refute Map.has_key?(boot["snapshot"], "state_version")
-    refute Map.has_key?(boot["snapshot"]["save_slot"], "state_version")
+    assert boot["snapshot"]["state"]
   end
 
-  test "boot can omit a full snapshot when the active slot is cached by the client" do
+  test "boot can omit a full snapshot when the client has a cached snapshot" do
     player = Sessions.authenticate_player(nil, @now)
-    _initial_boot = Sessions.boot_player(player.id, MapSet.new(), @now)
+    _initial_boot = Sessions.boot_player(player.id, false, @now)
 
-    cached_boot =
-      Sessions.boot_player(
-        player.id,
-        MapSet.new([0]),
-        @now
-      )
+    cached_boot = Sessions.boot_player(player.id, true, @now)
 
-    assert cached_boot["active_save_slot"] == 0
-    assert cached_boot["save_slot"]["slot_index"] == 0
-    assert cached_boot["save_slot"]["has_data"]
     assert cached_boot["snapshot"] == nil
-    refute Map.has_key?(cached_boot, "slots")
-  end
-
-  test "boot selection uses last valid slot, then first populated slot, then slot zero" do
-    player = Sessions.authenticate_player(nil, @now)
-
-    slot_1 = SaveSlots.get_slot!(player.id, 1)
-    slot_2 = SaveSlots.get_slot!(player.id, 2)
-
-    put_slot_state(slot_1, State.new(@now), @now)
-    put_slot_state(slot_2, State.new(@now), @now)
-    put_player_active_slot(player, 2)
-
-    assert SaveSlots.determine_active_slot(Repo.get!(Player, player.id), @now).slot_index == 2
-
-    slot_2 |> SaveSlot.changeset(%{state: nil}) |> Repo.update!()
-    put_player_active_slot(player, 3)
-
-    assert SaveSlots.determine_active_slot(Repo.get!(Player, player.id), @now).slot_index == 1
-
-    SaveSlots.get_slots(player.id)
-    |> Enum.each(fn slot ->
-      slot |> SaveSlot.changeset(%{state: nil}) |> Repo.update!()
-    end)
-
-    put_player_active_slot(player, 3)
-
-    selected_slot = SaveSlots.determine_active_slot(Repo.get!(Player, player.id), @now)
-    assert selected_slot.slot_index == 0
-    assert match?(%State{}, selected_slot.state)
   end
 
   test "commands are FIFO and ACK-gated" do
     player = create_player()
 
     first = Commands.enqueue(player.id, "game.noop", intent(0), @now)
-    second = Commands.enqueue(player.id, "save_slots.list", intent(1), @now)
-    third = Commands.enqueue(player.id, "save_slot.switch", intent(2, %{"slot_index" => 1}), @now)
+    second = Commands.enqueue(player.id, "game.noop", intent(1), @now)
+    third = Commands.enqueue(player.id, "game.noop", intent(2), @now)
 
     assert first["type"] == "game.noop.result"
     assert first["command_id"] == 0
@@ -97,14 +55,13 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(ack, "acked")
     refute Map.has_key?(ack, "next_result")
     refute Map.has_key?(ack, "requires_ack")
-    assert ack["released_result"]["type"] == "save_slots.list.result"
+    assert ack["released_result"]["type"] == "game.noop.result"
     assert ack["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
 
     ack = Commands.ack(player.id, 1, @now)
-    assert ack["released_result"]["type"] == "save_slot.switch.result"
+    assert ack["released_result"]["type"] == "game.noop.result"
     assert ack["released_result"]["command_id"] == 2
-    assert ack["released_result"]["snapshot"]["active_save_slot"] == 1
     assert command_statuses(player.id) == ["acked", "acked", "succeeded"]
   end
 
@@ -112,7 +69,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
 
     Commands.enqueue(player.id, "game.noop", intent(0), @now)
-    Commands.enqueue(player.id, "save_slots.list", intent(1), @now)
+    Commands.enqueue(player.id, "game.noop", intent(1), @now)
 
     ignored = Commands.ack(player.id, 1, @now)
 
@@ -122,43 +79,9 @@ defmodule Incrementalist.Game.CommandsTest do
 
     released = Commands.ack(player.id, 0, @now)
 
-    assert released["released_result"]["type"] == "save_slots.list.result"
+    assert released["released_result"]["type"] == "game.noop.result"
     assert released["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
-  end
-
-  test "slot switch trusts cache hints only to omit snapshots for populated slots" do
-    player = create_player()
-
-    slot_1 = SaveSlots.get_slot!(player.id, 1)
-    put_slot_state(slot_1, State.new(@now), @now)
-
-    cached_result =
-      Commands.enqueue(
-        player.id,
-        "save_slot.switch",
-        intent(0, %{"slot_index" => 1, "has_cached_snapshot" => true}),
-        @now
-      )
-
-    assert cached_result["type"] == "save_slot.switch.result"
-    assert cached_result["active_save_slot"] == 1
-    assert cached_result["save_slot"]["slot_index"] == 1
-    assert length(cached_result["slots"]) == 4
-    refute Map.has_key?(cached_result, "snapshot")
-
-    Commands.ack(player.id, 0, @now)
-
-    empty_slot_result =
-      Commands.enqueue(
-        player.id,
-        "save_slot.switch",
-        intent(1, %{"slot_index" => 2, "has_cached_snapshot" => true}),
-        @now
-      )
-
-    assert empty_slot_result["type"] == "save_slot.switch.result"
-    assert empty_slot_result["snapshot"]["active_save_slot"] == 2
   end
 
   test "area.select updates the current area when unlocked" do
@@ -193,15 +116,15 @@ defmodule Incrementalist.Game.CommandsTest do
     assert result["type"] == "notice.event.result"
     assert result["leaf_id"] == "leaf.sage_tip.1.confirm_button"
 
-    slot = SaveSlots.get_slot!(player.id, 0)
-    refute "leaf.sage_tip.1.confirm_button" in slot.notices.active_leaf_ids
-    assert "leaf.sage_tip.1.confirm_button" in slot.notices.dismissed_leaf_ids
+    ps = PlayerStates.get!(player.id)
+    refute "leaf.sage_tip.1.confirm_button" in ps.notices.active_leaf_ids
+    assert "leaf.sage_tip.1.confirm_button" in ps.notices.dismissed_leaf_ids
   end
 
   test "notice.event child_shown for a sage tip keeps sage guidance cleared after area switch" do
     player = create_player()
-    slot = SaveSlots.get_slot!(player.id, 0)
-    unlocked_state = %{slot.state | level: 10, area: "sage"}
+    ps = PlayerStates.get!(player.id)
+    unlocked_state = %{ps.state | level: 10, area: "sage"}
     other_tip_leaf_ids =
       Incrementalist.Game.Constants.sage_tip_levels()
       |> Enum.reject(&(&1 == 1))
@@ -217,8 +140,8 @@ defmodule Incrementalist.Game.CommandsTest do
         }
       end)
 
-    slot
-    |> SaveSlot.changeset(%{
+    ps
+    |> Incrementalist.Game.Persistence.PlayerState.changeset(%{
       state: unlocked_state,
       notices: notices,
       last_saved_at: @now
@@ -243,19 +166,19 @@ defmodule Incrementalist.Game.CommandsTest do
     refute "leaf.area.sage.go_button" in go_cloverfield["notices"]["active_leaf_ids"]
     refute "parent.area.dropdown" in go_cloverfield["notices"]["active_parent_ids"]
 
-    updated_slot = SaveSlots.get_slot!(player.id, 0)
-    assert "leaf.sage_tip.1.confirm_button" in updated_slot.notices.seen_leaf_ids
-    refute "leaf.sage_tip.1.confirm_button" in updated_slot.notices.dismissed_leaf_ids
-    refute "leaf.area.sage.go_button" in updated_slot.notices.active_leaf_ids
+    updated_ps = PlayerStates.get!(player.id)
+    assert "leaf.sage_tip.1.confirm_button" in updated_ps.notices.seen_leaf_ids
+    refute "leaf.sage_tip.1.confirm_button" in updated_ps.notices.dismissed_leaf_ids
+    refute "leaf.area.sage.go_button" in updated_ps.notices.active_leaf_ids
   end
 
   test "dismissed non-sage area leaf notice stays cleared after area navigation" do
     player = create_player()
-    slot = SaveSlots.get_slot!(player.id, 0)
-    unlocked_state = %{slot.state | level: 10, area: "sage"}
+    ps = PlayerStates.get!(player.id)
+    unlocked_state = %{ps.state | level: 10, area: "sage"}
 
-    slot
-    |> SaveSlot.changeset(%{
+    ps
+    |> Incrementalist.Game.Persistence.PlayerState.changeset(%{
       state: unlocked_state,
       notices: Notices.new(unlocked_state),
       last_saved_at: @now
@@ -283,15 +206,15 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert go_sage["type"] == "area.select.result"
 
-    updated_slot = SaveSlots.get_slot!(player.id, 0)
-    refute "leaf.area.cloverfield.go_button" in updated_slot.notices.active_leaf_ids
-    assert "leaf.area.cloverfield.go_button" in updated_slot.notices.dismissed_leaf_ids
+    updated_ps = PlayerStates.get!(player.id)
+    refute "leaf.area.cloverfield.go_button" in updated_ps.notices.active_leaf_ids
+    assert "leaf.area.cloverfield.go_button" in updated_ps.notices.dismissed_leaf_ids
   end
 
   test "stored results replay without re-executing command rules" do
     player = create_player()
 
-    result = Commands.enqueue(player.id, "save_slot.reset", intent(0), @now)
+    result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
     replayed_once = Commands.replay_pending(player.id)
     replayed_twice = Commands.replay_pending(player.id)
 
@@ -302,9 +225,6 @@ defmodule Incrementalist.Game.CommandsTest do
 
     command = Repo.one!(GameCommand)
     assert command.replay_count == 2
-
-    refute Map.has_key?(result["snapshot"], "state_version")
-    refute Map.has_key?(command, :state_version)
 
     Commands.ack(player.id, 0, @now)
     assert Commands.replay_pending(player.id) == nil
@@ -336,20 +256,26 @@ defmodule Incrementalist.Game.CommandsTest do
     assert Repo.aggregate(GameCommand, :count) == 1
   end
 
-  test "save slot boundaries block follow-up commands until acknowledged" do
+  test "game.reset resets the player state and returns a fresh snapshot" do
+    player = create_player()
+
+    reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
+    assert reset_result["type"] == "game.reset.result"
+    assert reset_result["snapshot"]["state"]
+  end
+
+  test "game.reset blocks follow-up commands until acknowledged" do
     player = create_player()
 
     Commands.enqueue(player.id, "game.noop", intent(0), @now)
 
-    switch =
-      Commands.enqueue(player.id, "save_slot.switch", intent(1, %{"slot_index" => 1}), @now)
-
-    assert switch["type"] == "command.queued"
+    reset = Commands.enqueue(player.id, "game.reset", intent(1), @now)
+    assert reset["type"] == "command.queued"
     assert Commands.enqueue(player.id, "game.noop", intent(2), @now) == :queue_full
 
     ack = Commands.ack(player.id, 0, @now)
 
-    assert ack["released_result"]["type"] == "save_slot.switch.result"
+    assert ack["released_result"]["type"] == "game.reset.result"
     assert ack["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
 
@@ -359,11 +285,11 @@ defmodule Incrementalist.Game.CommandsTest do
     assert command_statuses(player.id) == ["acked", "acked"]
   end
 
-  test "save reset persists claim boundary from snapshot projection" do
+  test "game.reset persists claim boundary from snapshot projection" do
     player = create_player()
 
-    reset_result = Commands.enqueue(player.id, "save_slot.reset", intent(0), @now)
-    assert reset_result["type"] == "save_slot.reset.result"
+    reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
+    assert reset_result["type"] == "game.reset.result"
 
     can_claim_at = get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
     assert is_binary(can_claim_at)
@@ -391,7 +317,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     boot =
       player.id
-      |> Sessions.boot_player(MapSet.new(), @now)
+      |> Sessions.boot_player(false, @now)
       |> Map.put("pending_result", Commands.replay_pending(player.id))
 
     assert boot["pending_result"] == result
@@ -425,7 +351,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
   defp create_player do
     player = Sessions.authenticate_player(nil, @now)
-    _snapshot = Sessions.boot_player(player.id, MapSet.new(), @now)
+    _snapshot = Sessions.boot_player(player.id, false, @now)
     Repo.get!(Player, player.id)
   end
 
@@ -440,20 +366,5 @@ defmodule Incrementalist.Game.CommandsTest do
         order_by: [asc: command.sequence],
         select: command.status
     )
-  end
-
-  defp put_slot_state(%SaveSlot{} = slot, state, now) do
-    slot
-    |> SaveSlot.changeset(%{
-      state: state,
-      last_saved_at: now
-    })
-    |> Repo.update!()
-  end
-
-  defp put_player_active_slot(%Player{} = player, slot_index) do
-    player
-    |> Player.changeset(%{active_save_slot: slot_index, last_seen_at: Time.now()})
-    |> Repo.update!()
   end
 end

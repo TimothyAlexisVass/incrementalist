@@ -26,38 +26,21 @@ defmodule IncrementalistWeb.UserSocket do
 
     player = Sessions.authenticate_player(player_id)
 
+    has_cached_snapshot =
+      case {Map.get(params, "has_cached_snapshot"), Map.get(params, "cache_username")} do
+        {"true", cache_username} when is_binary(cache_username) ->
+          cache_username == player.username
+
+        _ ->
+          false
+      end
+
     {:ok,
      socket
      |> assign(:player_id, player.id)
-     |> assign(:cached_save_slots, cached_save_slots(params, player.username))}
+     |> assign(:has_cached_snapshot, has_cached_snapshot)}
   end
 
   @impl true
   def id(socket), do: "player:#{socket.assigns.player_id}"
-
-  defp cached_save_slots(
-         %{"cached_save_slots" => slots, "cache_username" => cache_username},
-         player_username
-       )
-       when is_binary(slots) and is_binary(cache_username) and is_binary(player_username) do
-    if cache_username == player_username do
-      parse_cached_save_slots(slots)
-    else
-      MapSet.new()
-    end
-  end
-
-  defp cached_save_slots(_params, _player_username), do: MapSet.new()
-
-  defp parse_cached_save_slots(slots) do
-    slots
-    |> String.split(",", trim: true)
-    |> Enum.flat_map(fn slot ->
-      case Integer.parse(slot) do
-        {slot_index, ""} when slot_index in 0..3 -> [slot_index]
-        _ -> []
-      end
-    end)
-    |> MapSet.new()
-  end
 end

@@ -600,18 +600,5 @@ defmodule Incrementalist.Game.State do
 
   defp parse_iso_ms(_), do: nil
 
-  def summary(slot, active_slot_index) do
-    state = slot.state
 
-    %{
-      "slot_index" => slot.slot_index,
-      "file_index" => slot.slot_index,
-      "is_current" => slot.slot_index == active_slot_index,
-      "has_data" => state != nil,
-      "level" => if(state, do: state.level || 1, else: 1),
-      "rewards_claimed" =>
-        if(state && state.progress_bar, do: state.progress_bar.rewards_claimed || 0, else: 0),
-      "saved_at" => Time.iso8601(slot.last_saved_at)
-    }
-  end
 end

@@ -5,7 +5,6 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
     create table(:players) do
       add(:username, :string, null: false)
       add(:email, :string)
-      add(:active_save_slot, :integer, null: false, default: 0)
       add(:last_seen_at, :utc_datetime_usec, null: false)
 
       timestamps(type: :utc_datetime_usec)
@@ -13,9 +12,8 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
 
     create(unique_index(:players, [:username]))
 
-    create table(:save_slots) do
+    create table(:player_states) do
       add(:player_id, references(:players, on_delete: :delete_all), null: false)
-      add(:slot_index, :integer, null: false)
       add(:state, :map)
       add(:notices, :map)
       add(:has_daily_token, :boolean, null: false, default: true)
@@ -24,17 +22,11 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       timestamps(type: :utc_datetime_usec)
     end
 
-    create(unique_index(:save_slots, [:player_id, :slot_index]))
-
-    create(
-      constraint(:save_slots, :save_slots_slot_index_range,
-        check: "slot_index >= 0 AND slot_index < 4"
-      )
-    )
+    create(unique_index(:player_states, [:player_id]))
 
     create table(:game_commands) do
       add(:player_id, references(:players, on_delete: :delete_all), null: false)
-      add(:save_slot_id, references(:save_slots, on_delete: :nilify_all))
+      add(:player_state_id, references(:player_states, on_delete: :nilify_all))
       add(:command_id, :bigint, null: false)
       add(:sequence, :bigint, null: false)
       add(:command_type, :string, null: false)

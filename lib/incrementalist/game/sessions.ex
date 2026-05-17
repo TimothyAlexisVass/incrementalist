@@ -4,13 +4,13 @@ defmodule Incrementalist.Game.Sessions do
 
   Player identity is intentionally separate from save authority. The browser may
   cache visible snapshots for faster rendering, but the username only identifies
-  a player. It cannot choose the active slot or queued command.
+  a player.
   """
 
   import Ecto.Query
 
   alias Incrementalist.Game.Helpers.Players.UsernameGenerator
-  alias Incrementalist.Game.Persistence.{Player, SaveSlots}
+  alias Incrementalist.Game.Persistence.{Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.Time
   alias Incrementalist.Repo
@@ -27,8 +27,8 @@ defmodule Incrementalist.Game.Sessions do
     |> unwrap_transaction()
   end
 
-  def boot_player(player_id, cached_save_slots \\ MapSet.new(), now \\ Time.now()) do
-    PlayerServer.boot_player(player_id, cached_save_slots, now)
+  def boot_player(player_id, has_cached_snapshot \\ false, now \\ Time.now()) do
+    PlayerServer.boot_player(player_id, has_cached_snapshot, now)
   end
 
   def cleanup_anonymous_players(now \\ Time.now()) do
@@ -43,7 +43,7 @@ defmodule Incrementalist.Game.Sessions do
 
   defp create_player(now) do
     player = insert_player!(now)
-    SaveSlots.ensure_four_slots(player.id, now)
+    PlayerStates.ensure_state(player.id, now)
     player
   end
 
@@ -53,7 +53,7 @@ defmodule Incrementalist.Game.Sessions do
       |> Player.changeset(%{last_seen_at: now})
       |> Repo.update!()
 
-    SaveSlots.ensure_four_slots(player.id, now)
+    PlayerStates.ensure_state(player.id, now)
     player
   end
 
@@ -64,7 +64,6 @@ defmodule Incrementalist.Game.Sessions do
          |> Player.changeset(%{
            username: username,
            email: nil,
-           active_save_slot: 0,
            last_seen_at: now
          })
          |> Repo.insert() do

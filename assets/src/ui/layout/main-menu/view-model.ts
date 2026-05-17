@@ -1,7 +1,5 @@
 import { TabMenu, TabDefinition, Rect } from '../../components/tab-menu/tab-menu';
-import { SaveSlotActions } from '../../components/cards/save-slot';
 import { COLORS } from '../../../colors';
-import { renderSaveFilesTab } from './panels/save-files';
 import { renderBasicShopTab, ShopActions } from './panels/basic-shop/index';
 import { renderQuestsTab } from './panels/quests/render';
 import { renderAchievementsTab } from './panels/achievements/render';
@@ -21,27 +19,12 @@ import {
 } from '../../managers/notices';
 
 let tabMenu: TabMenu | null = null;
-let saveSlotActions: SaveSlotActions | null = null;
 let shopActions: ShopActions | null = null;
 let channel: GameChannel | null = null;
 let runCommand: ((cmd: () => Promise<any>) => void) | null = null;
 
 export function getTabMenu(): TabMenu {
   if (!tabMenu) {
-    const renderPlaceholder = (title: string) => (_canvas: HTMLCanvasElement, _input: InteractionState, _state: ServerState, rect: Rect) => {
-      const renderer = getActiveWebGLRenderer();
-      if (!renderer) return;
-      renderer.drawText({
-        text: `${title} Placeholder`,
-        x: rect.x + rect.width / 2,
-        y: rect.y + rect.height / 2,
-        font: '24px Arial',
-        color: COLORS.panel.textPrimary,
-        align: 'center',
-        baseline: 'middle'
-      });
-    };
-
     const tabs: TabDefinition[] = [
       {
         id: 'shop',
@@ -77,28 +60,6 @@ export function getTabMenu(): TabMenu {
         id: 'stats',
         label: 'Stats',
         renderContent: renderStatsTab
-      },
-      {
-        id: 'save',
-        label: 'Save Files',
-        renderContent: (canvas, input, state, rect) => {
-          if (saveSlotActions) {
-            renderSaveFilesTab(canvas, input, state, rect, saveSlotActions);
-          } else {
-            const renderer = getActiveWebGLRenderer();
-            if (renderer) {
-              renderer.drawText({
-                text: 'Actions not initialized',
-                x: rect.x + rect.width / 2,
-                y: rect.y + rect.height / 2,
-                font: '18px Arial',
-                color: COLORS.panel.textPrimary,
-                align: 'center',
-                baseline: 'middle'
-              });
-            }
-          }
-        }
       }
     ];
 
@@ -112,14 +73,6 @@ export function getTabMenu(): TabMenu {
     });
   }
   return tabMenu;
-}
-
-export function setSaveSlotActions(actions: SaveSlotActions) {
-  saveSlotActions = actions;
-}
-
-export function getSaveSlotActions(): SaveSlotActions | null {
-  return saveSlotActions;
 }
 
 export function setShopActions(actions: ShopActions) {

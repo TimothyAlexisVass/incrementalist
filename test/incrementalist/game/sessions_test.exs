@@ -7,18 +7,17 @@ defmodule Incrementalist.Game.SessionsTest do
 
   @now ~U[2026-05-04 12:00:00.000000Z]
 
-  test "authenticate_player creates a player with a generated username and four slots" do
+  test "authenticate_player creates a player with a generated username and one state" do
     player = Sessions.authenticate_player(nil, @now)
 
     assert player.username
     assert player.email == nil
     assert player.last_seen_at == @now
 
-    boot = Sessions.boot_player(player.id, MapSet.new(), @now)
+    boot = Sessions.boot_player(player.id, false, @now)
 
     assert boot["username"] == player.username
-    assert boot["snapshot"]["active_save_slot"] == 0
-    assert boot["snapshot"]["save_slot"]["has_data"]
+    assert boot["snapshot"]["state"]
   end
 
   test "authenticate_player refreshes an existing player by id" do
@@ -40,7 +39,6 @@ defmodule Incrementalist.Game.SessionsTest do
       |> Player.changeset(%{
         username: "OldAnon",
         email: nil,
-        active_save_slot: 0,
         last_seen_at: old
       })
       |> Repo.insert!()
@@ -50,7 +48,6 @@ defmodule Incrementalist.Game.SessionsTest do
       |> Player.changeset(%{
         username: "KeptPlayer",
         email: "kept@example.com",
-        active_save_slot: 0,
         last_seen_at: old
       })
       |> Repo.insert!()

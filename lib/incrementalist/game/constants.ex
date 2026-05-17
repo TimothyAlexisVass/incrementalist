@@ -23,9 +23,6 @@ defmodule Incrementalist.Game.Constants do
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
   @daily_bonus @daily_bonus_path |> File.read!() |> Jason.decode!()
 
-  def max_save_slots, do: 4
-  def valid_slot_indexes, do: 0..(max_save_slots() - 1)
-
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
 
@@ -75,7 +72,7 @@ defmodule Incrementalist.Game.Constants do
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
   def sisu_refill_threshold_factor, do: 0.9
 
-  def charge_crystal_azure_claim_interval, do: 12
+  def charge_crystal_azure_claim_interval, do: 9
   def charge_crystal_aether_claim_interval, do: 40
   def charge_crystal_lucent_level_interval, do: 24
   def charge_crystal_transcendent_level_interval, do: 100

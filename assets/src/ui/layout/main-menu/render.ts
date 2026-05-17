@@ -2,7 +2,6 @@ import { Overlay } from '../../managers/overlays';
 import { COLORS } from '../../../colors';
 import { InteractionState } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
-import { SaveSlotActions } from '../../components/cards/save-slot';
 import {
   TOP_HUD_HEIGHT,
   BOTTOM_HUD_HEIGHT,
@@ -10,16 +9,12 @@ import {
   DISPLAY_AREA_WIDTH,
   HUD_LEFT_PADDING
 } from '../../../config';
-import { getTabMenu, setSaveSlotActions, setShopActions, getNetwork } from './view-model';
+import { getTabMenu, setShopActions, getNetwork } from './view-model';
 import { ShopActions } from './panels/basic-shop/index';
 import { handleMainMenuInteractions } from './interactions';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 
 export class MainMenu implements Overlay {
-  public setActions(actions: SaveSlotActions) {
-    setSaveSlotActions(actions);
-  }
-
   public setShopActions(actions: ShopActions) {
     setShopActions(actions);
   }

@@ -30,7 +30,7 @@ export class GameChannel {
   constructor(
     private readonly username: string | null,
     private readonly token: string | null,
-    private readonly cachedSaveSlots: number[] = []
+    private readonly hasCachedSnapshot: boolean = false
   ) {}
 
   get status() {
@@ -56,7 +56,7 @@ export class GameChannel {
     const params = new URLSearchParams({ vsn: "2.0.0" });
     if (this.token) params.set("token", this.token);
     if (this.username) params.set("cache_username", this.username);
-    if (this.cachedSaveSlots.length > 0) params.set("cached_save_slots", this.cachedSaveSlots.join(","));
+    if (this.hasCachedSnapshot) params.set("has_cached_snapshot", "true");
 
     const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     this.socket = new WebSocket(`${scheme}://${window.location.host}/socket/websocket?${params}`);

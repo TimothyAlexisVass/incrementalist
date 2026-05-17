@@ -1,12 +1,10 @@
 import { GameChannel } from "../net/game-channel";
 import { 
   ackAppliedResult, 
-  switchSaveSlot, 
-  resetSaveSlot, 
+  resetGame, 
   progressClaimIn,
   selectArea,
-  shopPurchase,
-  listSaveSlots
+  shopPurchase
 } from "../net/commands";
 import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
@@ -63,7 +61,7 @@ import {
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
 
-// Cached snapshots are projection data. They make boot and slot switches feel
+// Cached snapshots are projection data. They make boot feel
 // instant, but server command results remain the only source of durable truth.
 const usernameKey = "incrementalist.playerUsername";
 const tokenKey = "incrementalist.playerToken";
@@ -89,36 +87,11 @@ export class GameClient {
   }
 
   async boot() {
-    // ... (rest of boot stays the same until start())
     const username = window.localStorage.getItem(usernameKey);
     const token = window.localStorage.getItem(tokenKey);
     this.snapshotCache = new SnapshotCache(username);
-    this.channel = new GameChannel(username, token, this.snapshotCache.cachedSlotIndexes());
-
-    // Initialize Save Slot Actions
-    this.mainMenu.setActions({
-      onSwitch: (index: number) => {
-        if (!this.channel) return;
-        this.ui.modals.open(new LoadingModal('Switching save slot...'));
-        this.runCommand(() => switchSaveSlot(this.channel!, index, false)).then(() => {
-          this.closeAllTransientUi();
-        });
-      },
-      onReset: (index: number) => {
-        this.ui.modals.open(new ResetConfirmationModal(
-          'Reset Save Slot',
-          'Are you sure you want to delete this file?\nThis cannot be undone.',
-          () => {
-            if (!this.channel) return;
-            this.ui.modals.open(new LoadingModal('Resetting save slot...'));
-            this.runCommand(() => resetSaveSlot(this.channel!)).then(() => {
-              this.closeAllTransientUi();
-            });
-          },
-          () => this.ui.modals.close()
-        ));
-      }
-    });
+    const hasCachedSnapshot = this.snapshotCache.hasCachedSnapshot();
+    this.channel = new GameChannel(username, token, hasCachedSnapshot);
     
     this.mainMenu.setShopActions({
       onPurchase: (itemId: string) => {
@@ -148,7 +121,7 @@ export class GameClient {
       this.snapshotCache = new SnapshotCache(result.username);
 
       synchronize(result.server_time);
-      this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load(result.active_save_slot);
+      this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load();
       if (this.store.state.snapshot) {
         // Ensure the bar projection is up to date even if the snapshot was cached
         this.store.state.snapshot.state.projection_params = result.projection_params;
@@ -157,26 +130,19 @@ export class GameClient {
         notices.setSnapshot(this.store.state.snapshot);
         updateAreaViewModel(this.store.state.snapshot.state);
       }
-      this.store.state.slots = [result.save_slot];
 
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
         syncHudInstantly(this.store.state.snapshot.state);
       }
 
-
       if (result.pending_result) {
-        // The pending result belongs before any new local action; acknowledging it
-        // first keeps the server queue and the rendered snapshot on the same boundary.
         await this.applyAndAck(result.pending_result);
       }
     };
 
     try {
       await this.channel.connect();
-      // Fetch all save slots to ensure the UI shows all 4 slots immediately.
-      // This is done after connect resolves to ensure the channel is fully ready.
-      await this.runCommand(() => listSaveSlots(this.channel!));
     } catch (error) {
       this.store.state.statusTone = "error";
       this.store.state.status = error instanceof Error ? error.message : "Boot failed";
@@ -212,7 +178,6 @@ export class GameClient {
   }
 
   private async applyAndAck(result: ServerResult) {
-    this.hydrateSnapshotFromCache(result);
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
@@ -220,7 +185,7 @@ export class GameClient {
     }
     this.cacheSnapshotFromResult(result);
 
-    if (result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result") {
+    if (result.type === "game.reset.result") {
       this.closeAllTransientUi();
       if (this.store.state.snapshot) {
         getStateFromSnapshot(this.store.state.snapshot);
@@ -232,9 +197,7 @@ export class GameClient {
       this.closeAllTransientUi();
     }
 
-
     this.applyProgressEffects(result, previousAmounts);
-
 
     if (!isAckableCommandResult(result)) return;
 
@@ -243,7 +206,6 @@ export class GameClient {
     let next = await ackAppliedResult(this.channel!, result.command_id);
     if (clearsCommandQueue(result)) this.channel!.clearCommandQueue();
     while (next) {
-      this.hydrateSnapshotFromCache(next);
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
@@ -251,7 +213,7 @@ export class GameClient {
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
-      if (next.type === "save_slot.switch.result" || next.type === "save_slot.reset.result") {
+      if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
         if (this.store.state.snapshot) {
           getStateFromSnapshot(this.store.state.snapshot);
@@ -287,19 +249,6 @@ export class GameClient {
     };
   }
 
-  private hydrateSnapshotFromCache(result: ServerResult) {
-    if (result.type !== "save_slot.switch.result" || result.snapshot) return;
-
-    const cachedSnapshot = this.snapshotCache!.load(result.active_save_slot);
-    if (cachedSnapshot) {
-      this.store.state.snapshot = cachedSnapshot;
-      getStateFromSnapshot(cachedSnapshot);
-    } else {
-      // Clear the stale snapshot from the previous slot
-      this.store.state.snapshot = null;
-    }
-  }
-
   private cacheSnapshotFromResult(result: ServerResult) {
     if (!this.store.state.snapshot) return;
 
@@ -314,8 +263,7 @@ export class GameClient {
         result.type === "area.select.result" ||
         result.type === "shop.purchase.result" ||
         result.type === "notice.event.result" ||
-        result.type === "save_slot.switch.result" ||
-        result.type === "save_slot.reset.result") {
+        result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
       return;
     }
@@ -608,5 +556,5 @@ export class GameClient {
 // ---------------------------------------------------------------------------
 
 function clearsCommandQueue(result: AckableCommandResult) {
-  return result.type === "save_slot.switch.result" || result.type === "save_slot.reset.result";
+  return result.type === "game.reset.result";
 }

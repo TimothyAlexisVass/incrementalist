@@ -1,23 +1,21 @@
-defmodule Incrementalist.Game.Persistence.SaveSlot do
+defmodule Incrementalist.Game.Persistence.PlayerState do
   @moduledoc """
-  One of the four anonymous save files.
+  The single game state row for each player.
 
-  `state == nil` means the slot is visibly empty. Once initialized, `state` is
-  versioned JSON so gameplay data can evolve without requiring a relational
-  schema change for every rule tweak.
+  `state == nil` means the player has not yet started playing. Once initialized,
+  `state` is versioned JSON so gameplay data can evolve without requiring a
+  relational schema change for every rule tweak.
   """
 
   use Ecto.Schema
 
   import Ecto.Changeset
 
-  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Persistence.Player
   alias Incrementalist.Game.State
   alias Incrementalist.Game.Notices
 
-  schema "save_slots" do
-    field :slot_index, :integer
+  schema "player_states" do
     embeds_one :state, State, on_replace: :update
     embeds_one :notices, Notices, on_replace: :update
     field :has_daily_token, :boolean, default: true
@@ -28,17 +26,16 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     timestamps(type: :utc_datetime_usec)
   end
 
-  def changeset(save_slot, attrs) do
+  def changeset(player_state, attrs) do
     attrs = normalize_attrs(attrs)
 
-    save_slot
-    |> cast(attrs, [:player_id, :slot_index, :last_saved_at, :has_daily_token])
+    player_state
+    |> cast(attrs, [:player_id, :last_saved_at, :has_daily_token])
     |> cast_embed(:state)
     |> cast_embed(:notices)
-    |> validate_required([:player_id, :slot_index])
-    |> validate_inclusion(:slot_index, Constants.valid_slot_indexes())
+    |> validate_required([:player_id])
     |> foreign_key_constraint(:player_id)
-    |> unique_constraint([:player_id, :slot_index])
+    |> unique_constraint([:player_id])
   end
 
   defp normalize_attrs(attrs) do
@@ -62,11 +59,11 @@ defmodule Incrementalist.Game.Persistence.SaveSlot do
     end
   end
 
-  def inject_state_tokens(%__MODULE__{state: %State{}} = slot) do
-    %{slot | state: %{slot.state | has_daily_token: slot.has_daily_token}}
+  def inject_state_tokens(%__MODULE__{state: %State{}} = ps) do
+    %{ps | state: %{ps.state | has_daily_token: ps.has_daily_token}}
   end
 
-  def inject_state_tokens(slot), do: slot
+  def inject_state_tokens(ps), do: ps
 
   def extract_state_tokens(%State{} = state) do
     state.has_daily_token || false
