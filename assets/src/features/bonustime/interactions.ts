@@ -19,6 +19,26 @@ export function handleBonusTimeInteractions(
   if (!snapshot || !snapshot.state.daily_bonus) return { type: 'none' };
 
   const db = snapshot.state.daily_bonus;
+  const hasToken = snapshot.state.has_daily_token || db.special_tokens > 0;
+
+  // Intercept interaction if player is locked out (no tokens)
+  if (!hasToken) {
+    if (db.last_result?.tier) {
+      const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
+      const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
+      const btnRect = { x: centerX - 100, y: centerY + 60, width: 200, height: 40 };
+
+      const isOverBtn = input.pointer &&
+                        input.pointer.x >= btnRect.x && input.pointer.x <= btnRect.x + btnRect.width &&
+                        input.pointer.y >= btnRect.y && input.pointer.y <= btnRect.y + btnRect.height;
+
+      if (isOverBtn && input.clicked && !input.consumed) {
+        input.consumed = true;
+        return { type: 'open_chest_reward' };
+      }
+    }
+    return { type: 'none' };
+  }
 
   // 1. Sub-game interactions
   const activeGameId = getActiveGameId(state);

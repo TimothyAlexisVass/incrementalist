@@ -398,7 +398,7 @@ export class GameClient {
         }
       }
 
-      renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal);
+      renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, input);
     }
     
     renderProgressBar(this.canvas, input, uiBlocked);

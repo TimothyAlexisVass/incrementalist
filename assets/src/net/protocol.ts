@@ -88,6 +88,7 @@ export type DailyBonusState = {
   reward_counts: Record<string, number>;
   checklist_entry_indexes: Record<string, number>;
   last_result: any | null;
+  rotation_anchor?: string;
 };
 
 export type NoticeState = {
