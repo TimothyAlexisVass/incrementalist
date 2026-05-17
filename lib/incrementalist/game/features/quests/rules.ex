@@ -140,7 +140,8 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
       0 -> 1.0
       -1 ->
         if BigNum.compare(requirement, BigNum.zero()) > 0 do
-          BigNum.div(current, requirement) |> BigNum.to_float() |> min(1.0) |> Float.round(5)
+          {:ok, result} = BigNum.div(current, requirement)
+          result |> BigNum.to_float() |> min(1.0) |> Float.round(5)
         else
           1.0
         end
