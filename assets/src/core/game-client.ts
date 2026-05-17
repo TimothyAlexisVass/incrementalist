@@ -482,15 +482,19 @@ export class GameClient {
       }
     }
 
-    // Any activity collects the progress bar if it's ready, even with a modal
-    // open or after another UI element consumed the click.
-    // This collection path must never block or swallow the original interaction.
-    if (activity && this.channel) {
-      claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
-    }
-
     // The UI is drawn over the game world. It can consume clicks.
     this.ui.tick(dt, input);
+
+    // Any activity collects the progress bar if it's ready, but we prevent simultaneous
+    // collection on the exact frame a UI interaction consumed a click. This prevents
+    // visual overlap (like reward text spawning from a shop button).
+    // Mouse movement on the very next frame will collect it normally.
+    // This collection path must never block or swallow the original interaction.
+    if (activity && this.channel) {
+      if (!(input.clicked && input.consumed)) {
+        claimRewardOnAnyInput(this.channel, this.canvas, input.pointer, (cmd) => this.runCommand(cmd));
+      }
+    }
     this.ui.render(this.canvas, input, this.store.state);
 
     // Update and render reward collection effects (including Sisu particles and click bursts)
