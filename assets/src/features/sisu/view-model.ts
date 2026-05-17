@@ -21,7 +21,8 @@ export type SisuRefillTier = {
   cycleDecay: number;
 };
 
-export { SISU_BASE_MAX, SISU_PER_LEVEL } from "./levels";
+import { SISU_PER_LEVEL, SISU_BASE_MAX } from "./levels";
+export { SISU_BASE_MAX, SISU_PER_LEVEL };
 
 export const SISU_MIN_MULTIPLIER = 1;
 export const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
