@@ -276,17 +276,17 @@ export class GameClient {
     // Without this, reloads can resurrect an older cached projection until the
     // next full snapshot arrives.
     if (result.type === "progress.claim_reward.result" ||
-        result.type === "progress.set_idle_mode.result" ||
-        result.type === "progress.claim_in.result" ||
-        result.type === "sisu.refill.result" ||
-        result.type === "sisu.upgrade_max.result" ||
-        result.type === "area.select.result" ||
-        result.type === "shop.purchase.result" ||
-        result.type === "notice.event.result" ||
-        result.type === "quest.claim.result" ||
-        result.type === "stats.update.result" ||
-        result.type === "bonustime.play.result" ||
-        result.type === "game.reset.result") {
+      result.type === "progress.set_idle_mode.result" ||
+      result.type === "progress.claim_in.result" ||
+      result.type === "sisu.refill.result" ||
+      result.type === "sisu.upgrade_max.result" ||
+      result.type === "area.select.result" ||
+      result.type === "shop.purchase.result" ||
+      result.type === "notice.event.result" ||
+      result.type === "quest.claim.result" ||
+      result.type === "stats.update.result" ||
+      result.type === "bonustime.play.result" ||
+      result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
       return;
     }
@@ -324,7 +324,7 @@ export class GameClient {
       };
 
       const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
-      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 5);
+      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 10);
 
       newlyUnlocked.forEach((id, index) => {
         const achievement = this.store.state.snapshot!.state.achievements[id];

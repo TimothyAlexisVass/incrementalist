@@ -540,14 +540,25 @@ defmodule Incrementalist.Game.State do
     defs = Incrementalist.Game.Constants.quest_defs()
     for {id, quest_def} <- defs, into: %{} do
       q = Enum.find(quests, &(&1.id == id))
+      claimed_rank = if(q, do: q.claimed_rank, else: 0)
+      max_rank = Enum.max(Map.keys(quest_def.ranks))
+      
+      active_rank = min(claimed_rank + 1, max_rank)
+      reward = 
+        case quest_def.ranks[active_rank] do
+          nil -> BigNum.zero()
+          rank_def -> rank_def.reward
+        end
+
       {id,
        %{
          "name" => quest_def.name,
          "category" => quest_def.category,
          "rank" => if(q, do: q.rank, else: 0),
-         "max_rank" => Enum.max(Map.keys(quest_def.ranks)),
+         "max_rank" => max_rank,
          "progress" => if(q, do: q.progress, else: 0.0),
-         "claimed_rank" => if(q, do: q.claimed_rank, else: 0)
+         "claimed_rank" => claimed_rank,
+         "reward" => reward
        }}
     end
   end

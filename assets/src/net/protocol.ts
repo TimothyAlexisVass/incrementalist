@@ -52,6 +52,7 @@ export type QuestState = {
   max_rank: number;
   progress: number;
   claimed_rank: number;
+  reward?: BigNum;
 };
 
 export type AchievementState = {

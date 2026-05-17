@@ -8,7 +8,7 @@ import { getViewModel as getProgressBarViewModel } from "../progress-bar/view-mo
 import { getServerNow } from "../../core/time";
 import { SISU_METER_RADIUS } from "../../config";
 
-import { REFILL_TIERS, UPGRADE_COSTS } from "./levels";
+import { REFILL_TIERS, UPGRADE_COSTS, SISU_BASE_MAX, SISU_PER_LEVEL } from "./levels";
 
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -21,7 +21,7 @@ export type SisuRefillTier = {
   cycleDecay: number;
 };
 
-export { SISU_BASE_MAX, SISU_PER_LEVEL } from "./levels";
+export { SISU_BASE_MAX, SISU_PER_LEVEL };
 
 export const SISU_MIN_MULTIPLIER = 1;
 export const SISU_MAX_UPGRADE_LEVEL = UPGRADE_COSTS.length - 1;
