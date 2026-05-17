@@ -103,10 +103,8 @@ defmodule Incrementalist.Game.Features.Progress.Bar do
         variance = 0.8 + random_fn.() * 0.4
         coin = BigNum.from_number(trunc(35 * level_pow * reward_multiplier * variance))
 
-        shard =
-          BigNum.from_number(
-            trunc(BigNum.to_float(coin) / (4.0 + random_fn.() * 12.0) * 2)
-          )
+        divisor = (4.0 + random_fn.() * 12.0) / 2.0
+        shard = BigNum.div(coin, BigNum.from_number(divisor))
 
         c1 = if random_fn.() < 0.1, do: 1, else: 0
         c2 = if random_fn.() < 0.01, do: 10, else: 0
