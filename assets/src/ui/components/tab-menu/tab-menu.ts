@@ -59,6 +59,10 @@ export class TabMenu {
 
   public setActiveTabId(id: string) {
     if (this.tabs.some(t => t.id === id)) {
+      const prevTab = this.tabs.find(t => t.id === this.activeTabId);
+      if (prevTab && prevTab.id !== id && prevTab.onLeave) {
+        prevTab.onLeave();
+      }
       this.activeTabId = id;
     }
   }

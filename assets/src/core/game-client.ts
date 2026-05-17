@@ -1,7 +1,7 @@
 import { GameChannel } from "../net/game-channel";
-import { 
-  ackAppliedResult, 
-  resetGame, 
+import {
+  ackAppliedResult,
+  resetGame,
   progressClaimIn,
   selectArea,
   shopPurchase
@@ -33,11 +33,11 @@ import {
 import { renderProgressBar } from "../features/progress-bar/render";
 import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
-import { 
-  createFloatingTextState, 
+import {
+  createFloatingTextState,
   renderFloatingTexts,
   spawnFloatingText,
-  updateFloatingTexts, 
+  updateFloatingTexts,
 } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress-bar/claim-effects";
 import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-model";
@@ -96,7 +96,7 @@ export class GameClient {
     this.snapshotCache = new SnapshotCache(username);
     const hasCachedSnapshot = this.snapshotCache.hasCachedSnapshot();
     this.channel = new GameChannel(username, token, hasCachedSnapshot);
-    
+
     this.mainMenu.setShopActions({
       onPurchase: (itemId: string) => {
         if (!this.channel) return;
@@ -264,14 +264,14 @@ export class GameClient {
     // Without this, reloads can resurrect an older cached projection until the
     // next full snapshot arrives.
     if (result.type === "progress.claim_reward.result" ||
-        result.type === "progress.set_idle_mode.result" ||
-        result.type === "progress.claim_in.result" ||
-        result.type === "sisu.refill.result" ||
-        result.type === "sisu.upgrade_max.result" ||
-        result.type === "area.select.result" ||
-        result.type === "shop.purchase.result" ||
-        result.type === "notice.event.result" ||
-        result.type === "game.reset.result") {
+      result.type === "progress.set_idle_mode.result" ||
+      result.type === "progress.claim_in.result" ||
+      result.type === "sisu.refill.result" ||
+      result.type === "sisu.upgrade_max.result" ||
+      result.type === "area.select.result" ||
+      result.type === "shop.purchase.result" ||
+      result.type === "notice.event.result" ||
+      result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
       return;
     }
@@ -309,16 +309,21 @@ export class GameClient {
       };
 
       const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
-      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 4);
+      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 5);
 
-      spawnFloatingText(
-        this.floatingTexts,
-        "Achievement Unlocked!",
-        baseX,
-        baseY,
-        COLORS.rewards.achievement,
-        popupOptions
-      );
+      newlyUnlocked.forEach((id, index) => {
+        const achievement = this.store.state.snapshot!.state.achievements[id];
+        if (achievement) {
+          spawnFloatingText(
+            this.floatingTexts,
+            achievement.name,
+            baseX,
+            baseY + (index * 40),
+            COLORS.rewards.achievement,
+            popupOptions
+          );
+        }
+      });
     }
   }
 
@@ -440,7 +445,7 @@ export class GameClient {
 
       renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, input);
     }
-    
+
     renderProgressBar(this.canvas, input, uiBlocked);
     this.sisuControlLayout = this.store.state.snapshot
       ? renderSisuControl(this.canvas, input, this.store.state, uiBlocked)
@@ -464,7 +469,7 @@ export class GameClient {
         (cmd) => this.runCommand(cmd)
       );
     }
-    
+
     if (this.store.state.snapshot && this.store.state.currentView === View.GAME) {
       renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
@@ -487,18 +492,18 @@ export class GameClient {
       if (this.channel) {
         this.runCommand(() => selectArea(this.channel!, areaKey));
       }
-    }, this.channel || undefined, 
-    this.store.state.snapshot?.state.has_bonustime_token,
-    getBonusTimeTooltipData(this.store.state) || undefined,
-    this.store.state.snapshot?.state.features.bonus_time_purchased,
-    (cmd) => this.runCommand(cmd));
+    }, this.channel || undefined,
+      this.store.state.snapshot?.state.has_bonustime_token,
+      getBonusTimeTooltipData(this.store.state) || undefined,
+      this.store.state.snapshot?.state.features.bonus_time_purchased,
+      (cmd) => this.runCommand(cmd));
 
     // 2. Handle specific UI element clicks before general activity collection.
     if (!uiBlocked && input.clicked && input.pointer && this.channel) {
       if (handleProgressClick(
-        this.channel, 
-        this.canvas, 
-        input.pointer, 
+        this.channel,
+        this.canvas,
+        input.pointer,
         (cmd) => this.runCommand(cmd),
         (itemId) => this.openShopAndHighlight(itemId)
       )) {
