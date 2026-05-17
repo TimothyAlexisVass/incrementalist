@@ -118,6 +118,7 @@ async function resolveClaimAsync(
   } finally {
     setPendingClaimIntent(false);
     claimResolutionInFlight = false;
+    clearPendingClaimPopupPoint();
   }
 }
 
