@@ -435,9 +435,30 @@ defmodule Incrementalist.Game.CommandExecutor do
 
           next_state = %{ps.state | stats: new_stats} |> Achievements.evaluate()
 
-          if next_state != ps.state do
-            update_player_state(ps, %{state: next_state, last_saved_at: now})
-          end
+          next_notices =
+            if screen_id == "achievements" do
+              unlocked_leaf_ids =
+                next_state.achievements
+                |> Map.keys()
+                |> Enum.map(&Notices.leaf_achievement_id/1)
+
+              current_notices = ps.notices || Notices.new(ps.state)
+              updated_seen = Enum.uniq(current_notices.seen_leaf_ids ++ unlocked_leaf_ids)
+              notices_with_seen = %{current_notices | seen_leaf_ids: updated_seen}
+              Notices.refresh_for_state_transition(notices_with_seen, ps.state, next_state)
+            else
+              Notices.refresh_for_state_transition(
+                ps.notices || Notices.new(ps.state),
+                ps.state,
+                next_state
+              )
+            end
+
+          update_player_state(ps, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
 
           {"succeeded",
            %{
@@ -446,7 +467,7 @@ defmodule Incrementalist.Game.CommandExecutor do
              "command_id" => command.command_id,
              "stats" => next_state.stats,
              "achievements" => State.visible_achievements(next_state.achievements),
-             "notices" => ps.notices
+             "notices" => Notices.payload(next_notices)
            }, ps.id}
         else
           {:error, reason} ->

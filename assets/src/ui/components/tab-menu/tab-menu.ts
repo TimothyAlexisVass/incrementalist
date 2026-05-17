@@ -22,6 +22,7 @@ export interface TabDefinition {
   hotkey?: string;
   renderContent: (canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, rect: Rect) => void;
   tickContent?: (dt: number) => void;
+  onLeave?: () => void;
   noticeParentId?: string;
   noticeLeafId?: string;
 }
@@ -58,7 +59,18 @@ export class TabMenu {
 
   public setActiveTabId(id: string) {
     if (this.tabs.some(t => t.id === id)) {
+      const prevTab = this.tabs.find(t => t.id === this.activeTabId);
+      if (prevTab && prevTab.id !== id && prevTab.onLeave) {
+        prevTab.onLeave();
+      }
       this.activeTabId = id;
+    }
+  }
+
+  public triggerLeave() {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (activeTab?.onLeave) {
+      activeTab.onLeave();
     }
   }
 
@@ -219,6 +231,10 @@ export class TabMenu {
       });
 
       if (clicked) {
+        const prevTab = this.tabs.find(t => t.id === this.activeTabId);
+        if (prevTab && prevTab.id !== tab.id && prevTab.onLeave) {
+          prevTab.onLeave();
+        }
         this.activeTabId = tab.id;
         if (tab.noticeParentId) {
           notices.reportParentVisibleViaPseudoLeaf(

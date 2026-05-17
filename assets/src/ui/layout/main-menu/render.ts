@@ -27,6 +27,10 @@ export class MainMenu implements Overlay {
     return getTabMenu().getActiveTabId();
   }
 
+  public onClose() {
+    getTabMenu().triggerLeave();
+  }
+
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void) {
     const renderer = getActiveWebGLRenderer();
     if (!renderer) {
@@ -57,7 +61,9 @@ export class MainMenu implements Overlay {
     const { channel, runCommand } = getNetwork();
     getTabMenu().render(canvas, input, state, menuRect, channel || undefined, runCommand || undefined);
 
-    handleMainMenuInteractions(input, shellRect, onClose);
+    handleMainMenuInteractions(input, shellRect, () => {
+      onClose();
+    });
   }
 
   tick(dt: number) {

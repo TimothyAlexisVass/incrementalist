@@ -5,6 +5,7 @@ import { getActiveWebGLRenderer } from '../../renderer/webgl';
 export interface Overlay {
   render(canvas: HTMLCanvasElement, input: InteractionState, state: ServerState, onClose: () => void): void;
   tick(dt: number): void;
+  onClose?: () => void;
 }
 
 export class Overlays {
@@ -15,6 +16,9 @@ export class Overlays {
   }
 
   close() {
+    if (this.activeOverlay?.onClose) {
+      this.activeOverlay.onClose();
+    }
     this.activeOverlay = null;
   }
   

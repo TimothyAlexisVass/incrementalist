@@ -1,7 +1,7 @@
 import { GameChannel } from "../net/game-channel";
-import { 
-  ackAppliedResult, 
-  resetGame, 
+import {
+  ackAppliedResult,
+  resetGame,
   progressClaimIn,
   selectArea,
   shopPurchase
@@ -33,10 +33,11 @@ import {
 import { renderProgressBar } from "../features/progress-bar/render";
 import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
-import { 
-  createFloatingTextState, 
-  renderFloatingTexts, 
-  updateFloatingTexts, 
+import {
+  createFloatingTextState,
+  renderFloatingTexts,
+  spawnFloatingText,
+  updateFloatingTexts,
 } from "../render/effects";
 import type { ResourceAmounts } from "../features/progress-bar/claim-effects";
 import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-model";
@@ -60,6 +61,9 @@ import {
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
+import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT } from '../config';
+import { COLORS } from '../colors';
+
 
 // Cached snapshots are projection data. They make boot feel
 // instant, but server command results remain the only source of durable truth.
@@ -104,7 +108,7 @@ export class GameClient {
     }
 
     this.channel = new GameChannel(username, token, hasCachedSnapshot);
-    
+
     this.mainMenu.setShopActions({
       onPurchase: (itemId: string) => {
         if (!this.channel) return;
@@ -191,6 +195,7 @@ export class GameClient {
 
   private async applyAndAck(result: ServerResult) {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+    const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
       notices.setSnapshot(this.store.state.snapshot);
@@ -210,6 +215,7 @@ export class GameClient {
     }
 
     this.applyProgressEffects(result, previousAmounts);
+    this.applyAchievementEffects(result, previousAchievements);
 
     if (!isAckableCommandResult(result)) return;
 
@@ -219,12 +225,14 @@ export class GameClient {
     if (clearsCommandQueue(result)) this.channel!.clearCommandQueue();
     while (next) {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+      const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
         notices.setSnapshot(this.store.state.snapshot);
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
+      this.applyAchievementEffects(next, previousAchievements);
       if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
         if (this.store.state.snapshot) {
@@ -295,6 +303,43 @@ export class GameClient {
       popupPoint: getPendingClaimPopupPoint()
     });
     clearPendingClaimPopupPoint();
+  }
+
+  private applyAchievementEffects(result: ServerResult, previousAchievements: string[]) {
+    if (!this.store.state.snapshot) return;
+
+    const currentAchievements = Object.keys(this.store.state.snapshot.state.achievements).filter(
+      k => this.store.state.snapshot!.state.achievements[k].unlocked_at
+    );
+
+    const newlyUnlocked = currentAchievements.filter(id => !previousAchievements.includes(id));
+
+    if (newlyUnlocked.length > 0) {
+      const popupOptions = {
+        lifeMs: 5000,
+        riseSpeed: 2,
+        font: 'bold 24px "Outfit"',
+        textAlign: "center" as CanvasTextAlign,
+        type: "achievement_unlock"
+      };
+
+      const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
+      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 5);
+
+      newlyUnlocked.forEach((id, index) => {
+        const achievement = this.store.state.snapshot!.state.achievements[id];
+        if (achievement) {
+          spawnFloatingText(
+            this.floatingTexts,
+            achievement.name,
+            baseX,
+            baseY + (index * 40),
+            COLORS.rewards.achievement,
+            popupOptions
+          );
+        }
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -415,7 +460,7 @@ export class GameClient {
 
       renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, input);
     }
-    
+
     renderProgressBar(this.canvas, input, uiBlocked);
     this.sisuControlLayout = this.store.state.snapshot
       ? renderSisuControl(this.canvas, input, this.store.state, uiBlocked)
@@ -439,7 +484,7 @@ export class GameClient {
         (cmd) => this.runCommand(cmd)
       );
     }
-    
+
     if (this.store.state.snapshot && this.store.state.currentView === View.GAME) {
       renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
@@ -462,18 +507,18 @@ export class GameClient {
       if (this.channel) {
         this.runCommand(() => selectArea(this.channel!, areaKey));
       }
-    }, this.channel || undefined, 
-    this.store.state.snapshot?.state.has_bonustime_token,
-    getBonusTimeTooltipData(this.store.state) || undefined,
-    this.store.state.snapshot?.state.features.bonus_time_purchased,
-    (cmd) => this.runCommand(cmd));
+    }, this.channel || undefined,
+      this.store.state.snapshot?.state.has_bonustime_token,
+      getBonusTimeTooltipData(this.store.state) || undefined,
+      this.store.state.snapshot?.state.features.bonus_time_purchased,
+      (cmd) => this.runCommand(cmd));
 
     // 2. Handle specific UI element clicks before general activity collection.
     if (!uiBlocked && input.clicked && input.pointer && this.channel) {
       if (handleProgressClick(
-        this.channel, 
-        this.canvas, 
-        input.pointer, 
+        this.channel,
+        this.canvas,
+        input.pointer,
         (cmd) => this.runCommand(cmd),
         (itemId) => this.openShopAndHighlight(itemId)
       )) {
