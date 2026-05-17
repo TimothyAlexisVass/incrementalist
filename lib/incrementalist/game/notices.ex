@@ -177,6 +177,9 @@ defmodule Incrementalist.Game.Notices do
 
         next_active_parent_ids =
           notices.active_parent_ids
+          |> MapSet.new()
+          |> MapSet.difference(MapSet.new(parent_ids))
+          |> MapSet.to_list()
           |> prune_parent_ids(next_active_leaf_ids)
 
         %{
