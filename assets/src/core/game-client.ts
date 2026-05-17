@@ -91,6 +91,18 @@ export class GameClient {
     const token = window.localStorage.getItem(tokenKey);
     this.snapshotCache = new SnapshotCache(username);
     const hasCachedSnapshot = this.snapshotCache.hasCachedSnapshot();
+
+    if (hasCachedSnapshot) {
+      const cached = this.snapshotCache.load();
+      if (cached) {
+        this.store.state.snapshot = cached;
+        getStateFromSnapshot(cached);
+        notices.setSnapshot(cached);
+        updateAreaViewModel(cached.state);
+        syncHudInstantly(cached.state);
+      }
+    }
+
     this.channel = new GameChannel(username, token, hasCachedSnapshot);
     
     this.mainMenu.setShopActions({
@@ -263,6 +275,9 @@ export class GameClient {
         result.type === "area.select.result" ||
         result.type === "shop.purchase.result" ||
         result.type === "notice.event.result" ||
+        result.type === "quest.claim.result" ||
+        result.type === "stats.update.result" ||
+        result.type === "bonustime.play.result" ||
         result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
       return;
