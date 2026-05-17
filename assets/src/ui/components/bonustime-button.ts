@@ -31,7 +31,11 @@ export function doBonusTimeButton(
   }
 
   if (isHovered && tooltip) {
-    queueTooltip(input.pointer!, tooltip, { textUpdateKey });
+    queueTooltip(input.pointer!, tooltip, {
+      widthMode: 'estimated',
+      estimatedWidthFactor: 0.52,
+      textUpdateKey
+    });
   }
 
   drawBonusTimeButton(rect, hasToken, isHovered);
