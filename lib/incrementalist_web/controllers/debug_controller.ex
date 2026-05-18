@@ -390,11 +390,17 @@ defmodule IncrementalistWeb.DebugController do
                 <option value="prize_wheel" #{if current_override && active_game_id == "prize_wheel", do: "selected"}>Prize Wheel (prize_wheel)</option>
                 <option value="resource_checklist" #{if current_override && active_game_id == "resource_checklist", do: "selected"}>Resource Checklist (resource_checklist)</option>
                 <option value="coin_rain" #{if current_override && active_game_id == "coin_rain", do: "selected"}>Coin Rain (coin_rain)</option>
-                <option value="item_checklist" #{if current_override && active_game_id == "item_checklist", do: "selected"}>Item Checklist (item_checklist)</option>
-                <option value="hammer_smash" #{if current_override && active_game_id == "hammer_smash", do: "selected"}>Hammer Smash (hammer_smash)</option>
                 <option value="plinko_drop" #{if current_override && active_game_id == "plinko_drop", do: "selected"}>Plinko Drop (plinko_drop)</option>
+                <option value="hammer_smash" #{if current_override && active_game_id == "hammer_smash", do: "selected"}>Hammer Smash (hammer_smash)</option>
+                <option value="reward_labyrinth" #{if current_override && active_game_id == "reward_labyrinth", do: "selected"}>Reward Labyrinth (reward_labyrinth)</option>
+                <option value="ladder_climb" #{if current_override && active_game_id == "ladder_climb", do: "selected"}>Ladder Climb (ladder_climb)</option>
+                <option value="card_pick" #{if current_override && active_game_id == "card_pick", do: "selected"}>Card Pick (card_pick)</option>
+                <option value="lucky_dice" #{if current_override && active_game_id == "lucky_dice", do: "selected"}>Lucky Dice (lucky_dice)</option>
+                <option value="item_checklist" #{if current_override && active_game_id == "item_checklist", do: "selected"}>Item Checklist (item_checklist)</option>
+                <option value="scratch_card" #{if current_override && active_game_id == "scratch_card", do: "selected"}>Scratch Card (scratch_card)</option>
+                <option value="match_pairs" #{if current_override && active_game_id == "match_pairs", do: "selected"}>Match Pairs (match_pairs)</option>
                 <option value="jackpot_meter" #{if current_override && active_game_id == "jackpot_meter", do: "selected"}>Jackpot Meter (jackpot_meter)</option>
-                <option value="bonus_time" #{if current_override && active_game_id == "bonus_time", do: "selected"}>Bonus Time (bonus_time)</option>
+                <option value="its_bonus_time" #{if current_override && active_game_id == "its_bonus_time", do: "selected"}>It's Bonus Time (its_bonus_time)</option>
               </select>
             </div>
             

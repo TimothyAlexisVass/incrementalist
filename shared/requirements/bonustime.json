@@ -1,16 +1,22 @@
 {
-  "rotation_slot_count": 9,
+  "rotation_slot_count": 15,
   "rotation_anchor": "2026-01-11T00:00:00Z",
   "rotation": {
     "1": "chest_draw",
     "2": "prize_wheel",
     "3": "resource_checklist",
     "4": "coin_rain",
-    "5": "item_checklist",
+    "5": "plinko_drop",
     "6": "hammer_smash",
-    "7": "plinko_drop",
-    "8": "jackpot_meter",
-    "9": "bonus_time"
+    "7": "reward_labyrinth",
+    "8": "ladder_climb",
+    "9": "card_pick",
+    "10": "lucky_dice",
+    "11": "item_checklist",
+    "12": "scratch_card",
+    "13": "match_pairs",
+    "14": "jackpot_meter",
+    "15": "its_bonus_time"
   },
   "games": {
     "chest_draw": {
@@ -30,26 +36,50 @@
       "name": "Coin Rain",
       "slot": 4
     },
-    "item_checklist": {
-      "name": "Item Checklist",
-      "slot": 5,
-      "checklist_key": "item"
+    "plinko_drop": {
+      "name": "Plinko Drop",
+      "slot": 5
     },
     "hammer_smash": {
       "name": "Hammer Smash",
       "slot": 6
     },
-    "plinko_drop": {
-      "name": "Plinko Drop",
+    "reward_labyrinth": {
+      "name": "Reward Labyrinth",
       "slot": 7
+    },
+    "ladder_climb": {
+      "name": "Ladder Climb",
+      "slot": 8
+    },
+    "card_pick": {
+      "name": "Card Pick",
+      "slot": 9
+    },
+    "lucky_dice": {
+      "name": "Lucky Dice",
+      "slot": 10
+    },
+    "item_checklist": {
+      "name": "Item Checklist",
+      "slot": 11,
+      "checklist_key": "item"
+    },
+    "scratch_card": {
+      "name": "Scratch Card",
+      "slot": 12
+    },
+    "match_pairs": {
+      "name": "Match Pairs",
+      "slot": 13
     },
     "jackpot_meter": {
       "name": "Jackpot Meter",
-      "slot": 8
+      "slot": 14
     },
-    "bonus_time": {
-      "name": "Bonus Time",
-      "slot": 9
+    "its_bonus_time": {
+      "name": "It's Bonus Time",
+      "slot": 15
     }
   },
   "reward_tiers": {

@@ -27,7 +27,9 @@ defmodule Incrementalist.Game.Constants do
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
 
   def area_defs do
-    Enum.map(@areas, &normalize_area/1)
+    @areas
+    |> Enum.map(&normalize_area/1)
+    |> Enum.sort_by(& &1.unlock_level)
   end
 
   def shop_item_defs do
