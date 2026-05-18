@@ -94,7 +94,7 @@ lib/incrementalist/
       achievements/
       quests/
       shops/
-      daily_bonus/
+      bonustime/
       progress/
         bar/
         sisu/
@@ -186,7 +186,7 @@ Phases 1-10 are completed and therefore removed from this plan.
 - Included Games: Chest Draw, Prize Wheel, Coin Rain, Resource/Item Checklists, Reward Labyrinth, Ladder Climb, Hammer Smash, Lucky Dice, Plinko Drop, Scratch Card, Jackpot Meter, and Bonus Time.
 - Implement dual-token system: `daily_tokens` (rotating) and `special_tokens` (persistent).
 - Enforce token grant rule: 1 `daily_token` granted at boundary ONLY IF total tokens is 0.
-- Implement `daily_bonus.open`, `daily_bonus.play`, and game-specific commands.
+- Implement `bonustime.open`, `bonustime.play`, and game-specific commands.
 - Render the Daily tab and daily bonus interactions in Canvas/WebGL.
 - Keep client animations reveal-only and server-validated.
 

@@ -4,13 +4,13 @@
 Port the Resource Checklist daily task system to the server and Canvas UI.
 
 ## Implementation
-- **Server Rules**: Add `checklist_rules.ex` to `lib/incrementalist/game/features/daily_bonus/`.
+- **Server Rules**: Add `checklist_rules.ex` to `lib/incrementalist/game/features/bonustime/`.
   - Implement `check_off(state, checklist_key)`: Consumes a token and grants the reward at `checklist_entry_indexes[checklist_key]`.
   - Increment the entry index (modulo 36).
 - **Client Render**: Add `resource-checklist.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a basic grid of representational boxes (e.g., 6x6 or scrollable list).
   - Use simple "Collected" / "Locked" text labels or color changes.
-- **Client Interaction**: `daily_bonus.play` command updates the authoritative index.
+- **Client Interaction**: `bonustime.play` command updates the authoritative index.
 - **Reveal**: Highlight the newly checked box with a representational border or color change.
 
 ## Aesthetic Note

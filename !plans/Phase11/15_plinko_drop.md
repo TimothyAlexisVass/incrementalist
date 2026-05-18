@@ -4,7 +4,7 @@
 Port the Plinko Drop mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `plinko_drop.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `plinko_drop.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_path(streak)`: Generates one or more paths through the 12-row peg board.
 - **Client Render**: Add `plinko-drop.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a basic peg board (grid of points) and reward boxes at the bottom.

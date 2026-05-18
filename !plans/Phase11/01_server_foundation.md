@@ -19,7 +19,7 @@ Implementations for all mini-games in this phase must be **visually basic and re
 Modify the core database and Ecto schemas:
 - **Table**: Add `has_daily_token` (Boolean, default false) to the `save_slots` table in `priv/repo/migrations/*_create_game_schema.exs`.
 - **Ecto Schema**: Add `has_daily_token` to `lib/incrementalist/game/persistence/save_slot.ex`.
-- **State Schema**: Add `daily_bonus` field to the `SaveSlot` state JSONB in `lib/incrementalist/game/state.ex` as an embedded schema:
+- **State Schema**: Add `bonustime` field to the `SaveSlot` state JSONB in `lib/incrementalist/game/state.ex` as an embedded schema:
 - `special_tokens`: Integer (Persistent bonus attempts).
 - `last_token_boundary_index`: Integer (Last boundary at which a token grant was evaluated).
 - `streak`: Integer (Consecutive days played).
@@ -31,7 +31,7 @@ Modify the core database and Ecto schemas:
 - `last_result`: Map (Durable details of the most recent play, including reward_id and BigNum reward_amount).
 
 ### 2. Rules Implementation
-Create `lib/incrementalist/game/features/daily_bonus/rules.ex`:
+Create `lib/incrementalist/game/features/bonustime/rules.ex`:
 - **Scheduled Grant Job**: Implement a scheduled task (e.g., via a GenServer or Quantum) that runs every 12 hours.
   - Executes `UPDATE save_slots SET has_daily_token = true WHERE has_daily_token = false`.
   - Broadcasts a "boundary_reached" event to all active `PlayerServer` processes to synchronize their in-memory `State`.
@@ -46,9 +46,9 @@ Create `lib/incrementalist/game/features/daily_bonus/rules.ex`:
 ### 3. Constants
 Update `lib/incrementalist/game/constants.ex` to provide accessors for the JSON data.
 Define hardcoded timing and rotation constants:
-- `daily_bonus_rotation_anchor_at`: Hardcoded global UTC boundary (e.g., 2024-01-01T00:00:00Z).
-- `daily_bonus_slot_ms`: 43_200_000 (12 hours).
-- `daily_bonus_rotation_slot_count`: 9.
+- `bonustime_rotation_anchor_at`: Hardcoded global UTC boundary (e.g., 2024-01-01T00:00:00Z).
+- `bonustime_slot_ms`: 43_200_000 (12 hours).
+- `bonustime_rotation_slot_count`: 9.
 
 ## Verification
 - Unit tests for token grant logic (especially the "grant only if 0" rule).

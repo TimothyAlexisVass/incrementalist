@@ -4,7 +4,7 @@
 Port the Scratch Card mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `scratch_card.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `scratch_card.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_grid(streak)`: Generates a grid of hidden symbols.
 - **Client Render**: Add `scratch-card.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a grid of "Hidden" boxes (colored rectangles).

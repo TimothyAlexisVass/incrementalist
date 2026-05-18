@@ -9,7 +9,7 @@ Port the Item Checklist daily task system to the server and Canvas UI.
 - **Client Render**: Add `item-checklist.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a basic grid of 8 representational boxes (one for each item).
   - Use simple "Found" / "Missing" text labels or color changes.
-- **Client Interaction**: `daily_bonus.play` updates the checklist state.
+- **Client Interaction**: `bonustime.play` updates the checklist state.
 - **Reveal**: Highlight the newly found item box with a representational border.
 
 ## Aesthetic Note

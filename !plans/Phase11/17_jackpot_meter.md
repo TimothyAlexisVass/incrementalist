@@ -4,7 +4,7 @@
 Implement the progressive Jackpot Meter system with server-authoritative tracking.
 
 ## Implementation
-- **Server Rules**: Add `jackpot_rules.ex` to `lib/incrementalist/game/features/daily_bonus/`.
+- **Server Rules**: Add `jackpot_rules.ex` to `lib/incrementalist/game/features/bonustime/`.
   - Implement `increment_meter(state, amount)`: Persists progress and handles jackpot rolls when full.
 - **Client Render**: Add `jackpot-meter.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a representational meter (row of 7 boxes).
@@ -16,5 +16,5 @@ Implement the progressive Jackpot Meter system with server-authoritative trackin
 Implementations must be visually basic. Use representational boxes and color changes.
 
 ## Verification
-- Meter progress matches the server's `daily_bonus.jackpot_progress`.
+- Meter progress matches the server's `bonustime.jackpot_progress`.
 - Jackpot reward is granted upon the 7th increment.

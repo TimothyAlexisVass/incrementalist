@@ -4,7 +4,7 @@
 Port the Ladder Climb mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `ladder_climb.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `ladder_climb.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `climb_outcome(streak)`: Returns the highest rung reached before a "slip".
 - **Client Render**: Add `ladder-climb.ts` to `assets/src/features/daily-bonus/render/`.
   - Render a representational vertical "ladder" (stack of boxes).

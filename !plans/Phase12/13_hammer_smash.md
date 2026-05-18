@@ -4,7 +4,7 @@
 Port the Hammer Smash mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `hammer_smash.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `hammer_smash.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `evaluate_smash(timing, streak)`: Calculates smash power based on meter timing and streak floor.
   - Handle the "Smash the bell" extra attempt if two 100% smashes occur.
 - **Client Render**: Add `hammer-smash.ts` to `assets/src/features/daily-bonus/render/`.

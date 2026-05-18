@@ -4,7 +4,7 @@
 Port the Reward Labyrinth mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `reward_labyrinth.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `reward_labyrinth.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_parameters(streak)`: Generates the labyrinth seed, item locations (5-10), and step budget (4-10 + streak bonus).
   - Implement `evaluate_results(found_items, path)`: Validates the movement path and items collected.
 - **Client Render**: Add `reward-labyrinth.ts` to `assets/src/features/daily-bonus/render/`.

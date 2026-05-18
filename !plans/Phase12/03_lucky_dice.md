@@ -4,7 +4,7 @@
 Port the Lucky Dice mini-game to server-authoritative rules and WebGL rendering.
 
 ## Implementation
-- **Server Rules**: Add `lucky_dice.ex` to `lib/incrementalist/game/features/daily_bonus/games/`.
+- **Server Rules**: Add `lucky_dice.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `roll_dice(streak)`: Returns the face values of two dice.
 - **Client Render**: Add `lucky-dice.ts` to `assets/src/features/daily-bonus/render/`.
   - Render representational boxes as "Dice".
