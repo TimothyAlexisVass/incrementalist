@@ -1,4 +1,4 @@
-# Phase 11, Step 14: Lucky Dice
+# Phase 12, Step 3: Lucky Dice
 
 ## Objective
 Port the Lucky Dice mini-game to server-authoritative rules and WebGL rendering.
@@ -6,7 +6,7 @@ Port the Lucky Dice mini-game to server-authoritative rules and WebGL rendering.
 ## Implementation
 - **Server Rules**: Add `lucky_dice.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `roll_dice(streak)`: Returns the face values of two dice.
-- **Client Render**: Add `lucky-dice.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `lucky-dice.ts` to `assets/src/features/bonustime/lucky-dice/render.ts`.
   - Render representational boxes as "Dice".
   - Use text labels on the boxes (1-6) to show outcomes.
 - **Client Interaction**: `Roll` button trigger.

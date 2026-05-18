@@ -1,4 +1,4 @@
-# Phase 11, Step 16: Scratch Card
+# Phase 12, Step 4: Scratch Card
 
 ## Objective
 Port the Scratch Card mini-game to server-authoritative rules and WebGL rendering.
@@ -6,7 +6,7 @@ Port the Scratch Card mini-game to server-authoritative rules and WebGL renderin
 ## Implementation
 - **Server Rules**: Add `scratch_card.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_grid(streak)`: Generates a grid of hidden symbols.
-- **Client Render**: Add `scratch-card.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `scratch-card.ts` to `assets/src/features/bonustime/scratch-card/render.ts`.
   - Render a grid of "Hidden" boxes (colored rectangles).
   - On click, immediately change box color/label to show the hidden symbol.
 - **Client Interaction**: Click-to-reveal on individual slots.

@@ -1,4 +1,4 @@
-# Phase 11, Step 11: Reward Labyrinth
+# Phase 12, Step 1: Reward Labyrinth
 
 ## Objective
 Port the Reward Labyrinth mini-game to server-authoritative rules and WebGL rendering.
@@ -7,7 +7,7 @@ Port the Reward Labyrinth mini-game to server-authoritative rules and WebGL rend
 - **Server Rules**: Add `reward_labyrinth.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_parameters(streak)`: Generates the labyrinth seed, item locations (5-10), and step budget (4-10 + streak bonus).
   - Implement `evaluate_results(found_items, path)`: Validates the movement path and items collected.
-- **Client Render**: Add `reward-labyrinth.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `reward-labyrinth.ts` to `assets/src/features/bonustime/reward-labyrinth/render.ts`.
   - Implement a basic 2D grid or node-based view using simple lines/boxes.
   - Represent player movement as a box jumping between nodes.
 - **Client Interaction**: Interactive movement choices via basic buttons or click targets.

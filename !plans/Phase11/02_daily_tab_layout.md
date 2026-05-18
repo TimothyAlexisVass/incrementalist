@@ -6,8 +6,8 @@ Integrate the Daily Bonus entrance into the main Canvas-based application layout
 ## Implementation
 - **BONUSTIME Button**: Create `assets/src/ui/components/bonustime-button.ts`.
   - Implement a `doBonusTimeButton` function (following the `doButton` pattern).
-  - Implement the **rainbow-colored hue-rotation animation** for the text when `daily_tokens > 0`.
-  - Render the text in a muted grey when `daily_tokens === 0`.
+  - Implement the **rainbow-colored hue-rotation animation** for the text when `has_bonustime_token` is true or `special_tokens > 0`.
+  - Render the text in a muted grey when neither token type is available.
 - **HUD Integration**:
   - Use `doBonusTimeButton` in the center of the HUD.
   - Clicking this area toggles `currentView` between `GAME` and `BONUSTIME`.
@@ -22,7 +22,7 @@ Integrate the Daily Bonus entrance into the main Canvas-based application layout
   - Occupies the entire `DISPLAY_AREA`.
   - Displays a subtle active game indicator and maximizes space for mini-game content.
   - **Aesthetic Constraint**: UI should be visually basic (simple boxes/text) to define layout space.
-- **State Integration**: Ensure `daily_tokens` and `streak` from the server snapshot are accessible to the renderer.
+- **State Integration**: Ensure `has_bonustime_token`, `special_tokens`, and `streak` from the server snapshot are accessible to the renderer.
 
 ## Verification
 - "BONUSTIME" button is center-stage in the bottom HUD.

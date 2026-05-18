@@ -6,7 +6,7 @@ Implement the "It's Bonus Time!" multiplier state and visual countdown.
 ## Implementation
 - **Server Rules**: Add `its_bonus_time_rules.ex` to `lib/incrementalist/game/features/bonustime/`.
   - Implement `apply_bonus_multiplier(value, state)`: Doubles specific rewards if `bonus_time` is active.
-- **Client Render**: Add `bonus-time.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `bonus-time.ts` to `assets/src/features/bonustime/bonus-time/render.ts`.
   - Render a basic timer box (colored rectangle) with a text countdown.
   - Use simple text color changes to indicate urgency.
 - **Client Interaction**: Automatically active when tokens are > 0.

@@ -6,7 +6,7 @@ Port the Prize Wheel mini-game to server-authoritative rules and WebGL rendering
 ## Implementation
 - **Server Rules**: Add `prize_wheel.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `spin_outcome(streak)`: Returns the winning slot index and reward values.
-- **Client Render**: Add `prize-wheel.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `prize-wheel.ts` to `assets/src/features/bonustime/02-prize-wheel/render.ts`.
   - Render a representational circle or box as the "Wheel Area".
   - Use simple text labels ("Spinning...", "Result") to show state.
 - **Client Interaction**: Send `bonustime.play { game: "prize_wheel" }` on "Spin" click.

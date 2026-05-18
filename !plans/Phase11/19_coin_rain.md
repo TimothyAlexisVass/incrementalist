@@ -7,7 +7,7 @@ Port the Coin Rain interactive mini-game to server-authoritative rules and WebGL
 - **Server Rules**: Add `coin_rain.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `generate_parameters(streak)`: Returns the game seed, duration, and multiplier.
   - Implement `evaluate_results(collected_count)`: Validates the player's performance against expected limits.
-- **Client Render**: Add `coin-rain.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `coin-rain.ts` to `assets/src/features/bonustime/coin-rain/render.ts`.
   - Implement representational falling colored boxes (representing coins/gems).
   - Create a simple rectangle "catcher" at the bottom controlled by the player.
 - **Client Interaction**: Start the game on `bonustime.play`. Send final count to the server upon completion.

@@ -1,4 +1,4 @@
-# Phase 11, Step 12: Ladder Climb
+# Phase 12, Step 2: Ladder Climb
 
 ## Objective
 Port the Ladder Climb mini-game to server-authoritative rules and WebGL rendering.
@@ -6,7 +6,7 @@ Port the Ladder Climb mini-game to server-authoritative rules and WebGL renderin
 ## Implementation
 - **Server Rules**: Add `ladder_climb.ex` to `lib/incrementalist/game/features/bonustime/games/`.
   - Implement `climb_outcome(streak)`: Returns the highest rung reached before a "slip".
-- **Client Render**: Add `ladder-climb.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `ladder-climb.ts` to `assets/src/features/bonustime/ladder-climb/render.ts`.
   - Render a representational vertical "ladder" (stack of boxes).
   - Use a simple marker box to represent the player's current rung.
 - **Client Interaction**: `Climb` button trigger.

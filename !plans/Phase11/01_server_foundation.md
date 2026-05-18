@@ -9,10 +9,10 @@ Implementations for all mini-games in this phase must be **visually basic and re
 ## Implementation
 
 ### 0. Domain Data (Requirements)
-- **File**: Create `shared/requirements/daily-bonus.json` (Done).
+- **File**: Create or update `shared/requirements/bonustime.json`.
   - Define the 15-slot game rotation.
   - Define reward tiers (tier_1 through tier_7) with chances and rarities.
-  - Define streak-based scaling (e.g., initial pick counts for Card Pick, roll counts for Chest Draw).
+  - Define streak-based scaling (e.g., extra rolls for Chest Draw and extra drops for Plinko Drop).
 - **Constants**: Update `lib/incrementalist/game/constants.ex` to load and expose this data.
 
 ### 1. Schema Expansion
@@ -48,7 +48,7 @@ Update `lib/incrementalist/game/constants.ex` to provide accessors for the JSON 
 Define hardcoded timing and rotation constants:
 - `bonustime_rotation_anchor_at`: Hardcoded global UTC boundary (e.g., 2024-01-01T00:00:00Z).
 - `bonustime_slot_ms`: 43_200_000 (12 hours).
-- `bonustime_rotation_slot_count`: 9.
+- `bonustime_rotation_slot_count`: 15.
 
 ## Verification
 - Unit tests for token grant logic (especially the "grant only if 0" rule).

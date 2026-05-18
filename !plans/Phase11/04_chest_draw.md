@@ -23,7 +23,7 @@ Port the Chest Draw mini-game and establish the core `bonustime.play` command fl
   - Return the final best outcome (highest tier).
 
 ### 3. Client Render (`chest-draw.ts`)
-- **Location**: `assets/src/features/daily-bonus/render/chest-draw.ts`.
+- **Location**: `assets/src/features/bonustime/01-chest-draw/render.ts`.
 - **Render**:
   - Representational "Unknown chest" (colored box with text).
   - "Roll Track" (row of small boxes) below the chest.

@@ -11,12 +11,12 @@
 ## Rotation Logic
 
 - **Frequency**: Active game changes every 12 hours (`00:00 UTC` and `12:00 UTC`).
-- **Rotation Length**: 9 games (full rotation takes 4.5 days).
-- **Drift**: Because the 9-slot rotation (108 hours) is not a multiple of 24 hours, games drift between morning (00:00-12:00) and evening (12:00-24:00) slots every 4.5 days.
+- **Rotation Length**: 15 games (full rotation takes 7.5 days).
+- **Drift**: Because the 15-slot rotation (180 hours) is not a multiple of 24 hours, games drift between morning (00:00-12:00) and evening (12:00-24:00) slots every 7.5 days.
 - **Anchor Calculation**:
   - `rotationAnchorUtc`: `00:00 UTC` boundary where slot 1 starts.
   - `boundaryIndex`: `floor((now - anchor) / 12 hours)`.
-  - `activeSlot`: `(boundaryIndex % 9) + 1`.
+  - `activeSlot`: `(boundaryIndex % 15) + 1`.
   - `nextChangeAt`: `anchor + ((boundaryIndex + 1) * 12 hours)`.
 
 ## Streak System
@@ -39,5 +39,7 @@
 1.  **Server Foundation**: Logic for rotation, tokens, and streak.
 2.  **Tab Layout**: Daily tab integration in Canvas/WebGL.
 3.  **Command Orchestration**: Protocol and state merging.
-4.  **Simpler Mini-Games**: Step-by-step porting of 13 rotating games.
-5.  **Complex Mini-Games**: Step-by-step porting of the 2 more complex games.
+4.  **One-Shot Mini-Games**: Step-by-step porting of the 10 one-shot rotation games.
+5.  **Complex Mini-Games**: Step-by-step porting of the 5 multi-step rotation games, with Card Pick and Match Pairs tracked in later Phase 12 docs.
+
+The full daily-bonus rotation is 15 games total. Card Pick and Match Pairs are separate later mini-games, not part of that 15-slot rotation.

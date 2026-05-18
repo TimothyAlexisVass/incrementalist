@@ -156,7 +156,7 @@ assets/src/
     shop/
     quests/
     achievements/
-    daily-bonus/
+    bonustime/
     save-slots/
   theme/
     colors.ts
@@ -182,17 +182,20 @@ Phases 1-10 are completed and therefore removed from this plan.
 
 ### Phase 11: BONUSTIME
 
-- Port daily token rotation (12-hour slots), streaks (decrement by 3 on miss), and 13 daily mini-games.
-- Included Games: Chest Draw, Prize Wheel, Coin Rain, Resource/Item Checklists, Reward Labyrinth, Ladder Climb, Hammer Smash, Lucky Dice, Plinko Drop, Scratch Card, Jackpot Meter, and Bonus Time.
-- Implement dual-token system: `daily_tokens` (rotating) and `special_tokens` (persistent).
+- Port daily token rotation (12-hour slots), streaks (decrement by 3 on miss), and the 15-slot daily bonus roster.
+- One-shot games: Chest Draw, Prize Wheel, Coin Rain, Resource/Item Checklists, Plinko Drop, Jackpot Meter, Bonus Time, plus the remaining one-shot rotation slots.
+- Multi-step bonus games: Reward Labyrinth, Ladder Climb, Hammer Smash, Lucky Dice, Scratch Card.
+- Implement dual-token system: `has_daily_token` (rotating) and `special_tokens` (persistent).
 - Enforce token grant rule: 1 `daily_token` granted at boundary ONLY IF total tokens is 0.
 - Implement `bonustime.open`, `bonustime.play`, and game-specific commands.
 - Render the Daily tab and daily bonus interactions in Canvas/WebGL.
 - Keep client animations reveal-only and server-validated.
 
-Deliverable: daily bonus loop, dual-token mechanics, 13 one-shot games, and reveal animations are ported.
+Deliverable: daily bonus loop, dual-token mechanics, 15 daily bonus games, and reveal animations are ported.
 
-### Phase 12: Card Pick & Match Pairs
+The remaining multi-step daily bonus games are tracked in `!plans/Phase12/`.
+
+### Later: Card Pick & Match Pairs
 
 - Port the remaining complex mini-games: Card Pick and Match Pairs.
 - Replace the legacy client-board model with server-authoritative session state.

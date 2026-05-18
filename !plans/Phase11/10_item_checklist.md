@@ -6,7 +6,7 @@ Port the Item Checklist daily task system to the server and Canvas UI.
 ## Implementation
 - **Server Rules**: Reuse `checklist_rules.ex` with `checklist_key: "item"`.
   - Implement `check_off(state, "item")`: Consumes a token and grants the reward.
-- **Client Render**: Add `item-checklist.ts` to `assets/src/features/daily-bonus/render/`.
+- **Client Render**: Add `item-checklist.ts` to `assets/src/features/bonustime/05-item-checklist/render.ts`.
   - Render a basic grid of 8 representational boxes (one for each item).
   - Use simple "Found" / "Missing" text labels or color changes.
 - **Client Interaction**: `bonustime.play` updates the checklist state.
