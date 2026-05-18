@@ -35,6 +35,7 @@ import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAre
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
 import {
   createFloatingTextState,
+  getAvailableFloatingTextStackIndexes,
   renderFloatingTexts,
   spawnFloatingText,
   updateFloatingTexts,
@@ -73,6 +74,14 @@ import { COLORS } from '../colors';
 // instant, but server command results remain the only source of durable truth.
 const usernameKey = "incrementalist.playerUsername";
 const tokenKey = "incrementalist.playerToken";
+const MILESTONE_ANNOUNCEMENT_TYPE = "milestone_announcement";
+const MILESTONE_ANNOUNCEMENT_LINE_GAP = 40;
+let nextMilestoneAnnouncementGroupId = 1;
+
+type MilestoneBaseline = {
+  unlockedAchievementIds: Set<string>;
+  claimedQuestRanksById: Map<string, number>;
+};
 
 export class GameClient {
   private readonly store: Store<ServerState>;
@@ -200,7 +209,7 @@ export class GameClient {
 
   private async applyAndAck(result: ServerResult) {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
-    const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
+    const milestoneBaseline = this.snapshotMilestoneBaseline();
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
       notices.setSnapshot(this.store.state.snapshot);
@@ -220,7 +229,7 @@ export class GameClient {
     }
 
     this.applyProgressEffects(result, previousAmounts);
-    this.applyAchievementEffects(result, previousAchievements);
+    this.applyMilestoneEffects(milestoneBaseline);
 
     if (!isAckableCommandResult(result)) return;
 
@@ -230,14 +239,14 @@ export class GameClient {
     if (clearsCommandQueue(result)) this.channel!.clearCommandQueue();
     while (next) {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
-      const previousAchievements = this.store.state.snapshot ? Object.keys(this.store.state.snapshot.state.achievements).filter(k => this.store.state.snapshot!.state.achievements[k].unlocked_at) : [];
+      const milestoneBaseline = this.snapshotMilestoneBaseline();
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
         notices.setSnapshot(this.store.state.snapshot);
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
-      this.applyAchievementEffects(next, previousAchievements);
+      this.applyMilestoneEffects(milestoneBaseline);
       if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
         if (this.store.state.snapshot) {
@@ -310,40 +319,82 @@ export class GameClient {
     clearPendingClaimPopupPoint();
   }
 
-  private applyAchievementEffects(result: ServerResult, previousAchievements: string[]) {
-    if (!this.store.state.snapshot) return;
+  private snapshotMilestoneBaseline(): MilestoneBaseline {
+    const baseline: MilestoneBaseline = {
+      unlockedAchievementIds: new Set<string>(),
+      claimedQuestRanksById: new Map<string, number>()
+    };
 
-    const currentAchievements = Object.keys(this.store.state.snapshot.state.achievements).filter(
-      k => this.store.state.snapshot!.state.achievements[k].unlocked_at
+    const snapshot = this.store.state.snapshot;
+    if (!snapshot) return baseline;
+
+    for (const [achievementId, achievement] of Object.entries(snapshot.state.achievements)) {
+      if (achievement.unlocked_at) {
+        baseline.unlockedAchievementIds.add(achievementId);
+      }
+    }
+
+    for (const [questId, quest] of Object.entries(snapshot.state.quests)) {
+      baseline.claimedQuestRanksById.set(questId, quest.claimed_rank);
+    }
+
+    return baseline;
+  }
+
+  private applyMilestoneEffects(previous: MilestoneBaseline) {
+    const snapshot = this.store.state.snapshot;
+    if (!snapshot) return;
+
+    const announcements: Array<{ text: string; color: string }> = [];
+
+    for (const [achievementId, achievement] of Object.entries(snapshot.state.achievements)) {
+      if (achievement.unlocked_at && !previous.unlockedAchievementIds.has(achievementId)) {
+        announcements.push({ text: achievement.name, color: COLORS.rewards.achievement });
+      }
+    }
+
+    for (const [questId, quest] of Object.entries(snapshot.state.quests)) {
+      const previousClaimedRank = previous.claimedQuestRanksById.get(questId) ?? 0;
+      if (quest.claimed_rank > previousClaimedRank) {
+        announcements.push({ text: `Quest: ${quest.name}`, color: COLORS.rewards.questSummary });
+      }
+    }
+
+    if (announcements.length === 0) return;
+
+    const stackIndexes = getAvailableFloatingTextStackIndexes(
+      this.floatingTexts,
+      MILESTONE_ANNOUNCEMENT_TYPE,
+      announcements.length
     );
+    const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
+    const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 10);
+    const popupOptions = {
+      lifeMs: 5000,
+      riseSpeed: 2,
+      font: 'bold 24px "Outfit"',
+      textAlign: "center" as CanvasTextAlign,
+      type: MILESTONE_ANNOUNCEMENT_TYPE
+    };
 
-    const newlyUnlocked = currentAchievements.filter(id => !previousAchievements.includes(id));
+    for (let i = 0; i < announcements.length; i += 1) {
+      const announcement = announcements[i];
+      const stackIndex = stackIndexes[i] ?? i;
+      const groupId = nextMilestoneAnnouncementGroupId;
+      nextMilestoneAnnouncementGroupId += 1;
 
-    if (newlyUnlocked.length > 0) {
-      const popupOptions = {
-        lifeMs: 5000,
-        riseSpeed: 2,
-        font: 'bold 24px "Outfit"',
-        textAlign: "center" as CanvasTextAlign,
-        type: "achievement_unlock"
-      };
-
-      const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
-      const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 10);
-
-      newlyUnlocked.forEach((id, index) => {
-        const achievement = this.store.state.snapshot!.state.achievements[id];
-        if (achievement) {
-          spawnFloatingText(
-            this.floatingTexts,
-            achievement.name,
-            baseX,
-            baseY + (index * 40),
-            COLORS.rewards.achievement,
-            popupOptions
-          );
+      spawnFloatingText(
+        this.floatingTexts,
+        announcement.text,
+        baseX,
+        baseY + (stackIndex * MILESTONE_ANNOUNCEMENT_LINE_GAP),
+        announcement.color,
+        {
+          ...popupOptions,
+          stackGroupId: groupId,
+          stackIndex
         }
-      });
+      );
     }
   }
 

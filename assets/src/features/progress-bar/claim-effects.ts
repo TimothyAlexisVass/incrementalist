@@ -7,7 +7,8 @@ import {
   spawnFloatingText,
   type FloatingText,
   type FloatingTextOptions,
-  spawnRewardPopup
+  spawnRewardPopup,
+  getAvailableFloatingTextStackIndexes
 } from "../../render/effects";
 import { TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_HEIGHT } from "../../config";
 import { BigNum, ZERO, add, sub, compare } from "../../core/bignum";
@@ -256,33 +257,6 @@ function measureTextWidth(text: string, font: string) {
   return 0;
 }
 
-function getAvailableNoticeGroupIndexes(floatingTexts: FloatingText[], type: string, count: number) {
-  const occupiedIndexes = new Set<number>();
-
-  for (const floatingText of floatingTexts) {
-    if (
-      floatingText.type === type &&
-      floatingText.stackGroupId !== null &&
-      floatingText.stackIndex !== null
-    ) {
-      occupiedIndexes.add(floatingText.stackIndex);
-    }
-  }
-
-  const indexes = [];
-  let nextIndex = 0;
-
-  while (indexes.length < count) {
-    if (!occupiedIndexes.has(nextIndex)) {
-      indexes.push(nextIndex);
-      occupiedIndexes.add(nextIndex);
-    }
-    nextIndex += 1;
-  }
-
-  return indexes;
-}
-
 function spawnLevelUpEffects(floatingTexts: FloatingText[], canvas: HTMLCanvasElement, levelUps: ReturnType<typeof computeLevelUps>) {
   if (levelUps.length === 0) return;
 
@@ -292,7 +266,7 @@ function spawnLevelUpEffects(floatingTexts: FloatingText[], canvas: HTMLCanvasEl
   const baseY = TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT + 52;
   const lineStep = 30;
   const groupStep = 108;
-  const groupIndexes = getAvailableNoticeGroupIndexes(floatingTexts, "level_up", levelUps.length);
+  const groupIndexes = getAvailableFloatingTextStackIndexes(floatingTexts, "level_up", levelUps.length);
 
   for (let i = 0; i < levelUps.length; i += 1) {
     const levelUp = levelUps[i];

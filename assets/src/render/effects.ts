@@ -106,6 +106,39 @@ export function spawnFloatingText(
   }
 }
 
+export function getAvailableFloatingTextStackIndexes(
+  floatingTexts: FloatingText[],
+  type: string,
+  count: number
+) {
+  if (!Array.isArray(floatingTexts) || count <= 0) return [];
+
+  const occupiedIndexes = new Set<number>();
+
+  for (const floatingText of floatingTexts) {
+    if (
+      floatingText.type === type &&
+      floatingText.stackGroupId !== null &&
+      floatingText.stackIndex !== null
+    ) {
+      occupiedIndexes.add(floatingText.stackIndex);
+    }
+  }
+
+  const indexes: number[] = [];
+  let nextIndex = 0;
+
+  while (indexes.length < count) {
+    if (!occupiedIndexes.has(nextIndex)) {
+      indexes.push(nextIndex);
+      occupiedIndexes.add(nextIndex);
+    }
+    nextIndex += 1;
+  }
+
+  return indexes;
+}
+
 export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   const canvasWidth = canvas?.width ?? CANVAS_WIDTH;
 
