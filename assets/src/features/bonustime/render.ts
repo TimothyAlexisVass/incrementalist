@@ -24,6 +24,9 @@ import { getResourceChecklistState, ResourceChecklistState } from "./03-resource
 import { renderItemChecklist } from "./05-item-checklist/render";
 import { getItemChecklistData } from "./05-item-checklist/view-model";
 import { getItemChecklistState, ItemChecklistState } from "./05-item-checklist/interactions";
+import { renderPlinkoDrop } from "./15-plinko-drop/render";
+import { getPlinkoDropData } from "./15-plinko-drop/view-model";
+import { getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -50,7 +53,8 @@ export function renderBonusTimeOverview(
   const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
                            (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE) ||
                            (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
-                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE);
+                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
+                           (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -117,6 +121,11 @@ export function renderBonusTimeOverview(
     const data = getItemChecklistData(state);
     if (data) {
       renderItemChecklist(data, rect);
+    }
+  } else if (activeGameId === "plinko_drop") {
+    const data = getPlinkoDropData(state);
+    if (data) {
+      renderPlinkoDrop(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({

@@ -10,6 +10,8 @@ import { handleResourceChecklistInteractions, getResourceChecklistState, Resourc
 import { getResourceChecklistData } from "./03-resource-checklist/view-model";
 import { handleItemChecklistInteractions, getItemChecklistState, ItemChecklistState } from "./05-item-checklist/interactions";
 import { getItemChecklistData } from "./05-item-checklist/view-model";
+import { getPlinkoDropData } from "./15-plinko-drop/view-model";
+import { handlePlinkoDropInteractions, getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -31,7 +33,8 @@ export function handleBonusTimeInteractions(
   const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
                            (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE) ||
                            (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
-                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE);
+                           (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
+                           (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -94,6 +97,15 @@ export function handleBonusTimeInteractions(
 
       if (intent?.type === 'open_modal') {
         return { type: 'open_chest_reward' };
+      }
+    }
+  } else if (activeGameId === "plinko_drop") {
+    const data = getPlinkoDropData(state);
+    if (data) {
+      const intent = handlePlinkoDropInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
       }
     }
   }

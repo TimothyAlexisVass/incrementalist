@@ -1,12 +1,10 @@
 import { GameChannel } from "../net/game-channel";
 import {
   ackAppliedResult,
-  resetGame,
   progressClaimIn,
   selectArea,
   shopPurchase
 } from "../net/commands";
-import { ResetConfirmationModal, LoadingModal } from '../ui/components/modals/confirmation-modal';
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
 import { applyResult, clearShopHighlight, createServerState, type ServerState, View } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
@@ -55,9 +53,10 @@ import { resetChestState } from "../features/bonustime/01-chest-draw/interaction
 import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactions";
 import { resetResourceChecklistState } from "../features/bonustime/03-resource-checklist/interactions";
 import { resetItemChecklistState } from "../features/bonustime/05-item-checklist/interactions";
+import { resetPlinkoState } from "../features/bonustime/15-plinko-drop/interactions";
 import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
-import { Interactions, InteractionState, pointInRect } from "../ui/managers/interactions";
+import { Interactions, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
 import {
   NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
@@ -66,7 +65,7 @@ import {
 } from "../ui/managers/notices";
 import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-model";
 import { getActiveWebGLRenderer } from "../renderer/webgl";
-import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT } from '../config';
+import { DISPLAY_AREA_X, DISPLAY_AREA_WIDTH, TOP_HUD_EXP_BAR_Y } from '../config';
 import { COLORS } from '../colors';
 
 
@@ -94,6 +93,7 @@ export class GameClient {
   private readonly interactions: Interactions;
   private sisuControlLayout: SisuControlLayout | null = null;
   private bonusRewardModal: RewardModalState | null = null;
+  private pendingCloseTransientUi = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -225,6 +225,7 @@ export class GameClient {
     }
 
     if (result.type === "area.select.result") {
+      this.store.state.currentView = View.GAME;
       this.closeAllTransientUi();
     }
 
@@ -255,6 +256,7 @@ export class GameClient {
         }
       }
       if (next.type === "area.select.result") {
+        this.store.state.currentView = View.GAME;
         this.closeAllTransientUi();
       }
       // The server releases at most one queued result per acknowledgement so the
@@ -371,7 +373,7 @@ export class GameClient {
       announcements.length
     );
     const baseX = DISPLAY_AREA_X + (DISPLAY_AREA_WIDTH / 2);
-    const baseY = DISPLAY_AREA_Y + (DISPLAY_AREA_HEIGHT / 10);
+    const baseY = 40;
     const popupOptions = {
       lifeMs: 5000,
       riseSpeed: 2,
@@ -462,6 +464,11 @@ export class GameClient {
     getActiveWebGLRenderer()?.beginFrame([0, 0, 0, 0]);
     beginTooltipFrame();
 
+    if (this.pendingCloseTransientUi) {
+      this.closeAllTransientUi();
+      this.pendingCloseTransientUi = false;
+    }
+
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
 
@@ -534,6 +541,7 @@ export class GameClient {
           resetWheelState();
           resetResourceChecklistState();
           resetItemChecklistState();
+          resetPlinkoState();
           sceneInput.consumed = true;
         }
       }
@@ -601,6 +609,13 @@ export class GameClient {
     renderBottomHUD(this.canvas, sceneInput, amounts?.level ?? 1, isMainMenuOpen, () => {
       this.handleMenuButtonPress();
     }, () => {
+      const hasTransientUiOpen = this.ui.overlays.isOpen() || this.ui.modals.isOpen();
+      if (hasTransientUiOpen) {
+        this.store.state.currentView = View.BONUSTIME;
+        this.pendingCloseTransientUi = true;
+        return;
+      }
+
       this.store.state.currentView = this.store.state.currentView === View.BONUSTIME ? View.GAME : View.BONUSTIME;
     }, (areaKey) => {
       if (this.channel) {

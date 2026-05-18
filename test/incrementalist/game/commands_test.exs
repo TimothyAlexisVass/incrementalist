@@ -354,6 +354,45 @@ defmodule Incrementalist.Game.CommandsTest do
     assert result["bonustime"]["rotation_anchor"] == DateTime.to_iso8601(@now)
   end
 
+  test "bonustime.play plinko_drop includes authoritative roll payload in last_result" do
+    plinko_anchor = DateTime.add(@now, -(4 * 43_200_000), :millisecond)
+
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(plinko_anchor)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "plinko_drop"}),
+        @now
+      )
+
+    assert result["type"] == "bonustime.play.result"
+    assert result["status"] == "ok"
+    assert result["bonustime"]["active_game_id"] == "plinko_drop"
+
+    last_result = result["bonustime"]["last_result"] || result["bonustime"][:last_result]
+    assert last_result["game_id"] == "plinko_drop"
+    assert is_list(last_result["rolls"])
+    assert length(last_result["rolls"]) == 13
+    assert hd(last_result["rolls"]) == true
+    assert Enum.all?(last_result["rolls"], &is_boolean/1)
+    assert is_map(last_result["plinko"])
+    assert is_list(last_result["plinko"]["drops"])
+    assert length(last_result["plinko"]["drops"]) >= 1
+    assert is_integer(last_result["plinko"]["best_drop_index"])
+  end
+
   test "cleanup deletes only ACKed command rows older than forty eight hours" do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)

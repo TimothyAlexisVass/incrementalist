@@ -16,6 +16,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
   alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
   alias Incrementalist.Game.Features.BonusTime.Games.Checklist
+  alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -526,6 +527,10 @@ defmodule Incrementalist.Game.CommandExecutor do
                 {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "item")
                 {t, [idx], updated_state}
 
+              "plinko_drop" ->
+                {t, rolls, plinko} = PlinkoDrop.roll_reward(next_state.bonustime.streak)
+                {t, %{"rolls" => rolls, "plinko" => plinko}, next_state}
+
               _ ->
                 {1, [1], next_state}
             end
@@ -540,14 +545,16 @@ defmodule Incrementalist.Game.CommandExecutor do
           bonustime = next_state.bonustime
           new_reward_counts = Map.update(bonustime.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
 
-          last_result = %{
-            "game_id" => game_id,
-            "tier" => tier,
-            "rolls" => rolls,
-            "reward_amount" => reward_amount,
-            "token_type" => token_type,
-            "played_at" => Time.iso8601(now)
-          }
+          last_result =
+            %{
+              "game_id" => game_id,
+              "tier" => tier,
+              "rolls" => if(is_map(rolls), do: rolls["rolls"], else: rolls),
+              "reward_amount" => reward_amount,
+              "token_type" => token_type,
+              "played_at" => Time.iso8601(now)
+            }
+            |> maybe_put_plinko_payload(rolls)
 
           next_bonustime = %{
             bonustime
@@ -702,6 +709,12 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_game_id(%{"game" => game_id}) when is_binary(game_id), do: {:ok, game_id}
   defp fetch_game_id(%{game: game_id}) when is_binary(game_id), do: {:ok, game_id}
   defp fetch_game_id(_), do: {:error, "game_id_required"}
+
+  defp maybe_put_plinko_payload(last_result, rolls) when is_map(rolls) do
+    Map.put(last_result, "plinko", rolls["plinko"])
+  end
+
+  defp maybe_put_plinko_payload(last_result, _rolls), do: last_result
 
   defp error_result(reason, command, extra \\ %{}) do
     extra
