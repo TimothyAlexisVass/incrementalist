@@ -585,6 +585,17 @@ export class WebGLRenderer {
     }
   }
 
+  public withScissorDisabled(draw: () => void) {
+    const snapshot = this.captureScissorState();
+    this.threeRenderer.setScissorTest(false);
+    this.gl.disable(this.gl.SCISSOR_TEST);
+    try {
+      draw();
+    } finally {
+      this.restoreScissorState(snapshot);
+    }
+  }
+
   drawRect(options: DrawRectOptions) {
     const gl = this.gl;
     const { x, y, width, height, color } = options;

@@ -1,7 +1,8 @@
 import { COLORS } from '../../../../../colors';
 import { ServerState } from '../../../../../net/snapshots';
 import { getActiveWebGLRenderer } from '../../../../../renderer/webgl';
-import { drawQuestCard } from '../../../../components/cards/quest';
+import { drawNoticeDot } from '../../../../components/button';
+import { drawQuestCard, getQuestNoticeAnchor } from '../../../../components/cards/quest';
 import { ScrollingPanel } from '../../../../components/scrolling-panel';
 import { Rect, TabDefinition, TabMenu } from '../../../../components/tab-menu/tab-menu';
 import { InteractionState } from '../../../../managers/interactions';
@@ -10,6 +11,7 @@ import { handleQuestInteractions } from './interactions';
 import { QuestState, GameSnapshot } from '../../../../../net/protocol';
 import { getNetwork } from '../../view-model';
 import { markViewed } from '../../../../../net/commands';
+import { notices } from '../../../../managers/notices';
 
 const CARD_HEIGHT_PX = 92;
 const CARD_GAP_PX = 12;
@@ -67,7 +69,7 @@ function getQuestSubTabs(viewModel: any): TabMenu {
       tabHeight: 32,
       tabPadding: 18,
       gap: 6,
-      contentGap: 4,
+      contentMargin: 5,
       font: 'bold 14px Arial'
     }, 'main');
   }
@@ -94,6 +96,8 @@ function renderQuestList(
   const cardWidth = Math.max(1, listRect.width - CARD_SCROLLBAR_GUTTER_PX);
   const contentHeight = (quests.length * CARD_HEIGHT_PX) + (Math.max(0, quests.length - 1) * CARD_GAP_PX);
   const scrollingPanel = getScrollingPanel(panelKey, listRect, contentHeight);
+  const noticeOverlays: Array<{ leafId: string; x: number; y: number; radius: number }> = [];
+  const { channel, runCommand } = getNetwork();
 
   scrollingPanel.update(input);
   const scrollOffsetY = scrollingPanel.getScrollOffset();
@@ -109,22 +113,34 @@ function renderQuestList(
       if (cardY >= listRect.y + listRect.height) break;
       if (cardY + CARD_HEIGHT_PX <= listRect.y) continue;
 
-      const { channel, runCommand } = getNetwork();
+      const cardRect = {
+        x: listRect.x,
+        y: cardY,
+        width: cardWidth,
+        height: CARD_HEIGHT_PX
+      };
       drawQuestCard({
         quest,
-        rect: {
-          x: listRect.x,
-          y: cardY,
-          width: cardWidth,
-          height: CARD_HEIGHT_PX
-        },
+        rect: cardRect,
         channel: channel || undefined,
-        runCommand: runCommand || undefined
+        runCommand: runCommand || undefined,
+        showNotice: false
       });
+
+      const leafId = `leaf.quest.${(quest as any).id}.claim_button`;
+      if (quest.rank > quest.claimed_rank && notices.hasLeafNotice(leafId)) {
+        const anchor = getQuestNoticeAnchor(cardRect);
+        noticeOverlays.push({ leafId, x: anchor.x, y: anchor.y, radius: anchor.radius });
+      }
     }
   });
 
   scrollingPanel.drawScrollBar(renderer);
+
+  for (const overlay of noticeOverlays) {
+    drawNoticeDot(overlay.x, overlay.y, overlay.radius);
+    notices.reportLeafVisible(overlay.leafId, true, channel || undefined, runCommand || undefined);
+  }
 }
 
 function getScrollingPanel(panelKey: 'daily' | 'main', rect: Rect, contentHeight: number): ScrollingPanel {

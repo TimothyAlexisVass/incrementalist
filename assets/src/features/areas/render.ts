@@ -185,7 +185,6 @@ function renderDropdownItems(
     const renderItem = () => {
       drawButton(itemRect, area.is_locked ? "" : area.name, {
         active: isHovered,
-        padding: 0,
         font: BOTTOM_HUD_BUTTON_FONT,
         activeSurface: COLORS.button.surface.active,
         inactiveSurface: COLORS.panel.bg,
@@ -206,8 +205,7 @@ function renderDropdownItems(
       drawLockedElement(canvas, input, itemRect, renderItem, {
         opacity: 0,
         criteria: formatUnlockRequirement(area.unlock_level, level),
-        showNotice: hasNotice,
-        showNoticePing: true
+        showNotice: hasNotice
       });
     } else {
       renderItem();

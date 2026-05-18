@@ -67,7 +67,6 @@ export function renderSisuControl(
       font: SISU_METER_FONT,
       criteria: formatUnlockRequirement(sisuRequiredLevel, snapshot.state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.sisu_generator.locked_text"),
-      showNoticePing: true,
       shape: "circle",
       padding: 8
     });

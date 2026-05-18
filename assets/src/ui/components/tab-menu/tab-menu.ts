@@ -1,6 +1,6 @@
 import { COLORS } from '../../../colors';
-import { doButton } from '../button';
-import { InteractionState } from '../../managers/interactions';
+import { drawButton, drawNoticeDot } from '../button';
+import { InteractionState, pointInRect } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { notices } from '../../managers/notices';
 import { GameChannel } from '../../../net/game-channel';
@@ -33,7 +33,7 @@ export interface TabMenuConfig {
   tabHeight?: number;
   tabPadding?: number;
   gap?: number;
-  contentGap?: number;
+  contentMargin?: number;
   font?: string;
 }
 
@@ -96,7 +96,7 @@ export class TabMenu {
     const tabHeight = this.config.tabHeight || 30;
     const tabPadding = this.config.tabPadding || 16;
     const gap = this.config.gap || 4;
-    const contentGap = this.config.contentGap || 0;
+    const contentMargin = this.config.contentMargin || 0;
     const font = this.config.font || 'bold 14px Arial';
 
     // Calculate text widths including optional hotkeys
@@ -146,20 +146,23 @@ export class TabMenu {
         currentX += actualTabWidths[i] + gap;
       }
 
-      // Calculate content rect
+      // Content is anchored to the tab rect coordinate space:
+      // - left edge exactly matches the left edge of the leftmost tab button rect
+      // - top edge is tabHeight + contentMargin below the tab row
       if (position === 'top-left' || position === 'top-right') {
+        const contentTopY = containerRect.y + tabHeight + contentMargin;
         contentRect = {
           x: containerRect.x,
-          y: containerRect.y + tabHeight + contentGap,
+          y: contentTopY,
           width: containerRect.width,
-          height: containerRect.height - tabHeight - contentGap
+          height: containerRect.height - tabHeight - contentMargin
         };
       } else {
         contentRect = {
           x: containerRect.x,
           y: containerRect.y,
           width: containerRect.width,
-          height: containerRect.height - tabHeight - contentGap
+          height: containerRect.height - tabHeight - contentMargin
         };
       }
     } else {
@@ -192,60 +195,49 @@ export class TabMenu {
       // Calculate content rect
       if (position === 'top-left' || position === 'bottom-left') {
         contentRect = {
-          x: containerRect.x + uniformTabWidth + contentGap,
+          x: containerRect.x + uniformTabWidth + contentMargin,
           y: containerRect.y,
-          width: containerRect.width - uniformTabWidth - contentGap,
+          width: containerRect.width - uniformTabWidth - contentMargin,
           height: containerRect.height
         };
       } else {
         contentRect = {
           x: containerRect.x,
           y: containerRect.y,
-          width: containerRect.width - uniformTabWidth - contentGap,
+          width: containerRect.width - uniformTabWidth - contentMargin,
           height: containerRect.height
         };
       }
     }
 
-    // Render Tab Buttons
+    // Resolve tab clicks first so content switches in the same frame.
     for (let i = 0; i < this.tabs.length; i++) {
       const tab = this.tabs[i];
       const rect = tabRects[i];
-      const isActive = this.activeTabId === tab.id;
+      const isHovered = pointInRect(input.pointer, rect);
+      const startedInside = pointInRect(input.pressStartPointer, rect);
+      const clicked = isHovered && startedInside && input.clicked && !input.consumed;
 
-      let label = tab.label;
-      if (tab.hotkey) {
-        label += ` [${tab.hotkey}]`;
+      if (!clicked) {
+        continue;
       }
 
-      const clicked = doButton(input, rect, label, {
-        padding: 0,
-        active: isActive || undefined,
-        activeSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
-        inactiveSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
-        activeBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
-        inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
-        textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
-        font: font,
-        showNotice: !isActive && tab.noticeParentId ? notices.hasParentNotice(tab.noticeParentId) : false
-      });
-
-      if (clicked) {
-        const prevTab = this.tabs.find(t => t.id === this.activeTabId);
-        if (prevTab && prevTab.id !== tab.id && prevTab.onLeave) {
-          prevTab.onLeave();
-        }
-        this.activeTabId = tab.id;
-        if (tab.noticeParentId) {
-          notices.reportParentVisibleViaPseudoLeaf(
-            tab.noticeLeafId || `leaf.tab.${tab.id}.button`,
-            tab.noticeParentId,
-            true,
-            channel,
-            runCommand
-          );
-        }
+      input.consumed = true;
+      const prevTab = this.tabs.find(t => t.id === this.activeTabId);
+      if (prevTab && prevTab.id !== tab.id && prevTab.onLeave) {
+        prevTab.onLeave();
       }
+      this.activeTabId = tab.id;
+      if (tab.noticeParentId) {
+        notices.reportParentVisibleViaPseudoLeaf(
+          tab.noticeLeafId || `leaf.tab.${tab.id}.button`,
+          tab.noticeParentId,
+          true,
+          channel,
+          runCommand
+        );
+      }
+      break;
     }
 
     // Render Content
@@ -262,6 +254,47 @@ export class TabMenu {
       }
 
       activeTab.renderContent(canvas, input, state, contentRect);
+    }
+
+    // Render tab buttons last so tab row sits above panel content.
+    for (let i = 0; i < this.tabs.length; i++) {
+      const tab = this.tabs[i];
+      const rect = tabRects[i];
+      const isActive = this.activeTabId === tab.id;
+      const isHovered = pointInRect(input.pointer, rect);
+      const startedInside = pointInRect(input.pressStartPointer, rect);
+      const isDown = input.isPressed;
+      const isInteractionActive = isDown ? (startedInside && isHovered) : isHovered;
+
+      let label = tab.label;
+      if (tab.hotkey) {
+        label += ` [${tab.hotkey}]`;
+      }
+
+      drawButton(rect, label, {
+        active: isActive || isInteractionActive,
+        activeSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
+        inactiveSurface: isActive ? COLORS.button.surface.active : COLORS.button.secondary.surface,
+        activeBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
+        inactiveBorder: isActive ? COLORS.button.border.active : COLORS.button.secondary.border,
+        textColor: isActive ? COLORS.button.text : COLORS.button.secondary.text,
+        font,
+        showNotice: false
+      });
+    }
+
+    // Render tab notices in a dedicated pass so they always sit above all tab buttons.
+    for (let i = 0; i < this.tabs.length; i++) {
+      const tab = this.tabs[i];
+      const rect = tabRects[i];
+      const isActive = this.activeTabId === tab.id;
+      const showNotice = !isActive && tab.noticeParentId ? notices.hasParentNotice(tab.noticeParentId) : false;
+
+      if (!showNotice) {
+        continue;
+      }
+
+      drawNoticeDot(rect.x + rect.width - 1, rect.y + 1, 4);
     }
   }
 }

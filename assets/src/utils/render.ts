@@ -20,7 +20,6 @@ export interface LockedDrawOptions {
   textX?: number;
   textY?: number;
   showNotice?: boolean;
-  showNoticePing?: boolean;
 }
 
 

@@ -8,8 +8,10 @@ import {
   SHOP_ITEM_REQ_FONT 
 } from '../../../../../config';
 import { Rect } from '../../../../components/tab-menu/tab-menu';
-import { drawShopItemCard } from '../../../../components/cards/shop-item';
+import { drawNoticeDot } from '../../../../components/button';
+import { drawShopItemCard, getShopItemNoticeAnchor } from '../../../../components/cards/shop-item';
 import { drawLazyLoader } from '../../../../components/utils/lazy-loader';
+import { notices } from '../../../../managers/notices';
 
 export function drawShopPanel(
   rect: Rect,
@@ -25,6 +27,7 @@ export function drawShopPanel(
   const itemWidth = rect.width;
   const itemHeight = 100;
   const itemGap = 16;
+  const noticeAnchors: Array<{ x: number; y: number; radius: number }> = [];
 
   items.forEach((item, index) => {
     const itemRect = {
@@ -37,7 +40,17 @@ export function drawShopPanel(
     drawShopItemCard(itemRect, { 
       item, 
       canAfford: item.canAfford,
-      isHighlighted: item.isHighlighted
+      isHighlighted: item.isHighlighted,
+      showNotice: false
     });
+
+    const leafId = `leaf.shop_item.${item.id}.purchase_button`;
+    if (!item.is_purchased && item.can_purchase && notices.hasLeafNotice(leafId)) {
+      noticeAnchors.push(getShopItemNoticeAnchor(itemRect));
+    }
   });
+
+  for (const anchor of noticeAnchors) {
+    drawNoticeDot(anchor.x, anchor.y, anchor.radius);
+  }
 }

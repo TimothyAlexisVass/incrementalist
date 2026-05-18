@@ -74,7 +74,7 @@ export function getTabMenu(): TabMenu {
       position: 'top-left',
       tabHeight: 36,
       tabPadding: 24,
-      contentGap: 4,
+      contentMargin: 5,
       font: 'bold 16px Arial'
     });
   }

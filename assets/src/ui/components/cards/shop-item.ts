@@ -8,7 +8,7 @@ import {
 import { formatBigNum, formatLevel } from '../../../utils';
 import { Rect } from '../tab-menu/tab-menu';
 import { InteractionState, pointInRect } from '../../managers/interactions';
-import { drawButton } from '../button';
+import { drawButton, drawNoticeDot } from '../button';
 import { drawCurrencyAmount } from '../../../render/currency-icons';
 import { ShopItemDefinition } from '../../../net/protocol';
 import { notices } from '../../managers/notices';
@@ -24,6 +24,7 @@ export interface ShopItemCardProps {
   item: ShopItemDefinition;
   canAfford: boolean;
   isHighlighted?: boolean;
+  showNotice?: boolean;
 }
 
 export function drawShopItemCard(
@@ -35,7 +36,7 @@ export function drawShopItemCard(
     return;
   }
 
-  const { item, canAfford, isHighlighted } = props;
+  const { item, canAfford, isHighlighted, showNotice = true } = props;
   const isPurchased = item.is_purchased;
 
   let opacity = 1.0;
@@ -98,14 +99,7 @@ export function drawShopItemCard(
       baseline: 'top'
     });
   } else {
-    const btnWidth = 120;
-    const btnHeight = 32;
-    const btnRect = {
-      x: rect.x + rect.width - btnWidth - 16,
-      y: rect.y + rect.height - btnHeight - 16,
-      width: btnWidth,
-      height: btnHeight
-    };
+    const btnRect = getShopItemPurchaseButtonRect(rect);
 
     if (!item.can_purchase) {
       renderer.drawText({
@@ -122,8 +116,7 @@ export function drawShopItemCard(
       drawButton(btnRect, '', {
         active: canAfford,
         textColor: canAfford ? COLORS.button.text : COLORS.panel.textSecondary,
-        showNotice: notices.hasLeafNotice(`leaf.shop_item.${item.id}.purchase_button`),
-        showNoticePing: true
+        showNotice: false
       });
 
       drawCurrencyAmount(
@@ -144,6 +137,12 @@ export function drawShopItemCard(
           formatter: formatBigNum
         }
       );
+
+      const leafId = `leaf.shop_item.${item.id}.purchase_button`;
+      if (showNotice && notices.hasLeafNotice(leafId)) {
+        const anchor = getShopItemNoticeAnchor(rect);
+        drawNoticeDot(anchor.x, anchor.y, anchor.radius);
+      }
     }
   }
 }
@@ -158,14 +157,7 @@ export function handleShopItemCardInteractions(
 
   if (item.is_purchased || !item.can_purchase || !canAfford) return;
 
-  const btnWidth = 120;
-  const btnHeight = 32;
-  const btnRect = {
-    x: rect.x + rect.width - btnWidth - 16,
-    y: rect.y + rect.height - btnHeight - 16,
-    width: btnWidth,
-    height: btnHeight
-  };
+  const btnRect = getShopItemPurchaseButtonRect(rect);
 
   if (pointInRect(input.pointer, btnRect) &&
     pointInRect(input.pressStartPointer, btnRect) &&
@@ -183,6 +175,26 @@ export function handleShopItemCardInteractions(
     
     input.consumed = true;
   }
+}
+
+export function getShopItemPurchaseButtonRect(rect: Rect) {
+  const btnWidth = 120;
+  const btnHeight = 32;
+  return {
+    x: rect.x + rect.width - btnWidth - 16,
+    y: rect.y + rect.height - btnHeight - 16,
+    width: btnWidth,
+    height: btnHeight
+  };
+}
+
+export function getShopItemNoticeAnchor(rect: Rect) {
+  const btnRect = getShopItemPurchaseButtonRect(rect);
+  return {
+    x: btnRect.x + btnRect.width - 1,
+    y: btnRect.y + 1,
+    radius: 4
+  };
 }
 
 function drawRectOutline(

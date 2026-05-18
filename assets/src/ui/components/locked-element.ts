@@ -11,7 +11,6 @@ export interface LockedElementOptions {
   criteria?: string | string[];
   font?: string;
   showNotice?: boolean;
-  showNoticePing?: boolean;
   shape?: "rect" | "circle";
   padding?: number;
 }
@@ -32,7 +31,6 @@ export function drawLockedElement(
     criteria,
     font = "bold 13px Arial",
     showNotice = false,
-    showNoticePing = false,
     shape = "rect",
     padding = 0
   } = options;
@@ -61,7 +59,7 @@ export function drawLockedElement(
     const noticeX = textX + textWidth / 2 + 6;
     const noticeY = textY - fontSize / 2 - 4;
 
-    drawNoticeDot(noticeX, noticeY, 4, showNoticePing);
+    drawNoticeDot(noticeX, noticeY, 4);
   }
 
   const hitX = rect.x - padding;

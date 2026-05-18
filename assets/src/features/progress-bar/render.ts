@@ -533,7 +533,6 @@ export function renderIdleModeToggle(
     drawLockedElement(canvas, blocked ? { ...input, pointer: null, clicked: false } : input, toggleRect, drawToggle, {
       criteria: formatUnlockRequirement(requiredLevel, state.level),
       showNotice: notices.hasLeafNotice("leaf.feature.idle_mode.locked_text"),
-      showNoticePing: true,
       padding: 3
     });
     return null;

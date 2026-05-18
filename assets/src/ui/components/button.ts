@@ -14,17 +14,13 @@ export interface ButtonOptions {
   textAlign?: CanvasTextAlign;
   textX?: number;
   textY?: number;
-  padding?: number;
   showNotice?: boolean;
-  showNoticePing?: boolean;
 }
 
-const TWO_PI = Math.PI * 2;
 const NOTICE_PING_INTERVAL_MS = 8_000;
 const NOTICE_PING_DURATION_MS = 2_000;
 const NOTICE_PING_MAX_RADIUS_PX = 120;
 const NOTICE_PING_COLOR = '#00ff00';
-const BUTTON_PADDING_PX = 3;
 const ZERO_ALPHA_RGBA: readonly [number, number, number, number] = [0, 0, 0, 0];
 
 function getNowMs() {
@@ -85,25 +81,17 @@ export function drawButton(
     font = BUTTON_DEFAULT_FONT,
     textAlign = 'center',
     textX = rect.x + (rect.width / 2),
-    textY = rect.y + (rect.height / 2),
-    padding = BUTTON_PADDING_PX
+    textY = rect.y + (rect.height / 2)
   } = options;
 
-  const paddedRect = {
-    x: rect.x - padding,
-    y: rect.y - padding,
-    width: rect.width + (padding * 2),
-    height: rect.height + (padding * 2)
-  };
-
   renderer.drawRect({
-    x: paddedRect.x,
-    y: paddedRect.y,
-    width: paddedRect.width,
-    height: paddedRect.height,
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height,
     color: cssToRgba(active ? activeSurface : inactiveSurface)
   });
-  drawRectOutline(renderer, paddedRect, borderWidth, cssToRgba(active ? activeBorder : inactiveBorder));
+  drawRectOutline(renderer, rect, borderWidth, cssToRgba(active ? activeBorder : inactiveBorder));
   renderer.drawText({
     text: label,
     x: textX,
@@ -115,28 +103,26 @@ export function drawButton(
   });
 
   if (options.showNotice) {
-    drawNoticeDot(rect.x + rect.width + 2, rect.y - 2, 4, options.showNoticePing ?? false);
+    drawNoticeDot(rect.x + rect.width - 1, rect.y + 1, 4);
   }
 }
 
 export function drawNoticeDot(
   x: number,
   y: number,
-  radius: number = 4,
-  animated: boolean = true
+  radius: number = 4
 ) {
   const renderer = getActiveWebGLRenderer();
-
-  if (animated) {
+  renderer.withScissorDisabled(() => {
     drawNoticePing(x, y, radius);
-  }
 
-  const color = cssToRgba(NOTICE_PING_COLOR);
+    const color = cssToRgba(NOTICE_PING_COLOR);
 
-  // Outer glow (soft) - USING ADDITIVE BLENDING
-  // renderer.drawCircle(x, y, radius * 1.3, [color[0], color[1], color[2], 0.25], 0.9, "additive");
-  // Main dot core (bright, solid)
-  renderer.drawCircle(x, y, radius, color, 0.05, "normal");
+    // Outer glow (soft) - USING ADDITIVE BLENDING
+    // renderer.drawCircle(x, y, radius * 1.3, [color[0], color[1], color[2], 0.25], 0.9, "additive");
+    // Main dot core (bright, solid)
+    renderer.drawCircle(x, y, radius, color, 0.05, "normal");
+  });
 }
 
 import { InteractionState, pointInRect } from '../managers/interactions';
@@ -147,13 +133,7 @@ export function doButton(
   label: string,
   options: ButtonOptions = {}
 ): boolean {
-  const padding = options.padding ?? BUTTON_PADDING_PX;
-  const hitRect = {
-    x: rect.x - padding,
-    y: rect.y - padding,
-    width: rect.width + (padding * 2),
-    height: rect.height + (padding * 2)
-  };
+  const hitRect = rect;
 
   const isHovered = pointInRect(input.pointer, hitRect);
   const startedInside = pointInRect(input.pressStartPointer, hitRect);

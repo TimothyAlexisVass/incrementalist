@@ -232,8 +232,7 @@ function renderTipPanel(
 
   const buttonClicked = !blocked && doButton(input, buttonRect, buttonLabel, {
     font: BOTTOM_HUD_BUTTON_FONT,
-    showNotice: notices.hasLeafNotice(leafId),
-    showNoticePing: true
+    showNotice: notices.hasLeafNotice(leafId)
   });
 
   notices.reportLeafVisible(leafId, notices.hasLeafNotice(leafId), channel, runCommand);

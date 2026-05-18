@@ -1,7 +1,8 @@
 import { COLORS } from '../../../../../colors';
 import { ServerState } from '../../../../../net/snapshots';
 import { getActiveWebGLRenderer } from '../../../../../renderer/webgl';
-import { drawAchievementCard } from '../../../../components/cards/achievement';
+import { drawNoticeDot } from '../../../../components/button';
+import { drawAchievementCard, getAchievementNoticeAnchor } from '../../../../components/cards/achievement';
 import { ScrollingPanel } from '../../../../components/scrolling-panel';
 import { Rect } from '../../../../components/tab-menu/tab-menu';
 import { InteractionState } from '../../../../managers/interactions';
@@ -11,6 +12,7 @@ import { getNetwork } from '../../view-model';
 import { markViewed } from '../../../../../net/commands';
 import { hexToRgba } from '../../../../../utils/color';
 import { doCheckbox } from '../../../../components/checkbox';
+import { notices } from '../../../../managers/notices';
 
 const CARD_HEIGHT_PX = 80;
 const CARD_GAP_PX = 8;
@@ -97,6 +99,7 @@ export function renderAchievementsTab(
   const cardWidth = Math.max(1, listRect.width - CARD_SCROLLBAR_GUTTER_PX);
   const contentHeight = (achievements.length * CARD_HEIGHT_PX) + (Math.max(0, achievements.length - 1) * CARD_GAP_PX);
   const scrollingPanel = getScrollingPanel(listRect, contentHeight);
+  const noticeAnchors: Array<{ x: number; y: number; radius: number }> = [];
 
   scrollingPanel.update(input);
   scrollingPanel.drawClippedContent(renderer, (scrollOffsetY) => {
@@ -109,15 +112,25 @@ export function renderAchievementsTab(
       if (cardY + CARD_HEIGHT_PX <= listRect.y) continue;
 
       const { channel, runCommand } = getNetwork();
-      drawAchievementCard(achievement, {
+      const cardRect = {
         x: listRect.x,
         y: cardY,
         width: cardWidth,
         height: CARD_HEIGHT_PX
-      }, channel || undefined, runCommand || undefined);
+      };
+      drawAchievementCard(achievement, cardRect, channel || undefined, runCommand || undefined, { showNotice: false });
+
+      const leafId = `leaf.achievement.${(achievement as any).id}.unlocked`;
+      if (notices.hasLeafNotice(leafId)) {
+        noticeAnchors.push(getAchievementNoticeAnchor(cardRect));
+      }
     }
   });
   scrollingPanel.drawScrollBar(renderer);
+
+  for (const anchor of noticeAnchors) {
+    drawNoticeDot(anchor.x, anchor.y, anchor.radius);
+  }
 }
 
 function getScrollingPanel(rect: Rect, contentHeight: number): ScrollingPanel {
@@ -129,4 +142,3 @@ function getScrollingPanel(rect: Rect, contentHeight: number): ScrollingPanel {
   achievementsScrollingPanel.setContentHeight(contentHeight);
   return achievementsScrollingPanel;
 }
-

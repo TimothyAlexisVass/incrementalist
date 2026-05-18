@@ -6,14 +6,20 @@ import { hexToRgba } from '../../../utils/color';
 import { notices } from '../../managers/notices';
 import { drawNoticeDot } from '../button';
 
+interface AchievementCardRenderOptions {
+  showNotice?: boolean;
+}
+
 export function drawAchievementCard(
   achievement: AchievementState,
   rect: { x: number; y: number; width: number; height: number },
   channel?: GameChannel,
-  runCommand?: (cmd: () => Promise<any>) => void
+  runCommand?: (cmd: () => Promise<any>) => void,
+  renderOptions: AchievementCardRenderOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
+  const { showNotice = true } = renderOptions;
 
   const isUnlocked = achievement.unlocked_at !== null;
   const bgColor = hexToRgba(isUnlocked ? COLORS.panel.bg : '#0a0a0a');
@@ -72,14 +78,18 @@ export function drawAchievementCard(
   // Notification Dot
   const leafId = `leaf.achievement.${(achievement as any).id}.unlocked`;
   const hasNotice = notices.hasLeafNotice(leafId);
-  if (hasNotice) {
-    drawNoticeDot(
-      rect.x + rect.width - 8,
-      rect.y + 8,
-      5,
-      true
-    );
+  if (showNotice && hasNotice) {
+    const anchor = getAchievementNoticeAnchor(rect);
+    drawNoticeDot(anchor.x, anchor.y, anchor.radius);
   }
+}
+
+export function getAchievementNoticeAnchor(rect: { x: number; y: number; width: number; height: number }) {
+  return {
+    x: rect.x + rect.width - 8,
+    y: rect.y + 8,
+    radius: 5
+  };
 }
 
 function getConditionText(condition: string): string {

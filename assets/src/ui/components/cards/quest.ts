@@ -11,10 +11,11 @@ export interface QuestCardOptions {
   onClaim?: () => void;
   channel?: GameChannel;
   runCommand?: (cmd: () => Promise<any>) => void;
+  showNotice?: boolean;
 }
 
 export function drawQuestCard(options: QuestCardOptions) {
-  const { quest, rect, onClaim, channel, runCommand } = options;
+  const { quest, rect, onClaim, channel, runCommand, showNotice = true } = options;
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
 
@@ -84,10 +85,11 @@ export function drawQuestCard(options: QuestCardOptions) {
 
   // Claim Button or Status
   if (canClaim) {
-    const btnWidth = 80;
-    const btnHeight = 28;
-    const btnX = rect.x + rect.width - btnWidth - 12;
-    const btnY = rect.y + rect.height - btnHeight - 12;
+    const claimRect = getQuestClaimButtonRect(rect);
+    const btnX = claimRect.x;
+    const btnY = claimRect.y;
+    const btnWidth = claimRect.width;
+    const btnHeight = claimRect.height;
 
     renderer.drawRect({
       x: btnX,
@@ -110,13 +112,9 @@ export function drawQuestCard(options: QuestCardOptions) {
     // Notification Dot
     const leafId = `leaf.quest.${(quest as any).id}.claim_button`;
     const hasNotice = notices.hasLeafNotice(leafId);
-    if (hasNotice) {
-      drawNoticeDot(
-        btnX + btnWidth - 4,
-        btnY + 4,
-        5,
-        true
-      );
+    if (showNotice && hasNotice) {
+      const anchor = getQuestNoticeAnchor(rect);
+      drawNoticeDot(anchor.x, anchor.y, anchor.radius);
 
       notices.reportLeafVisible(leafId, true, channel, runCommand);
     }
@@ -149,15 +147,32 @@ export function isQuestClaimClicked(
   pointer: { x: number; y: number },
   rect: { x: number; y: number; width: number; height: number }
 ): boolean {
-  const btnWidth = 80;
-  const btnHeight = 28;
-  const btnX = rect.x + rect.width - btnWidth - 12;
-  const btnY = rect.y + rect.height - btnHeight - 12;
+  const claimRect = getQuestClaimButtonRect(rect);
 
   return (
-    pointer.x >= btnX &&
-    pointer.x <= btnX + btnWidth &&
-    pointer.y >= btnY &&
-    pointer.y <= btnY + btnHeight
+    pointer.x >= claimRect.x &&
+    pointer.x <= claimRect.x + claimRect.width &&
+    pointer.y >= claimRect.y &&
+    pointer.y <= claimRect.y + claimRect.height
   );
+}
+
+export function getQuestClaimButtonRect(rect: { x: number; y: number; width: number; height: number }) {
+  const btnWidth = 80;
+  const btnHeight = 28;
+  return {
+    x: rect.x + rect.width - btnWidth - 12,
+    y: rect.y + rect.height - btnHeight - 12,
+    width: btnWidth,
+    height: btnHeight
+  };
+}
+
+export function getQuestNoticeAnchor(rect: { x: number; y: number; width: number; height: number }) {
+  const claimRect = getQuestClaimButtonRect(rect);
+  return {
+    x: claimRect.x + claimRect.width - 4,
+    y: claimRect.y + 4,
+    radius: 5
+  };
 }
