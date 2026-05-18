@@ -502,10 +502,10 @@ export function getProgressBarLayout(canvas: HTMLCanvasElement) {
 export function getIdleModeToggleRect(canvas: HTMLCanvasElement) {
   const barLayout = getProgressBarLayout(canvas);
   return {
-    x: barLayout.x + barLayout.width / 2 - 32,
-    y: barLayout.y + barLayout.height + 40,
-    width: 66,
-    height: 20
+    x: barLayout.x + barLayout.width / 2 - 35,
+    y: barLayout.y + barLayout.height + 37,
+    width: 71,
+    height: 25
   };
 }
 
