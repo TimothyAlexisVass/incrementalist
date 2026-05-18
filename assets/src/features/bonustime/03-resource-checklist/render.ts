@@ -2,8 +2,14 @@ import { getActiveWebGLRenderer, RGBA } from "../../../renderer/webgl";
 import { hexToRgba, cssToRgba } from "../../../utils";
 import { ResourceChecklistData } from "./view-model";
 import { ResourceChecklistState, getResourceChecklistState } from "./interactions";
-import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from "../../../config";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
+import {
+  BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX,
+  BONUSTIME_CHECKLIST_BASE_GAP_PX,
+  BONUSTIME_CHECKLIST_BASE_HEIGHT_PX,
+  BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+  fitRectWithinBonusTimeArea
+} from "../layout";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -18,32 +24,22 @@ export function renderResourceChecklist(
 
   const state = getResourceChecklistState();
   const now = performance.now();
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
+  const layout = fitRectWithinBonusTimeArea(
+    rect,
+    BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+    BONUSTIME_CHECKLIST_BASE_HEIGHT_PX
+  );
   const displayedEntryIndex =
     state === ResourceChecklistState.IDLE
       ? data.nextEntryIndex
       : (data.nextEntryIndex + 16) % 17;
 
-  // Title
-  renderer.drawText({
-    text: "RESOURCE CHECKLIST",
-    x: centerX,
-    y: rect.y + 40,
-    font: MODAL_TITLE_FONT,
-    color: "#edf2f7",
-    align: 'center',
-    baseline: 'middle'
-  });
-
   const gridCols = 6;
-  const boxSize = 48;
-  const gap = 10;
-  const gridWidth = gridCols * boxSize + (gridCols - 1) * gap;
-  const gridHeight = 3 * boxSize + 2 * gap;
-
-  const startX = centerX - gridWidth / 2;
-  const startY = centerY - gridHeight / 2 + 10;
+  const boxSize = BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX * layout.scale;
+  const gap = BONUSTIME_CHECKLIST_BASE_GAP_PX * layout.scale;
+  const startX = layout.x;
+  const startY = layout.y;
+  const labelFontSize = Math.max(12, Math.round(13 * layout.scale));
 
   // Draw 17 boxes in a 6-column grid
   for (let i = 0; i < 17; i++) {
@@ -99,30 +95,10 @@ export function renderResourceChecklist(
       text: (i + 1).toString(),
       x: boxX + boxSize / 2,
       y: boxY + boxSize / 2,
-      font: MODAL_BODY_FONT,
+      font: `${labelFontSize}px Arial`,
       color: labelColor,
       align: 'center',
       baseline: 'middle'
     });
   }
-
-  // Bottom instruction label
-  let instruction = "";
-  if (state === ResourceChecklistState.IDLE) {
-    instruction = data.hasToken ? "CLICK ANYWHERE TO CHECK OFF" : "NO TOKENS AVAILABLE";
-  } else if (state === ResourceChecklistState.REVEALING) {
-    instruction = "CHECKING OFF...";
-  } else if (state === ResourceChecklistState.REVEALED) {
-    instruction = "CLICK TO CLAIM REWARD";
-  }
-
-  renderer.drawText({
-    text: instruction,
-    x: centerX,
-    y: startY + gridHeight + 35,
-    font: MODAL_BODY_FONT,
-    color: "#a0aec0",
-    align: 'center',
-    baseline: 'middle'
-  });
 }

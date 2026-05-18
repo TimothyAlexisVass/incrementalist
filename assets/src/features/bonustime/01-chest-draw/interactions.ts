@@ -2,6 +2,7 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { ChestDrawData } from "./view-model";
+import { fitRectWithinBonusTimeArea } from "../layout";
 
 export enum ChestState {
   IDLE,
@@ -22,9 +23,10 @@ export function handleChestDrawInteractions(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
+  const layout = fitRectWithinBonusTimeArea(chestRect, 300, 300);
   const isHover = input.pointer &&
-                  input.pointer.x >= chestRect.x && input.pointer.x <= chestRect.x + chestRect.width &&
-                  input.pointer.y >= chestRect.y && input.pointer.y <= chestRect.y + chestRect.height;
+                  input.pointer.x >= layout.x && input.pointer.x <= layout.x + layout.width &&
+                  input.pointer.y >= layout.y && input.pointer.y <= layout.y + layout.height;
 
   if (isHover && input.clicked && !input.consumed) {
     if (internalState === ChestState.IDLE && data.hasToken && channel) {

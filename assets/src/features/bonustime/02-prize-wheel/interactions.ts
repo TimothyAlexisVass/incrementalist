@@ -2,6 +2,7 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { PrizeWheelData } from "./view-model";
+import { fitRectWithinBonusTimeArea } from "../layout";
 
 export enum WheelState {
   IDLE,
@@ -22,9 +23,10 @@ export function handlePrizeWheelInteractions(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
+  const layout = fitRectWithinBonusTimeArea(wheelRect, 300, 300);
   const isHover = input.pointer &&
-                  input.pointer.x >= wheelRect.x && input.pointer.x <= wheelRect.x + wheelRect.width &&
-                  input.pointer.y >= wheelRect.y && input.pointer.y <= wheelRect.y + wheelRect.height;
+                  input.pointer.x >= layout.x && input.pointer.x <= layout.x + layout.width &&
+                  input.pointer.y >= layout.y && input.pointer.y <= layout.y + layout.height;
 
   if (isHover && input.clicked && !input.consumed) {
     if (internalState === WheelState.IDLE && data.hasToken && channel) {

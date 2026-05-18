@@ -53,14 +53,11 @@ export function handleBonusTimeInteractions(
   }
 
   // 1. Sub-game interactions
-  const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
-  const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
-  const size = 300;
   const gameRect = {
-    x: centerX - size / 2,
-    y: centerY - size / 2,
-    width: size,
-    height: size
+    x: DISPLAY_AREA_X,
+    y: DISPLAY_AREA_Y,
+    width: DISPLAY_AREA_WIDTH,
+    height: DISPLAY_AREA_HEIGHT
   };
 
   if (activeGameId === 'chest_draw') {

@@ -2,6 +2,11 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { ResourceChecklistData } from "./view-model";
+import {
+  BONUSTIME_CHECKLIST_BASE_HEIGHT_PX,
+  BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+  fitRectWithinBonusTimeArea
+} from "../layout";
 
 export enum ResourceChecklistState {
   IDLE,
@@ -22,9 +27,14 @@ export function handleResourceChecklistInteractions(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
+  const layout = fitRectWithinBonusTimeArea(
+    rect,
+    BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+    BONUSTIME_CHECKLIST_BASE_HEIGHT_PX
+  );
   const isHover = input.pointer &&
-                  input.pointer.x >= rect.x && input.pointer.x <= rect.x + rect.width &&
-                  input.pointer.y >= rect.y && input.pointer.y <= rect.y + rect.height;
+                  input.pointer.x >= layout.x && input.pointer.x <= layout.x + layout.width &&
+                  input.pointer.y >= layout.y && input.pointer.y <= layout.y + layout.height;
 
   if (isHover && input.clicked && !input.consumed) {
     if (internalState === ResourceChecklistState.IDLE && data.hasToken && channel) {
