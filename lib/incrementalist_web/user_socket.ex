@@ -9,6 +9,7 @@ defmodule IncrementalistWeb.UserSocket do
   use Phoenix.Socket
 
   alias Incrementalist.Game.Sessions
+  alias Incrementalist.Game.Session.FullSnapshotOverrides
 
   channel "game", IncrementalistWeb.GameChannel
 
@@ -21,14 +22,18 @@ defmodule IncrementalistWeb.UserSocket do
             {:ok, id} -> id
             _ -> nil
           end
-        _ -> nil
+
+        _ ->
+          nil
       end
 
     player = Sessions.authenticate_player(player_id)
 
+    force_full_snapshot = FullSnapshotOverrides.consume?(player.id)
+
     has_cached_snapshot =
       case {Map.get(params, "has_cached_snapshot"), Map.get(params, "cache_username")} do
-        {"true", cache_username} when is_binary(cache_username) ->
+        {"true", cache_username} when is_binary(cache_username) and not force_full_snapshot ->
           cache_username == player.username
 
         _ ->

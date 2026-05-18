@@ -530,7 +530,10 @@ defmodule Incrementalist.Game.State do
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
       "has_bonustime_token" => projected_state.has_bonustime_token,
-      "bonustime" => if(projected_state.bonustime, do: Map.merge(Map.from_struct(projected_state.bonustime), %{"rotation_anchor" => Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601()}), else: nil),
+      "bonustime" => if(projected_state.bonustime, do: Map.merge(Map.from_struct(projected_state.bonustime), %{
+        "rotation_anchor" => Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Incrementalist.Game.Time.iso8601(),
+        "active_game_id" => Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
+      }), else: nil),
       "projection_params" =>
         projection_params(projected_state, now)
     }

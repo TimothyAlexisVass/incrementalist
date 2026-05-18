@@ -18,6 +18,11 @@ const GAME_NAMES: Record<string, string> = {
 };
 
 export function getActiveGameId(state?: ServerState): string {
+  const serverActiveGameId = state?.snapshot?.state.bonustime?.active_game_id;
+  if (serverActiveGameId) {
+    return serverActiveGameId;
+  }
+
   const now = getServerNow();
   let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
   if (!anchorStr) {

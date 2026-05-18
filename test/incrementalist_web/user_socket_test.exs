@@ -1,10 +1,16 @@
 defmodule IncrementalistWeb.UserSocketTest do
   use Incrementalist.DataCase, async: false
 
+  alias Incrementalist.Game.Session.FullSnapshotOverrides
   alias Incrementalist.Game.Sessions
   alias IncrementalistWeb.UserSocket
 
   @now ~U[2026-05-13 12:00:00.000000Z]
+
+  setup do
+    FullSnapshotOverrides.clear()
+    :ok
+  end
 
   test "connect authenticates a player and assigns player_id" do
     player = Sessions.authenticate_player(nil, @now)
@@ -54,5 +60,24 @@ defmodule IncrementalistWeb.UserSocketTest do
 
     assert connected_socket.assigns.player_id == player.id
     assert connected_socket.assigns.has_cached_snapshot == false
+  end
+
+  test "connect consumes full snapshot override and ignores cached snapshot once" do
+    player = Sessions.authenticate_player(nil, @now)
+    token = Phoenix.Token.sign(IncrementalistWeb.Endpoint, "player_auth", player.id)
+    FullSnapshotOverrides.request(player.id)
+
+    params = %{
+      "token" => token,
+      "has_cached_snapshot" => "true",
+      "cache_username" => player.username
+    }
+
+    socket = %Phoenix.Socket{endpoint: IncrementalistWeb.Endpoint}
+    assert {:ok, first_socket} = UserSocket.connect(params, socket, nil)
+    assert first_socket.assigns.has_cached_snapshot == false
+
+    assert {:ok, second_socket} = UserSocket.connect(params, socket, nil)
+    assert second_socket.assigns.has_cached_snapshot == true
   end
 end

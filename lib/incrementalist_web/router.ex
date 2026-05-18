@@ -21,5 +21,8 @@ defmodule IncrementalistWeb.Router do
     post "/delete/:id", DebugController, :delete
     get "/edit/:id", DebugController, :edit
     post "/update/:id", DebugController, :update
+    post "/set_active_game", DebugController, :set_active_game
+    post "/grant_token/:id", DebugController, :grant_token
+    post "/full_snapshot/:id", DebugController, :full_snapshot
   end
 end

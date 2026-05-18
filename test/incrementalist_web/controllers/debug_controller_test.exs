@@ -4,6 +4,7 @@ defmodule IncrementalistWeb.DebugControllerTest do
   import Ecto.Query
   alias Incrementalist.Game.Persistence.{Player, PlayerState, GameCommand}
   alias Incrementalist.Game.Persistence.PlayerStates
+  alias Incrementalist.Game.Session.FullSnapshotOverrides
   alias Incrementalist.Repo
 
   defp create_player(username) do
@@ -13,6 +14,11 @@ defmodule IncrementalistWeb.DebugControllerTest do
       last_seen_at: DateTime.utc_now()
     })
     |> Repo.insert!()
+  end
+
+  setup do
+    FullSnapshotOverrides.clear()
+    :ok
   end
 
   test "GET /debug - lists empty players and registered players", %{conn: conn} do
@@ -46,6 +52,7 @@ defmodule IncrementalistWeb.DebugControllerTest do
       "level" => 42,
       "coins" => %{"m" => 5.5, "e" => 2}
     }
+
     json_payload = Jason.encode!(custom_state)
 
     conn = post(conn, "/debug/update/#{player.id}", %{"state_json" => json_payload})
@@ -66,7 +73,8 @@ defmodule IncrementalistWeb.DebugControllerTest do
     assert resp =~ "Invalid JSON Format"
   end
 
-  test "POST /debug/delete/:id - performs cascading deletions of player, state, and command logs", %{conn: conn} do
+  test "POST /debug/delete/:id - performs cascading deletions of player, state, and command logs",
+       %{conn: conn} do
     player = create_player("tester_eve")
     ps = PlayerStates.load_or_create(player)
     p_id = player.id
@@ -97,5 +105,47 @@ defmodule IncrementalistWeb.DebugControllerTest do
     refute Repo.get(Player, p_id)
     refute Repo.one(from ps in PlayerState, where: ps.player_id == ^p_id)
     refute Repo.one(from gc in GameCommand, where: gc.player_id == ^p_id)
+  end
+
+  test "POST /debug/set_active_game - sets and resets active daily game overrides", %{conn: conn} do
+    # Clear existing override
+    Application.put_env(:incrementalist, :bonustime_game_override, nil)
+
+    # 1. Override to prize_wheel
+    conn = post(conn, "/debug/set_active_game", %{"game_id" => "prize_wheel"})
+    assert redirected_to(conn) =~ "/debug?success="
+    assert Application.get_env(:incrementalist, :bonustime_game_override) == "prize_wheel"
+    assert Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id() == "prize_wheel"
+
+    # 2. Reset back to natural rotation
+    conn2 = post(conn, "/debug/set_active_game", %{"game_id" => "rotation"})
+    assert redirected_to(conn2) =~ "/debug?success="
+    assert is_nil(Application.get_env(:incrementalist, :bonustime_game_override))
+  end
+
+  test "POST /debug/grant_token/:id - sets has_bonustime_token to true", %{conn: conn} do
+    player = create_player("tester_token_grant")
+    ps = PlayerStates.load_or_create(player)
+
+    # Force has_bonustime_token to false first
+    Repo.update!(PlayerState.changeset(ps, %{has_bonustime_token: false}))
+    refute PlayerStates.get(player.id).has_bonustime_token
+
+    # Grant token
+    conn = post(conn, "/debug/grant_token/#{player.id}")
+    assert redirected_to(conn) =~ "/debug?success="
+
+    # Verify that token is now true
+    assert PlayerStates.get(player.id).has_bonustime_token
+  end
+
+  test "POST /debug/full_snapshot/:id - queues one-shot full snapshot for player", %{conn: conn} do
+    player = create_player("tester_full_snapshot")
+
+    conn = post(conn, "/debug/full_snapshot/#{player.id}")
+    assert redirected_to(conn) =~ "/debug?success="
+
+    assert FullSnapshotOverrides.consume?(player.id)
+    refute FullSnapshotOverrides.consume?(player.id)
   end
 end

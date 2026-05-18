@@ -3,6 +3,7 @@ defmodule IncrementalistWeb.DebugController do
 
   alias Incrementalist.Game.Persistence.{Player, PlayerState, GameCommand}
   alias Incrementalist.Game.Persistence.PlayerStates
+  alias Incrementalist.Game.Session.FullSnapshotOverrides
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -155,6 +156,12 @@ defmodule IncrementalistWeb.DebugController do
       border: 1px solid rgba(210, 153, 34, 0.3);
     }
 
+    .tag-danger {
+      background-color: rgba(248, 81, 73, 0.15);
+      color: #f85149;
+      border: 1px solid rgba(248, 81, 73, 0.3);
+    }
+
     /* Alert / Error Box */
     .alert {
       padding: 16px;
@@ -209,6 +216,11 @@ defmodule IncrementalistWeb.DebugController do
       box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.3);
     }
 
+    select:focus {
+      border-color: #1f6feb !important;
+      box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.3);
+    }
+
     .breadcrumb {
       margin-bottom: 20px;
       font-size: 0.9rem;
@@ -231,20 +243,24 @@ defmodule IncrementalistWeb.DebugController do
   # ---------------------------------------------------------------------------
   def index(conn, params) do
     # Fetch players with a join on player_states to see if state exists
-    query = from p in Player,
-      left_join: ps in PlayerState, on: ps.player_id == p.id,
-      order_by: [desc: p.id],
-      select: %{
-        id: p.id,
-        username: p.username,
-        email: p.email,
-        last_seen_at: p.last_seen_at,
-        inserted_at: p.inserted_at,
-        has_state: not is_nil(ps.id)
-      }
+    query =
+      from p in Player,
+        left_join: ps in PlayerState,
+        on: ps.player_id == p.id,
+        order_by: [desc: p.id],
+        select: %{
+          id: p.id,
+          username: p.username,
+          email: p.email,
+          last_seen_at: p.last_seen_at,
+          inserted_at: p.inserted_at,
+          has_state: not is_nil(ps.id),
+          has_token: ps.has_bonustime_token
+        }
 
     players = Repo.all(query)
 
+    csrf_token = Plug.CSRFProtection.get_csrf_token()
     success_msg = Map.get(conn.assigns, :success_msg) || Map.get(params, "success")
     error_msg = Map.get(conn.assigns, :error_msg) || Map.get(params, "error")
 
@@ -252,8 +268,10 @@ defmodule IncrementalistWeb.DebugController do
       cond do
         success_msg ->
           "<div class=\"alert alert-success\">#{success_msg}</div>"
+
         error_msg ->
           "<div class=\"alert alert-error\">#{error_msg}</div>"
+
         true ->
           ""
       end
@@ -262,19 +280,33 @@ defmodule IncrementalistWeb.DebugController do
       if Enum.empty?(players) do
         """
         <tr>
-          <td colspan="5" style="text-align: center; color: #8b949e; padding: 40px;">
+          <td colspan="7" style="text-align: center; color: #8b949e; padding: 40px;">
             No players found in database.
           </td>
         </tr>
         """
       else
         Enum.map(players, fn p ->
-          email = p.email || "<span style=\"color: #8b949e; font-style: italic;\">Anonymous</span>"
+          email =
+            p.email || "<span style=\"color: #8b949e; font-style: italic;\">Anonymous</span>"
+
           state_tag =
             if p.has_state do
               "<span class=\"tag tag-success\">Active State</span>"
             else
               "<span class=\"tag tag-warning\">No State</span>"
+            end
+
+          token_tag =
+            cond do
+              not p.has_state ->
+                "<span class=\"tag tag-warning\">No State</span>"
+
+              p.has_token ->
+                "<span class=\"tag tag-success\">Available</span>"
+
+              true ->
+                "<span class=\"tag tag-danger\">Used</span>"
             end
 
           last_seen =
@@ -284,9 +316,6 @@ defmodule IncrementalistWeb.DebugController do
               "N/A"
             end
 
-          # Form for csrf protection & delete call
-          csrf_token = Plug.CSRFProtection.get_csrf_token()
-
           """
           <tr>
             <td><strong>##{p.id}</strong></td>
@@ -294,9 +323,18 @@ defmodule IncrementalistWeb.DebugController do
             <td>#{email}</td>
             <td>#{last_seen}</td>
             <td>#{state_tag}</td>
-            <td style="text-align: right;">
-              <a href="/debug/edit/#{p.id}" class="btn btn-primary btn-action" style="margin-right: 8px;">Edit State</a>
-              <form action="/debug/delete/#{p.id}" method="post" style="display: inline;" onsubmit="return confirm('Are you absolutely sure you want to delete player #{p.username}? This will wipe their save state and command logs permanently!');">
+            <td>#{token_tag}</td>
+            <td style="display: flex; flex-wrap: wrap; text-align: right; max-width: 16rem; gap: 0.5rem;">
+              <form action="/debug/grant_token/#{p.id}" method="post">
+                <input type="hidden" name="_csrf_token" value="#{csrf_token}">
+                <button type="submit" class="btn btn-secondary btn-action" style="color: #3fb950; border-color: rgba(46, 160, 67, 0.4);">Grant Token</button>
+              </form>
+              <form action="/debug/full_snapshot/#{p.id}" method="post">
+                <input type="hidden" name="_csrf_token" value="#{csrf_token}">
+                <button type="submit" class="btn btn-secondary btn-action" style="color: #58a6ff; border-color: rgba(88, 166, 255, 0.4);">Full Snapshot</button>
+              </form>
+              <a href="/debug/edit/#{p.id}" class="btn btn-primary btn-action">Edit State</a>
+              <form action="/debug/delete/#{p.id}" method="post" onsubmit="return confirm('Are you absolutely sure you want to delete player #{p.username}? This will wipe their save state and command logs permanently!');">
                 <input type="hidden" name="_csrf_token" value="#{csrf_token}">
                 <button type="submit" class="btn btn-danger btn-action">Delete</button>
               </form>
@@ -306,6 +344,9 @@ defmodule IncrementalistWeb.DebugController do
         end)
         |> Enum.join("\n")
       end
+
+    current_override = Application.get_env(:incrementalist, :bonustime_game_override)
+    active_game_id = Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
 
     page_html = """
     <!DOCTYPE html>
@@ -327,6 +368,31 @@ defmodule IncrementalistWeb.DebugController do
 
         #{alert_html}
 
+        <!-- Active Daily Game Override -->
+        <div class="card" style="margin-bottom: 30px;">
+          <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; color: #ffffff; margin-top: 0; margin-bottom: 10px;">Active Daily Game Override</h2>
+          <p style="color: #8b949e; margin-top: 0; margin-bottom: 20px; font-size: 0.9rem;">
+            Set which game is active today. Changing this affects all players instantly. Currently computed active game: <strong>#{active_game_id}</strong>
+            #{if current_override, do: " <span class=\"tag tag-warning\">Overridden</span>", else: " <span class=\"tag tag-success\">Natural Rotation</span>"}
+          </p>
+          
+          <form action="/debug/set_active_game" method="post" style="display: flex; gap: 12px; align-items: center;">
+            <input type="hidden" name="_csrf_token" value="#{csrf_token}">
+            
+            <div style="flex: 1; max-width: 400px;">
+              <select name="game_id" style="width: 100%; background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 10px; font-size: 0.9rem; font-family: 'Inter', sans-serif;">
+                <option value="rotation" #{if is_nil(current_override), do: "selected"}>Use Time-Based Natural Rotation</option>
+                <option value="chest_draw" #{if current_override == "chest_draw", do: "selected"}>Chest Draw (chest_draw)</option>
+                <option value="prize_wheel" #{if current_override == "prize_wheel", do: "selected"}>Prize Wheel (prize_wheel)</option>
+                <option value="resource_checklist" #{if current_override == "resource_checklist", do: "selected"}>Resource Checklist (resource_checklist)</option>
+                <option value="item_checklist" #{if current_override == "item_checklist", do: "selected"}>Item Checklist (item_checklist)</option>
+              </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Apply Active Game</button>
+          </form>
+        </div>
+
         <div class="card">
           <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; color: #ffffff; margin-top: 0; margin-bottom: 20px;">Registered Players</h2>
           <table style="width: 100%;">
@@ -336,7 +402,8 @@ defmodule IncrementalistWeb.DebugController do
                 <th>Username</th>
                 <th>Email</th>
                 <th>Last Active</th>
-                <th>Status</th>
+                <th>State</th>
+                <th>Token</th>
                 <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
@@ -360,18 +427,19 @@ defmodule IncrementalistWeb.DebugController do
     player_id = String.to_integer(player_id)
 
     case Repo.transaction(fn ->
-      # 1. Clean up command history
-      Repo.delete_all(from gc in GameCommand, where: gc.player_id == ^player_id)
-      # 2. Clean up player state
-      Repo.delete_all(from ps in PlayerState, where: ps.player_id == ^player_id)
-      # 3. Delete player identity
-      case Repo.get(Player, player_id) do
-        nil -> {:error, "Player not found"}
-        player -> Repo.delete!(player)
-      end
-    end) do
+           # 1. Clean up command history
+           Repo.delete_all(from gc in GameCommand, where: gc.player_id == ^player_id)
+           # 2. Clean up player state
+           Repo.delete_all(from ps in PlayerState, where: ps.player_id == ^player_id)
+           # 3. Delete player identity
+           case Repo.get(Player, player_id) do
+             nil -> {:error, "Player not found"}
+             player -> Repo.delete!(player)
+           end
+         end) do
       {:ok, _} ->
         redirect(conn, to: "/debug?success=Player+#{player_id}+successfully+deleted!")
+
       _ ->
         redirect(conn, to: "/debug?error=Failed+to+delete+player+#{player_id}")
     end
@@ -454,19 +522,23 @@ defmodule IncrementalistWeb.DebugController do
     case Jason.decode(state_json_str) do
       {:ok, parsed_state} ->
         # Ecto changeset casting validation!
-        changeset = PlayerState.changeset(ps, %{
-          state: parsed_state,
-          has_bonustime_token: Map.get(parsed_state, "has_bonustime_token") || ps.has_bonustime_token,
-          last_saved_at: DateTime.utc_now()
-        })
+        changeset =
+          PlayerState.changeset(ps, %{
+            state: parsed_state,
+            has_bonustime_token:
+              Map.get(parsed_state, "has_bonustime_token") || ps.has_bonustime_token,
+            last_saved_at: DateTime.utc_now()
+          })
 
         case Repo.update(changeset) do
           {:ok, _updated_ps} ->
-            redirect(conn, to: "/debug?success=State+for+player+#{player.username}+successfully+saved!")
+            redirect(conn,
+              to: "/debug?success=State+for+player+#{player.username}+successfully+saved!"
+            )
 
           {:error, changeset_error} ->
             error_details = inspect_changeset_errors(changeset_error)
-            
+
             error_html = """
             <div class="alert alert-error">
               <strong>Changeset Validation Failed:</strong><br>
@@ -486,6 +558,53 @@ defmodule IncrementalistWeb.DebugController do
 
         html(conn, edit_error_page(player, state_json_str, error_html, csrf_token))
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Set Active Daily Game Override
+  # ---------------------------------------------------------------------------
+  def set_active_game(conn, %{"game_id" => game_id}) do
+    override = if game_id == "rotation", do: nil, else: game_id
+    Application.put_env(:incrementalist, :bonustime_game_override, override)
+
+    redirect(conn, to: "/debug?success=Active+daily+game+successfully+updated+to+#{game_id}!")
+  end
+
+  # ---------------------------------------------------------------------------
+  # Grant Daily Play Token
+  # ---------------------------------------------------------------------------
+  def grant_token(conn, %{"id" => player_id}) do
+    player_id = String.to_integer(player_id)
+    player = Repo.get!(Player, player_id)
+    ps = PlayerStates.load_or_create(player)
+
+    changeset = PlayerState.changeset(ps, %{has_bonustime_token: true})
+
+    case Repo.update(changeset) do
+      {:ok, _} ->
+        redirect(conn,
+          to: "/debug?success=BonusTime+token+successfully+granted+to+#{player.username}!"
+        )
+
+      {:error, _} ->
+        redirect(conn, to: "/debug?error=Failed+to+grant+BonusTime+token+to+#{player.username}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Force Full Snapshot On Next Boot
+  # ---------------------------------------------------------------------------
+  def full_snapshot(conn, %{"id" => player_id}) do
+    player_id = String.to_integer(player_id)
+    player = Repo.get!(Player, player_id)
+
+    FullSnapshotOverrides.request(player.id)
+
+    redirect(
+      conn,
+      to:
+        "/debug?success=Full+snapshot+queued+for+#{player.username}.+Next+reconnect+will+ignore+client+cache."
+    )
   end
 
   # Helper to pretty print changeset errors for deep embedded schemas

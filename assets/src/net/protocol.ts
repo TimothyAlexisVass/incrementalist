@@ -90,6 +90,7 @@ export type BonusTimeState = {
   checklist_entry_indexes: Record<string, number>;
   last_result: any | null;
   rotation_anchor?: string;
+  active_game_id?: string;
 };
 
 export type NoticeState = {
