@@ -18,6 +18,7 @@ import { resolveUpdatingText } from "../../../utils/text";
 
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
 const EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER = 2;
+const EXP_BAR_FILL_LERP_SPEED = 12;
 const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
   COLORS.bar.exp.fillStart,
   COLORS.bar.exp.fillEnd,
@@ -26,6 +27,8 @@ const EXP_BAR_LEVEL_UP_COLORS = Object.freeze([
 ]);
 const TOP_HUD_EXP_TEXT_KEY = "top_hud.exp";
 const TOP_HUD_LEVEL_TEXT_KEY = "top_hud.level";
+let displayedExpFillRatio = 0;
+let hasExpFillInitialized = false;
 
 export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   const renderer = getActiveWebGLRenderer();
@@ -47,6 +50,14 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
 
   const requiredExp = getRequiredExp(model.displayedLevel);
   const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
+  if (!hasExpFillInitialized) {
+    displayedExpFillRatio = fillRatio;
+    hasExpFillInitialized = true;
+  } else {
+    const lerpAmount = 1 - Math.exp(-EXP_BAR_FILL_LERP_SPEED * (Math.max(0, dtMs) / 1000));
+    displayedExpFillRatio += (fillRatio - displayedExpFillRatio) * lerpAmount;
+  }
+  displayedExpFillRatio = Math.min(1, Math.max(0, displayedExpFillRatio));
   const expBarRect = {
     x: TOP_HUD_EXP_BAR_X,
     y: TOP_HUD_EXP_BAR_Y,
@@ -57,7 +68,7 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   drawHorizontalBar(
     expBarRect,
     {
-      fillRatio,
+      fillRatio: displayedExpFillRatio,
       fillStartColor: COLORS.bar.exp.fillStart,
       fillEndColor: COLORS.bar.exp.fillEnd
     }
