@@ -60,6 +60,13 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     GenServer.call(via_tuple(player_id), :disconnect)
   end
 
+  def reload_from_persistence(player_id, now \\ Time.now()) do
+    case GenServer.whereis(via_tuple(player_id)) do
+      nil -> :ok
+      pid -> GenServer.call(pid, {:reload_from_persistence, now})
+    end
+  end
+
   @impl true
   def init(player_id: player_id) do
     Process.flag(:trap_exit, true)
@@ -111,6 +118,11 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   def handle_call(:disconnect, _from, state) do
     save_player_state(state)
     {:stop, :normal, :ok, %{state | player_state: nil}}
+  end
+
+  @impl true
+  def handle_call({:reload_from_persistence, now}, _from, state) do
+    {:reply, :ok, refresh_player_and_state(state, now)}
   end
 
   @impl true

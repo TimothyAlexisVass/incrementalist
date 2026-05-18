@@ -4,6 +4,8 @@ defmodule IncrementalistWeb.DebugController do
   alias Incrementalist.Game.Persistence.{Player, PlayerState, GameCommand}
   alias Incrementalist.Game.Persistence.PlayerStates
   alias Incrementalist.Game.Session.FullSnapshotOverrides
+  alias Incrementalist.Game.Session.PlayerServer
+  alias Incrementalist.Game.Time
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -345,8 +347,9 @@ defmodule IncrementalistWeb.DebugController do
         |> Enum.join("\n")
       end
 
-    current_override = Application.get_env(:incrementalist, :bonustime_game_override)
+    current_override = Application.get_env(:incrementalist, :bonustime_rotation_anchor_override)
     active_game_id = Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
+    rotation_override_display = if(current_override, do: inspect(current_override), else: nil)
 
     page_html = """
     <!DOCTYPE html>
@@ -372,8 +375,9 @@ defmodule IncrementalistWeb.DebugController do
         <div class="card" style="margin-bottom: 30px;">
           <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.4rem; color: #ffffff; margin-top: 0; margin-bottom: 10px;">Active Daily Game Override</h2>
           <p style="color: #8b949e; margin-top: 0; margin-bottom: 20px; font-size: 0.9rem;">
-            Set which game is active today. Changing this affects all players instantly. Currently computed active game: <strong>#{active_game_id}</strong>
+            Set which game is active today by shifting the rotation anchor. Changing this affects all players instantly. Currently computed active game: <strong>#{active_game_id}</strong>
             #{if current_override, do: " <span class=\"tag tag-warning\">Overridden</span>", else: " <span class=\"tag tag-success\">Natural Rotation</span>"}
+            #{if rotation_override_display, do: "<br><span style=\"font-size: 0.8rem;\">rotation_anchor override: <code>#{rotation_override_display}</code></span>", else: ""}
           </p>
           
           <form action="/debug/set_active_game" method="post" style="display: flex; gap: 12px; align-items: center;">
@@ -382,10 +386,15 @@ defmodule IncrementalistWeb.DebugController do
             <div style="flex: 1; max-width: 400px;">
               <select name="game_id" style="width: 100%; background-color: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 10px; font-size: 0.9rem; font-family: 'Inter', sans-serif;">
                 <option value="rotation" #{if is_nil(current_override), do: "selected"}>Use Time-Based Natural Rotation</option>
-                <option value="chest_draw" #{if current_override == "chest_draw", do: "selected"}>Chest Draw (chest_draw)</option>
-                <option value="prize_wheel" #{if current_override == "prize_wheel", do: "selected"}>Prize Wheel (prize_wheel)</option>
-                <option value="resource_checklist" #{if current_override == "resource_checklist", do: "selected"}>Resource Checklist (resource_checklist)</option>
-                <option value="item_checklist" #{if current_override == "item_checklist", do: "selected"}>Item Checklist (item_checklist)</option>
+                <option value="chest_draw" #{if current_override && active_game_id == "chest_draw", do: "selected"}>Chest Draw (chest_draw)</option>
+                <option value="prize_wheel" #{if current_override && active_game_id == "prize_wheel", do: "selected"}>Prize Wheel (prize_wheel)</option>
+                <option value="resource_checklist" #{if current_override && active_game_id == "resource_checklist", do: "selected"}>Resource Checklist (resource_checklist)</option>
+                <option value="coin_rain" #{if current_override && active_game_id == "coin_rain", do: "selected"}>Coin Rain (coin_rain)</option>
+                <option value="item_checklist" #{if current_override && active_game_id == "item_checklist", do: "selected"}>Item Checklist (item_checklist)</option>
+                <option value="hammer_smash" #{if current_override && active_game_id == "hammer_smash", do: "selected"}>Hammer Smash (hammer_smash)</option>
+                <option value="plinko_drop" #{if current_override && active_game_id == "plinko_drop", do: "selected"}>Plinko Drop (plinko_drop)</option>
+                <option value="jackpot_meter" #{if current_override && active_game_id == "jackpot_meter", do: "selected"}>Jackpot Meter (jackpot_meter)</option>
+                <option value="bonus_time" #{if current_override && active_game_id == "bonus_time", do: "selected"}>Bonus Time (bonus_time)</option>
               </select>
             </div>
             
@@ -532,6 +541,11 @@ defmodule IncrementalistWeb.DebugController do
 
         case Repo.update(changeset) do
           {:ok, _updated_ps} ->
+            # Keep live in-memory session state aligned with admin DB edits.
+            PlayerServer.reload_from_persistence(player.id)
+            # Force next browser boot to ignore cache and fetch authoritative snapshot.
+            FullSnapshotOverrides.request(player.id)
+
             redirect(conn,
               to: "/debug?success=State+for+player+#{player.username}+successfully+saved!"
             )
@@ -564,10 +578,33 @@ defmodule IncrementalistWeb.DebugController do
   # Set Active Daily Game Override
   # ---------------------------------------------------------------------------
   def set_active_game(conn, %{"game_id" => game_id}) do
-    override = if game_id == "rotation", do: nil, else: game_id
-    Application.put_env(:incrementalist, :bonustime_game_override, override)
+    if game_id == "rotation" do
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
 
-    redirect(conn, to: "/debug?success=Active+daily+game+successfully+updated+to+#{game_id}!")
+      redirect(conn,
+        to: "/debug?success=Active+daily+game+successfully+reset+to+natural+rotation!"
+      )
+    else
+      case game_slot_index(game_id) do
+        {:ok, target_slot_index} ->
+          override_anchor =
+            compute_rotation_anchor_override_for_slot(target_slot_index) |> Time.iso8601()
+
+          Application.put_env(
+            :incrementalist,
+            :bonustime_rotation_anchor_override,
+            override_anchor
+          )
+
+          redirect(
+            conn,
+            to: "/debug?success=Active+daily+game+successfully+updated+to+#{game_id}!"
+          )
+
+        {:error, :unknown_game} ->
+          redirect(conn, to: "/debug?error=Unknown+BonusTime+game+id+#{game_id}")
+      end
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -615,6 +652,34 @@ defmodule IncrementalistWeb.DebugController do
       end)
     end)
     |> Jason.encode!(pretty: true)
+  end
+
+  defp game_slot_index(game_id) when is_binary(game_id) do
+    rotation = Incrementalist.Game.Constants.bonustime_rotation()
+
+    case Enum.find(rotation, fn {_slot, id} -> id == game_id end) do
+      {slot_index_str, ^game_id} ->
+        {:ok, String.to_integer(slot_index_str)}
+
+      nil ->
+        {:error, :unknown_game}
+    end
+  end
+
+  defp compute_rotation_anchor_override_for_slot(target_slot_index)
+       when is_integer(target_slot_index) do
+    now_ms = Time.now() |> Time.to_unix_ms()
+    slot_ms = Incrementalist.Game.Constants.bonustime_slot_ms()
+    slot_count = Incrementalist.Game.Constants.bonustime_rotation_slot_count()
+    anchor_ms = Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.to_unix_ms()
+
+    elapsed = max(0, now_ms - anchor_ms)
+    boundary_index = div(elapsed, slot_ms)
+    current_slot_index = rem(boundary_index, slot_count) + 1
+    slot_delta = target_slot_index - current_slot_index
+    override_anchor_ms = anchor_ms - slot_delta * slot_ms
+
+    DateTime.from_unix!(override_anchor_ms, :millisecond)
   end
 
   # Re-render edit form with correct params on error

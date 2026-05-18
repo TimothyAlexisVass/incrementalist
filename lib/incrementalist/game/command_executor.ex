@@ -554,6 +554,13 @@ defmodule Incrementalist.Game.CommandExecutor do
           next_state = %{next_state | bonustime: next_bonustime}
           next_state = Achievements.evaluate(next_state)
 
+          projected_bonustime =
+            Map.merge(Map.from_struct(next_bonustime), %{
+              "rotation_anchor" =>
+                Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.iso8601(),
+              "active_game_id" => active_game_id
+            })
+
           next_notices =
             Notices.refresh_for_state_transition(
               ps.notices || Notices.new(ps.state),
@@ -574,7 +581,7 @@ defmodule Incrementalist.Game.CommandExecutor do
              "command_id" => command.command_id,
              "coins" => next_state.coins,
              "has_bonustime_token" => next_state.has_bonustime_token,
-             "bonustime" => next_state.bonustime,
+             "bonustime" => projected_bonustime,
              "achievements" => State.visible_achievements(next_state.achievements),
              "notices" => Notices.payload(next_notices)
            }, ps.id}
@@ -716,8 +723,10 @@ defmodule Incrementalist.Game.CommandExecutor do
 
     # HAMMER: Force the column update. No more excuses.
     import Ecto.Query
-    _ = from(s in PlayerState, where: s.id == ^ps.id)
-        |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
+
+    _ =
+      from(s in PlayerState, where: s.id == ^ps.id)
+      |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
 
     updated_ps
   end

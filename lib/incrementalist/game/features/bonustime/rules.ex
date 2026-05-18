@@ -82,22 +82,16 @@ defmodule Incrementalist.Game.Features.BonusTime.Rules do
   end
 
   def get_active_game_id(now \\ Time.now()) do
-    case Application.get_env(:incrementalist, :bonustime_game_override) do
-      nil ->
-        anchor_ms = Time.to_unix_ms(Constants.bonustime_rotation_anchor_at())
-        now_ms = Time.to_unix_ms(now)
+    anchor_ms = Time.to_unix_ms(Constants.bonustime_rotation_anchor_at())
+    now_ms = Time.to_unix_ms(now)
 
-        elapsed = max(0, now_ms - anchor_ms)
-        boundary_index = div(elapsed, Constants.bonustime_slot_ms())
+    elapsed = max(0, now_ms - anchor_ms)
+    boundary_index = div(elapsed, Constants.bonustime_slot_ms())
 
-        slot_count = Constants.bonustime_rotation_slot_count()
-        active_slot_index = rem(boundary_index, slot_count) + 1
+    slot_count = Constants.bonustime_rotation_slot_count()
+    active_slot_index = rem(boundary_index, slot_count) + 1
 
-        rotation = Constants.bonustime_rotation()
-        rotation[to_string(active_slot_index)]
-
-      override ->
-        override
-    end
+    rotation = Constants.bonustime_rotation()
+    rotation[to_string(active_slot_index)]
   end
 end

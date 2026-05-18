@@ -1,9 +1,9 @@
 [
   {
-    "key": "sage",
-    "name": "The Sage",
-    "description": "A quiet, ancient place of wisdom where growth begins.",
-    "unlock_level": 1
+    "key": "market",
+    "name": "The Market",
+    "description": "A bustling market to trade your hard earned goods.",
+    "unlock_level": 15
   },
   {
     "key": "cloverfield",
@@ -12,9 +12,9 @@
     "unlock_level": 10
   },
   {
-    "key": "market",
-    "name": "The Market",
-    "description": "A bustling market to trade your hard earned goods.",
-    "unlock_level": 15
+    "key": "sage",
+    "name": "The Sage",
+    "description": "A quiet, ancient place of wisdom and incremental growth.",
+    "unlock_level": 1
   }
 ]

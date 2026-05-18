@@ -57,6 +57,22 @@ defmodule Incrementalist.Game.Constants do
   def bonustime_game_rules, do: @bonustime["game_rules"]
 
   def bonustime_rotation_anchor_at do
+    case Application.get_env(:incrementalist, :bonustime_rotation_anchor_override) do
+      %DateTime{} = dt ->
+        dt
+
+      iso when is_binary(iso) ->
+        case DateTime.from_iso8601(iso) do
+          {:ok, dt, _} -> dt
+          _ -> default_bonustime_rotation_anchor_at()
+        end
+
+      _ ->
+        default_bonustime_rotation_anchor_at()
+    end
+  end
+
+  defp default_bonustime_rotation_anchor_at do
     {:ok, dt, _} = DateTime.from_iso8601(@bonustime["rotation_anchor"])
     dt
   end

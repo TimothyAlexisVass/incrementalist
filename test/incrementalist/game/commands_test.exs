@@ -125,6 +125,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     ps = PlayerStates.get!(player.id)
     unlocked_state = %{ps.state | level: 10, area: "sage"}
+
     other_tip_leaf_ids =
       Incrementalist.Game.Constants.sage_tip_levels()
       |> Enum.reject(&(&1 == 1))
@@ -291,7 +292,9 @@ defmodule Incrementalist.Game.CommandsTest do
     reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
     assert reset_result["type"] == "game.reset.result"
 
-    can_claim_at = get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
+    can_claim_at =
+      get_in(reset_result, ["snapshot", "state", "projection_params", "can_claim_at"])
+
     assert is_binary(can_claim_at)
 
     {:ok, claim_at, 0} = DateTime.from_iso8601(can_claim_at)
@@ -304,7 +307,7 @@ defmodule Incrementalist.Game.CommandsTest do
         "progress.claim_reward",
         intent(1),
         claim_at
-    )
+      )
 
     assert claim_result["type"] == "progress.claim_reward.result"
     assert claim_result["charge_crystals"].azure == 0
@@ -321,6 +324,34 @@ defmodule Incrementalist.Game.CommandsTest do
       |> Map.put("pending_result", Commands.replay_pending(player.id))
 
     assert boot["pending_result"] == result
+  end
+
+  test "bonustime.play keeps projected rotation fields in command result bonustime payload" do
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(@now)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "chest_draw"}),
+        @now
+      )
+
+    assert result["type"] == "bonustime.play.result"
+    assert result["status"] == "ok"
+    assert is_map(result["bonustime"])
+    assert result["bonustime"]["active_game_id"] == "chest_draw"
+    assert result["bonustime"]["rotation_anchor"] == DateTime.to_iso8601(@now)
   end
 
   test "cleanup deletes only ACKed command rows older than forty eight hours" do

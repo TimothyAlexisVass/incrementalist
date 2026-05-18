@@ -18,6 +18,14 @@ defmodule IncrementalistWeb.DebugControllerTest do
 
   setup do
     FullSnapshotOverrides.clear()
+    Application.delete_env(:incrementalist, :bonustime_game_override)
+    Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_game_override)
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
     :ok
   end
 
@@ -107,20 +115,18 @@ defmodule IncrementalistWeb.DebugControllerTest do
     refute Repo.one(from gc in GameCommand, where: gc.player_id == ^p_id)
   end
 
-  test "POST /debug/set_active_game - sets and resets active daily game overrides", %{conn: conn} do
-    # Clear existing override
-    Application.put_env(:incrementalist, :bonustime_game_override, nil)
-
-    # 1. Override to prize_wheel
+  test "POST /debug/set_active_game - sets and resets rotation anchor overrides", %{conn: conn} do
+    # 1. Shift anchor so prize_wheel is active immediately
     conn = post(conn, "/debug/set_active_game", %{"game_id" => "prize_wheel"})
     assert redirected_to(conn) =~ "/debug?success="
-    assert Application.get_env(:incrementalist, :bonustime_game_override) == "prize_wheel"
+    assert is_binary(Application.get_env(:incrementalist, :bonustime_rotation_anchor_override))
     assert Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id() == "prize_wheel"
+    assert is_nil(Application.get_env(:incrementalist, :bonustime_game_override))
 
-    # 2. Reset back to natural rotation
+    # 2. Reset back to natural rotation anchor
     conn2 = post(conn, "/debug/set_active_game", %{"game_id" => "rotation"})
     assert redirected_to(conn2) =~ "/debug?success="
-    assert is_nil(Application.get_env(:incrementalist, :bonustime_game_override))
+    assert is_nil(Application.get_env(:incrementalist, :bonustime_rotation_anchor_override))
   end
 
   test "POST /debug/grant_token/:id - sets has_bonustime_token to true", %{conn: conn} do

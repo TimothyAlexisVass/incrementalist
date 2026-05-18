@@ -41,13 +41,13 @@ export function renderStatsTab(
 
   const stats = snapshot.state.stats;
   const lines = [
-    { label: 'Total Achievements', value: stats.total_achievements.toString() },
-    { label: 'Total Quests Claimed', value: stats.total_quests_claimed.toString() },
-    { label: 'Total Progress Claims', value: stats.total_progress_claims.toString() },
-    { label: 'Total Days Played', value: stats.total_days_played.toString() },
-    { label: 'Coins Earned (Life)', value: formatBigNum(stats.total_coins_earned) },
-    { label: 'Shards Earned (Life)', value: formatBigNum(stats.total_shards_earned) },
-    { label: 'Cores Earned (Life)', value: formatBigNum(stats.total_cores_earned) }
+    { label: 'Progress Bars Claimed', value: stats.total_progress_claims.toString() },
+    { label: 'Achievements', value: stats.total_achievements.toString() },
+    { label: 'Quests Completed', value: stats.total_quests_claimed.toString() },
+    { label: 'Days Played', value: stats.total_days_played.toString() },
+    { label: 'Coins Earned', value: formatBigNum(stats.total_coins_earned) },
+    { label: 'Shards Earned', value: formatBigNum(stats.total_shards_earned) },
+    { label: 'Cores Earned', value: formatBigNum(stats.total_cores_earned) }
   ];
 
   let currentY = rect.y + 30;

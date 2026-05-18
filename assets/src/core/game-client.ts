@@ -414,6 +414,7 @@ export class GameClient {
     const activeModal = this.ui.modals.getActiveModal();
     const modalBlocking = activeModal?.isBlocking ?? (activeModal !== null);
     const overlayOpen = this.ui.overlays.isOpen();
+    const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
     const uiBlocked = modalBlocking || overlayOpen;
 
     if (input.clicked && input.pointer) {
@@ -475,9 +476,9 @@ export class GameClient {
       renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, input);
     }
 
-    renderProgressBar(this.canvas, input, uiBlocked);
+    renderProgressBar(this.canvas, input, modalBlocking);
     this.sisuControlLayout = this.store.state.snapshot
-      ? renderSisuControl(this.canvas, input, this.store.state, uiBlocked)
+      ? renderSisuControl(this.canvas, input, this.store.state, modalBlocking)
       : null;
     renderSisuGlassBallOverlay(this.canvas, this.store.state);
 
@@ -512,7 +513,6 @@ export class GameClient {
     updateFloatingTexts(this.floatingTexts, dt);
 
     // Render BottomHUD before game-world click handlers so its buttons take precedence.
-    const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
     renderBottomHUD(this.canvas, input, amounts?.level ?? 1, isMainMenuOpen, () => {
       this.handleMenuButtonPress();
     }, () => {
