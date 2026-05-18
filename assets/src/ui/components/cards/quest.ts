@@ -4,6 +4,7 @@ import { QuestState } from '../../../net/protocol';
 import { GameChannel } from '../../../net/game-channel';
 import { notices } from '../../managers/notices';
 import { drawNoticeDot } from '../button';
+import { drawHorizontalBar } from '../bar';
 
 export interface QuestCardOptions {
   quest: QuestState;
@@ -65,23 +66,22 @@ export function drawQuestCard(options: QuestCardOptions) {
   const barY = rect.y + 40;
   const barWidth = rect.width - 24;
   const barHeight = 8;
-  renderer.drawRect({
-    x: barX,
-    y: barY,
-    width: barWidth,
-    height: barHeight,
-    color: [0.1, 0.1, 0.15, 1.0] as const
-  });
-
-  // Progress Bar Fill
-  const fillWidth = barWidth * quest.progress;
-  renderer.drawRect({
-    x: barX,
-    y: barY,
-    width: fillWidth,
-    height: barHeight,
-    color: isCompleted ? ([0.2, 0.8, 0.4, 1.0] as const) : ([0.4, 0.6, 1.0, 1.0] as const)
-  });
+  drawHorizontalBar(
+    {
+      x: barX,
+      y: barY,
+      width: barWidth,
+      height: barHeight
+    },
+    {
+      fillRatio: quest.progress,
+      fillStartColor: isCompleted ? COLORS.bar.quest.readyStart : COLORS.bar.quest.pendingStart,
+      fillEndColor: isCompleted ? COLORS.bar.quest.readyEnd : COLORS.bar.quest.pendingEnd,
+      trackColor: [0.1, 0.1, 0.15, 1.0] as const,
+      borderColor: [0.1, 0.1, 0.15, 1.0] as const,
+      borderWidth: 1
+    }
+  );
 
   // Claim Button or Status
   if (canClaim) {

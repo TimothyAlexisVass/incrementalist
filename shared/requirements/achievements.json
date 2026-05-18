@@ -3,90 +3,105 @@
     "id": "tutorial_graduated",
     "name": "Graduated",
     "multiplier": 0.20,
-    "condition": "tutorial_graduated"
+    "condition": "tutorial_graduated",
+    "favor": 1
   },
   {
     "id": "level_10",
     "name": "Newbie Incrementalist",
     "multiplier": 0.0005,
-    "condition": "level_10"
+    "condition": "level_10",
+    "favor": 1
   },
   {
     "id": "level_20",
     "name": "Good Incrementalist",
     "multiplier": 0.0005,
-    "condition": "level_20"
+    "condition": "level_20",
+    "favor": 1
   },
   {
     "id": "level_40",
     "name": "Better Incrementalist",
     "multiplier": 0.0005,
-    "condition": "level_40"
+    "condition": "level_40",
+    "favor": 1
   },
   {
     "id": "rewards_50",
     "name": "First Rewards",
     "multiplier": 0.0005,
-    "condition": "rewards_50"
+    "condition": "rewards_50",
+    "favor": 1
   },
   {
     "id": "rewards_250",
     "name": "More Rewards",
     "multiplier": 0.0005,
-    "condition": "rewards_250"
+    "condition": "rewards_250",
+    "favor": 1
   },
   {
     "id": "rewards_500",
     "name": "Moar Rewards",
     "multiplier": 0.0005,
-    "condition": "rewards_500"
+    "condition": "rewards_500",
+    "favor": 1
   },
   {
     "id": "rewards_1000",
     "name": "Even More Rewards",
     "multiplier": 0.0005,
-    "condition": "rewards_1000"
+    "condition": "rewards_1000",
+    "favor": 1
   },
   {
     "id": "coins_50000",
     "name": "High Roller",
     "multiplier": 0.0005,
-    "condition": "coins_50000"
+    "condition": "coins_50000",
+    "favor": 1
   },
   {
     "id": "coins_100000",
     "name": "New Digit Unlocked!",
     "multiplier": 0.0005,
-    "condition": "coins_100000"
+    "condition": "coins_100000",
+    "favor": 1
   },
   {
     "id": "shards_2500",
     "name": "First Shards",
     "multiplier": 0.0005,
-    "condition": "shards_2500"
+    "condition": "shards_2500",
+    "favor": 1
   },
   {
     "id": "cores_100",
     "name": "First Cores",
     "multiplier": 0.0005,
-    "condition": "cores_100"
+    "condition": "cores_100",
+    "favor": 1
   },
   {
     "id": "screens_viewed_stats",
     "name": "This Screen Is Boring",
     "multiplier": 0.0005,
-    "condition": "screens_viewed_stats"
+    "condition": "screens_viewed_stats",
+    "favor": 1
   },
   {
     "id": "screens_viewed_quests",
     "name": "More Tasks, YAY!",
     "multiplier": 0.0005,
-    "condition": "screens_viewed_quests"
+    "condition": "screens_viewed_quests",
+    "favor": 1
   },
   {
     "id": "screens_viewed_achievements",
     "name": "This is An Achievement!",
     "multiplier": 0.0005,
-    "condition": "screens_viewed_achievements"
+    "condition": "screens_viewed_achievements",
+    "favor": 1
   }
 ]

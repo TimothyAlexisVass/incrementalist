@@ -17,6 +17,16 @@ export interface DrawRectOptions {
   alpha?: number;
 }
 
+export interface DrawGradientRectOptions {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  colorStart: RGBA;
+  colorEnd: RGBA;
+  alpha?: number;
+}
+
 export interface DrawTextOptions {
   text: string;
   x: number;
@@ -134,6 +144,32 @@ uniform vec4 u_color;
 
 void main() {
   gl_FragColor = u_color;
+}
+`;
+
+const GRADIENT_VERTEX_SHADER_SOURCE = `
+attribute vec2 a_position;
+attribute vec2 a_texcoord;
+uniform vec2 u_resolution;
+varying vec2 v_texcoord;
+
+void main() {
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+  gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+  v_texcoord = a_texcoord;
+}
+`;
+
+const GRADIENT_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+uniform vec4 u_colorStart;
+uniform vec4 u_colorEnd;
+varying vec2 v_texcoord;
+
+void main() {
+  float t = clamp(v_texcoord.x, 0.0, 1.0);
+  gl_FragColor = mix(u_colorStart, u_colorEnd, t);
 }
 `;
 
@@ -365,6 +401,15 @@ export class WebGLRenderer {
   private readonly colorUniformLocation: WebGLUniformLocation;
   private readonly colorBuffer: WebGLBuffer;
 
+  private readonly gradientProgram: WebGLProgram;
+  private readonly gradientPositionLocation: number;
+  private readonly gradientTexcoordLocation: number;
+  private readonly gradientResolutionLocation: WebGLUniformLocation;
+  private readonly gradientColorStartLocation: WebGLUniformLocation;
+  private readonly gradientColorEndLocation: WebGLUniformLocation;
+  private readonly gradientPositionBuffer: WebGLBuffer;
+  private readonly gradientTexcoordBuffer: WebGLBuffer;
+
   private readonly textProgram: WebGLProgram;
   private readonly textPositionLocation: number;
   private readonly textTexcoordLocation: number;
@@ -457,6 +502,15 @@ export class WebGLRenderer {
     this.colorResolutionLocation = mustGetUniform(gl, this.colorProgram, "u_resolution");
     this.colorUniformLocation = mustGetUniform(gl, this.colorProgram, "u_color");
     this.colorBuffer = mustCreateBuffer(gl);
+
+    this.gradientProgram = mustCreateProgram(gl, GRADIENT_VERTEX_SHADER_SOURCE, GRADIENT_FRAGMENT_SHADER_SOURCE);
+    this.gradientPositionLocation = gl.getAttribLocation(this.gradientProgram, "a_position");
+    this.gradientTexcoordLocation = gl.getAttribLocation(this.gradientProgram, "a_texcoord");
+    this.gradientResolutionLocation = mustGetUniform(gl, this.gradientProgram, "u_resolution");
+    this.gradientColorStartLocation = mustGetUniform(gl, this.gradientProgram, "u_colorStart");
+    this.gradientColorEndLocation = mustGetUniform(gl, this.gradientProgram, "u_colorEnd");
+    this.gradientPositionBuffer = mustCreateBuffer(gl);
+    this.gradientTexcoordBuffer = mustCreateBuffer(gl);
 
     this.textProgram = mustCreateProgram(gl, TEXT_VERTEX_SHADER_SOURCE, TEXT_FRAGMENT_SHADER_SOURCE);
     this.textPositionLocation = gl.getAttribLocation(this.textProgram, "a_position");
@@ -624,6 +678,65 @@ export class WebGLRenderer {
     gl.uniform2f(this.colorResolutionLocation, this.canvas.width, this.canvas.height);
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     gl.uniform4f(this.colorUniformLocation, color[0] * alpha, color[1] * alpha, color[2] * alpha, color[3] * alpha);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  drawGradientRect(options: DrawGradientRectOptions) {
+    const gl = this.gl;
+    const { x, y, width, height, colorStart, colorEnd } = options;
+
+    if (width <= 0 || height <= 0) return;
+
+    const x1 = x;
+    const y1 = y;
+    const x2 = x + width;
+    const y2 = y + height;
+
+    const vertices = new Float32Array([
+      x1, y1,
+      x2, y1,
+      x1, y2,
+      x1, y2,
+      x2, y1,
+      x2, y2
+    ]);
+
+    const texcoords = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+      0, 1,
+      1, 0,
+      1, 1
+    ]);
+
+    gl.useProgram(this.gradientProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gradientPositionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.gradientPositionLocation);
+    gl.vertexAttribPointer(this.gradientPositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gradientTexcoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, texcoords, gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(this.gradientTexcoordLocation);
+    gl.vertexAttribPointer(this.gradientTexcoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+    gl.uniform2f(this.gradientResolutionLocation, this.canvas.width, this.canvas.height);
+    const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
+    gl.uniform4f(
+      this.gradientColorStartLocation,
+      colorStart[0] * alpha,
+      colorStart[1] * alpha,
+      colorStart[2] * alpha,
+      colorStart[3] * alpha
+    );
+    gl.uniform4f(
+      this.gradientColorEndLocation,
+      colorEnd[0] * alpha,
+      colorEnd[1] * alpha,
+      colorEnd[2] * alpha,
+      colorEnd[3] * alpha
+    );
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 

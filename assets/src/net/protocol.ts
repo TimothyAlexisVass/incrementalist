@@ -52,19 +52,22 @@ export type QuestState = {
   max_rank: number;
   progress: number;
   claimed_rank: number;
-  reward?: BigNum;
+  fame?: BigNum;
+  favor?: number;
 };
 
 export type AchievementState = {
   name: string;
   multiplier: number;
   condition: string;
+  favor: number;
   unlocked_at: string | null;
 };
 
 export type StatsState = {
   total_achievements: number;
   total_quests_claimed: number;
+  total_favor: number;
   total_progress_claims: number;
   total_days_played: number;
   total_level_ups_daily: number;
@@ -104,8 +107,11 @@ export type GameSnapshot = {
   state: {
     area: string;
   level: number;
+  trust: number;
   exp: BigNum;
   required_exp: BigNum;
+  fame: BigNum;
+  required_fame: BigNum;
   coins: BigNum;
   shards: BigNum;
   cores: BigNum;
@@ -164,6 +170,9 @@ export type ProgressClaimRewardResult = {
   type: "progress.claim_reward.result";
   status: "ok";
   command_id: number;
+  trust: number;
+  fame: BigNum;
+  required_fame: BigNum;
   coins: BigNum;
   exp: BigNum;
   level: number;
@@ -226,7 +235,9 @@ export type QuestClaimResult = {
   status: "ok";
   command_id: number;
   quest_id: string;
-  coins: BigNum;
+  trust: number;
+  fame: BigNum;
+  required_fame: BigNum;
   quests: Record<string, QuestState>;
   achievements: Record<string, AchievementState>;
   stats: StatsState;

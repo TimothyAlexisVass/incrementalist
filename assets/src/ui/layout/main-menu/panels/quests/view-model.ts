@@ -26,12 +26,12 @@ export function getQuestViewModel(state: ServerState): QuestViewModel {
       return rankA - rankB;
     }
 
-    // 3. Reward ascending
-    const rewardA = a.reward || { m: 0, e: 0 };
-    const rewardB = b.reward || { m: 0, e: 0 };
-    const rewardComp = compareBigNum(rewardA, rewardB);
-    if (rewardComp !== 0) {
-      return rewardComp;
+    // 3. Fame ascending
+    const fameA = a.fame || { m: 0, e: 0 };
+    const fameB = b.fame || { m: 0, e: 0 };
+    const fameComp = compareBigNum(fameA, fameB);
+    if (fameComp !== 0) {
+      return fameComp;
     }
 
     // 4. Stable fallback by ID ascending

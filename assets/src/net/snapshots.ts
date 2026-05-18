@@ -106,6 +106,9 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 export function applyAuthoritativeData(
   state: ServerState,
   data: {
+    fame?: BigNum;
+    required_fame?: BigNum;
+    trust?: number;
     coins?: BigNum;
     exp?: BigNum;
     level?: number;
@@ -122,6 +125,9 @@ export function applyAuthoritativeData(
 ) {
   if (!state.snapshot) return;
 
+  if (data.fame !== undefined) state.snapshot.state.fame = data.fame;
+  if (data.required_fame !== undefined) state.snapshot.state.required_fame = data.required_fame;
+  if (data.trust !== undefined) state.snapshot.state.trust = data.trust;
   if (data.coins !== undefined) state.snapshot.state.coins = data.coins;
   if (data.exp !== undefined) state.snapshot.state.exp = data.exp;
   if (data.level !== undefined) {

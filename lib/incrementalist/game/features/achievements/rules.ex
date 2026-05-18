@@ -10,16 +10,16 @@ defmodule Incrementalist.Game.Features.Achievements.Rules do
     defs = Constants.achievement_defs()
     now = Time.now() |> Time.iso8601()
 
-    {updated_achievements, unlocked_count} =
-      Enum.reduce(defs, {state.achievements || %{}, 0}, fn achievement_def, {acc, count} ->
+    {updated_achievements, unlocked_count, unlocked_favor} =
+      Enum.reduce(defs, {state.achievements || %{}, 0, 0}, fn achievement_def, {acc, count, favor_count} ->
         id = achievement_def.id
         if Map.has_key?(acc, id) do
-          {acc, count + 1}
+          {acc, count + 1, favor_count}
         else
           if condition_met?(achievement_def.condition, state) do
-            {Map.put(acc, id, now), count + 1}
+            {Map.put(acc, id, now), count + 1, favor_count + (achievement_def.favor || 1)}
           else
-            {acc, count}
+            {acc, count, favor_count}
           end
         end
       end)
@@ -35,7 +35,11 @@ defmodule Incrementalist.Game.Features.Achievements.Rules do
     if updated_achievements != state.achievements or
          unlocked_count != state.stats.total_achievements or
          reward_multiplier != state.progress_bar.reward_multiplier do
-      new_stats = %{state.stats | total_achievements: unlocked_count}
+      new_stats = %{
+        state.stats
+        | total_achievements: unlocked_count,
+          total_favor: state.stats.total_favor + unlocked_favor
+      }
       new_progress_bar = %{state.progress_bar | reward_multiplier: reward_multiplier}
 
       %{

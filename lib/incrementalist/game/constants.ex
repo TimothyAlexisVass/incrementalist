@@ -85,6 +85,10 @@ defmodule Incrementalist.Game.Constants do
   def progress_bar_base_idle_mode_off_fill_rate, do: 0.8
   def progress_bar_base_idle_mode_on_fill_rate, do: 0.24
   def progress_bar_sisu_min_multiplier, do: 1.0
+  def trust_required_fame_base_multiplier, do: 10.1
+  def trust_required_fame_base_addition, do: 9
+  def trust_required_fame_small_snap_threshold, do: 1000
+  def trust_required_fame_small_snap_step, do: 10
   def sisu_diminishment_reduction_factor_per_cycle, do: 0.98
   def sisu_refill_threshold_factor, do: 0.9
 
@@ -165,7 +169,8 @@ defmodule Incrementalist.Game.Constants do
       {rank,
        %{
          requirement: normalize_quest_requirement(id, data["requirement"]),
-         reward: BigNum.from_number(data["reward"])
+         fame: BigNum.from_number(data["fame"]),
+         favor: data["favor"] || 1
        }}
     end
   end
@@ -175,17 +180,13 @@ defmodule Incrementalist.Game.Constants do
 
   defp normalize_quest_requirement(_id, value), do: value
 
-  defp normalize_achievement(%{
-         "id" => id,
-         "name" => name,
-         "multiplier" => multiplier,
-         "condition" => condition
-       }) do
+  defp normalize_achievement(achievement) do
     %{
-      id: id,
-      name: name,
-      multiplier: multiplier,
-      condition: condition
+      id: achievement["id"],
+      name: achievement["name"],
+      multiplier: achievement["multiplier"],
+      condition: achievement["condition"],
+      favor: achievement["favor"] || 1
     }
   end
 end

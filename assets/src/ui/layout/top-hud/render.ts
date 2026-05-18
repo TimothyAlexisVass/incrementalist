@@ -1,7 +1,7 @@
 import { COLORS } from "../../../colors";
 import {
   TOP_HUD_EXP_BAR_X, TOP_HUD_EXP_BAR_Y, TOP_HUD_EXP_BAR_WIDTH, TOP_HUD_EXP_BAR_HEIGHT,
-  TOP_HUD_LEVEL_X, TOP_HUD_EXP_COUNTER_X, TOP_HUD_EXP_COUNTER_Y,
+  TOP_HUD_LEVEL_X, TOP_HUD_LEVEL_Y, TOP_HUD_EXP_COUNTER_X,
   TOP_HUD_CURRENCY_ICON_SIZE,
   TOP_HUD_COIN_COUNTER_Y, TOP_HUD_COINS_COUNTER_RIGHT, TOP_HUD_SHARDS_COUNTER_RIGHT, TOP_HUD_CORES_COUNTER_RIGHT,
   TOP_HUD_LEVEL_FONT, TOP_HUD_EXP_FONT, TOP_HUD_COINS_FONT
@@ -13,6 +13,7 @@ import { getHudViewModel, getAndClearQueuedLevelUps } from "./view-model";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
+import { drawHorizontalBar, getHorizontalBarCenterY } from "../../components/bar";
 import { resolveUpdatingText } from "../../../utils/text";
 
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
@@ -44,28 +45,23 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
     color: cssToRgba(COLORS.panel.bg)
   });
 
-  renderer.drawRect({
+  const requiredExp = getRequiredExp(model.displayedLevel);
+  const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
+  const expBarRect = {
     x: TOP_HUD_EXP_BAR_X,
     y: TOP_HUD_EXP_BAR_Y,
     width: TOP_HUD_EXP_BAR_WIDTH,
-    height: TOP_HUD_EXP_BAR_HEIGHT,
-    color: cssToRgba(COLORS.bar.track)
-  });
+    height: TOP_HUD_EXP_BAR_HEIGHT
+  };
 
-  const requiredExp = getRequiredExp(model.displayedLevel);
-  const fillRatio = Math.min(1, Math.max(0, toNumber(model.displayedExp) / toNumber(requiredExp)));
-
-  renderer.drawRect({
-    x: TOP_HUD_EXP_BAR_X,
-    y: TOP_HUD_EXP_BAR_Y,
-    width: TOP_HUD_EXP_BAR_WIDTH * fillRatio,
-    height: TOP_HUD_EXP_BAR_HEIGHT,
-    color: cssToRgba(COLORS.bar.exp.fillStart)
-  });
-  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y, width: TOP_HUD_EXP_BAR_WIDTH, height: 2, color: cssToRgba(COLORS.bar.border) });
-  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y + TOP_HUD_EXP_BAR_HEIGHT - 2, width: TOP_HUD_EXP_BAR_WIDTH, height: 2, color: cssToRgba(COLORS.bar.border) });
-  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
-  renderer.drawRect({ x: TOP_HUD_EXP_BAR_X + TOP_HUD_EXP_BAR_WIDTH - 2, y: TOP_HUD_EXP_BAR_Y, width: 2, height: TOP_HUD_EXP_BAR_HEIGHT, color: cssToRgba(COLORS.bar.border) });
+  drawHorizontalBar(
+    expBarRect,
+    {
+      fillRatio,
+      fillStartColor: COLORS.bar.exp.fillStart,
+      fillEndColor: COLORS.bar.exp.fillEnd
+    }
+  );
 
   const expText = resolveUpdatingText(
     TOP_HUD_EXP_TEXT_KEY,
@@ -75,17 +71,17 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
       font: TOP_HUD_EXP_FONT,
       color: COLORS.panel.textPrimary,
       align: 'center',
-      baseline: 'alphabetic'
+      baseline: 'middle'
     })
   );
   renderer.drawText({
     text: expText,
     x: TOP_HUD_EXP_COUNTER_X,
-    y: TOP_HUD_EXP_COUNTER_Y,
+    y: getHorizontalBarCenterY(expBarRect),
     font: TOP_HUD_EXP_FONT,
     color: COLORS.panel.textPrimary,
     align: 'center',
-    baseline: 'alphabetic'
+    baseline: 'middle'
   });
   const levelText = resolveUpdatingText(
     TOP_HUD_LEVEL_TEXT_KEY,
@@ -101,7 +97,7 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
   renderer.drawText({
     text: levelText,
     x: TOP_HUD_LEVEL_X,
-    y: 34,
+    y: TOP_HUD_LEVEL_Y,
     font: TOP_HUD_LEVEL_FONT,
     color: COLORS.panel.textPrimary,
     align: 'left',

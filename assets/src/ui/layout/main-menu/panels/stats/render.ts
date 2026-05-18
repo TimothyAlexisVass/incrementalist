@@ -41,10 +41,11 @@ export function renderStatsTab(
 
   const stats = snapshot.state.stats;
   const lines = [
-    { label: 'Progress Bars Claimed', value: stats.total_progress_claims.toString() },
-    { label: 'Achievements', value: stats.total_achievements.toString() },
-    { label: 'Quests Completed', value: stats.total_quests_claimed.toString() },
-    { label: 'Days Played', value: stats.total_days_played.toString() },
+    { label: 'Progress Bars Claimed', value: String(stats.total_progress_claims ?? 0) },
+    { label: 'Achievements', value: String(stats.total_achievements ?? 0) },
+    { label: 'Quests Completed', value: String(stats.total_quests_claimed ?? 0) },
+    { label: 'Favor', value: String(stats.total_favor ?? 0) },
+    { label: 'Days Played', value: String(stats.total_days_played ?? 0) },
     { label: 'Coins Earned', value: formatBigNum(stats.total_coins_earned) },
     { label: 'Shards Earned', value: formatBigNum(stats.total_shards_earned) },
     { label: 'Cores Earned', value: formatBigNum(stats.total_cores_earned) }
@@ -75,4 +76,3 @@ export function renderStatsTab(
     currentY += 32;
   }
 }
-

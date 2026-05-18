@@ -34,18 +34,27 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
       true ->
         ranks_to_claim = (quest.claimed_rank + 1)..quest.rank
 
-        {total_reward, last_claimed_rank} =
-          Enum.reduce(ranks_to_claim, {BigNum.zero(), quest.claimed_rank}, fn rank_index, {acc, last_rank} ->
+        {total_fame, total_favor, last_claimed_rank} =
+          Enum.reduce(ranks_to_claim, {BigNum.zero(), 0, quest.claimed_rank}, fn rank_index, {acc_fame, acc_favor, last_rank} ->
             rank_def = quest_def.ranks[rank_index]
             if rank_def do
-              {BigNum.add(acc, rank_def.reward), rank_index}
+              {
+                BigNum.add(acc_fame, rank_def.fame),
+                acc_favor + (rank_def.favor || 1),
+                rank_index
+              }
             else
-              {acc, last_rank}
+              {acc_fame, acc_favor, last_rank}
             end
           end)
 
         if last_claimed_rank > quest.claimed_rank do
-          new_coins = BigNum.add(state.coins, total_reward)
+          {new_trust, new_fame, new_required_fame} =
+            apply_trust_level_ups(
+              state.trust || 1,
+              BigNum.add(state.fame || BigNum.zero(), total_fame),
+              state.required_fame || required_fame_for_trust(state.trust || 1)
+            )
 
           # Update quest state
           new_quests = Enum.map(state.quests, fn q ->
@@ -61,10 +70,16 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
           # Update stats
           new_stats = %{state.stats |
             total_quests_claimed: state.stats.total_quests_claimed + claims_count,
-            total_coins_earned: BigNum.add(state.stats.total_coins_earned, total_reward)
+            total_favor: state.stats.total_favor + total_favor
           }
 
-          new_state = %{state | coins: new_coins, quests: new_quests, stats: new_stats}
+          new_state = %{state |
+            trust: new_trust,
+            fame: new_fame,
+            required_fame: new_required_fame,
+            quests: new_quests,
+            stats: new_stats
+          }
 
           # Re-evaluate in case claiming one quest affects another (e.g. quest_c_rank)
           {:ok, evaluate(new_state)}
@@ -152,6 +167,36 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
       (current / requirement) |> min(1.0) |> max(0.0) |> Float.round(5)
     else
       1.0
+    end
+  end
+
+  defp apply_trust_level_ups(trust, fame, required_fame) do
+    if BigNum.compare(fame, required_fame) >= 0 do
+      next_trust = trust + 1
+      next_fame = BigNum.sub(fame, required_fame)
+      next_required_fame = required_fame_for_trust(next_trust)
+      apply_trust_level_ups(next_trust, next_fame, next_required_fame)
+    else
+      {trust, fame, required_fame}
+    end
+  end
+
+  defp required_fame_for_trust(trust) do
+    base = BigNum.from_number(trust)
+    term = BigNum.mul(BigNum.from_number(Constants.trust_required_fame_base_multiplier()), BigNum.pow(base, 2))
+    required_fame = BigNum.add(term, BigNum.from_number(Constants.trust_required_fame_base_addition()))
+    snap_small_required_fame(required_fame)
+  end
+
+  defp snap_small_required_fame(required_fame) do
+    if BigNum.compare(required_fame, BigNum.from_number(Constants.trust_required_fame_small_snap_threshold())) < 0 do
+      rounded =
+        round(BigNum.to_float(required_fame) / Constants.trust_required_fame_small_snap_step()) *
+          Constants.trust_required_fame_small_snap_step()
+
+      BigNum.from_number(rounded)
+    else
+      required_fame
     end
   end
 end

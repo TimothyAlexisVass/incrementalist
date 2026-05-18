@@ -141,6 +141,7 @@ defmodule Incrementalist.Game.State do
     embedded_schema do
       field :total_achievements, :integer, default: 0
       field :total_quests_claimed, :integer, default: 0
+      field :total_favor, :integer, default: 0
       field :total_progress_claims, :integer, default: 0
       field :total_days_played, :integer, default: 0
       field :total_level_ups_daily, :integer, default: 0
@@ -160,6 +161,7 @@ defmodule Incrementalist.Game.State do
       cast(schema, attrs, [
         :total_achievements,
         :total_quests_claimed,
+        :total_favor,
         :total_progress_claims,
         :total_days_played,
         :total_level_ups_daily,
@@ -249,9 +251,12 @@ defmodule Incrementalist.Game.State do
 
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
+    embeds_one :fame, BigNum, on_replace: :update
+    embeds_one :required_fame, BigNum, on_replace: :update
     embeds_one :coins, BigNum, on_replace: :update
     embeds_one :shards, BigNum, on_replace: :update
     embeds_one :cores, BigNum, on_replace: :update
+    field :trust, :integer, default: 1
 
     field :idle_mode, :boolean, default: false
     field :first_played_at, :string
@@ -281,6 +286,7 @@ defmodule Incrementalist.Game.State do
       :version,
       :area,
       :level,
+      :trust,
       :idle_mode,
       :first_played_at,
       :last_claimed_at,
@@ -291,6 +297,8 @@ defmodule Incrementalist.Game.State do
     ])
     |> cast_embed(:exp)
     |> cast_embed(:required_exp)
+    |> cast_embed(:fame)
+    |> cast_embed(:required_fame)
     |> cast_embed(:coins)
     |> cast_embed(:shards)
     |> cast_embed(:cores)
@@ -326,6 +334,8 @@ defmodule Incrementalist.Game.State do
     attrs
     |> maybe_put_embed(:exp)
     |> maybe_put_embed(:required_exp)
+    |> maybe_put_embed(:fame)
+    |> maybe_put_embed(:required_fame)
     |> maybe_put_embed(:coins)
     |> maybe_put_embed(:shards)
     |> maybe_put_embed(:cores)
@@ -368,9 +378,12 @@ defmodule Incrementalist.Game.State do
       has_bonustime_token: true,
       exp: BigNum.zero(),
       required_exp: BigNum.from_number(20),
+      fame: BigNum.zero(),
+      required_fame: BigNum.from_number(20),
       coins: BigNum.zero(),
       shards: BigNum.zero(),
       cores: BigNum.zero(),
+      trust: 1,
       idle_mode: false,
       first_played_at: timestamp,
       last_claimed_at: timestamp,
@@ -456,8 +469,11 @@ defmodule Incrementalist.Game.State do
     %{
       "area" => projected_state.area || "sage",
       "level" => projected_state.level || 1,
+      "trust" => projected_state.trust || 1,
       "exp" => projected_state.exp || BigNum.zero(),
       "required_exp" => projected_state.required_exp || BigNum.from_number(20),
+      "fame" => projected_state.fame || BigNum.zero(),
+      "required_fame" => projected_state.required_fame || BigNum.from_number(20),
       "coins" => projected_state.coins || BigNum.zero(),
       "shards" => projected_state.shards || BigNum.zero(),
       "cores" => projected_state.cores || BigNum.zero(),
@@ -547,10 +563,16 @@ defmodule Incrementalist.Game.State do
       max_rank = Enum.max(Map.keys(quest_def.ranks))
       
       active_rank = min(claimed_rank + 1, max_rank)
-      reward = 
+      fame =
         case quest_def.ranks[active_rank] do
           nil -> BigNum.zero()
-          rank_def -> rank_def.reward
+          rank_def -> rank_def.fame
+        end
+
+      favor =
+        case quest_def.ranks[active_rank] do
+          nil -> 0
+          rank_def -> rank_def.favor || 1
         end
 
       {id,
@@ -561,7 +583,8 @@ defmodule Incrementalist.Game.State do
          "max_rank" => max_rank,
          "progress" => if(q, do: q.progress, else: 0.0),
          "claimed_rank" => claimed_rank,
-         "reward" => reward
+         "fame" => fame,
+         "favor" => favor
        }}
     end
   end
@@ -575,6 +598,7 @@ defmodule Incrementalist.Game.State do
          "name" => achievement_def.name,
          "multiplier" => achievement_def.multiplier,
          "condition" => achievement_def.condition,
+         "favor" => achievement_def.favor || 1,
          "unlocked_at" => unlocked_at
        }}
     end

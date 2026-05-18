@@ -12,10 +12,25 @@ import { QuestState, GameSnapshot } from '../../../../../net/protocol';
 import { getNetwork } from '../../view-model';
 import { markViewed } from '../../../../../net/commands';
 import { notices } from '../../../../managers/notices';
+import { formatNumberRatio } from '../../../../../utils';
+import { toNumber } from '../../../../../core/bignum';
+import { resolveUpdatingText } from '../../../../../utils/text';
+import { ZERO } from '../../../../../core/bignum';
+import { drawHorizontalBar, getHorizontalBarCenterY } from '../../../../components/bar';
+import {
+  TOP_HUD_LEVEL_FONT,
+  TOP_HUD_EXP_FONT,
+  QUEST_FAME_BAR_WIDTH,
+  QUEST_FAME_BAR_HEIGHT,
+  QUEST_FAME_BAR_TRUST_GAP,
+  QUEST_FAME_BAR_ROW_HEIGHT
+} from '../../../../../config';
 
 const CARD_HEIGHT_PX = 92;
 const CARD_GAP_PX = 12;
 const CARD_SCROLLBAR_GUTTER_PX = 12;
+const FAME_BAR_TEXT_KEY = "quests.fame_bar.text";
+const FAME_BAR_TRUST_TEXT_KEY = "quests.fame_bar.trust";
 
 let questSubTabs: TabMenu | null = null;
 let dailyScrollingPanel: ScrollingPanel | null = null;
@@ -38,6 +53,9 @@ export function renderQuestsTab(
   }
 
   drawQuestPanelFrame(rect);
+  if (snapshot) {
+    drawFameBar(snapshot, rect);
+  }
   const viewModel = getQuestViewModel(state);
   getQuestSubTabs(viewModel).render(canvas, input, state, rect);
 }
@@ -179,4 +197,76 @@ function cssToRgba(color: string): [number, number, number, number] {
   const parsed = Number.parseInt(expanded, 16);
   if (!Number.isFinite(parsed)) return [1, 1, 1, 1];
   return [((parsed >> 16) & 255) / 255, ((parsed >> 8) & 255) / 255, (parsed & 255) / 255, 1];
+}
+
+function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
+  const renderer = getActiveWebGLRenderer();
+  if (!renderer) return;
+
+  const barWidth = QUEST_FAME_BAR_WIDTH;
+  // Keep the fame bar right edge pixel-aligned with quest card right edges.
+  const questCardRightEdgeX = rect.x + rect.width - CARD_SCROLLBAR_GUTTER_PX;
+  const barX = questCardRightEdgeX - barWidth;
+  const barY = rect.y + Math.floor((QUEST_FAME_BAR_ROW_HEIGHT - QUEST_FAME_BAR_HEIGHT) / 2);
+  const barRect = {
+    x: barX,
+    y: barY,
+    width: barWidth,
+    height: QUEST_FAME_BAR_HEIGHT
+  };
+  const trust = Math.max(1, snapshot.state.trust || 1);
+  const fame = snapshot.state.fame || ZERO;
+  const requiredFame = snapshot.state.required_fame || { m: 2, e: 1 };
+  const fillRatio = Math.min(1, Math.max(0, toNumber(fame) / Math.max(1, toNumber(requiredFame))));
+
+  drawHorizontalBar(
+    barRect,
+    {
+      fillRatio,
+      fillStartColor: COLORS.bar.fame.fillStart,
+      fillEndColor: COLORS.bar.fame.fillEnd
+    }
+  );
+
+  const trustText = resolveUpdatingText(
+    FAME_BAR_TRUST_TEXT_KEY,
+    String(trust),
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: TOP_HUD_LEVEL_FONT,
+      color: COLORS.panel.textPrimary,
+      align: 'right',
+      baseline: 'middle'
+    })
+  );
+  renderer.drawText({
+    text: trustText,
+    x: barX - QUEST_FAME_BAR_TRUST_GAP,
+    y: getHorizontalBarCenterY(barRect),
+    font: TOP_HUD_LEVEL_FONT,
+    color: COLORS.panel.textPrimary,
+    align: 'right',
+    baseline: 'middle'
+  });
+
+  const fameText = resolveUpdatingText(
+    FAME_BAR_TEXT_KEY,
+    `${formatNumberRatio(fame, requiredFame)} FAME`,
+    (candidate) => renderer.isTextReady({
+      text: candidate,
+      font: TOP_HUD_EXP_FONT,
+      color: COLORS.panel.textPrimary,
+      align: 'center',
+      baseline: 'middle'
+    })
+  );
+  renderer.drawText({
+    text: fameText,
+    x: barX + barWidth / 2,
+    y: getHorizontalBarCenterY(barRect),
+    font: TOP_HUD_EXP_FONT,
+    color: COLORS.panel.textPrimary,
+    align: 'center',
+    baseline: 'middle'
+  });
 }

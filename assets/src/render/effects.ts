@@ -7,7 +7,8 @@ import {
   TOP_HUD_CORES_COUNTER_RIGHT,
   TOP_HUD_COIN_COUNTER_Y,
   TOP_HUD_EXP_COUNTER_X,
-  TOP_HUD_EXP_COUNTER_Y,
+  TOP_HUD_EXP_BAR_Y,
+  TOP_HUD_EXP_BAR_HEIGHT,
   TOP_HUD_SHARDS_COUNTER_RIGHT,
   TOP_HUD_COINS_COUNTER_RIGHT,
   CANVAS_WIDTH,
@@ -155,7 +156,7 @@ export function getHudRewardTargets(canvas: HTMLCanvasElement | null) {
   return {
     exp: {
       x: TOP_HUD_EXP_COUNTER_X,
-      y: TOP_HUD_EXP_COUNTER_Y
+      y: TOP_HUD_EXP_BAR_Y + (TOP_HUD_EXP_BAR_HEIGHT / 2)
     },
     coins: { x: canvasWidth - TOP_HUD_COINS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },
     shards: { x: canvasWidth - TOP_HUD_SHARDS_COUNTER_RIGHT, y: TOP_HUD_COIN_COUNTER_Y },

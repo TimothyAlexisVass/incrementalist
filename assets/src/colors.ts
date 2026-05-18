@@ -9,7 +9,7 @@ export const COLORS = Object.freeze({
   },
   bar: {
     track: '#0f1b30',
-    border: '#5b6f93',
+    border: '#000',
     progress: {
       border: '#412407',
       fillStart: [255, 107, 107], // #FF6B6B
@@ -23,8 +23,12 @@ export const COLORS = Object.freeze({
       }
     },
     exp: {
-      fillStart: '#934caf',
-      fillEnd: '#e753ec'
+      fillStart: '#6d1f8c',
+      fillEnd: '#d053ec'
+    },
+    fame: {
+      fillStart: '#083245',
+      fillEnd: '#0fbcc2'
     },
     quest: {
       readyStart: '#34a853',

@@ -52,8 +52,8 @@ export function renderAchievementsTab(
     .reduce((sum, a) => sum + a.multiplier, 0);
 
   // Header area
-  const headerHeight = 40;
-  const headerY = rect.y + 10;
+  const headerHeight = 32;
+  const headerY = rect.y;
   
   // Draw Checkbox
   const checkboxSize = 20;
@@ -91,9 +91,9 @@ export function renderAchievementsTab(
 
   const listRect = {
     x: rect.x,
-    y: rect.y + headerHeight + 10,
+    y: rect.y + headerHeight + 5,
     width: Math.max(1, rect.width),
-    height: Math.max(1, rect.height - headerHeight - 10)
+    height: Math.max(1, rect.height - headerHeight - 5)
   };
 
   const cardWidth = Math.max(1, listRect.width - CARD_SCROLLBAR_GUTTER_PX);
