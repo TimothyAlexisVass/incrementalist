@@ -36,6 +36,7 @@ export { getSisuControlRect };
 
 const SISU_MULTIPLIER_TEXT_KEY = "sisu.control.multiplier";
 const SISU_GLASS_BALL_RADIUS = 32;
+const SISU_BASELINE_EPSILON = 0.005;
 
 export function renderSisuControl(
   canvas: HTMLCanvasElement,
@@ -181,6 +182,9 @@ function drawSisuControlNative(
   const transcendentMax = getSisuTierTarget(maxBasic, "transcendent");
   const startAngle = -Math.PI / 2;
   const fullCircle = Math.PI * 2;
+  const baselineSisu = SISU_MIN_MULTIPLIER;
+  const normalizedDisplayCurrent =
+    displayCurrent <= baselineSisu + SISU_BASELINE_EPSILON ? baselineSisu : displayCurrent;
 
   const getTierFillRatio = (value: number, tierMin: number, tierMax: number) => {
     if (tierMax <= tierMin) return value >= tierMax ? 1 : 0;
@@ -198,7 +202,7 @@ function drawSisuControlNative(
       : "azure";
 
   // Crystal goes behind the meter.
-  if (showSisuHoverInfo && displayCurrent > 1) {
+  if (showSisuHoverInfo && normalizedDisplayCurrent > baselineSisu) {
     renderSisuCrystal(renderer, centerX, centerY, 40, crystalTier);
   }
 
@@ -206,25 +210,25 @@ function drawSisuControlNative(
   renderer.drawRing(centerX, centerY, barRadius, SISU_METER_THICKNESS, hexToRgba(COLORS.bar.track));
 
   // Azure Tier
-  const azureFillRatio = getTierFillRatio(displayCurrent, SISU_MIN_MULTIPLIER, azureMax);
+  const azureFillRatio = getTierFillRatio(normalizedDisplayCurrent, SISU_MIN_MULTIPLIER, azureMax);
   if (azureFillRatio > 0) {
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * azureFillRatio, hexToRgba(COLORS.sisu.azure));
   }
 
   // Aether Tier
-  const aetherFillRatio = getTierFillRatio(displayCurrent, azureMax, aetherMax);
+  const aetherFillRatio = getTierFillRatio(normalizedDisplayCurrent, azureMax, aetherMax);
   if (aetherFillRatio > 0) {
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * aetherFillRatio, hexToRgba(COLORS.sisu.aether));
   }
 
   // Lucent Tier
-  const lucentFillRatio = getTierFillRatio(displayCurrent, aetherMax, lucentMax);
+  const lucentFillRatio = getTierFillRatio(normalizedDisplayCurrent, aetherMax, lucentMax);
   if (lucentFillRatio > 0) {
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * lucentFillRatio, hexToRgba(COLORS.sisu.lucent));
   }
 
   // Transcendent Tier
-  const transcendentFillRatio = getTierFillRatio(displayCurrent, lucentMax, transcendentMax);
+  const transcendentFillRatio = getTierFillRatio(normalizedDisplayCurrent, lucentMax, transcendentMax);
   if (transcendentFillRatio > 0) {
     renderer.drawArc(centerX, centerY, barRadius, SISU_METER_THICKNESS, startAngle, startAngle + fullCircle * transcendentFillRatio, hexToRgba(COLORS.sisu.transcendent));
   }
