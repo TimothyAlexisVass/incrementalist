@@ -20,6 +20,10 @@ export function renderItemChecklist(
   const now = performance.now();
   const centerX = rect.x + rect.width / 2;
   const centerY = rect.y + rect.height / 2;
+  const displayedEntryIndex =
+    state === ItemChecklistState.IDLE
+      ? data.nextEntryIndex
+      : (data.nextEntryIndex + 16) % 17;
 
   // Title
   renderer.drawText({
@@ -48,9 +52,8 @@ export function renderItemChecklist(
     const boxX = startX + col * (boxSize + gap);
     const boxY = startY + row * (boxSize + gap);
 
-    const entry = data.entries[i];
-    const isCompleted = entry.completed;
-    const isActive = entry.active;
+    const isCompleted = i < displayedEntryIndex;
+    const isActive = i === displayedEntryIndex;
 
     let bgColor: RGBA = [27 / 255, 36 / 255, 53 / 255, 0.72];
     let borderColor: RGBA = [111 / 255, 132 / 255, 166 / 255, 0.3];
