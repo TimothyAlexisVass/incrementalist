@@ -152,6 +152,7 @@ class SisuGeneratorModalImpl implements Modal {
   private upgradeRect: Rect | null = null;
   public readonly isBlocking = false;
   public readonly closeOnMenuButton = true;
+  public readonly closeOnOutsideClick = true;
 
   constructor(
     private readonly getState: () => ServerState,
@@ -159,6 +160,11 @@ class SisuGeneratorModalImpl implements Modal {
     private readonly runCommand: (cmd: () => Promise<ServerResult>) => Promise<ServerResult | null>,
     private readonly onClose: () => void
   ) { }
+
+  getInteractionMaskRect(_canvas: HTMLCanvasElement): Rect | null {
+    if (this.modalRect) return this.modalRect;
+    return this.computeModalRect();
+  }
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
     const renderer = getActiveWebGLRenderer();
@@ -171,13 +177,11 @@ class SisuGeneratorModalImpl implements Modal {
     const bgImage = getSisuModalBackgroundImage();
     const isModalImageReady = isImageReady(bgImage);
 
-    const modalWidth = isModalImageReady ? bgImage.naturalWidth * SISU_MODAL_SCALE : 560;
-    const modalHeight = isModalImageReady ? bgImage.naturalHeight * SISU_MODAL_SCALE : 224;
-
-    const modalX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - modalWidth;
-    const modalY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - modalHeight;
-
-    this.modalRect = { x: modalX, y: modalY, width: modalWidth, height: modalHeight };
+    this.modalRect = this.computeModalRect();
+    const modalX = this.modalRect.x;
+    const modalY = this.modalRect.y;
+    const modalWidth = this.modalRect.width;
+    const modalHeight = this.modalRect.height;
 
     if (isModalImageReady) {
       renderer.drawImage({
@@ -332,6 +336,20 @@ class SisuGeneratorModalImpl implements Modal {
         this.hoverBlendByTier[tierId] = Math.max(0, current - transitionStep);
       }
     }
+  }
+
+  private computeModalRect(): Rect {
+    const bgImage = getSisuModalBackgroundImage();
+    const isModalImageReady = isImageReady(bgImage);
+    const modalWidth = isModalImageReady ? bgImage.naturalWidth * SISU_MODAL_SCALE : 560;
+    const modalHeight = isModalImageReady ? bgImage.naturalHeight * SISU_MODAL_SCALE : 224;
+
+    return {
+      x: DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - modalWidth,
+      y: DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT - modalHeight,
+      width: modalWidth,
+      height: modalHeight
+    };
   }
 }
 

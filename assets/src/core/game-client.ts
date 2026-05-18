@@ -412,13 +412,44 @@ export class GameClient {
     const { state: input, activity } = this.interactions.tick();
 
     const activeModal = this.ui.modals.getActiveModal();
+    const modalMaskRect = activeModal?.getInteractionMaskRect?.(this.canvas) ?? null;
     const modalBlocking = activeModal?.isBlocking ?? (activeModal !== null);
     const overlayOpen = this.ui.overlays.isOpen();
     const isMainMenuOpen = this.ui.overlays.isActive(this.mainMenu);
+    const pointerOverModalMask = modalMaskRect
+      ? pointInRect(input.pointer, modalMaskRect) || pointInRect(input.pressStartPointer, modalMaskRect)
+      : false;
+    const closeOnOutsideClick = Boolean(
+      activeModal &&
+      activeModal.closeOnOutsideClick &&
+      input.clicked &&
+      input.pointer &&
+      modalMaskRect &&
+      !pointInRect(input.pointer, modalMaskRect)
+    );
+
+    if (closeOnOutsideClick) {
+      this.ui.modals.close();
+      input.consumed = true;
+    }
+
     const uiBlocked = modalBlocking || overlayOpen;
 
-    if (input.clicked && input.pointer) {
-      spawnGpuClickBurst(input.pointer.x, input.pointer.y);
+    // Route gameplay interactions through inert input when blocked, or when
+    // a non-blocking modal's interaction region is under the pointer.
+    const sceneInput = (modalBlocking || pointerOverModalMask || closeOnOutsideClick)
+      ? {
+        ...input,
+        pointer: null,
+        pressStartPointer: null,
+        clicked: false,
+        isPressed: false,
+        consumed: true
+      }
+      : input;
+
+    if (sceneInput.clicked && sceneInput.pointer) {
+      spawnGpuClickBurst(sceneInput.pointer.x, sceneInput.pointer.y);
     }
 
     // Advance client-side estimation of progress bar fill
@@ -441,21 +472,21 @@ export class GameClient {
     renderAreaBackground(this.canvas);
 
     if (this.store.state.currentView === View.BONUSTIME) {
-      if (this.bonusRewardModal?.open && input.clicked && input.pointer) {
+      if (this.bonusRewardModal?.open && sceneInput.clicked && sceneInput.pointer) {
         const layout = getRewardModalLayout(this.canvas);
-        if (resolveRewardModalAction(layout, input.pointer.x, input.pointer.y)) {
+        if (resolveRewardModalAction(layout, sceneInput.pointer.x, sceneInput.pointer.y)) {
           this.bonusRewardModal.open = false;
           resetChestState();
           resetWheelState();
           resetResourceChecklistState();
           resetItemChecklistState();
-          input.consumed = true;
+          sceneInput.consumed = true;
         }
       }
 
-      if (!input.consumed) {
+      if (!sceneInput.consumed) {
         const interactionResult = handleBonusTimeInteractions(
-          input,
+          sceneInput,
           this.store.state,
           this.channel || undefined,
           (cmd) => this.runCommand(cmd)
@@ -473,12 +504,12 @@ export class GameClient {
         }
       }
 
-      renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, input);
+      renderBonusTimeOverview(this.canvas, this.store.state, this.bonusRewardModal, sceneInput);
     }
 
-    renderProgressBar(this.canvas, input, modalBlocking);
+    renderProgressBar(this.canvas, sceneInput, modalBlocking);
     this.sisuControlLayout = this.store.state.snapshot
-      ? renderSisuControl(this.canvas, input, this.store.state, modalBlocking)
+      ? renderSisuControl(this.canvas, sceneInput, this.store.state, modalBlocking)
       : null;
     renderSisuGlassBallOverlay(this.canvas, this.store.state);
 
@@ -501,7 +532,7 @@ export class GameClient {
     }
 
     if (this.store.state.snapshot && this.store.state.currentView === View.GAME) {
-      renderAreaSpecifics(this.canvas, input, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
+      renderAreaSpecifics(this.canvas, sceneInput, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
 
     const amounts = this.snapshotAmounts();
@@ -513,7 +544,7 @@ export class GameClient {
     updateFloatingTexts(this.floatingTexts, dt);
 
     // Render BottomHUD before game-world click handlers so its buttons take precedence.
-    renderBottomHUD(this.canvas, input, amounts?.level ?? 1, isMainMenuOpen, () => {
+    renderBottomHUD(this.canvas, sceneInput, amounts?.level ?? 1, isMainMenuOpen, () => {
       this.handleMenuButtonPress();
     }, () => {
       this.store.state.currentView = this.store.state.currentView === View.BONUSTIME ? View.GAME : View.BONUSTIME;
@@ -528,20 +559,20 @@ export class GameClient {
       (cmd) => this.runCommand(cmd));
 
     // 2. Handle specific UI element clicks before general activity collection.
-    if (!uiBlocked && input.clicked && input.pointer && this.channel) {
+    if (!uiBlocked && sceneInput.clicked && sceneInput.pointer && this.channel) {
       if (handleProgressClick(
         this.channel,
         this.canvas,
-        input.pointer,
+        sceneInput.pointer,
         (cmd) => this.runCommand(cmd),
         (itemId) => this.openShopAndHighlight(itemId)
       )) {
-        input.consumed = true;
+        sceneInput.consumed = true;
       }
     }
 
-    if (!uiBlocked && input.clicked && input.pointer && this.sisuControlLayout && pointInRect(input.pointer, this.sisuControlLayout.controlRect)) {
-      input.consumed = true;
+    if (!uiBlocked && sceneInput.clicked && sceneInput.pointer && this.sisuControlLayout && pointInRect(sceneInput.pointer, this.sisuControlLayout.controlRect)) {
+      sceneInput.consumed = true;
       if (this.store.state.snapshot?.state.features.sisu_generator_purchased && this.channel) {
         this.ui.modals.open(
           createSisuGeneratorModal(
@@ -575,7 +606,7 @@ export class GameClient {
     renderFloatingTexts(this.floatingTexts);
 
     if (isMainMenuOpen) {
-      renderAreaDropdownAboveMenu(this.canvas, input, (areaKey) => {
+      renderAreaDropdownAboveMenu(this.canvas, sceneInput, (areaKey) => {
         if (this.channel) {
           this.runCommand(() => selectArea(this.channel!, areaKey));
         }

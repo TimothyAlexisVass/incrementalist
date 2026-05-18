@@ -8,6 +8,13 @@ export interface Modal {
   isBlocking: boolean;
   backdropAlpha?: number;
   closeOnMenuButton?: boolean;
+  closeOnOutsideClick?: boolean;
+  getInteractionMaskRect?: (canvas: HTMLCanvasElement) => {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
 }
 
 export class Modals {

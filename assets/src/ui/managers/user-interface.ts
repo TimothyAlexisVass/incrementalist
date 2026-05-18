@@ -1,6 +1,6 @@
 import { Modals } from './modals';
 import { Overlays } from './overlays';
-import { InteractionState } from './interactions';
+import { InteractionState, pointInRect } from './interactions';
 import { ServerState } from '../../net/snapshots';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
 
@@ -17,12 +17,18 @@ export class UserInterface {
     getActiveWebGLRenderer();
 
     const modal = this.modals.getActiveModal();
+    const modalMaskRect = modal?.getInteractionMaskRect?.(canvas) ?? null;
+    const pointerOverModalMask = modalMaskRect
+      ? pointInRect(input.pointer, modalMaskRect) || pointInRect(input.pressStartPointer, modalMaskRect)
+      : false;
     const isBlocking = modal?.isBlocking ?? false;
 
     // Render overlays first (behind modals).
-    // If a blocking modal is open, we pass a "swallowed" input to overlays 
-    // so they stay visible but don't respond to clicks.
-    const overlayInput = isBlocking ? { ...input, clicked: false, isPressed: false, consumed: true } : input;
+    // Block overlays if the active modal is fully blocking, or if pointer is
+    // currently over a non-blocking modal's interaction mask.
+    const overlayInput = (isBlocking || pointerOverModalMask)
+      ? { ...input, pointer: null, pressStartPointer: null, clicked: false, isPressed: false, consumed: true }
+      : input;
     this.overlays.render(canvas, overlayInput, state);
 
     if (this.modals.isOpen()) {
