@@ -27,5 +27,7 @@ export function getAreaViewModel() {
 
 export function updateAreaViewModel(snapshotState: any) {
   areaViewModel.currentArea = snapshotState.area;
-  areaViewModel.availableAreas = snapshotState.areas || [];
+  areaViewModel.availableAreas = [...(snapshotState.areas || [])].sort(
+    (a, b) => b.unlock_level - a.unlock_level
+  );
 }
