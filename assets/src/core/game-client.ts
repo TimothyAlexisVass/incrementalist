@@ -80,7 +80,7 @@ let nextMilestoneAnnouncementGroupId = 1;
 
 type MilestoneBaseline = {
   unlockedAchievementIds: Set<string>;
-  claimedQuestRanksById: Map<string, number>;
+  readyQuestIds: Set<string>;
 };
 
 export class GameClient {
@@ -322,7 +322,7 @@ export class GameClient {
   private snapshotMilestoneBaseline(): MilestoneBaseline {
     const baseline: MilestoneBaseline = {
       unlockedAchievementIds: new Set<string>(),
-      claimedQuestRanksById: new Map<string, number>()
+      readyQuestIds: new Set<string>()
     };
 
     const snapshot = this.store.state.snapshot;
@@ -335,7 +335,9 @@ export class GameClient {
     }
 
     for (const [questId, quest] of Object.entries(snapshot.state.quests)) {
-      baseline.claimedQuestRanksById.set(questId, quest.claimed_rank);
+      if (quest.rank > quest.claimed_rank) {
+        baseline.readyQuestIds.add(questId);
+      }
     }
 
     return baseline;
@@ -354,8 +356,9 @@ export class GameClient {
     }
 
     for (const [questId, quest] of Object.entries(snapshot.state.quests)) {
-      const previousClaimedRank = previous.claimedQuestRanksById.get(questId) ?? 0;
-      if (quest.claimed_rank > previousClaimedRank) {
+      const wasReady = previous.readyQuestIds.has(questId);
+      const isReady = quest.rank > quest.claimed_rank;
+      if (isReady && !wasReady) {
         announcements.push({ text: `Quest: ${quest.name}`, color: COLORS.rewards.questSummary });
       }
     }

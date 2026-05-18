@@ -31,10 +31,10 @@ export const COLORS = Object.freeze({
       fillEnd: '#0fbcc2'
     },
     quest: {
-      readyStart: '#34a853',
-      readyEnd: '#7ce89a',
-      pendingStart: '#4b72c2',
-      pendingEnd: '#6ea9ff'
+      readyStart: '#188b37',
+      readyEnd: '#51ff82',
+      pendingStart: '#163b84',
+      pendingEnd: '#6ecaff'
     }
   },
   sisu: {
