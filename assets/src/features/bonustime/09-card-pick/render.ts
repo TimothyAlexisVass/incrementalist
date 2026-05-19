@@ -1,15 +1,16 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, cssToRgba, to255 } from "../../../utils";
-import { ItsBonusTimeData } from "./view-model";
+import { hexToRgba, to255 } from "../../../utils";
+import { CardPickData } from "./view-model";
 import {
-  ItsBonusTimeState, getItsBonusTimeState, getFlippedIndices, getRestFlippedIndices,
-  getRevealIndexMap, getItsHoveredIndex, getFinalRevealStartTime
+  CardPickState, getCardPickState, getFlippedIndices, getRestFlippedIndices,
+  getRevealIndexMap, getCardPickHoveredIndex, getFinalRevealStartTime,
+  getCurrentMaxPicks, getBonusPhaseStartTime
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { drawButton } from "../../../ui/components/button";
 import {
   BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, MODAL_BODY_FONT, BONUSTIME_BUTTON_FONT,
-  BONUSTIME_HUGE_BUTTON_FONT, BONUSTIME_BODY_FONT, BONUSTIME_LABEL_FONT
+  BONUSTIME_BODY_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
 
@@ -17,8 +18,8 @@ function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
-export function renderItsBonusTime(
-  data: ItsBonusTimeData,
+export function renderCardPick(
+  data: CardPickData,
   rect: { x: number; y: number; width: number; height: number },
   pointer: { x: number; y: number } | null
 ) {
@@ -26,57 +27,57 @@ export function renderItsBonusTime(
   if (!renderer) return;
 
   const now = performance.now();
-  const state = getItsBonusTimeState();
-
   const centerX = rect.x + rect.width / 2;
   const centerY = rect.y + rect.height / 2;
 
-  if (state === ItsBonusTimeState.IDLE) {
-    // 1. Render beautiful glassmorphic welcome card
-    const cardRect = { x: centerX - 300, y: centerY - 180, width: 600, height: 360 };
+  const state = getCardPickState();
+
+  // 1. Render IDLE welcome view
+  if (state === CardPickState.IDLE) {
+    const cardWidth = 560;
+    const cardHeight = 360;
+    const cardRect = {
+      x: centerX - cardWidth / 2,
+      y: centerY - cardHeight / 2 - 20,
+      width: cardWidth,
+      height: cardHeight
+    };
+
+    // Modal panel background
     renderer.drawGlowRect({
       x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: [122, 90, 240, 255], radius: 24, intensity: 0.35, outerAlpha: 0.3
+      color: [255, 190, 77, 255], radius: 16, intensity: 0.3, outerAlpha: 0.15
     });
+
     renderer.drawRect({
       x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: hexToRgba("#1a1438", 0.9)
+      color: hexToRgba("#120d24", 0.98)
     });
 
-    // Draw card borders
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: 2, height: cardRect.height, color: hexToRgba("#ffbe4d", 0.4) });
-    renderer.drawRect({ x: cardRect.x + cardRect.width - 2, y: cardRect.y, width: 2, height: cardRect.height, color: hexToRgba("#ffbe4d", 0.4) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 2, width: cardRect.width, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
+    // Top and bottom accent lines
+    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
+    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 3, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
 
-    // Title
+    // Title text
     renderer.drawText({
-      text: "IT'S BONUS TIME!",
-      x: centerX, y: cardRect.y + 50, font: BONUSTIME_TITLE_FONT,
+      text: "CARD PICK",
+      x: centerX, y: cardRect.y + 60, font: BONUSTIME_TITLE_FONT,
       color: "#ffbe4d", align: 'center', baseline: 'middle'
     });
 
     // Subtitle / Description
     renderer.drawText({
-      text: "A massive hidden grid of rewards.",
-      x: centerX, y: cardRect.y + 110, font: BONUSTIME_BODY_FONT,
+      text: "Flip cards with a chance to win massive prizes",
+      x: centerX, y: cardRect.y + 130, font: BONUSTIME_BODY_FONT,
       color: "#edf2f7", align: 'center', baseline: 'middle'
     });
-    renderer.drawText({
-      text: "Flip the tiles using your picks to reveal massive coin multipliers.",
-      x: centerX, y: cardRect.y + 140, font: MODAL_BODY_FONT,
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-    renderer.drawText({
-      text: "Your daily streak increases your starting flips.",
-      x: centerX, y: cardRect.y + 165, font: MODAL_BODY_FONT,
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
 
+    const initialPicks = 2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7));
     const dayLabel = pluralize(data.streak, "day");
+    const pickLabel = pluralize(initialPicks, "pick");
     renderer.drawText({
-      text: `Current Streak: ${data.streak} ${dayLabel}`,
-      x: centerX, y: cardRect.y + 205, font: BONUSTIME_BODY_FONT,
+      text: `Current Streak: ${data.streak} ${dayLabel}  (${initialPicks} starting ${pickLabel})`,
+      x: centerX, y: cardRect.y + 195, font: BONUSTIME_BODY_FONT,
       color: "#52df87", align: 'center', baseline: 'middle'
     });
 
@@ -86,7 +87,7 @@ export function renderItsBonusTime(
       pointer.x >= btnRect.x && pointer.x <= btnRect.x + btnRect.width &&
       pointer.y >= btnRect.y && pointer.y <= btnRect.y + btnRect.height;
 
-    drawButton(btnRect, "FLIP THE BOARD", {
+    drawButton(btnRect, "START", {
       font: BONUSTIME_BUTTON_FONT,
       active: !!isOverBtn
     });
@@ -108,21 +109,24 @@ export function renderItsBonusTime(
   const flippedIndices = getFlippedIndices();
   const restFlippedIndices = getRestFlippedIndices();
   const revealMap = getRevealIndexMap();
-  const hoveredIdx = getItsHoveredIndex();
+  const hoveredIdx = getCardPickHoveredIndex();
 
-  const picksMade = Math.min(flips, Array.from(flippedIndices).filter(idx => revealMap.has(idx)).length);
-  const picksLeft = Math.max(0, flips - picksMade);
+  const currentMaxPicks = (state === CardPickState.PLAYING)
+    ? (getCurrentMaxPicks() || (2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7))))
+    : (getCurrentMaxPicks() || flips);
+
+  const picksMade = Math.min(currentMaxPicks, Array.from(flippedIndices).filter(idx => revealMap.has(idx)).length);
+  const picksLeft = Math.max(0, currentMaxPicks - picksMade);
 
   // Status indicators at the top of display area
   renderer.drawText({
-    text: "IT'S BONUS TIME!",
+    text: "CARD PICK",
     x: rect.x + 40, y: rect.y + 40, font: BONUSTIME_TITLE_FONT,
     color: "#ffbe4d", align: 'left', baseline: 'middle'
   });
 
-  // Single line Picks Text replacement:
   const picksText = picksLeft > 0
-    ? `Flip ${picksLeft} ${picksLeft === flips ? '' : 'more '}${pluralize(picksLeft, 'tile')}`
+    ? `Pick ${picksLeft} ${picksLeft === currentMaxPicks ? '' : 'more '}${pluralize(picksLeft, 'card')}`
     : '';
   renderer.drawText({
     text: picksText,
@@ -130,37 +134,77 @@ export function renderItsBonusTime(
     color: picksLeft > 0 ? "#52df87" : "#ff5b8f", align: 'right', baseline: 'middle'
   });
 
-  // 16x8 Grid rendering (Exactly 128 positions, no positions skipped)
-  const cols = 16;
-  const rows = 8;
-  const tileSize = 55;
-  const gap = 4;
+  // 6x6 Grid rendering
+  const cols = 6;
+  const rows = 6;
+  const tileSize = 65;
+  const gap = 10;
   const totalGridWidth = cols * tileSize + (cols - 1) * gap;
   const totalGridHeight = rows * tileSize + (rows - 1) * gap;
 
   const gridStartX = rect.x + (rect.width - totalGridWidth) / 2;
-  const gridStartY = rect.y + 110;
+  const gridStartY = rect.y + 100;
+
+  const gridCenterX = gridStartX + totalGridWidth / 2;
+  const gridCenterY = gridStartY + totalGridHeight / 2;
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const idx = r * cols + c;
 
-      const tx = gridStartX + c * (tileSize + gap);
-      const ty = gridStartY + r * (tileSize + gap);
+      let tx = gridStartX + c * (tileSize + gap);
+      let ty = gridStartY + r * (tileSize + gap);
+
+      // WebGL Shuffling Physics: Chaotic, deterministic random shuffle around center grid coordinates
+      if (state === CardPickState.SHUFFLING) {
+        const elapsed = now - getBonusPhaseStartTime();
+        const t = Math.min(1.0, elapsed / 1500); // 0 to 1
+        
+        // Envelope goes from 0 -> 1 -> 0
+        const env = Math.sin(t * Math.PI);
+
+        // Unique frequency and phases based on card index to ensure chaotic paths
+        const freqX = 12 + (idx % 5) * 4;
+        const freqY = 10 + (idx % 7) * 3;
+        const phaseX = (idx * 0.77) % Math.PI;
+        const phaseY = (idx * 1.33) % Math.PI;
+
+        // Base rotation and scale contraction
+        const angle = env * Math.PI * (1.5 + (idx % 4) * 0.5);
+        const scale = 1.0 - env * (0.35 + (idx % 3) * 0.05);
+
+        // Chaotic displacement amplitude
+        const wobbleAmp = 80 * env;
+        const wobbleX = wobbleAmp * Math.sin(t * freqX + phaseX);
+        const wobbleY = wobbleAmp * Math.cos(t * freqY + phaseY);
+
+        const dx = tx - gridCenterX;
+        const dy = ty - gridCenterY;
+
+        const rotX = dx * Math.cos(angle) - dy * Math.sin(angle);
+        const rotY = dx * Math.sin(angle) + dy * Math.cos(angle);
+
+        tx = gridCenterX + rotX * scale + wobbleX;
+        ty = gridCenterY + rotY * scale + wobbleY;
+      }
 
       const isPlayerFlipped = flippedIndices.has(idx);
       const isRestFlipped = restFlippedIndices.has(idx);
 
-      if (isPlayerFlipped || isRestFlipped) {
+      // Cards turn completely upside down again (closed) during shuffling phase
+      const isFlipped = (state !== CardPickState.SHUFFLING) && (isPlayerFlipped || isRestFlipped);
+
+      if (isFlipped) {
         // Render REVEALED state for tile
-        const tier = revealMap.get(idx) || 1;
+        const cardVal = revealMap.get(idx) || { tier: 1, multiplier: 1 };
+        const tier = cardVal.tier;
         const tierConf = getTierConfig(tier);
         const tierColor = tierConf?.color || "#ffffff";
 
-        // Wish 3: distinctly fade the rest of the tiles (opacity = 0.4)
-        const alpha = isRestFlipped ? 0.4 : 1.0;
+        // Dim unclicked ones flipped in FINAL_REVEAL
+        const alpha = isRestFlipped ? 0.35 : 1.0;
 
-        // Soft outer glow of reward color
+        // Outer glow of reward color
         renderer.drawGlowRect({
           x: tx, y: ty, width: tileSize, height: tileSize,
           color: to255(hexToRgba(tierColor)), radius: 8, intensity: 0.55, outerAlpha: 0.35, alpha
@@ -172,7 +216,7 @@ export function renderItsBonusTime(
           color: hexToRgba(tierColor, 0.15), alpha
         });
 
-        // Wish 4: Outline player picked ones with a thicker border
+        // Outline player-picked ones with thicker border, missed ones with thin border
         if (isPlayerFlipped) {
           const borderThickness = 3;
           renderer.drawRect({ x: tx, y: ty, width: tileSize, height: borderThickness, color: hexToRgba(tierColor, 1.0) });
@@ -180,7 +224,6 @@ export function renderItsBonusTime(
           renderer.drawRect({ x: tx + tileSize - borderThickness, y: ty, width: borderThickness, height: tileSize, color: hexToRgba(tierColor, 1.0) });
           renderer.drawRect({ x: tx, y: ty + tileSize - borderThickness, width: tileSize, height: borderThickness, color: hexToRgba(tierColor, 1.0) });
         } else {
-          // System unclicked reveals draw thin, faded border
           const borderThickness = 1.5;
           renderer.drawRect({ x: tx, y: ty, width: tileSize, height: borderThickness, color: hexToRgba(tierColor, 0.8), alpha });
           renderer.drawRect({ x: tx, y: ty, width: borderThickness, height: tileSize, color: hexToRgba(tierColor, 0.8), alpha });
@@ -188,15 +231,15 @@ export function renderItsBonusTime(
           renderer.drawRect({ x: tx, y: ty + tileSize - borderThickness, width: tileSize, height: borderThickness, color: hexToRgba(tierColor, 0.8), alpha });
         }
 
-        // Tier text inside
+        // Tier text inside card
         renderer.drawText({
           text: `T${tier}`,
           x: tx + tileSize / 2, y: ty + tileSize / 2,
-          font: "bold 20px 'Outfit'", color: tierColor, align: 'center', baseline: 'middle', alpha
+          font: "bold 22px 'Outfit'", color: tierColor, align: 'center', baseline: 'middle', alpha
         });
       } else {
         // Render CLOSED state for tile
-        const isHovered = hoveredIdx === idx;
+        const isHovered = (state === CardPickState.PLAYING) && (hoveredIdx === idx);
         const scale = isHovered ? 1.04 : 1.0;
         const drawSize = tileSize * scale;
         const offset = (drawSize - tileSize) / 2;
@@ -226,7 +269,7 @@ export function renderItsBonusTime(
         renderer.drawText({
           text: "?",
           x: tx + tileSize / 2, y: ty + tileSize / 2,
-          font: isHovered ? "bold 19px Arial" : "17px Arial",
+          font: isHovered ? "bold 21px Arial" : "19px Arial",
           color: isHovered ? "#ffbe4d" : "#7b6fa3",
           align: 'center', baseline: 'middle'
         });
@@ -234,19 +277,56 @@ export function renderItsBonusTime(
     }
   }
 
-  // 3. Render final countdown overlay if in FINAL_REVEAL state
-  if (state === ItsBonusTimeState.FINAL_REVEAL) {
-    const elapsed = now - getFinalRevealStartTime();
-    const remainingIndicesCount = 128 - flips;
-    const allRevealedDuration = 2000 + remainingIndicesCount * 20;
-
-    const remainingMs = Math.max(0, (allRevealedDuration + 5000) - elapsed);
+  // 3. Render gorgeous gold bonus count down overlay if in BONUS_PENDING state
+  if (state === CardPickState.BONUS_PENDING) {
+    const elapsed = now - getBonusPhaseStartTime();
+    const remainingMs = Math.max(0, 5000 - elapsed);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
 
     const bannerWidth = 460;
     const bannerHeight = 80;
     const bannerX = centerX - bannerWidth / 2;
-    const bannerY = gridStartY + totalGridHeight + 10;
+    const bannerY = gridStartY + totalGridHeight + 20;
+
+    renderer.drawGlowRect({
+      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
+      color: [255, 190, 77, 255], radius: 12, intensity: 0.45, outerAlpha: 0.25
+    });
+
+    renderer.drawRect({
+      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
+      color: hexToRgba("#1c140a", 0.95)
+    });
+
+    renderer.drawRect({ x: bannerX, y: bannerY, width: bannerWidth, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
+    renderer.drawRect({ x: bannerX, y: bannerY + bannerHeight - 2, width: bannerWidth, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
+
+    renderer.drawText({
+      text: "YOU GOT A BONUS PICK!",
+      x: centerX, y: bannerY + 28, font: "bold 15px Arial",
+      color: "#ffbe4d", align: 'center', baseline: 'middle'
+    });
+
+    renderer.drawText({
+      text: `Shuffling cards in ${remainingSeconds}s...`,
+      x: centerX, y: bannerY + 54, font: "13px Arial",
+      color: "#a0aec0", align: 'center', baseline: 'middle'
+    });
+  }
+
+  // 4. Render final countdown overlay if in FINAL_REVEAL state
+  if (state === CardPickState.FINAL_REVEAL) {
+    const elapsed = now - getFinalRevealStartTime();
+    const remainingIndicesCount = 36 - flips;
+    const allRevealedDuration = 2000 + remainingIndicesCount * 30;
+
+    const remainingMs = Math.max(0, (allRevealedDuration + 3000) - elapsed);
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+
+    const bannerWidth = 460;
+    const bannerHeight = 80;
+    const bannerX = centerX - bannerWidth / 2;
+    const bannerY = gridStartY + totalGridHeight + 20;
 
     renderer.drawGlowRect({
       x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,

@@ -178,35 +178,11 @@ Canvas-only UI contract:
 - DOM may host the canvas and non-game browser shell only. Gameplay display, menus, overlays, buttons, hit testing, hover state, and modal-like flows belong in Canvas/WebGL modules.
 
 ## Migration Phases
-Phases 1-10 are completed and therefore removed from this plan.
+Phases 1-11 are completed and therefore removed from this plan.
 
-### Phase 11: BONUSTIME
+### Phase 12: BONUS TIME (Part 2)
 
-- Port daily token rotation (12-hour slots), streaks (decrement by 3 on miss), and the 15-slot daily bonus roster.
-- One-shot games: Chest Draw, Prize Wheel, Coin Rain, Resource/Item Checklists, Plinko Drop, Jackpot Meter, Bonus Time, plus the remaining one-shot rotation slots.
-- Multi-step bonus games: Reward Labyrinth, Ladder Climb, Hammer Smash, Lucky Dice, Scratch Card.
-- Implement dual-token system: `has_daily_token` (rotating) and `special_tokens` (persistent).
-- Enforce token grant rule: 1 `daily_token` granted at boundary ONLY IF total tokens is 0.
-- Implement `bonustime.open`, `bonustime.play`, and game-specific commands.
-- Render the Daily tab and daily bonus interactions in Canvas/WebGL.
-- Keep client animations reveal-only and server-validated.
-
-Deliverable: daily bonus loop, dual-token mechanics, 15 daily bonus games, and reveal animations are ported.
-
-The remaining multi-step daily bonus games are tracked in `!plans/Phase12/`.
-
-### Later: Card Pick & Match Pairs
-
-- Port the remaining complex mini-games: Card Pick and Match Pairs.
-- Replace the legacy client-board model with server-authoritative session state.
-- Client sends reveal intent with picked count only (Card Pick) or paired indexes (Match Pairs).
-- Server accepts picks only if they match the server-owned session phase.
-- Client may remember which visible card positions the player clicked as UI state, then map server reveal results onto those positions.
-- Server calculates reveal outcomes only when reveal is requested.
-- Reveal response includes all results: picked results first, then missed results (to show "what was where").
-- Bonus phases and multipliers reveal only allowed information.
-
-Deliverable: Card Pick and Match Pairs session lifecycles and reveal flows are ported.
+- Implement the remaining bonus games
 
 ### Phase 13: Legacy Removal
 

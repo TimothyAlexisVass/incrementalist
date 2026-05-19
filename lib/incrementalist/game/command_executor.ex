@@ -19,6 +19,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.Checklist
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
   alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
+  alias Incrementalist.Game.Features.BonusTime.Games.CardPick
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
@@ -722,6 +723,68 @@ defmodule Incrementalist.Game.CommandExecutor do
                          "coins_others" => coins_others
                        }, next_state}
 
+                    "card_pick" ->
+                      {total_picks, final_board} =
+                        CardPick.roll_reward(
+                          next_state.bonustime.streak,
+                          next_state.bonustime.bonustime_flips,
+                          now
+                        )
+
+                      claimed_cards = Enum.take(final_board, total_picks)
+                      best_card = Enum.max_by(claimed_cards, fn c -> c.tier end)
+                      best_tier = best_card.tier
+
+                      other_cards = delete_one_card(claimed_cards, best_card)
+
+                      # Update reward_counts for other_cards
+                      updated_reward_counts =
+                        Enum.reduce(other_cards, next_state.bonustime.reward_counts, fn c, acc ->
+                          Map.update(acc, "tier_#{c.tier}", 1, &(&1 + 1))
+                        end)
+
+                      next_bonustime = %{next_state.bonustime | reward_counts: updated_reward_counts}
+                      next_state = %{next_state | bonustime: next_bonustime}
+
+                      # Apply rewards for other_cards with multipliers
+                      {next_state, coins_others} =
+                        Enum.reduce(other_cards, {next_state, BigNum.zero()}, fn card, {state_acc, coins_acc} ->
+                          {next_state_acc, base_coins} = Incrementalist.Game.Rewards.grant_bonus_reward(state_acc, card.tier)
+                          multiplied_coins = BigNum.mul(base_coins, BigNum.from_number(card.multiplier))
+                          reward_remainder = BigNum.mul(base_coins, BigNum.from_number(card.multiplier - 1))
+
+                          next_state_acc = %{
+                            next_state_acc
+                            | coins: BigNum.add(next_state_acc.coins, reward_remainder),
+                              stats: %{
+                                next_state_acc.stats
+                                | total_coins_earned: BigNum.add(next_state_acc.stats.total_coins_earned, reward_remainder)
+                              }
+                          }
+
+                          {next_state_acc, BigNum.add(coins_acc, multiplied_coins)}
+                        end)
+
+                      # Calculate multiplier remainder for best_card and grant it
+                      {_, best_card_base_coins} = Incrementalist.Game.Rewards.grant_bonus_reward(next_state, best_tier)
+                      best_remainder = BigNum.mul(best_card_base_coins, BigNum.from_number(best_card.multiplier - 1))
+
+                      next_state = %{
+                        next_state
+                        | coins: BigNum.add(next_state.coins, best_remainder),
+                          stats: %{
+                            next_state.stats
+                            | total_coins_earned: BigNum.add(next_state.stats.total_coins_earned, best_remainder)
+                          }
+                      }
+
+                      {best_tier,
+                       %{
+                         "board" => Enum.map(final_board, fn c -> %{"tier" => c.tier, "multiplier" => c.multiplier} end),
+                         "flips" => total_picks,
+                         "coins_others" => BigNum.add(coins_others, best_remainder)
+                       }, next_state}
+
                     _ ->
                       {1, [1], next_state}
                   end
@@ -747,6 +810,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                   }
                   |> maybe_put_plinko_payload(rolls)
                   |> maybe_adjust_its_bonus_time_result(rolls)
+                  |> maybe_adjust_card_pick_result(rolls)
 
                 next_bonustime = %{
                   bonustime
@@ -965,7 +1029,25 @@ defmodule Incrementalist.Game.CommandExecutor do
 
   defp maybe_adjust_its_bonus_time_result(last_result, _), do: last_result
 
+  defp maybe_adjust_card_pick_result(last_result, %{"board" => board, "flips" => flips, "coins_others" => coins_others}) do
+    total_coins = BigNum.add(coins_others, last_result["reward_amount"])
+    Map.merge(last_result, %{
+      "reward_amount" => total_coins,
+      "board" => board,
+      "flips" => flips
+    })
+  end
+
+  defp maybe_adjust_card_pick_result(last_result, _), do: last_result
+
   defp delete_one(list, item) do
+    case Enum.split_while(list, &(&1 != item)) do
+      {left, [_ | right]} -> left ++ right
+      _ -> list
+    end
+  end
+
+  defp delete_one_card(list, item) do
     case Enum.split_while(list, &(&1 != item)) do
       {left, [_ | right]} -> left ++ right
       _ -> list

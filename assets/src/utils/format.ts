@@ -186,3 +186,7 @@ export function formatTimestamp(timestamp: any, emptyText = 'Never', invalidText
 
   return date.toLocaleString();
 }
+
+export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return Math.floor(count) === 1 ? singular : plural;
+}

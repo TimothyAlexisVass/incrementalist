@@ -36,6 +36,9 @@ import { getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
 import { renderItsBonusTime } from "./18-its-bonus-time/render";
 import { getItsBonusTimeData } from "./18-its-bonus-time/view-model";
 import { getItsBonusTimeState, ItsBonusTimeState } from "./18-its-bonus-time/interactions";
+import { renderCardPick } from "./09-card-pick/render";
+import { getCardPickData } from "./09-card-pick/view-model";
+import { getCardPickState, CardPickState } from "./09-card-pick/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -69,7 +72,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
                            (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE) ||
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
-                           (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE);
+                           (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
+                           (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -156,6 +160,11 @@ export function renderBonusTimeOverview(
     const data = getItsBonusTimeData(state);
     if (data) {
       renderItsBonusTime(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "card_pick") {
+    const data = getCardPickData(state);
+    if (data) {
+      renderCardPick(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({

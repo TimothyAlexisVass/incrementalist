@@ -18,6 +18,8 @@ import { getCoinRainData } from "./04-coin-rain/view-model";
 import { handleCoinRainInteractions, getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
 import { getItsBonusTimeData } from "./18-its-bonus-time/view-model";
 import { handleItsBonusTimeInteractions, getItsBonusTimeState, ItsBonusTimeState } from "./18-its-bonus-time/interactions";
+import { getCardPickData } from "./09-card-pick/view-model";
+import { handleCardPickInteractions, getCardPickState, CardPickState } from "./09-card-pick/interactions";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -48,7 +50,8 @@ export function handleBonusTimeInteractions(
                            (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
                            (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE) ||
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
-                           (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE);
+                           (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
+                           (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -144,6 +147,15 @@ export function handleBonusTimeInteractions(
     const data = getItsBonusTimeData(state);
     if (data) {
       const intent = handleItsBonusTimeInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
+      }
+    }
+  } else if (activeGameId === "card_pick") {
+    const data = getCardPickData(state);
+    if (data) {
+      const intent = handleCardPickInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === "open_modal") {
         return { type: "open_chest_reward" };
