@@ -619,6 +619,14 @@ export class WebGLRenderer {
   beginFrame(clearColor: RGBA = [0, 0, 0, 0]) {
     this.frameCounter += 1;
     this.evictUnusedTextCacheEntries();
+
+    // Reset transient GL state so one pass cannot leak into the next frame.
+    this.setBlendMode("normal");
+    this.setGlobalAlpha(1.0);
+    this.gl.enable(this.gl.BLEND);
+    this.gl.disable(this.gl.SCISSOR_TEST);
+    this.gl.disable(this.gl.DEPTH_TEST);
+
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.gl.clearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);

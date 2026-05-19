@@ -533,6 +533,9 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
   }
 
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  gl.enable(gl.BLEND);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
   renderProgressBarGlow(gl, gl.canvas.width, gl.canvas.height);
   renderLiquidBubbles(gl, gl.canvas.width, gl.canvas.height);
