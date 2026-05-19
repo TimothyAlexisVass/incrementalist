@@ -42,4 +42,4 @@
 4.  **One-Shot Mini-Games**: Step-by-step porting of the 10 one-shot rotation games.
 5.  **Complex Mini-Games**: Step-by-step porting of the 5 multi-step rotation games, with Card Pick and Match Pairs tracked in later Phase 12 docs.
 
-The full daily-bonus rotation is 15 games total. Card Pick and Match Pairs are separate later mini-games, not part of that 15-slot rotation.
+The daily-bonus rotation contains all 15 games listed in `bonustime.json`, including Card Pick (slot 9) and Match Pairs (slot 13). The visual and interactive design implementation details for these two complex games are documented in the Phase 12 plans.

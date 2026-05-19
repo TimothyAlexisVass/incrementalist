@@ -221,6 +221,7 @@ defmodule Incrementalist.Game.State do
         "item" => 0
       }
       field :last_result, :map
+      field :jackpot_progress, :integer, default: 0
 
       embeds_one :active_session, Incrementalist.Game.State.ActiveSession, on_replace: :update
     end
@@ -235,7 +236,8 @@ defmodule Incrementalist.Game.State do
         :total_games_played,
         :reward_counts,
         :checklist_entry_indexes,
-        :last_result
+        :last_result,
+        :jackpot_progress
       ])
       |> cast_embed(:active_session)
     end
@@ -431,7 +433,8 @@ defmodule Incrementalist.Game.State do
         },
         checklist_entry_indexes: %{
           "resource" => 0, "item" => 0
-        }
+        },
+        jackpot_progress: 0
       }
     }
   end

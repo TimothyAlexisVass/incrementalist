@@ -17,6 +17,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
   alias Incrementalist.Game.Features.BonusTime.Games.Checklist
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
+  alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
 
@@ -504,10 +505,10 @@ defmodule Incrementalist.Game.CommandExecutor do
       "bonustime.play" ->
         ps = player_state(player, now)
 
-        with {:ok, next_state, token_type} <- BonusTime.spend_token(ps.state),
+        with {:ok, game_id} <- fetch_game_id(command.intent),
              active_game_id <- BonusTime.get_active_game_id(now),
-             {:ok, game_id} <- fetch_game_id(command.intent),
-             true <- game_id == active_game_id do
+             true <- game_id == active_game_id,
+             {:ok, next_state, token_type} <- BonusTime.spend_token_for_game(ps.state, game_id) do
           # Execute game rules
           {tier, rolls, next_state} =
             case game_id do
@@ -530,6 +531,10 @@ defmodule Incrementalist.Game.CommandExecutor do
               "plinko_drop" ->
                 {t, rolls, plinko} = PlinkoDrop.roll_reward(next_state.bonustime.streak)
                 {t, %{"rolls" => rolls, "plinko" => plinko}, next_state}
+
+              "jackpot_meter" ->
+                {:ok, updated_state, t, progress} = JackpotRules.play(next_state)
+                {t, [progress], updated_state}
 
               _ ->
                 {1, [1], next_state}

@@ -12,6 +12,8 @@ import { handleItemChecklistInteractions, getItemChecklistState, ItemChecklistSt
 import { getItemChecklistData } from "./05-item-checklist/view-model";
 import { getPlinkoDropData } from "./15-plinko-drop/view-model";
 import { handlePlinkoDropInteractions, getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
+import { getJackpotMeterData } from "./jackpot-meter/view-model";
+import { handleJackpotMeterInteractions, getJackpotState, JackpotState } from "./jackpot-meter/interactions";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -28,13 +30,19 @@ export function handleBonusTimeInteractions(
   if (!snapshot || !snapshot.state.bonustime) return { type: 'none' };
 
   const db = snapshot.state.bonustime;
-  const hasToken = snapshot.state.has_bonustime_token || db.special_tokens > 0;
   const activeGameId = getActiveGameId(state);
+
+  // Jackpot Meter strictly requires daily tokens, no special tokens allowed.
+  const hasToken = activeGameId === "jackpot_meter"
+    ? !!snapshot.state.has_bonustime_token
+    : (snapshot.state.has_bonustime_token || db.special_tokens > 0);
+
   const isGameInProgress = (activeGameId === "chest_draw" && getChestState() !== ChestState.IDLE) ||
                            (activeGameId === "prize_wheel" && getWheelState() !== WheelState.IDLE) ||
                            (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
                            (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
-                           (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE);
+                           (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
+                           (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -103,6 +111,15 @@ export function handleBonusTimeInteractions(
     const data = getPlinkoDropData(state);
     if (data) {
       const intent = handlePlinkoDropInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
+      }
+    }
+  } else if (activeGameId === "jackpot_meter") {
+    const data = getJackpotMeterData(state);
+    if (data) {
+      const intent = handleJackpotMeterInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === "open_modal") {
         return { type: "open_chest_reward" };

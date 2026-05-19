@@ -92,6 +92,7 @@ export type BonusTimeState = {
   reward_counts: Record<string, number>;
   checklist_entry_indexes: Record<string, number>;
   last_result: any | null;
+  jackpot_progress?: number;
   rotation_anchor?: string;
   active_game_id?: string;
 };

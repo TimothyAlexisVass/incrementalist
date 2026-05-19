@@ -20,6 +20,18 @@ defmodule Incrementalist.Game.Features.BonusTime.Rules do
     end
   end
 
+  def spend_token_for_game(%State{} = state, "jackpot_meter") do
+    if state.has_bonustime_token do
+      {:ok, %{state | has_bonustime_token: false}, "daily"}
+    else
+      {:error, "daily_token_required"}
+    end
+  end
+
+  def spend_token_for_game(%State{} = state, _game_id) do
+    spend_token(state)
+  end
+
   def advance_streak(%State{} = state, now) do
     played_day = Time.to_utc_day_index(now)
 

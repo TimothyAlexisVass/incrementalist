@@ -55,6 +55,7 @@ import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactio
 import { resetResourceChecklistState } from "../features/bonustime/03-resource-checklist/interactions";
 import { resetItemChecklistState } from "../features/bonustime/05-item-checklist/interactions";
 import { resetPlinkoState } from "../features/bonustime/15-plinko-drop/interactions";
+import { resetJackpotState } from "../features/bonustime/jackpot-meter/interactions";
 import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, pointInRect } from "../ui/managers/interactions";
@@ -560,6 +561,7 @@ export class GameClient {
           resetResourceChecklistState();
           resetItemChecklistState();
           resetPlinkoState();
+          resetJackpotState();
           sceneInput.consumed = true;
         }
       }
