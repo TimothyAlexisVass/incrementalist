@@ -36,4 +36,19 @@ defmodule Incrementalist.Game.Features.BonusTime.RulesTest do
 
     assert Rules.get_active_game_id(now) == "prize_wheel"
   end
+
+  test "its_bonus_time correctly generates 128 tile board and flips based on streak" do
+    alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
+
+    # Streak 0: base picks
+    {flips, board} = ItsBonusTime.roll_reward(0, 0)
+    assert length(board) == 128
+    assert flips >= 1
+    assert Enum.all?(board, fn tier -> tier >= 1 and tier <= 7 end)
+    assert Enum.count(board, fn tier -> tier == 7 end) == 1
+
+    # Streak 150
+    {flips_with_streak, _board} = ItsBonusTime.roll_reward(150, 0)
+    assert flips_with_streak > flips
+  end
 end

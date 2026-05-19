@@ -18,6 +18,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
   alias Incrementalist.Game.Features.BonusTime.Games.Checklist
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
+  alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
@@ -603,6 +604,14 @@ defmodule Incrementalist.Game.CommandExecutor do
           else
             # Standard single-step play OR Step 1 of Coin Rain
             with {:ok, next_state, token_type} <- BonusTime.spend_token_for_game(ps.state, game_id) do
+              next_state =
+                if token_type == "daily" do
+                  new_bonustime = %{next_state.bonustime | bonustime_flips: next_state.bonustime.bonustime_flips + 1}
+                  %{next_state | bonustime: new_bonustime}
+                else
+                  next_state
+                end
+
               if game_id == "coin_rain" do
                 # Step 1: Start Coin Rain
                 session_params = CoinRain.generate_session(next_state.bonustime.streak)
@@ -674,6 +683,45 @@ defmodule Incrementalist.Game.CommandExecutor do
                       {:ok, updated_state, t, progress} = JackpotRules.play(next_state)
                       {t, [progress], updated_state}
 
+                    "its_bonus_time" ->
+                      {flips, board_tiers} =
+                        ItsBonusTime.roll_reward(
+                          next_state.bonustime.streak,
+                          next_state.bonustime.bonustime_flips,
+                          now
+                        )
+
+                      # Extract first `flips` tiles (claimed rewards)
+                      claimed_tiers = Enum.take(board_tiers, flips)
+                      best_tier = Enum.max(claimed_tiers)
+
+                      # Delete exactly one occurrence of best_tier to let outer block apply it
+                      other_tiers = delete_one(claimed_tiers, best_tier)
+
+                      # Update reward_counts for other_tiers first
+                      updated_reward_counts =
+                        Enum.reduce(other_tiers, next_state.bonustime.reward_counts, fn t, acc ->
+                          Map.update(acc, "tier_#{t}", 1, &(&1 + 1))
+                        end)
+
+                      next_bonustime = %{next_state.bonustime | reward_counts: updated_reward_counts}
+                      next_state = %{next_state | bonustime: next_bonustime}
+
+                      # Apply rewards for other_tiers
+                      {next_state, coins_others} =
+                        Enum.reduce(other_tiers, {next_state, BigNum.zero()}, fn t, {state_acc, coins_acc} ->
+                          {next_state_acc, reward_coins} = Incrementalist.Game.Rewards.grant_bonus_reward(state_acc, t)
+                          {next_state_acc, BigNum.add(coins_acc, reward_coins)}
+                        end)
+
+                      {best_tier,
+                       %{
+                         "board" => board_tiers,
+                         "flips" => flips,
+                         "claimed_tiers" => claimed_tiers,
+                         "coins_others" => coins_others
+                       }, next_state}
+
                     _ ->
                       {1, [1], next_state}
                   end
@@ -698,6 +746,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                     "played_at" => Time.iso8601(now)
                   }
                   |> maybe_put_plinko_payload(rolls)
+                  |> maybe_adjust_its_bonus_time_result(rolls)
 
                 next_bonustime = %{
                   bonustime
@@ -880,7 +929,17 @@ defmodule Incrementalist.Game.CommandExecutor do
         attrs[:has_bonustime_token] || ps.has_bonustime_token
       end
 
-    attrs = Map.put(attrs, :has_bonustime_token, has_bonustime_token)
+    bonustime_flips =
+      if Map.has_key?(attrs, :state) do
+        PlayerState.extract_bonustime_flips(attrs.state)
+      else
+        attrs[:bonustime_flips] || ps.bonustime_flips
+      end
+
+    attrs =
+      attrs
+      |> Map.put(:has_bonustime_token, has_bonustime_token)
+      |> Map.put(:bonustime_flips, bonustime_flips)
 
     # Standard update
     updated_ps = Repo.update!(PlayerState.changeset(ps, attrs))
@@ -890,8 +949,26 @@ defmodule Incrementalist.Game.CommandExecutor do
 
     _ =
       from(s in PlayerState, where: s.id == ^ps.id)
-      |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token])
+      |> Repo.update_all(set: [has_bonustime_token: has_bonustime_token, bonustime_flips: bonustime_flips])
 
     updated_ps
+  end
+
+  defp maybe_adjust_its_bonus_time_result(last_result, %{"board" => board, "flips" => flips, "coins_others" => coins_others}) do
+    total_coins = BigNum.add(coins_others, last_result["reward_amount"])
+    Map.merge(last_result, %{
+      "reward_amount" => total_coins,
+      "board" => board,
+      "flips" => flips
+    })
+  end
+
+  defp maybe_adjust_its_bonus_time_result(last_result, _), do: last_result
+
+  defp delete_one(list, item) do
+    case Enum.split_while(list, &(&1 != item)) do
+      {left, [_ | right]} -> left ++ right
+      _ -> list
+    end
   end
 end

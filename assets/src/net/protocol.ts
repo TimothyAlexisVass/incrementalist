@@ -95,6 +95,7 @@ export type BonusTimeState = {
   jackpot_progress?: number;
   rotation_anchor?: string;
   active_game_id?: string;
+  bonustime_flips?: number;
   active_session?: {
     type: string;
     data: {

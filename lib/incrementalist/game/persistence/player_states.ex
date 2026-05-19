@@ -60,6 +60,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
     |> PlayerState.changeset(%{
       state: next_state,
       has_bonustime_token: PlayerState.extract_state_tokens(next_state),
+      bonustime_flips: PlayerState.extract_bonustime_flips(next_state),
       notices: Notices.new(next_state),
       last_saved_at: now
     })
@@ -114,6 +115,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
     |> PlayerState.changeset(%{
       state: projected_state,
       has_bonustime_token: if(projected_state, do: PlayerState.extract_state_tokens(projected_state), else: ps.has_bonustime_token),
+      bonustime_flips: if(projected_state, do: PlayerState.extract_bonustime_flips(projected_state), else: ps.bonustime_flips),
       notices: ps.notices,
       last_saved_at: now
     })
@@ -130,6 +132,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
     |> PlayerState.changeset(%{
       state: next_state,
       has_bonustime_token: PlayerState.extract_state_tokens(next_state),
+      bonustime_flips: PlayerState.extract_bonustime_flips(next_state),
       notices: Notices.new(next_state),
       last_saved_at: now
     })

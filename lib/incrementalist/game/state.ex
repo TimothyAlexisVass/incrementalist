@@ -222,6 +222,7 @@ defmodule Incrementalist.Game.State do
       }
       field :last_result, :map
       field :jackpot_progress, :integer, default: 0
+      field :bonustime_flips, :integer, virtual: true, default: 0
 
       embeds_one :active_session, Incrementalist.Game.State.ActiveSession, on_replace: :update
     end
@@ -237,7 +238,8 @@ defmodule Incrementalist.Game.State do
         :reward_counts,
         :checklist_entry_indexes,
         :last_result,
-        :jackpot_progress
+        :jackpot_progress,
+        :bonustime_flips
       ])
       |> cast_embed(:active_session)
     end

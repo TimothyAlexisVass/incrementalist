@@ -33,6 +33,13 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
       set: [has_bonustime_token: true]
     )
 
+    # If the new rotation slot is "chest_draw", reset all players' bonustime_flips to 0
+    active_game_id = Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
+    if active_game_id == "chest_draw" do
+      Logger.info("Rotation reached Chest Draw. Resetting flips for all players...")
+      Repo.update_all(PlayerState, set: [bonustime_flips: 0])
+    end
+
     # Broadcast to active players
     Registry.select(Incrementalist.Game.Session.PlayerRegistry, [{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
     |> Enum.each(fn {_player_id, pid} ->

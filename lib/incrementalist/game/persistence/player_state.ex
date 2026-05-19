@@ -19,6 +19,7 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
     embeds_one :state, State, on_replace: :update
     embeds_one :notices, Notices, on_replace: :update
     field :has_bonustime_token, :boolean, default: true
+    field :bonustime_flips, :integer, default: 0
     field :last_saved_at, :utc_datetime_usec
 
     belongs_to :player, Player
@@ -30,7 +31,7 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
     attrs = normalize_attrs(attrs)
 
     player_state
-    |> cast(attrs, [:player_id, :last_saved_at, :has_bonustime_token])
+    |> cast(attrs, [:player_id, :last_saved_at, :has_bonustime_token, :bonustime_flips])
     |> cast_embed(:state)
     |> cast_embed(:notices)
     |> validate_required([:player_id])
@@ -59,13 +60,24 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
     end
   end
 
-  def inject_state_tokens(%__MODULE__{state: %State{}} = ps) do
-    %{ps | state: %{ps.state | has_bonustime_token: ps.has_bonustime_token}}
+  def inject_state_tokens(%__MODULE__{state: %State{} = state} = ps) do
+    bonustime = state.bonustime || %State.BonusTime{}
+    new_bonustime = %{bonustime | bonustime_flips: ps.bonustime_flips || 0}
+    state_with_tokens = %{state | bonustime: new_bonustime, has_bonustime_token: ps.has_bonustime_token}
+    %{ps | state: state_with_tokens}
   end
 
   def inject_state_tokens(ps), do: ps
 
   def extract_state_tokens(%State{} = state) do
     state.has_bonustime_token || false
+  end
+
+  def extract_bonustime_flips(%State{} = state) do
+    if state.bonustime do
+      state.bonustime.bonustime_flips || 0
+    else
+      0
+    end
   end
 end

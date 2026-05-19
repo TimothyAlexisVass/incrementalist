@@ -17,6 +17,7 @@ defmodule Incrementalist.Repo.Migrations.CreateGameSchema do
       add(:state, :map)
       add(:notices, :map)
       add(:has_bonustime_token, :boolean, null: false, default: true)
+      add(:bonustime_flips, :integer, null: false, default: 0)
       add(:last_saved_at, :utc_datetime_usec)
 
       timestamps(type: :utc_datetime_usec)

@@ -33,6 +33,9 @@ import { getJackpotState, JackpotState } from "./jackpot-meter/interactions";
 import { renderCoinRain } from "./04-coin-rain/render";
 import { getCoinRainData } from "./04-coin-rain/view-model";
 import { getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
+import { renderItsBonusTime } from "./18-its-bonus-time/render";
+import { getItsBonusTimeData } from "./18-its-bonus-time/view-model";
+import { getItsBonusTimeState, ItsBonusTimeState } from "./18-its-bonus-time/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -65,7 +68,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
                            (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
                            (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE) ||
-                           (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE);
+                           (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
+                           (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -147,6 +151,11 @@ export function renderBonusTimeOverview(
     const data = getCoinRainData(state);
     if (data) {
       renderCoinRain(data, rect);
+    }
+  } else if (activeGameId === "its_bonus_time") {
+    const data = getItsBonusTimeData(state);
+    if (data) {
+      renderItsBonusTime(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({
