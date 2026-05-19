@@ -9,6 +9,7 @@ export interface QuestViewModel {
 
 export function getQuestViewModel(state: ServerState): QuestViewModel {
   const quests = state.snapshot?.state.quests || {};
+
   const questList = Object.entries(quests).map(([id, q]) => ({ id, ...q }));
 
   const sortQuests = (a: QuestState & { id: string }, b: QuestState & { id: string }) => {

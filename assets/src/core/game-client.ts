@@ -31,6 +31,7 @@ import {
 import { renderProgressBar } from "../features/progress-bar/render";
 import { closeAreaDropdown, renderAreaBackground, renderAreaSpecifics, renderAreaDropdownAboveMenu } from "../features/areas/render";
 import { updateWebGLEffects, renderWebGLEffects, spawnGpuClickBurst } from "../render/webgl-effects";
+import { spawnQuestFameLevelUpBurst } from "../features/quests/fame-bar";
 import {
   createFloatingTextState,
   getAvailableFloatingTextStackIndexes,
@@ -209,6 +210,7 @@ export class GameClient {
 
   private async applyAndAck(result: ServerResult) {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+    const previousTrust = result.type === "quest.claim.result" ? this.snapshotTrust() : null;
     const milestoneBaseline = this.snapshotMilestoneBaseline();
     applyResult(this.store.state, result);
     if (this.store.state.snapshot) {
@@ -230,6 +232,7 @@ export class GameClient {
     }
 
     this.applyProgressEffects(result, previousAmounts);
+    this.applyQuestEffects(result, previousTrust);
     this.applyMilestoneEffects(milestoneBaseline);
 
     if (!isAckableCommandResult(result)) return;
@@ -240,6 +243,7 @@ export class GameClient {
     if (clearsCommandQueue(result)) this.channel!.clearCommandQueue();
     while (next) {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
+      const previousTrust = next.type === "quest.claim.result" ? this.snapshotTrust() : null;
       const milestoneBaseline = this.snapshotMilestoneBaseline();
       applyResult(this.store.state, next);
       if (this.store.state.snapshot) {
@@ -247,6 +251,7 @@ export class GameClient {
       }
       this.cacheSnapshotFromResult(next);
       this.applyProgressEffects(next, previousAmounts);
+      this.applyQuestEffects(next, previousTrust);
       this.applyMilestoneEffects(milestoneBaseline);
       if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
@@ -285,6 +290,11 @@ export class GameClient {
     };
   }
 
+  private snapshotTrust(): number | null {
+    const snapshot = this.store.state.snapshot;
+    return snapshot ? snapshot.state.trust : null;
+  }
+
   private cacheSnapshotFromResult(result: ServerResult) {
     if (!this.store.state.snapshot) return;
 
@@ -319,6 +329,14 @@ export class GameClient {
       popupPoint: getPendingClaimPopupPoint()
     });
     clearPendingClaimPopupPoint();
+  }
+
+  private applyQuestEffects(result: ServerResult, previousTrust: number | null) {
+    if (result.type !== "quest.claim.result") return;
+    if (previousTrust === null) return;
+    if (result.trust <= previousTrust) return;
+
+    spawnQuestFameLevelUpBurst();
   }
 
   private snapshotMilestoneBaseline(): MilestoneBaseline {

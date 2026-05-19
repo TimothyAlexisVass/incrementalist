@@ -17,14 +17,11 @@ import { toNumber } from '../../../../../core/bignum';
 import { resolveUpdatingText } from '../../../../../utils/text';
 import { ZERO } from '../../../../../core/bignum';
 import { drawHorizontalBar, getHorizontalBarCenterY } from '../../../../components/bar';
-import { spawnGpuProgressCompletionBurst } from '../../../../../render/webgl-effects';
+import { getQuestFameBarRect, setQuestFameBarContainerRect } from '../../../../../features/quests/fame-bar';
 import {
   TOP_HUD_LEVEL_FONT,
   TOP_HUD_EXP_FONT,
-  QUEST_FAME_BAR_WIDTH,
-  QUEST_FAME_BAR_HEIGHT,
-  QUEST_FAME_BAR_TRUST_GAP,
-  QUEST_FAME_BAR_ROW_HEIGHT
+  QUEST_FAME_BAR_TRUST_GAP
 } from '../../../../../config';
 
 const CARD_HEIGHT_PX = 92;
@@ -33,12 +30,6 @@ const CARD_SCROLLBAR_GUTTER_PX = 12;
 const FAME_BAR_TEXT_KEY = "quests.fame_bar.text";
 const FAME_BAR_TRUST_TEXT_KEY = "quests.fame_bar.trust";
 const FAME_BAR_FILL_LERP_FACTOR = 0.2;
-const FAME_BAR_LEVEL_UP_COLORS = Object.freeze([
-  COLORS.bar.fame.fillStart,
-  COLORS.bar.fame.fillEnd,
-  '#ffffff',
-  '#18d9df'
-]);
 
 let questSubTabs: TabMenu | null = null;
 let dailyScrollingPanel: ScrollingPanel | null = null;
@@ -46,7 +37,6 @@ let mainScrollingPanel: ScrollingPanel | null = null;
 let lastViewedSnapshot: GameSnapshot | null = null;
 let displayedFameFillRatio = 0;
 let hasFameFillInitialized = false;
-let lastDisplayedTrust = 1;
 
 export function renderQuestsTab(
   canvas: HTMLCanvasElement,
@@ -64,6 +54,7 @@ export function renderQuestsTab(
   }
 
   drawQuestPanelFrame(rect);
+  setQuestFameBarContainerRect(rect);
   if (snapshot) {
     drawFameBar(snapshot, rect);
   }
@@ -214,17 +205,7 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
 
-  const barWidth = QUEST_FAME_BAR_WIDTH;
-  // Keep the fame bar right edge pixel-aligned with quest card right edges.
-  const questCardRightEdgeX = rect.x + rect.width - CARD_SCROLLBAR_GUTTER_PX;
-  const barX = questCardRightEdgeX - barWidth;
-  const barY = rect.y + Math.floor((QUEST_FAME_BAR_ROW_HEIGHT - QUEST_FAME_BAR_HEIGHT) / 2);
-  const barRect = {
-    x: barX,
-    y: barY,
-    width: barWidth,
-    height: QUEST_FAME_BAR_HEIGHT
-  };
+  const barRect = getQuestFameBarRect(rect);
   const trust = Math.max(1, snapshot.state.trust || 1);
   const fame = snapshot.state.fame || ZERO;
   const requiredFame = snapshot.state.required_fame || { m: 2, e: 1 };
@@ -236,11 +217,6 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
     displayedFameFillRatio += (fillRatio - displayedFameFillRatio) * FAME_BAR_FILL_LERP_FACTOR;
   }
   displayedFameFillRatio = Math.min(1, Math.max(0, displayedFameFillRatio));
-
-  if (trust > lastDisplayedTrust) {
-    spawnFameBarLevelUpBurst(barRect);
-  }
-  lastDisplayedTrust = trust;
 
   drawHorizontalBar(
     barRect,
@@ -264,7 +240,7 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
   );
   renderer.drawText({
     text: trustText,
-    x: barX - QUEST_FAME_BAR_TRUST_GAP,
+    x: barRect.x - QUEST_FAME_BAR_TRUST_GAP,
     y: getHorizontalBarCenterY(barRect),
     font: TOP_HUD_LEVEL_FONT,
     color: COLORS.panel.textPrimary,
@@ -285,26 +261,11 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
   );
   renderer.drawText({
     text: fameText,
-    x: barX + barWidth / 2,
+    x: barRect.x + barRect.width / 2,
     y: getHorizontalBarCenterY(barRect),
     font: TOP_HUD_EXP_FONT,
     color: COLORS.panel.textPrimary,
     align: 'center',
     baseline: 'middle'
   });
-}
-
-function spawnFameBarLevelUpBurst(barRect: { x: number; y: number; width: number; height: number }) {
-  spawnGpuProgressCompletionBurst(
-    barRect.x,
-    barRect.y,
-    barRect.width,
-    barRect.height,
-    FAME_BAR_LEVEL_UP_COLORS as any,
-    {
-      countMultiplier: 3,
-      gravity: 520,
-      lifeMultiplier: 2
-    }
-  );
 }
