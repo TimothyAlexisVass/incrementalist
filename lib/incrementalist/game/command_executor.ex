@@ -20,6 +20,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
   alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.CardPick
+  alias Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
@@ -785,6 +786,42 @@ defmodule Incrementalist.Game.CommandExecutor do
                          "coins_others" => BigNum.add(coins_others, best_remainder)
                        }, next_state}
 
+                    "reward_labyrinth" ->
+                      {steps_total, chests} =
+                        RewardLabyrinth.roll_reward(
+                          next_state.bonustime.streak,
+                          next_state.bonustime.bonustime_flips,
+                          now
+                        )
+
+                      best_chest = Enum.max_by(chests, fn c -> c.tier end)
+                      best_tier = best_chest.tier
+
+                      other_chests = delete_one_chest(chests, best_chest)
+
+                      # Update reward_counts for other_chests
+                      updated_reward_counts =
+                        Enum.reduce(other_chests, next_state.bonustime.reward_counts, fn c, acc ->
+                          Map.update(acc, "tier_#{c.tier}", 1, &(&1 + 1))
+                        end)
+
+                      next_bonustime = %{next_state.bonustime | reward_counts: updated_reward_counts}
+                      next_state = %{next_state | bonustime: next_bonustime}
+
+                      # Apply rewards for other_chests
+                      {next_state, coins_others} =
+                        Enum.reduce(other_chests, {next_state, BigNum.zero()}, fn chest, {state_acc, coins_acc} ->
+                          {next_state_acc, base_coins} = Incrementalist.Game.Rewards.grant_bonus_reward(state_acc, chest.tier)
+                          {next_state_acc, BigNum.add(coins_acc, base_coins)}
+                        end)
+
+                      {best_tier,
+                       %{
+                         "chests" => Enum.map(chests, fn c -> %{"step" => c.step, "tier" => c.tier} end),
+                         "steps_total" => steps_total,
+                         "coins_others" => coins_others
+                       }, next_state}
+
                     _ ->
                       {1, [1], next_state}
                   end
@@ -811,6 +848,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                   |> maybe_put_plinko_payload(rolls)
                   |> maybe_adjust_its_bonus_time_result(rolls)
                   |> maybe_adjust_card_pick_result(rolls)
+                  |> maybe_adjust_reward_labyrinth_result(rolls)
 
                 next_bonustime = %{
                   bonustime
@@ -1040,6 +1078,17 @@ defmodule Incrementalist.Game.CommandExecutor do
 
   defp maybe_adjust_card_pick_result(last_result, _), do: last_result
 
+  defp maybe_adjust_reward_labyrinth_result(last_result, %{"chests" => chests, "steps_total" => steps_total, "coins_others" => coins_others}) do
+    total_coins = BigNum.add(coins_others, last_result["reward_amount"])
+    Map.merge(last_result, %{
+      "reward_amount" => total_coins,
+      "chests" => chests,
+      "steps_total" => steps_total
+    })
+  end
+
+  defp maybe_adjust_reward_labyrinth_result(last_result, _), do: last_result
+
   defp delete_one(list, item) do
     case Enum.split_while(list, &(&1 != item)) do
       {left, [_ | right]} -> left ++ right
@@ -1048,6 +1097,13 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp delete_one_card(list, item) do
+    case Enum.split_while(list, &(&1 != item)) do
+      {left, [_ | right]} -> left ++ right
+      _ -> list
+    end
+  end
+
+  defp delete_one_chest(list, item) do
     case Enum.split_while(list, &(&1 != item)) do
       {left, [_ | right]} -> left ++ right
       _ -> list
