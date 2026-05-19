@@ -14,6 +14,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
   alias Incrementalist.Game.Features.BonusTime.Rules, as: BonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
+  alias Incrementalist.Game.Features.BonusTime.Games.CoinRain
   alias Incrementalist.Game.Features.BonusTime.Games.PrizeWheel
   alias Incrementalist.Game.Features.BonusTime.Games.Checklist
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
@@ -507,101 +508,241 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, game_id} <- fetch_game_id(command.intent),
              active_game_id <- BonusTime.get_active_game_id(now),
-             true <- game_id == active_game_id,
-             {:ok, next_state, token_type} <- BonusTime.spend_token_for_game(ps.state, game_id) do
-          # Execute game rules
-          {tier, rolls, next_state} =
-            case game_id do
-              "chest_draw" ->
-                {t, r} = ChestDraw.roll_reward(next_state.bonustime.streak)
-                {t, r, next_state}
+             true <- game_id == active_game_id do
+          
+          intent_map = if is_map(command.intent), do: command.intent, else: %{"game_id" => command.intent}
+          action = Map.get(intent_map, "action")
 
-              "prize_wheel" ->
-                {t, r} = PrizeWheel.roll_reward(next_state.bonustime.streak)
-                {t, r, next_state}
+          if game_id == "coin_rain" and action == "claim" do
+            # Step 2: Coin Rain Claim
+            active_session = ps.state.bonustime.active_session
+            if active_session && active_session.type == "coin_rain" do
+              path = Map.get(intent_map, "path", [])
+              seed = Map.get(active_session.data, "seed")
+              timer = Map.get(active_session.data, "timer")
+              bucket_speed = Map.get(active_session.data, "bucket_speed")
+              bucket_width = Map.get(active_session.data, "bucket_width")
+              token_type = Map.get(active_session.data, "token_type")
+              streak = ps.state.bonustime.streak
 
-              "resource_checklist" ->
-                {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "resource")
-                {t, [idx], updated_state}
+              {tier, coins_caught} = CoinRain.evaluate_results(path, seed, timer, streak, bucket_speed, bucket_width)
 
-              "item_checklist" ->
-                {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "item")
-                {t, [idx], updated_state}
+              # Apply reward chest
+              {next_state, reward_amount} =
+                Incrementalist.Game.Rewards.grant_bonus_reward(ps.state, tier)
 
-              "plinko_drop" ->
-                {t, rolls, plinko} = PlinkoDrop.roll_reward(next_state.bonustime.streak)
-                {t, %{"rolls" => rolls, "plinko" => plinko}, next_state}
+              # Apply normal coins caught
+              level = next_state.level
+              coins_per_catch = 1000 * level * (1 + streak * 0.05)
+              total_coins_to_grant = BigNum.from_number(trunc(coins_caught * coins_per_catch))
+              next_state = %{next_state | coins: BigNum.add(next_state.coins, total_coins_to_grant)}
 
-              "jackpot_meter" ->
-                {:ok, updated_state, t, progress} = JackpotRules.play(next_state)
-                {t, [progress], updated_state}
+              # Update streak and metadata
+              next_state = BonusTime.advance_streak(next_state, now)
 
-              _ ->
-                {1, [1], next_state}
+              bonustime = next_state.bonustime
+              new_reward_counts = Map.update(bonustime.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+
+              last_result =
+                %{
+                  "game_id" => game_id,
+                  "tier" => tier,
+                  "reward_amount" => reward_amount,
+                  "token_type" => token_type,
+                  "played_at" => Time.iso8601(now),
+                  "coins_caught" => coins_caught,
+                  "coins_granted" => total_coins_to_grant
+                }
+
+              next_bonustime = %{
+                bonustime
+                | total_games_played: bonustime.total_games_played + 1,
+                  reward_counts: new_reward_counts,
+                  last_result: last_result,
+                  active_session: nil # Clear session
+              }
+
+              next_state = %{next_state | bonustime: next_bonustime}
+              next_state = Achievements.evaluate(next_state)
+
+              next_notices =
+                Notices.refresh_for_state_transition(
+                  ps.notices || Notices.new(ps.state),
+                  ps.state,
+                  next_state
+                )
+
+              update_player_state(ps, %{
+                state: next_state,
+                notices: next_notices,
+                last_saved_at: now
+              })
+
+              projected_bonustime =
+                Map.merge(Map.from_struct(next_bonustime), %{
+                  "rotation_anchor" =>
+                    Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.iso8601(),
+                  "active_game_id" => active_game_id
+                })
+
+              {"succeeded",
+               %{
+                 "type" => "bonustime.play.result",
+                 "status" => "ok",
+                 "command_id" => command.command_id,
+                 "coins" => next_state.coins,
+                 "has_bonustime_token" => next_state.has_bonustime_token,
+                 "bonustime" => projected_bonustime,
+                 "achievements" => State.visible_achievements(next_state.achievements),
+                 "notices" => Notices.payload(next_notices),
+                 "action" => "claim"
+               }, ps.id}
+            else
+              {"failed", error_result("no_active_coin_rain_session", command), ps.id}
             end
+          else
+            # Standard single-step play OR Step 1 of Coin Rain
+            with {:ok, next_state, token_type} <- BonusTime.spend_token_for_game(ps.state, game_id) do
+              if game_id == "coin_rain" do
+                # Step 1: Start Coin Rain
+                session_params = CoinRain.generate_session(next_state.bonustime.streak)
+                active_session = %State.ActiveSession{
+                  type: "coin_rain",
+                  data: Map.merge(session_params, %{"token_type" => token_type, "started_at" => Time.iso8601(now)})
+                }
+                next_bonustime = %{next_state.bonustime | active_session: active_session}
+                next_state = %{next_state | bonustime: next_bonustime}
 
-          # Apply rewards
-          {next_state, reward_amount} =
-            Incrementalist.Game.Rewards.grant_bonus_reward(next_state, tier)
+                next_notices =
+                  Notices.refresh_for_state_transition(
+                    ps.notices || Notices.new(ps.state),
+                    ps.state,
+                    next_state
+                  )
 
-          # Update streak and metadata
-          next_state = BonusTime.advance_streak(next_state, now)
+                update_player_state(ps, %{
+                  state: next_state,
+                  notices: next_notices,
+                  last_saved_at: now
+                })
 
-          bonustime = next_state.bonustime
-          new_reward_counts = Map.update(bonustime.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+                projected_bonustime =
+                  Map.merge(Map.from_struct(next_bonustime), %{
+                    "rotation_anchor" =>
+                      Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.iso8601(),
+                    "active_game_id" => active_game_id
+                  })
 
-          last_result =
-            %{
-              "game_id" => game_id,
-              "tier" => tier,
-              "rolls" => if(is_map(rolls), do: rolls["rolls"], else: rolls),
-              "reward_amount" => reward_amount,
-              "token_type" => token_type,
-              "played_at" => Time.iso8601(now)
-            }
-            |> maybe_put_plinko_payload(rolls)
+                {"succeeded",
+                 %{
+                   "type" => "bonustime.play.result",
+                   "status" => "ok",
+                   "command_id" => command.command_id,
+                   "coins" => next_state.coins,
+                   "has_bonustime_token" => next_state.has_bonustime_token,
+                   "bonustime" => projected_bonustime,
+                   "achievements" => State.visible_achievements(next_state.achievements),
+                   "notices" => Notices.payload(next_notices),
+                   "action" => "start",
+                   "session" => session_params
+                 }, ps.id}
+              else
+                # Single-step games (Chest Draw, Plinko, Checklist, Jackpot, etc.)
+                {tier, rolls, next_state} =
+                  case game_id do
+                    "chest_draw" ->
+                      {t, r} = ChestDraw.roll_reward(next_state.bonustime.streak)
+                      {t, r, next_state}
 
-          next_bonustime = %{
-            bonustime
-            | total_games_played: bonustime.total_games_played + 1,
-              reward_counts: new_reward_counts,
-              last_result: last_result
-          }
+                    "prize_wheel" ->
+                      {t, r} = PrizeWheel.roll_reward(next_state.bonustime.streak)
+                      {t, r, next_state}
 
-          next_state = %{next_state | bonustime: next_bonustime}
-          next_state = Achievements.evaluate(next_state)
+                    "resource_checklist" ->
+                      {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "resource")
+                      {t, [idx], updated_state}
 
-          projected_bonustime =
-            Map.merge(Map.from_struct(next_bonustime), %{
-              "rotation_anchor" =>
-                Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.iso8601(),
-              "active_game_id" => active_game_id
-            })
+                    "item_checklist" ->
+                      {:ok, updated_state, t, idx} = Checklist.check_off(next_state, "item")
+                      {t, [idx], updated_state}
 
-          next_notices =
-            Notices.refresh_for_state_transition(
-              ps.notices || Notices.new(ps.state),
-              ps.state,
-              next_state
-            )
+                    "plinko_drop" ->
+                      {t, rolls, plinko} = PlinkoDrop.roll_reward(next_state.bonustime.streak)
+                      {t, %{"rolls" => rolls, "plinko" => plinko}, next_state}
 
-          update_player_state(ps, %{
-            state: next_state,
-            notices: next_notices,
-            last_saved_at: now
-          })
+                    "jackpot_meter" ->
+                      {:ok, updated_state, t, progress} = JackpotRules.play(next_state)
+                      {t, [progress], updated_state}
 
-          {"succeeded",
-           %{
-             "type" => "bonustime.play.result",
-             "status" => "ok",
-             "command_id" => command.command_id,
-             "coins" => next_state.coins,
-             "has_bonustime_token" => next_state.has_bonustime_token,
-             "bonustime" => projected_bonustime,
-             "achievements" => State.visible_achievements(next_state.achievements),
-             "notices" => Notices.payload(next_notices)
-           }, ps.id}
+                    _ ->
+                      {1, [1], next_state}
+                  end
+
+                # Apply rewards
+                {next_state, reward_amount} =
+                  Incrementalist.Game.Rewards.grant_bonus_reward(next_state, tier)
+
+                # Update streak and metadata
+                next_state = BonusTime.advance_streak(next_state, now)
+
+                bonustime = next_state.bonustime
+                new_reward_counts = Map.update(bonustime.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+
+                last_result =
+                  %{
+                    "game_id" => game_id,
+                    "tier" => tier,
+                    "rolls" => if(is_map(rolls), do: rolls["rolls"], else: rolls),
+                    "reward_amount" => reward_amount,
+                    "token_type" => token_type,
+                    "played_at" => Time.iso8601(now)
+                  }
+                  |> maybe_put_plinko_payload(rolls)
+
+                next_bonustime = %{
+                  bonustime
+                  | total_games_played: bonustime.total_games_played + 1,
+                    reward_counts: new_reward_counts,
+                    last_result: last_result
+                }
+
+                next_state = %{next_state | bonustime: next_bonustime}
+                next_state = Achievements.evaluate(next_state)
+
+                projected_bonustime =
+                  Map.merge(Map.from_struct(next_bonustime), %{
+                    "rotation_anchor" =>
+                      Incrementalist.Game.Constants.bonustime_rotation_anchor_at() |> Time.iso8601(),
+                    "active_game_id" => active_game_id
+                  })
+
+                next_notices =
+                  Notices.refresh_for_state_transition(
+                    ps.notices || Notices.new(ps.state),
+                    ps.state,
+                    next_state
+                  )
+
+                update_player_state(ps, %{
+                  state: next_state,
+                  notices: next_notices,
+                  last_saved_at: now
+                })
+
+                {"succeeded",
+                 %{
+                   "type" => "bonustime.play.result",
+                   "status" => "ok",
+                   "command_id" => command.command_id,
+                   "coins" => next_state.coins,
+                   "has_bonustime_token" => next_state.has_bonustime_token,
+                   "bonustime" => projected_bonustime,
+                   "achievements" => State.visible_achievements(next_state.achievements),
+                   "notices" => Notices.payload(next_notices)
+                 }, ps.id}
+              end
+            end
+          end
         else
           {:error, reason} ->
             {"failed", error_result(reason, command), ps.id}

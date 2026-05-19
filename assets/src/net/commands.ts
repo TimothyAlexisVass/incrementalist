@@ -73,6 +73,14 @@ export function playBonusTime(channel: GameChannel, gameId: string) {
   });
 }
 
+export function claimCoinRain(channel: GameChannel, path: [number, number][]) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
+    game: "coin_rain",
+    action: "claim",
+    path: path
+  });
+}
+
 export async function ackAppliedResult(
   channel: GameChannel,
   commandId: number

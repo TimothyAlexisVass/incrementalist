@@ -14,6 +14,8 @@ import { getPlinkoDropData } from "./15-plinko-drop/view-model";
 import { handlePlinkoDropInteractions, getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
 import { getJackpotMeterData } from "./jackpot-meter/view-model";
 import { handleJackpotMeterInteractions, getJackpotState, JackpotState } from "./jackpot-meter/interactions";
+import { getCoinRainData } from "./04-coin-rain/view-model";
+import { handleCoinRainInteractions, getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -42,7 +44,8 @@ export function handleBonusTimeInteractions(
                            (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
                            (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
                            (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
-                           (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE);
+                           (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE) ||
+                           (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -120,6 +123,15 @@ export function handleBonusTimeInteractions(
     const data = getJackpotMeterData(state);
     if (data) {
       const intent = handleJackpotMeterInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
+      }
+    }
+  } else if (activeGameId === "coin_rain") {
+    const data = getCoinRainData(state);
+    if (data) {
+      const intent = handleCoinRainInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === "open_modal") {
         return { type: "open_chest_reward" };

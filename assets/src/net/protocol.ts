@@ -95,6 +95,17 @@ export type BonusTimeState = {
   jackpot_progress?: number;
   rotation_anchor?: string;
   active_game_id?: string;
+  active_session?: {
+    type: string;
+    data: {
+      seed: number;
+      timer: number;
+      bucket_width: number;
+      bucket_speed: number;
+      token_type?: string;
+      started_at?: string;
+    };
+  } | null;
 };
 
 export type NoticeState = {

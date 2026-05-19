@@ -30,6 +30,9 @@ import { getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
 import { renderJackpotMeter } from "./jackpot-meter/render";
 import { getJackpotMeterData } from "./jackpot-meter/view-model";
 import { getJackpotState, JackpotState } from "./jackpot-meter/interactions";
+import { renderCoinRain } from "./04-coin-rain/render";
+import { getCoinRainData } from "./04-coin-rain/view-model";
+import { getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -61,7 +64,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "resource_checklist" && getResourceChecklistState() !== ResourceChecklistState.IDLE) ||
                            (activeGameId === "item_checklist" && getItemChecklistState() !== ItemChecklistState.IDLE) ||
                            (activeGameId === "plinko_drop" && getPlinkoState() !== PlinkoState.IDLE) ||
-                           (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE);
+                           (activeGameId === "jackpot_meter" && getJackpotState() !== JackpotState.IDLE) ||
+                           (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -138,6 +142,11 @@ export function renderBonusTimeOverview(
     const data = getJackpotMeterData(state);
     if (data) {
       renderJackpotMeter(data, rect);
+    }
+  } else if (activeGameId === "coin_rain") {
+    const data = getCoinRainData(state);
+    if (data) {
+      renderCoinRain(data, rect);
     }
   } else {
     renderer.drawText({
