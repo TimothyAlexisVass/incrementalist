@@ -1,8 +1,12 @@
+import bonustimeConfig from "../../../../../shared/requirements/bonustime.json";
+import { getRewardTierLabelColor } from "../../../colors";
+import { BONUSTIME_TIMER_FONT } from "../../../config";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba } from "../../../utils";
 import { isPointInWelcomeButton, renderBonusTimeWelcomeCard } from "../flow";
 import {
   LadderClimbData,
+  LADDER_CLIMB_REWARD_CAP_RUNG,
   LADDER_CLIMB_VISIBLE_RUNGS,
   getLadderClimbAnimationDurationMs
 } from "./view-model";
@@ -14,8 +18,16 @@ import {
   getLadderClimbState
 } from "./interactions";
 
+const LADDER_CONFIG = bonustimeConfig as {
+  reward_tiers: Record<string, { color?: string }>;
+};
+
 const LADDER_VIEWPORT_ROWS = 5;
 const LADDER_TILE_GAP = 12;
+
+function getTierColor(tier: number) {
+  return LADDER_CONFIG.reward_tiers[`tier_${Math.max(1, Math.min(7, Math.round(tier)))}`]?.color || "#ffffff";
+}
 
 export function renderLadderClimb(
   data: LadderClimbData,
@@ -90,7 +102,6 @@ export function renderLadderClimb(
     color: hexToRgba("#0b1220", 0.96)
   });
 
-  const tileFill = hexToRgba("#d8e0eb", 0.92);
   const tileTop = hexToRgba("#ffffff", 0.16);
   const tileBottom = hexToRgba("#000000", 0.24);
 
@@ -105,13 +116,15 @@ export function renderLadderClimb(
       width: tileSize,
       height: tileSize
     };
+    const tier = Math.min(rung, LADDER_CLIMB_REWARD_CAP_RUNG);
+    const tierColor = getTierColor(tier);
 
     renderer.drawRect({
       x: tileRect.x,
       y: tileRect.y,
       width: tileRect.width,
       height: tileRect.height,
-      color: tileFill
+      color: hexToRgba(tierColor, 0.92)
     });
 
     renderer.drawRect({
@@ -128,6 +141,16 @@ export function renderLadderClimb(
       width: tileRect.width,
       height: 1,
       color: tileBottom
+    });
+
+    renderer.drawText({
+      text: `T${tier}`,
+      x: tileRect.x + tileRect.width / 2,
+      y: tileRect.y + tileRect.height / 2,
+      font: BONUSTIME_TIMER_FONT,
+      color: getRewardTierLabelColor(tier),
+      align: "center",
+      baseline: "middle"
     });
   }
 
