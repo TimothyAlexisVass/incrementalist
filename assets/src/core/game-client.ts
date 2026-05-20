@@ -1,4 +1,5 @@
 import { GameChannel } from "../net/game-channel";
+import { ZERO } from "../core/bignum";
 import {
   ackAppliedResult,
   progressClaimIn,
@@ -52,15 +53,25 @@ import { renderBonusTimeOverview } from "../features/bonustime/render";
 import { handleBonusTimeInteractions } from "../features/bonustime/interactions";
 import { resetChestState } from "../features/bonustime/01-chest-draw/interactions";
 import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactions";
-import { resetResourceChecklistState } from "../features/bonustime/03-resource-checklist/interactions";
-import { resetItemChecklistState } from "../features/bonustime/05-item-checklist/interactions";
+import {
+  getResourceChecklistState,
+  ResourceChecklistState,
+  resetResourceChecklistState
+} from "../features/bonustime/03-resource-checklist/interactions";
+import { getResourceChecklistData } from "../features/bonustime/03-resource-checklist/view-model";
+import {
+  getItemChecklistState,
+  ItemChecklistState,
+  resetItemChecklistState
+} from "../features/bonustime/05-item-checklist/interactions";
+import { getItemChecklistData } from "../features/bonustime/05-item-checklist/view-model";
 import { resetPlinkoState } from "../features/bonustime/15-plinko-drop/interactions";
 import { resetJackpotState } from "../features/bonustime/jackpot-meter/interactions";
 import { resetCoinRainState } from "../features/bonustime/04-coin-rain/interactions";
 import { resetItsBonusTimeState } from "../features/bonustime/18-its-bonus-time/interactions";
 import { resetCardPickState } from "../features/bonustime/09-card-pick/interactions";
 import { resetLabyrinthState } from "../features/bonustime/07-reward-labyrinth/interactions";
-import { getBonusTimeTooltipData } from "../features/bonustime/view-model";
+import { getActiveGameId, getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
@@ -559,11 +570,23 @@ export class GameClient {
       if (this.bonusRewardModal?.open && sceneInput.clicked && sceneInput.pointer) {
         const layout = getRewardModalLayout(this.canvas);
         if (resolveRewardModalAction(layout, sceneInput.pointer.x, sceneInput.pointer.y)) {
+          const activeGameId = getActiveGameId(this.store.state);
+          const isPendingResourceChecklistReveal =
+            activeGameId === "resource_checklist" &&
+            getResourceChecklistState() === ResourceChecklistState.REVEALING;
+          const isPendingItemChecklistReveal =
+            activeGameId === "item_checklist" &&
+            getItemChecklistState() === ItemChecklistState.REVEALING;
+
           this.bonusRewardModal.open = false;
           resetChestState();
           resetWheelState();
-          resetResourceChecklistState();
-          resetItemChecklistState();
+          if (!isPendingResourceChecklistReveal) {
+            resetResourceChecklistState();
+          }
+          if (!isPendingItemChecklistReveal) {
+            resetItemChecklistState();
+          }
           resetPlinkoState();
           resetJackpotState();
           resetCoinRainState();
@@ -583,7 +606,29 @@ export class GameClient {
         );
         if (interactionResult.type === 'open_last_reward' || interactionResult.type === 'open_chest_reward') {
           const db = this.store.state.snapshot?.state.bonustime;
-          if (db?.last_result) {
+          const activeGameId = getActiveGameId(this.store.state);
+          const resourceChecklistData = activeGameId === "resource_checklist" ? getResourceChecklistData(this.store.state) : null;
+          const itemChecklistData = activeGameId === "item_checklist" ? getItemChecklistData(this.store.state) : null;
+          const checklistData = resourceChecklistData || itemChecklistData;
+          const currentChecklistEntry = checklistData?.entries[checklistData.nextEntryIndex] || null;
+          const isPendingResourceChecklistReveal =
+            activeGameId === "resource_checklist" &&
+            getResourceChecklistState() === ResourceChecklistState.REVEALING &&
+            currentChecklistEntry !== null;
+          const isPendingItemChecklistReveal =
+            activeGameId === "item_checklist" &&
+            getItemChecklistState() === ItemChecklistState.REVEALING &&
+            currentChecklistEntry !== null;
+          const isPendingChecklistReveal = isPendingResourceChecklistReveal || isPendingItemChecklistReveal;
+
+          if (isPendingChecklistReveal && currentChecklistEntry) {
+            this.bonusRewardModal = {
+              open: true,
+              tier: currentChecklistEntry.tier,
+              rarity: "Result",
+              rewardAmount: ZERO
+            };
+          } else if (db?.last_result) {
             this.bonusRewardModal = {
               open: true,
               tier: db.last_result.tier,

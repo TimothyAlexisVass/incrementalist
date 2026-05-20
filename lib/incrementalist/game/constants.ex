@@ -54,6 +54,24 @@ defmodule Incrementalist.Game.Constants do
     @bonustime["games"]
   end
 
+  def bonustime_checklist do
+    Map.fetch!(@bonustime, "checklists")
+  end
+
+  def bonustime_checklist_grid_columns do
+    Map.fetch!(bonustime_checklist(), "grid_columns")
+  end
+
+  def bonustime_checklist_grid_rows do
+    Map.fetch!(bonustime_checklist(), "grid_rows")
+  end
+
+  def bonustime_checklist_entries do
+    bonustime_checklist()
+    |> Map.fetch!("entries")
+    |> Enum.map(&Map.fetch!(&1, "tier"))
+  end
+
   def bonustime_slot_ms, do: 43_200_000
   def bonustime_rotation_slot_count, do: @bonustime["rotation_slot_count"]
   def bonustime_game_rules, do: @bonustime["game_rules"]

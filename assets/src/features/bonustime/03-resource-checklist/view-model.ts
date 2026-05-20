@@ -1,5 +1,6 @@
 import { ServerState } from "../../../net/snapshots";
 import { BigNum } from "../../../core/bignum";
+import bonustimeConfig from "../../../../../shared/requirements/bonustime.json";
 
 export interface ResourceChecklistEntry {
   entryIndex: number;
@@ -17,21 +18,28 @@ export interface ResourceChecklistData {
   lastRewardAmount: BigNum | null;
 }
 
-const CHECKLIST_TIERS = [2, 2, 3, 3, 3, 4, 4, 5, 3, 3, 4, 5, 6, 4, 4, 4, 7];
+const CHECKLIST_ENTRIES = bonustimeConfig.checklists.entries as Array<{ tier: number }>;
+
+function normalizeChecklistEntryIndex(value: unknown, entryCount: number): number {
+  const index = typeof value === "number" ? Math.floor(value) : Number(value);
+  return Number.isInteger(index) && index >= 0 && index < entryCount ? index : 0;
+}
 
 export function getResourceChecklistData(state: ServerState): ResourceChecklistData | null {
   const snapshot = state.snapshot;
   if (!snapshot || !snapshot.state.bonustime) return null;
 
   const db = snapshot.state.bonustime;
-  const nextEntryIndex = db.checklist_entry_indexes?.resource ?? 0;
+  const nextEntryIndex = normalizeChecklistEntryIndex(
+    db.checklist_entry_indexes?.resource,
+    CHECKLIST_ENTRIES.length
+  );
 
-  const entries: ResourceChecklistEntry[] = Array.from({ length: 17 }, (_, i) => {
-    const tier = CHECKLIST_TIERS[i] || 2;
+  const entries: ResourceChecklistEntry[] = CHECKLIST_ENTRIES.map((entry, i) => {
     return {
       entryIndex: i,
       entryNumber: i + 1,
-      tier,
+      tier: entry.tier,
       completed: i < nextEntryIndex,
       active: i === nextEntryIndex
     };

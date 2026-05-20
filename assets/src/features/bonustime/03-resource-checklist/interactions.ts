@@ -15,10 +15,13 @@ export enum ResourceChecklistState {
 }
 
 let internalState = ResourceChecklistState.IDLE;
-let revealStartTime = 0;
+let pendingEntryIndex = -1;
 
 export function getResourceChecklistState() { return internalState; }
-export function resetResourceChecklistState() { internalState = ResourceChecklistState.IDLE; }
+export function resetResourceChecklistState() {
+  internalState = ResourceChecklistState.IDLE;
+  pendingEntryIndex = -1;
+}
 
 export function handleResourceChecklistInteractions(
   input: InteractionState,
@@ -39,7 +42,7 @@ export function handleResourceChecklistInteractions(
   if (isHover && input.clicked && !input.consumed) {
     if (internalState === ResourceChecklistState.IDLE && data.hasToken && channel) {
       internalState = ResourceChecklistState.REVEALING;
-      revealStartTime = performance.now();
+      pendingEntryIndex = data.nextEntryIndex;
 
       if (runCommand) {
         runCommand(() => playBonusTime(channel, "resource_checklist"));
@@ -48,6 +51,7 @@ export function handleResourceChecklistInteractions(
       }
 
       input.consumed = true;
+      return { type: 'open_modal' as const };
     } else if (internalState === ResourceChecklistState.REVEALED) {
       input.consumed = true;
       return { type: 'open_modal' as const };
@@ -55,9 +59,9 @@ export function handleResourceChecklistInteractions(
   }
 
   if (internalState === ResourceChecklistState.REVEALING) {
-    const elapsed = performance.now() - revealStartTime;
-    if (elapsed > 1000 && data.lastTier !== null) {
+    if (data.nextEntryIndex !== pendingEntryIndex) {
       internalState = ResourceChecklistState.REVEALED;
+      pendingEntryIndex = -1;
     }
   }
 

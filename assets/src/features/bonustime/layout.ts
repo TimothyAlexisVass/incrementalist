@@ -1,3 +1,5 @@
+import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
+
 export interface Rect {
   x: number;
   y: number;
@@ -11,8 +13,13 @@ export interface FittedRect extends Rect {
 
 export const BONUSTIME_GAME_PADDING_PX = 50;
 
-export const BONUSTIME_CHECKLIST_GRID_COLS = 6;
-export const BONUSTIME_CHECKLIST_GRID_ROWS = 3;
+const CHECKLIST_CONFIG = bonustimeConfig.checklists as {
+  grid_columns: number;
+  grid_rows: number;
+};
+
+export const BONUSTIME_CHECKLIST_GRID_COLS = CHECKLIST_CONFIG.grid_columns;
+export const BONUSTIME_CHECKLIST_GRID_ROWS = CHECKLIST_CONFIG.grid_rows;
 export const BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX = 48;
 export const BONUSTIME_CHECKLIST_BASE_GAP_PX = 10;
 export const BONUSTIME_CHECKLIST_BASE_WIDTH_PX =
