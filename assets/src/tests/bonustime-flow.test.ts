@@ -5,6 +5,14 @@ import {
   getBonusTimeWelcomeLayout
 } from "../features/bonustime/flow";
 import {
+  BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX,
+  BONUSTIME_CHECKLIST_BASE_GAP_PX,
+  BONUSTIME_CHECKLIST_BASE_HEIGHT_PX,
+  BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+  BONUSTIME_CHECKLIST_GRID_COLS,
+  fitRectWithinBonusTimeArea
+} from "../features/bonustime/layout";
+import {
   MatchPairsState,
   getFinalRevealStartTime,
   getKnown,
@@ -23,6 +31,22 @@ import {
   resetChestState
 } from "../features/bonustime/01-chest-draw/interactions";
 import { type ChestDrawData } from "../features/bonustime/01-chest-draw/view-model";
+import {
+  ResourceChecklistState,
+  getResourceChecklistState,
+  getRewardWaitStartedAt as getResourceChecklistRewardWaitStartedAt,
+  handleResourceChecklistInteractions,
+  resetResourceChecklistState
+} from "../features/bonustime/03-resource-checklist/interactions";
+import { type ResourceChecklistData } from "../features/bonustime/03-resource-checklist/view-model";
+import {
+  ItemChecklistState,
+  getItemChecklistState,
+  getRewardWaitStartedAt as getItemChecklistRewardWaitStartedAt,
+  handleItemChecklistInteractions,
+  resetItemChecklistState
+} from "../features/bonustime/05-item-checklist/interactions";
+import { type ItemChecklistData } from "../features/bonustime/05-item-checklist/view-model";
 import {
   LabyrinthState,
   getLabyrinthState,
@@ -96,6 +120,26 @@ function matchPairsTileCenter(
   return {
     x: layout.gridStartX + (col * (layout.tileSize + layout.gap)) + (layout.tileSize / 2),
     y: layout.gridStartY + (row * (layout.tileSize + layout.gap)) + (layout.tileSize / 2)
+  };
+}
+
+function checklistEntryCenter(
+  rect: { x: number; y: number; width: number; height: number },
+  entryIndex: number
+): Point {
+  const layout = fitRectWithinBonusTimeArea(
+    rect,
+    BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
+    BONUSTIME_CHECKLIST_BASE_HEIGHT_PX
+  );
+  const boxSize = BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX * layout.scale;
+  const gap = BONUSTIME_CHECKLIST_BASE_GAP_PX * layout.scale;
+  const col = entryIndex % BONUSTIME_CHECKLIST_GRID_COLS;
+  const row = Math.floor(entryIndex / BONUSTIME_CHECKLIST_GRID_COLS);
+
+  return {
+    x: layout.x + (col * (boxSize + gap)) + (boxSize / 2),
+    y: layout.y + (row * (boxSize + gap)) + (boxSize / 2)
   };
 }
 
@@ -217,6 +261,96 @@ function runRewardLabyrinthFlow() {
   assert(getLabyrinthState() === LabyrinthState.REVEALED, "Reward Labyrinth should enter REVEALED once the modal is ready");
 }
 
+function runChecklistFlow() {
+  resetResourceChecklistState();
+  resetItemChecklistState();
+  setClock(0);
+
+  let queuedCommands = 0;
+  const runCommand = (_cmd: () => Promise<any>) => {
+    queuedCommands += 1;
+  };
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const resourceData: ResourceChecklistData = {
+    hasToken: true,
+    entries: [
+      { entryIndex: 0, entryNumber: 1, tier: 1, completed: false, active: false },
+      { entryIndex: 1, entryNumber: 2, tier: 2, completed: false, active: true },
+      { entryIndex: 2, entryNumber: 3, tier: 3, completed: false, active: false }
+    ],
+    nextEntryIndex: 1,
+    lastTier: null,
+    lastRewardAmount: ZERO
+  };
+  const resourceBoardClick = checklistEntryCenter(rect, 0);
+
+  const resourceClick = handleResourceChecklistInteractions(
+    makeInput(resourceBoardClick, true),
+    resourceData,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(resourceClick?.type === "open_modal", "Resource Checklist should open the confirmation from any board tile");
+  assert(getResourceChecklistState() === ResourceChecklistState.REVEALED, "Resource Checklist should lock after the board click");
+  assert(getResourceChecklistRewardWaitStartedAt() === 0, "Resource Checklist should not enter a waiting state");
+  assert(queuedCommands === 1, "Resource Checklist should queue exactly one play command");
+
+  const resourceRepeat = handleResourceChecklistInteractions(
+    makeInput(resourceBoardClick, true),
+    resourceData,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(resourceRepeat === null, "Resource Checklist should not queue another claim while the modal is open");
+  assert(queuedCommands === 1, "Resource Checklist should stay at one queued command");
+
+  resetResourceChecklistState();
+
+  const itemData: ItemChecklistData = {
+    hasToken: true,
+    entries: [
+      { entryIndex: 0, entryNumber: 1, tier: 1, completed: false, active: false },
+      { entryIndex: 1, entryNumber: 2, tier: 2, completed: false, active: true },
+      { entryIndex: 2, entryNumber: 3, tier: 3, completed: false, active: false }
+    ],
+    nextEntryIndex: 1,
+    lastTier: null,
+    lastRewardAmount: ZERO
+  };
+  const itemBoardClick = checklistEntryCenter(rect, 0);
+
+  const itemClick = handleItemChecklistInteractions(
+    makeInput(itemBoardClick, true),
+    itemData,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(itemClick?.type === "open_modal", "Item Checklist should open the confirmation from any board tile");
+  assert(getItemChecklistState() === ItemChecklistState.REVEALED, "Item Checklist should lock after the board click");
+  assert(getItemChecklistRewardWaitStartedAt() === 0, "Item Checklist should not enter a waiting state");
+  assert(Number(queuedCommands) === 2, "Item Checklist should queue exactly one additional play command");
+
+  const itemRepeat = handleItemChecklistInteractions(
+    makeInput(itemBoardClick, true),
+    itemData,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(itemRepeat === null, "Item Checklist should not queue another claim while the modal is open");
+  assert(Number(queuedCommands) === 2, "Item Checklist should stay at one queued command for the entry");
+
+  resetItemChecklistState();
+}
+
 function runMatchPairsFlow() {
   resetMatchPairsState();
   setClock(0);
@@ -317,6 +451,7 @@ function runMatchPairsFlow() {
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
+  runChecklistFlow();
   runMatchPairsFlow();
   console.log("bonustime flow tests passed");
 }

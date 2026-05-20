@@ -44,7 +44,7 @@ The WebGL interface displays a vertical column of boxes on the screen:
 - **Rewards Display**: Each rung box displays its associated reward tier (Rung 1: Common, Rung 2: Rare, etc., up to Rung 7+ which glows as Ultimate).
 - **Controls**: A single button is visible at the bottom of the screen:
   - **`Climb`**: Launches the next ascension roll.
-- **Completion State**: When a climb roll fails, the game displays the final rung reached and the reward granted. The `Climb` button transitions to a disabled or collection-acknowledged state.
+- **Completion State**: When a climb roll fails, the game displays the final rung reached and the reward granted.
 
 ---
 

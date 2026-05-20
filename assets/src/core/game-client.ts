@@ -571,23 +571,11 @@ export class GameClient {
       if (this.bonusRewardModal?.open && sceneInput.clicked && sceneInput.pointer) {
         const layout = getRewardModalLayout(this.canvas);
         if (resolveRewardModalAction(layout, sceneInput.pointer.x, sceneInput.pointer.y)) {
-          const activeGameId = getActiveGameId(this.store.state);
-          const isPendingResourceChecklistReveal =
-            activeGameId === "resource_checklist" &&
-            getResourceChecklistState() === ResourceChecklistState.REVEALING;
-          const isPendingItemChecklistReveal =
-            activeGameId === "item_checklist" &&
-            getItemChecklistState() === ItemChecklistState.REVEALING;
-
           this.bonusRewardModal.open = false;
           resetChestState();
           resetWheelState();
-          if (!isPendingResourceChecklistReveal) {
-            resetResourceChecklistState();
-          }
-          if (!isPendingItemChecklistReveal) {
-            resetItemChecklistState();
-          }
+          resetResourceChecklistState();
+          resetItemChecklistState();
           resetPlinkoState();
           resetJackpotState();
           resetCoinRainState();
@@ -613,17 +601,12 @@ export class GameClient {
           const itemChecklistData = activeGameId === "item_checklist" ? getItemChecklistData(this.store.state) : null;
           const checklistData = resourceChecklistData || itemChecklistData;
           const currentChecklistEntry = checklistData?.entries[checklistData.nextEntryIndex] || null;
-          const isPendingResourceChecklistReveal =
-            activeGameId === "resource_checklist" &&
-            getResourceChecklistState() === ResourceChecklistState.REVEALING &&
+          const isChecklistRewardReady =
+            ((activeGameId === "resource_checklist" && getResourceChecklistState() === ResourceChecklistState.REVEALED) ||
+             (activeGameId === "item_checklist" && getItemChecklistState() === ItemChecklistState.REVEALED)) &&
             currentChecklistEntry !== null;
-          const isPendingItemChecklistReveal =
-            activeGameId === "item_checklist" &&
-            getItemChecklistState() === ItemChecklistState.REVEALING &&
-            currentChecklistEntry !== null;
-          const isPendingChecklistReveal = isPendingResourceChecklistReveal || isPendingItemChecklistReveal;
 
-          if (isPendingChecklistReveal && currentChecklistEntry) {
+          if (isChecklistRewardReady && currentChecklistEntry) {
             this.bonusRewardModal = {
               open: true,
               tier: currentChecklistEntry.tier,

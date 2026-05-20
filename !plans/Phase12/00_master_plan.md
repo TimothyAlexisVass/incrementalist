@@ -3,12 +3,9 @@
 ## Overview
 
 This phase covers the implementation and WebGL representation of the remaining seven daily-bonus (`BONUSTIME`) mini-games:
-- **Reward Labyrinth** (Slot 7)
 - **Ladder Climb** (Slot 8)
-- **Card Pick** (Slot 9) — A one-shot card-flipping game with local reveals.
 - **Lucky Dice** (Slot 10) — A Yatzy-style 7x7 dice roller.
 - **Scratch Card** (Slot 12) — An interactive scrubbing game with a brush size and pixel budget.
-- **Match Pairs** (Slot 13) — A tile-matching memory game with a mistake budget.
 - **Hammer Smash** (Slot 6) — A carnival-style striker timing game.
 
 ---
@@ -20,12 +17,9 @@ All games are evaluated and served within the 12-hour rotation boundaries (`00:0
 | Slot | Game Name | Type | Interaction Model |
 | :---: | --- | --- | --- |
 | **6** | Hammer Smash | Volatility Choice | Interactive timing bar + multiple clicks + extra smash |
-| **7** | Reward Labyrinth | Hidden Choice | Node-based maze pathfinding exploration |
 | **8** | Ladder Climb | Pure Chance | Upward progression with declining success chance per step |
-| **9** | Card Pick | Hidden Choice | One-shot grid precalculations and clicks (like `its_bonus_time`) |
 | **10** | Lucky Dice | Pure Chance | 7x7 dice rolls, customizable keeps and rerolls |
 | **12** | Scratch Card | Hidden Choice | Scrubbing/scratching mask area, releasing penalty |
-| **13** | Match Pairs | Light Skill | Memory matching 48 tiles (24 pairs), mistake limits |
 
 ---
 
@@ -47,10 +41,7 @@ All games are evaluated and served within the 12-hour rotation boundaries (`00:0
 
 We will implement each game systematically as follows:
 
-1. **01_reward_labyrinth.md**: Explorer maze with step budget `steps = rand(4, 10) + min(streak / 15, 20)`.
 2. **02_ladder_climb.md**: Rung climber with declining chances, with streak boosting climb rolls by up to 1 percentage point (`min(streak / 60, 100) percentage points`).
 3. **03_lucky_dice.md**: 7x7 poker dice with keep-and-reroll mechanism and streak rolls `1 + min(floor(streak / 30), 2)`.
 4. **04_scratch_card.md**: Scratch 1000x500 surface using a brush with release penalty, where max streak unlocks up to 35% of scratch capability.
-5. **05_card_pick.md**: 6x6 card grid using the one-shot logic of `its_bonus_time` (single token-spend precalculating total picks and multipliers, with local interactive reveals).
-6. **06_match_pairs.md**: Memory game with 24 pairs, turn limit `4 + min(streak // 15, 6)`, and automatic last-turn flip consolation.
 7. **07_hammer_smash.md**: Volatility striker with moving bar, streak-based floor `min_amount = 5 + min(streak / 15, 15)`, and double-100% bell breaks.

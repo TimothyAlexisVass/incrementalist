@@ -3,7 +3,6 @@ import { hexToRgba } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { ItemChecklistData } from "./view-model";
-import { getItemChecklistState, ItemChecklistState } from "./interactions";
 import {
   BONUSTIME_CHECKLIST_GRID_COLS,
   BONUSTIME_CHECKLIST_BASE_BOX_SIZE_PX,
@@ -12,7 +11,6 @@ import {
   BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
   fitRectWithinBonusTimeArea
 } from "../layout";
-import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -24,22 +22,6 @@ export function renderItemChecklist(
 ) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
-  if (getItemChecklistState() === ItemChecklistState.IDLE) {
-    renderBonusTimeWelcomeCard(renderer, rect, {
-      cardWidth: 520,
-      cardHeight: 320,
-      title: "ITEM CHECKLIST",
-      bodyLines: ["Complete the checklist to reveal a reward."],
-      buttonText: "START CHECKLIST",
-      titleColor: "#ffbe4d",
-      bodyColor: "#edf2f7",
-      accentColor: "#ffbe4d",
-      glowColor: [255, 190, 77, 255],
-      backgroundColor: "#120d24",
-      buttonActive: false
-    });
-    return;
-  }
   const now = performance.now();
 
   const layout = fitRectWithinBonusTimeArea(
