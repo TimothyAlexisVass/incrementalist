@@ -2,15 +2,19 @@ import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
 import { CardPickData } from "./view-model";
 import {
+  BONUSTIME_CARD_PICK_BOARD_SIZE,
+  BONUSTIME_REWARD_MODAL_DELAY_MS,
+  getCardPickInitialPicks,
+  renderBonusTimeWelcomeCard
+} from "../flow";
+import {
   CardPickState, getCardPickState, getFlippedIndices, getRestFlippedIndices,
   getRevealIndexMap, getCardPickHoveredIndex, getFinalRevealStartTime,
   getCurrentMaxPicks, getBonusPhaseStartTime
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
-import { drawButton } from "../../../ui/components/button";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, MODAL_BODY_FONT, BONUSTIME_BUTTON_FONT,
-  BONUSTIME_BODY_FONT
+  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
 
@@ -34,62 +38,29 @@ export function renderCardPick(
 
   // 1. Render IDLE welcome view
   if (state === CardPickState.IDLE) {
-    const cardWidth = 560;
-    const cardHeight = 360;
-    const cardRect = {
-      x: centerX - cardWidth / 2,
-      y: centerY - cardHeight / 2 - 20,
-      width: cardWidth,
-      height: cardHeight
-    };
-
-    // Modal panel background
-    renderer.drawGlowRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: [255, 190, 77, 255], radius: 16, intensity: 0.3, outerAlpha: 0.15
-    });
-
-    renderer.drawRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: hexToRgba("#120d24", 0.98)
-    });
-
-    // Top and bottom accent lines
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 3, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
-
-    // Title text
-    renderer.drawText({
-      text: "CARD PICK",
-      x: centerX, y: cardRect.y + 60, font: BONUSTIME_TITLE_FONT,
-      color: "#ffbe4d", align: 'center', baseline: 'middle'
-    });
-
-    // Subtitle / Description
-    renderer.drawText({
-      text: "Flip cards with a chance to win massive prizes",
-      x: centerX, y: cardRect.y + 130, font: BONUSTIME_BODY_FONT,
-      color: "#edf2f7", align: 'center', baseline: 'middle'
-    });
-
-    const initialPicks = 2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7));
-    const dayLabel = pluralize(data.streak, "day");
-    const pickLabel = pluralize(initialPicks, "pick");
-    renderer.drawText({
-      text: `Current Streak: ${data.streak} ${dayLabel}  (${initialPicks} starting ${pickLabel})`,
-      x: centerX, y: cardRect.y + 195, font: BONUSTIME_BODY_FONT,
-      color: "#52df87", align: 'center', baseline: 'middle'
-    });
-
-    // Play Button
-    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
-    const isOverBtn = pointer &&
-      pointer.x >= btnRect.x && pointer.x <= btnRect.x + btnRect.width &&
-      pointer.y >= btnRect.y && pointer.y <= btnRect.y + btnRect.height;
-
-    drawButton(btnRect, "START", {
-      font: BONUSTIME_BUTTON_FONT,
-      active: !!isOverBtn
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 560,
+      cardHeight: 360,
+      title: "CARD PICK",
+      bodyLines: ["Flip cards with a chance to win massive prizes"],
+      streakText: (() => {
+        const initialPicks = getCardPickInitialPicks(data.streak);
+        const dayLabel = pluralize(data.streak, "day");
+        const pickLabel = pluralize(initialPicks, "pick");
+        return `Current Streak: ${data.streak} ${dayLabel}  (${initialPicks} starting ${pickLabel})`;
+      })(),
+      buttonText: "START",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: !!(pointer &&
+        pointer.x >= (centerX - 120) &&
+        pointer.x <= (centerX + 120) &&
+        pointer.y >= (centerY + 70) &&
+        pointer.y <= (centerY + 120))
     });
 
     return;
@@ -112,7 +83,7 @@ export function renderCardPick(
   const hoveredIdx = getCardPickHoveredIndex();
 
   const currentMaxPicks = (state === CardPickState.PLAYING)
-    ? (getCurrentMaxPicks() || (2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7))))
+    ? (getCurrentMaxPicks() || getCardPickInitialPicks(data.streak))
     : (getCurrentMaxPicks() || flips);
 
   const picksMade = Math.min(currentMaxPicks, Array.from(flippedIndices).filter(idx => revealMap.has(idx)).length);
@@ -135,8 +106,8 @@ export function renderCardPick(
   });
 
   // 6x6 Grid rendering
-  const cols = 6;
-  const rows = 6;
+  const cols = Math.round(Math.sqrt(BONUSTIME_CARD_PICK_BOARD_SIZE));
+  const rows = cols;
   const tileSize = 65;
   const gap = 10;
   const totalGridWidth = cols * tileSize + (cols - 1) * gap;
@@ -280,7 +251,7 @@ export function renderCardPick(
   // 3. Render gorgeous gold bonus count down overlay if in BONUS_PENDING state
   if (state === CardPickState.BONUS_PENDING) {
     const elapsed = now - getBonusPhaseStartTime();
-    const remainingMs = Math.max(0, 5000 - elapsed);
+    const remainingMs = Math.max(0, BONUSTIME_REWARD_MODAL_DELAY_MS - elapsed);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
 
     const bannerWidth = 460;
@@ -317,10 +288,10 @@ export function renderCardPick(
   // 4. Render final countdown overlay if in FINAL_REVEAL state
   if (state === CardPickState.FINAL_REVEAL) {
     const elapsed = now - getFinalRevealStartTime();
-    const remainingIndicesCount = 36 - flips;
+    const remainingIndicesCount = BONUSTIME_CARD_PICK_BOARD_SIZE - flips;
     const allRevealedDuration = 2000 + remainingIndicesCount * 30;
 
-    const remainingMs = Math.max(0, (allRevealedDuration + 3000) - elapsed);
+    const remainingMs = Math.max(0, (allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) - elapsed);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
 
     const bannerWidth = 460;

@@ -5,6 +5,11 @@ import {
   PlinkoDropData,
   getPlinkoAnimationDurationMs
 } from "./view-model";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  shouldOpenBonusTimeRewardModal
+} from "../flow";
 
 export enum PlinkoState {
   IDLE,
@@ -20,6 +25,7 @@ let animationStartedAt = 0;
 let requestStartedAt = 0;
 let previousPlayedAt: string | null = null;
 let resolvedPlayedAt: string | null = null;
+let rewardModalStartTime = 0;
 const RESULT_WAIT_TIMEOUT_MS = 5_000;
 
 export function getPlinkoState() {
@@ -41,6 +47,7 @@ export function resetPlinkoState() {
   requestStartedAt = 0;
   previousPlayedAt = null;
   resolvedPlayedAt = null;
+  rewardModalStartTime = 0;
 }
 
 export function handlePlinkoDropInteractions(
@@ -50,17 +57,30 @@ export function handlePlinkoDropInteractions(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
-  if (internalState === PlinkoState.IDLE && data.hasToken && channel) {
-    internalState = PlinkoState.PREPARING;
-    waitingForResult = true;
-    animationStartedAt = 0;
-    requestStartedAt = performance.now();
-    previousPlayedAt = data.lastPlayedAt;
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 460,
+    cardHeight: 320,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
-    if (runCommand) {
-      runCommand(() => playBonusTime(channel, "plinko_drop"));
-    } else {
-      playBonusTime(channel, "plinko_drop");
+  if (internalState === PlinkoState.IDLE && data.hasToken && channel) {
+    if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed) {
+      internalState = PlinkoState.PREPARING;
+      waitingForResult = true;
+      animationStartedAt = 0;
+      requestStartedAt = performance.now();
+      previousPlayedAt = data.lastPlayedAt;
+
+      if (runCommand) {
+        runCommand(() => playBonusTime(channel, "plinko_drop"));
+      } else {
+        playBonusTime(channel, "plinko_drop");
+      }
+
+      input.consumed = true;
     }
   }
 
@@ -76,9 +96,6 @@ export function handlePlinkoDropInteractions(
       internalState = PlinkoState.DROPPING;
       animationStartedAt = performance.now();
       input.consumed = true;
-    } else if (internalState === PlinkoState.REVEALED) {
-      input.consumed = true;
-      return { type: "open_modal" as const };
     }
   }
 
@@ -112,7 +129,12 @@ export function handlePlinkoDropInteractions(
       const elapsed = performance.now() - animationStartedAt;
       if (elapsed >= getPlinkoAnimationDurationMs(data)) {
         internalState = PlinkoState.REVEALED;
+        rewardModalStartTime = performance.now();
       }
+    }
+  } else if (internalState === PlinkoState.REVEALED) {
+    if (shouldOpenBonusTimeRewardModal(rewardModalStartTime, performance.now())) {
+      return { type: "open_modal" as const };
     }
   }
 

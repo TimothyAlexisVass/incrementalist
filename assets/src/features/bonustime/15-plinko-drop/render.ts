@@ -13,6 +13,7 @@ import {
   getPlinkoAnimationStartedAt,
   getPlinkoState
 } from "./interactions";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 type Point = { x: number; y: number };
 type PegAlignment = "left" | "center";
@@ -61,6 +62,23 @@ export function renderPlinkoDrop(
   const layout = getPlinkoLayout(rect);
   const stepMs = getPlinkoStepDurationMs();
   const dropGapMs = getPlinkoDropGapMs();
+
+  if (plinkoState === PlinkoState.IDLE) {
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 500,
+      cardHeight: 320,
+      title: "PLINKO DROP",
+      bodyLines: ["Drop the ball and chase the best landing lane."],
+      buttonText: "DROP BALL",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: false
+    });
+    return;
+  }
 
   const baseBallRadius = BALL_RADIUS_PX * layout.frame.scale;
   const pegRadius = PEG_RADIUS_PX * layout.frame.scale;

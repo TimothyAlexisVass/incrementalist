@@ -7,6 +7,7 @@ import {
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { COIN_RAIN_TIMER_FONT, COIN_RAIN_COUNTDOWN_FONT, BONUSTIME_RESULT_FONT } from "../../../config";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 const COUNTDOWN_DURATION_MS = 3000;
 const PLAY_DURATION_MS = 7000;
@@ -44,20 +45,20 @@ export function renderCoinRain(
   const centerY = rect.y + rect.height / 2;
 
   if (state === CoinRainState.IDLE) {
-    // "Click to play" prompt
-    renderer.drawText({
-      text: "COIN RAIN",
-      x: centerX, y: centerY - 30,
-      font: COIN_RAIN_COUNTDOWN_FONT,
-      color: COIN_COLOR,
-      align: 'center', baseline: 'middle'
-    });
-    renderer.drawText({
-      text: "Click to play",
-      x: centerX, y: centerY + 20,
-      font: COIN_RAIN_TIMER_FONT,
-      color: CAUGHT_LABEL_COLOR,
-      align: 'center', baseline: 'middle'
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 460,
+      cardHeight: 300,
+      title: "COIN RAIN",
+      bodyLines: ["Catch falling rewards before the timer runs out."],
+      streakText: `Current Streak: ${data.streak} day${data.streak === 1 ? "" : "s"}`,
+      buttonText: "START RAIN",
+      titleColor: COIN_COLOR,
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: COIN_COLOR,
+      glowColor: [255, 215, 0, 255],
+      backgroundColor: "#0d1117",
+      buttonActive: false
     });
   } else if (state === CoinRainState.COUNTDOWN) {
     const elapsed = now - getCountdownStart();

@@ -4,6 +4,7 @@ import { JackpotMeterData } from "./view-model";
 import { JackpotState, getJackpotState } from "./interactions";
 import { fitRectWithinBonusTimeArea } from "../layout";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -19,6 +20,25 @@ export function renderJackpotMeter(
   const now = performance.now();
   const state = getJackpotState();
   const layout = fitRectWithinBonusTimeArea(rect, 300, 300);
+
+  if (state === JackpotState.IDLE) {
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 520,
+      cardHeight: 320,
+      title: "JACKPOT METER",
+      bodyLines: ["Fill the meter for a guaranteed jackpot."],
+      streakText: `Current Streak: ${data.streak} day${data.streak === 1 ? "" : "s"}`,
+      buttonText: "TRY JACKPOT",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: false
+    });
+    return;
+  }
 
   // Background container
   renderer.drawRect({
@@ -169,7 +189,7 @@ export function renderJackpotMeter(
     const hue = (now % 1000) / 1000 * 360;
     btnColor = `hsl(${hue}, 70%, 50%)`;
   } else if (state === JackpotState.REVEALED) {
-    btnText = "CLAIM REWARD!";
+    btnText = "REWARD READY";
     if (data.lastTier) {
       const config = getTierConfig(data.lastTier);
       btnColor = config?.color || "#48bb78";

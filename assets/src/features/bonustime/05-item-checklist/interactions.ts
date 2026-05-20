@@ -7,6 +7,11 @@ import {
   BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
   fitRectWithinBonusTimeArea
 } from "../layout";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  shouldOpenBonusTimeRewardModal
+} from "../flow";
 
 export enum ItemChecklistState {
   IDLE,
@@ -16,11 +21,13 @@ export enum ItemChecklistState {
 
 let internalState = ItemChecklistState.IDLE;
 let pendingEntryIndex = -1;
+let rewardModalStartTime = 0;
 
 export function getItemChecklistState() { return internalState; }
 export function resetItemChecklistState() {
   internalState = ItemChecklistState.IDLE;
   pendingEntryIndex = -1;
+  rewardModalStartTime = 0;
 }
 
 export function handleItemChecklistInteractions(
@@ -35,11 +42,16 @@ export function handleItemChecklistInteractions(
     BONUSTIME_CHECKLIST_BASE_WIDTH_PX,
     BONUSTIME_CHECKLIST_BASE_HEIGHT_PX
   );
-  const isHover = input.pointer &&
-                  input.pointer.x >= layout.x && input.pointer.x <= layout.x + layout.width &&
-                  input.pointer.y >= layout.y && input.pointer.y <= layout.y + layout.height;
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 520,
+    cardHeight: 320,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
-  if (isHover && input.clicked && !input.consumed) {
+  if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed) {
     if (internalState === ItemChecklistState.IDLE && data.hasToken && channel) {
       internalState = ItemChecklistState.REVEALING;
       pendingEntryIndex = data.nextEntryIndex;
@@ -51,10 +63,6 @@ export function handleItemChecklistInteractions(
       }
 
       input.consumed = true;
-      return { type: 'open_modal' as const };
-    } else if (internalState === ItemChecklistState.REVEALED) {
-      input.consumed = true;
-      return { type: 'open_modal' as const };
     }
   }
 
@@ -62,6 +70,11 @@ export function handleItemChecklistInteractions(
     if (data.nextEntryIndex !== pendingEntryIndex) {
       internalState = ItemChecklistState.REVEALED;
       pendingEntryIndex = -1;
+      rewardModalStartTime = performance.now();
+    }
+  } else if (internalState === ItemChecklistState.REVEALED) {
+    if (shouldOpenBonusTimeRewardModal(rewardModalStartTime, performance.now())) {
+      return { type: 'open_modal' as const };
     }
   }
 

@@ -3,6 +3,13 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.CardPickTest do
   alias Incrementalist.Game.Features.BonusTime.Games.CardPick
   alias Incrementalist.Game.Time
 
+  test "shared card pick rules preserve the board size and streak scaling" do
+    assert CardPick.board_size() == 36
+    assert CardPick.initial_picks(0) == 2
+    assert CardPick.initial_picks(7) == 3
+    assert CardPick.initial_picks(49) == 9
+  end
+
   test "roll_reward/3 generates a correct 36-card board" do
     now = Time.now()
     {flips, board} = CardPick.roll_reward(0, 0, now)
@@ -15,21 +22,5 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.CardPickTest do
       assert card.tier in 1..7
       assert card.multiplier in [1, 2, 4]
     end
-  end
-
-  test "roll_reward/3 scales initial picks based on streak" do
-    now = Time.now()
-
-    # streak 0 => 2 picks (base)
-    # streak 7 => 3 picks
-    # streak 49 => 9 picks
-    {flips_0, _} = CardPick.roll_reward(0, 0, now)
-    assert flips_0 >= 2
-
-    {flips_7, _} = CardPick.roll_reward(7, 0, now)
-    assert flips_7 >= 3
-
-    {flips_49, _} = CardPick.roll_reward(49, 0, now)
-    assert flips_49 >= 9
   end
 end

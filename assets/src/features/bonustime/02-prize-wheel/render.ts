@@ -4,6 +4,7 @@ import { PrizeWheelData } from "./view-model";
 import { WheelState, getWheelState } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { fitRectWithinBonusTimeArea } from "../layout";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -21,6 +22,25 @@ export function renderPrizeWheel(
   const state = getWheelState();
   const now = performance.now();
   const layout = fitRectWithinBonusTimeArea(rect, 300, 300);
+
+  if (state === WheelState.IDLE) {
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 440,
+      cardHeight: 300,
+      title: "PRIZE WHEEL",
+      bodyLines: ["Spin the wheel for a chance at a massive reward."],
+      streakText: `Current Streak: ${data.streak} day${data.streak === 1 ? "" : "s"}`,
+      buttonText: "SPIN NOW",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: false
+    });
+    return;
+  }
 
   let color = DEFAULT_COLOR;
 

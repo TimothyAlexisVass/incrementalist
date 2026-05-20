@@ -3,6 +3,11 @@ import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { ChestDrawData } from "./view-model";
 import { fitRectWithinBonusTimeArea } from "../layout";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  shouldOpenBonusTimeRewardModal
+} from "../flow";
 
 export enum ChestState {
   IDLE,
@@ -12,9 +17,14 @@ export enum ChestState {
 
 let internalState = ChestState.IDLE;
 let revealStartTime = 0;
+let rewardModalStartTime = 0;
 
 export function getChestState() { return internalState; }
-export function resetChestState() { internalState = ChestState.IDLE; }
+export function resetChestState() {
+  internalState = ChestState.IDLE;
+  revealStartTime = 0;
+  rewardModalStartTime = 0;
+}
 
 export function handleChestDrawInteractions(
   input: InteractionState,
@@ -24,11 +34,16 @@ export function handleChestDrawInteractions(
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
   const layout = fitRectWithinBonusTimeArea(chestRect, 300, 300);
-  const isHover = input.pointer &&
-                  input.pointer.x >= layout.x && input.pointer.x <= layout.x + layout.width &&
-                  input.pointer.y >= layout.y && input.pointer.y <= layout.y + layout.height;
+  const welcomeLayout = getBonusTimeWelcomeLayout(chestRect, {
+    cardWidth: 420,
+    cardHeight: 300,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
-  if (isHover && input.clicked && !input.consumed) {
+  if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed) {
     if (internalState === ChestState.IDLE && data.hasToken && channel) {
       internalState = ChestState.REVEALING;
       revealStartTime = performance.now();
@@ -40,9 +55,6 @@ export function handleChestDrawInteractions(
       }
       
       input.consumed = true;
-    } else if (internalState === ChestState.REVEALED) {
-      input.consumed = true;
-      return { type: 'open_modal' as const };
     }
   }
 
@@ -51,6 +63,11 @@ export function handleChestDrawInteractions(
     const elapsed = performance.now() - revealStartTime;
     if (elapsed > 1500 && data.lastTier !== null) {
       internalState = ChestState.REVEALED;
+      rewardModalStartTime = performance.now();
+    }
+  } else if (internalState === ChestState.REVEALED) {
+    if (shouldOpenBonusTimeRewardModal(rewardModalStartTime, performance.now())) {
+      return { type: 'open_modal' as const };
     }
   }
 

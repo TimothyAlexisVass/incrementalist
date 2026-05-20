@@ -1,7 +1,6 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
 import { RewardLabyrinthData } from "./view-model";
-import { drawButton } from "../../../ui/components/button";
 import {
   LabyrinthState, getLabyrinthState, getCurrentCoords, getStepsRemaining,
   getDiscoveredChests, getHoveredDirection, getSymmetricConnections, getMazeSeed, getVisitedRooms
@@ -9,9 +8,9 @@ import {
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { pluralize } from "../../../utils/format";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, BONUSTIME_BUTTON_FONT,
-  BONUSTIME_BODY_FONT
+  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, BONUSTIME_BODY_FONT
 } from "../../../config";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -51,52 +50,22 @@ export function renderRewardLabyrinth(
 
   // 1. Render IDLE welcome view
   if (state === LabyrinthState.IDLE) {
-    const cardWidth = 560;
-    const cardHeight = 360;
-    const cardRect = {
-      x: centerX - cardWidth / 2,
-      y: centerY - cardHeight / 2 - 20,
-      width: cardWidth,
-      height: cardHeight
-    };
-
-    renderer.drawGlowRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: [255, 190, 77, 255], radius: 16, intensity: 0.3, outerAlpha: 0.15
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 560,
+      cardHeight: 360,
+      title: "REWARD LABYRINTH",
+      bodyLines: ["Navigate a hidden maze of rewards."],
+      streakText: `Current Streak: ${data.streak} ${pluralize(data.streak, "day")}`,
+      buttonText: "ENTER LABYRINTH",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: getHoveredDirection() === "enter"
     });
-    renderer.drawRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: hexToRgba("#120d24", 0.98)
-    });
-
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 3, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
-
-    renderer.drawText({
-      text: "REWARD LABYRINTH",
-      x: centerX, y: cardRect.y + 60, font: BONUSTIME_TITLE_FONT,
-      color: "#ffbe4d", align: 'center', baseline: 'middle'
-    });
-
-    renderer.drawText({
-      text: "Navigate a hidden maze of rewards.",
-      x: centerX, y: cardRect.y + 130, font: BONUSTIME_BODY_FONT,
-      color: "#edf2f7", align: 'center', baseline: 'middle'
-    });
-
-    const dayLabel = pluralize(data.streak, "day");
-    renderer.drawText({
-      text: `Current Streak: ${data.streak} ${dayLabel}`,
-      x: centerX, y: cardRect.y + 195, font: BONUSTIME_BODY_FONT,
-      color: "#52df87", align: 'center', baseline: 'middle'
-    });
-
-    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
-    const hovered = getHoveredDirection() === 'enter';
-    drawButton(btnRect, "ENTER LABYRINTH", {
-      font: BONUSTIME_BUTTON_FONT,
-      active: hovered,
-    });
+    return;
   }
 
   // 2. Main PLAYING exploration view
@@ -428,20 +397,10 @@ export function renderRewardLabyrinth(
       });
     }
 
-    // Claim rewards button
-    const claimBtn = { x: centerX - 100, y: cardRect.y + 275, width: 200, height: 45 };
-    const hovered = pointer &&
-      pointer.x >= claimBtn.x && pointer.x <= claimBtn.x + claimBtn.width &&
-      pointer.y >= claimBtn.y && pointer.y <= claimBtn.y + claimBtn.height;
-
-    drawButton(claimBtn, "CLAIM ALL REWARDS", {
-      font: BONUSTIME_BUTTON_FONT,
-      active: !!hovered,
-      activeSurface: "#B7791F",
-      inactiveSurface: "#1A202C",
-      activeBorder: "#D69E2E",
-      inactiveBorder: "#2D3748",
-      textColor: "#ffffff"
+    renderer.drawText({
+      text: "Reward modal opens automatically...",
+      x: centerX, y: cardRect.y + 275, font: BONUSTIME_BODY_FONT,
+      color: "#a0aec0", align: 'center', baseline: 'middle'
     });
   }
 }

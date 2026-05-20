@@ -4,6 +4,7 @@ import { ChestDrawData } from "./view-model";
 import { ChestState, getChestState } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { fitRectWithinBonusTimeArea } from "../layout";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -21,6 +22,24 @@ export function renderChestDraw(
   const state = getChestState();
   const now = performance.now();
   const layout = fitRectWithinBonusTimeArea(rect, 300, 300);
+
+  if (state === ChestState.IDLE) {
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 420,
+      cardHeight: 300,
+      title: "CHEST DRAW",
+      bodyLines: ["Open a chest and reveal a reward."],
+      buttonText: "OPEN CHEST",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [255, 190, 77, 255],
+      backgroundColor: "#120d24",
+      buttonActive: false
+    });
+    return;
+  }
 
   let color = DEFAULT_COLOR;
 

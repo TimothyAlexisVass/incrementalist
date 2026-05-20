@@ -2,6 +2,11 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { ItsBonusTimeData } from "./view-model";
+import {
+  BONUSTIME_REWARD_MODAL_DELAY_MS,
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton
+} from "../flow";
 
 export enum ItsBonusTimeState {
   IDLE,
@@ -61,18 +66,17 @@ export function handleItsBonusTimeInteractions(
 
   const gridStartX = gameRect.x + (gameRect.width - totalGridWidth) / 2;
   const gridStartY = gameRect.y + 110;
+  const welcomeLayout = getBonusTimeWelcomeLayout(gameRect, {
+    cardWidth: 600,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
   if (internalState === ItsBonusTimeState.IDLE) {
-    // Play button location (centered)
-    const centerX = gameRect.x + gameRect.width / 2;
-    const centerY = gameRect.y + gameRect.height / 2;
-    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
-
-    const isOverBtn = input.pointer &&
-                      input.pointer.x >= btnRect.x && input.pointer.x <= btnRect.x + btnRect.width &&
-                      input.pointer.y >= btnRect.y && input.pointer.y <= btnRect.y + btnRect.height;
-
-    if (isOverBtn && input.clicked && !input.consumed && data.hasToken && channel && !claimSent) {
+    if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed && data.hasToken && channel && !claimSent) {
       claimSent = true;
       internalState = ItsBonusTimeState.PLAYING;
       flippedIndices.clear();
@@ -163,7 +167,7 @@ export function handleItsBonusTimeInteractions(
     }
 
     const allRevealedDuration = 2000 + remainingIndices.length * 20;
-    if (elapsed >= allRevealedDuration + 5000) {
+    if (elapsed >= allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) {
       internalState = ItsBonusTimeState.REVEALED;
     }
   } else if (internalState === ItsBonusTimeState.REVEALED) {

@@ -2,6 +2,11 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime, claimCoinRain } from "../../../net/commands";
 import { CoinRainData } from "./view-model";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  shouldOpenBonusTimeRewardModal
+} from "../flow";
 
 export enum CoinRainState {
   IDLE,
@@ -50,6 +55,7 @@ let caughtIds: number[] = [];
 let lastTime = 0;
 let claimSent = false;
 let bucketPath: [number, number][] = [];
+let rewardModalStartTime = 0;
 
 export function getCoinRainState() { return internalState; }
 export function resetCoinRainState() {
@@ -62,6 +68,7 @@ export function resetCoinRainState() {
   lastTime = 0;
   claimSent = false;
   bucketPath = [];
+  rewardModalStartTime = 0;
 }
 
 export function getCoinRainBucketX() { return bucketX; }
@@ -88,6 +95,14 @@ export function handleCoinRainInteractions(
   const activeSession = data.activeSession;
   const bucketWidth = activeSession ? activeSession.data.bucket_width : BUCKET_WIDTH_PX;
   const bucketSpeed = activeSession ? activeSession.data.bucket_speed : (200 + Math.min(data.streak, 200));
+  const welcomeLayout = getBonusTimeWelcomeLayout(gameRect, {
+    cardWidth: 440,
+    cardHeight: 300,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
   // Pointer tracking for bucket: moves towards the pointer based on bucketSpeed
   if (input.pointer && input.pointer.x >= gameRect.x && input.pointer.x <= gameRect.x + gameRect.width) {
@@ -103,11 +118,7 @@ export function handleCoinRainInteractions(
   }
 
   if (internalState === CoinRainState.IDLE) {
-    const isInArea = input.pointer &&
-      input.pointer.x >= gameRect.x && input.pointer.x <= gameRect.x + gameRect.width &&
-      input.pointer.y >= gameRect.y && input.pointer.y <= gameRect.y + gameRect.height;
-
-    if (isInArea && input.clicked && !input.consumed && data.hasToken && channel) {
+    if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed && data.hasToken && channel) {
       internalState = CoinRainState.COUNTDOWN;
       stateStartTime = now;
       fallingItems = [];
@@ -239,14 +250,14 @@ export function handleCoinRainInteractions(
         }
       }
       internalState = CoinRainState.REVEALED;
+      rewardModalStartTime = data.lastTier !== null ? now : 0;
     }
   } else if (internalState === CoinRainState.REVEALED) {
-    const isInArea = input.pointer &&
-      input.pointer.x >= gameRect.x && input.pointer.x <= gameRect.x + gameRect.width &&
-      input.pointer.y >= gameRect.y && input.pointer.y <= gameRect.y + gameRect.height;
+    if (rewardModalStartTime === 0 && data.lastTier !== null) {
+      rewardModalStartTime = now;
+    }
 
-    if (isInArea && input.clicked && !input.consumed) {
-      input.consumed = true;
+    if (shouldOpenBonusTimeRewardModal(rewardModalStartTime, now)) {
       return { type: 'open_modal' as const };
     }
   }

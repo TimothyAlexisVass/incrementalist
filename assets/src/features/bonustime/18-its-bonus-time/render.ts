@@ -6,12 +6,12 @@ import {
   getRevealIndexMap, getItsHoveredIndex, getFinalRevealStartTime
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
-import { drawButton } from "../../../ui/components/button";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, MODAL_BODY_FONT, BONUSTIME_BUTTON_FONT,
-  BONUSTIME_HUGE_BUTTON_FONT, BONUSTIME_BODY_FONT, BONUSTIME_LABEL_FONT
+  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT,
+  BONUSTIME_BODY_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
+import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -32,63 +32,25 @@ export function renderItsBonusTime(
   const centerY = rect.y + rect.height / 2;
 
   if (state === ItsBonusTimeState.IDLE) {
-    // 1. Render beautiful glassmorphic welcome card
-    const cardRect = { x: centerX - 300, y: centerY - 180, width: 600, height: 360 };
-    renderer.drawGlowRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: [122, 90, 240, 255], radius: 24, intensity: 0.35, outerAlpha: 0.3
-    });
-    renderer.drawRect({
-      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: hexToRgba("#1a1438", 0.9)
-    });
-
-    // Draw card borders
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: 2, height: cardRect.height, color: hexToRgba("#ffbe4d", 0.4) });
-    renderer.drawRect({ x: cardRect.x + cardRect.width - 2, y: cardRect.y, width: 2, height: cardRect.height, color: hexToRgba("#ffbe4d", 0.4) });
-    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 2, width: cardRect.width, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
-
-    // Title
-    renderer.drawText({
-      text: "IT'S BONUS TIME!",
-      x: centerX, y: cardRect.y + 50, font: BONUSTIME_TITLE_FONT,
-      color: "#ffbe4d", align: 'center', baseline: 'middle'
-    });
-
-    // Subtitle / Description
-    renderer.drawText({
-      text: "A massive hidden grid of rewards.",
-      x: centerX, y: cardRect.y + 110, font: BONUSTIME_BODY_FONT,
-      color: "#edf2f7", align: 'center', baseline: 'middle'
-    });
-    renderer.drawText({
-      text: "Flip the tiles using your picks to reveal massive coin multipliers.",
-      x: centerX, y: cardRect.y + 140, font: MODAL_BODY_FONT,
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-    renderer.drawText({
-      text: "Your daily streak increases your starting flips.",
-      x: centerX, y: cardRect.y + 165, font: MODAL_BODY_FONT,
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-
-    const dayLabel = pluralize(data.streak, "day");
-    renderer.drawText({
-      text: `Current Streak: ${data.streak} ${dayLabel}`,
-      x: centerX, y: cardRect.y + 205, font: BONUSTIME_BODY_FONT,
-      color: "#52df87", align: 'center', baseline: 'middle'
-    });
-
-    // Play Button
-    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
-    const isOverBtn = pointer &&
-      pointer.x >= btnRect.x && pointer.x <= btnRect.x + btnRect.width &&
-      pointer.y >= btnRect.y && pointer.y <= btnRect.y + btnRect.height;
-
-    drawButton(btnRect, "FLIP THE BOARD", {
-      font: BONUSTIME_BUTTON_FONT,
-      active: !!isOverBtn
+    renderBonusTimeWelcomeCard(renderer, rect, {
+      cardWidth: 600,
+      cardHeight: 360,
+      title: "IT'S BONUS TIME!",
+      bodyLines: [
+        "A massive hidden grid of rewards.",
+        "Flip the tiles using your picks to reveal massive coin multipliers."
+      ],
+      streakText: `Current Streak: ${data.streak} ${pluralize(data.streak, "day")}`,
+      buttonText: "FLIP THE BOARD",
+      titleColor: "#ffbe4d",
+      bodyColor: "#edf2f7",
+      streakColor: "#52df87",
+      accentColor: "#ffbe4d",
+      glowColor: [122, 90, 240, 255],
+      backgroundColor: "#1a1438",
+      buttonActive: !!(pointer &&
+        pointer.x >= centerX - 120 && pointer.x <= centerX + 120 &&
+        pointer.y >= centerY + 70 && pointer.y <= centerY + 120)
     });
 
     return;
@@ -240,7 +202,7 @@ export function renderItsBonusTime(
     const remainingIndicesCount = 128 - flips;
     const allRevealedDuration = 2000 + remainingIndicesCount * 20;
 
-    const remainingMs = Math.max(0, (allRevealedDuration + 5000) - elapsed);
+    const remainingMs = Math.max(0, (allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) - elapsed);
     const remainingSeconds = Math.ceil(remainingMs / 1000);
 
     const bannerWidth = 460;

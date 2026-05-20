@@ -2,6 +2,11 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { RewardLabyrinthData } from "./view-model";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  shouldOpenBonusTimeRewardModal
+} from "../flow";
 
 export enum LabyrinthState {
   IDLE,
@@ -20,6 +25,7 @@ const discoveredChests: { step: number; tier: number; x: number; y: number }[] =
 let incomingDir: 'north' | 'south' | 'east' | 'west' | null = null;
 let claimSent = false;
 let hoveredDirection: 'north' | 'south' | 'east' | 'west' | 'enter' | null = null;
+let rewardModalStartTime = 0;
 
 // PRNG Seed based on game play timestamp to ensure random maze layout each game
 let mazeSeed = 42;
@@ -45,6 +51,7 @@ export function resetLabyrinthState() {
   incomingDir = null;
   claimSent = false;
   hoveredDirection = null;
+  rewardModalStartTime = 0;
   mazeSeed = 42;
 }
 
@@ -119,11 +126,17 @@ export function handleLabyrinthInteractions(
 
   const centerX = gameRect.x + gameRect.width / 2;
   const centerY = gameRect.y + gameRect.height / 2;
+  const welcomeLayout = getBonusTimeWelcomeLayout(gameRect, {
+    cardWidth: 560,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
   if (internalState === LabyrinthState.IDLE) {
-    const cardRectY = centerY - 200;
-    const btnRect = { x: centerX - 120, y: cardRectY + 270, width: 240, height: 50 };
-    const isOverBtn = pointerOverRect(input.pointer, btnRect);
+    const isOverBtn = isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout);
 
     if (isOverBtn) {
       hoveredDirection = 'enter';
@@ -216,14 +229,11 @@ export function handleLabyrinthInteractions(
       // Check if step budget is empty
       if (stepsRemaining <= 0 && internalState === LabyrinthState.PLAYING) {
         internalState = LabyrinthState.FINISHED;
+        rewardModalStartTime = now;
       }
     }
   } else if (internalState === LabyrinthState.FINISHED) {
-    // Finished state shows summary. Clicking the claim button opens the unified modal.
-    const cardRectY = centerY - 200;
-    const closeBtn = { x: centerX - 100, y: cardRectY + 275, width: 200, height: 45 };
-    if (pointerOverRect(input.pointer, closeBtn) && input.clicked && !input.consumed) {
-      input.consumed = true;
+    if (shouldOpenBonusTimeRewardModal(rewardModalStartTime, now)) {
       internalState = LabyrinthState.REVEALED;
       return { type: 'open_modal' as const };
     }

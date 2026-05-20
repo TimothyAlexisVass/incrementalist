@@ -2,6 +2,13 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { playBonusTime } from "../../../net/commands";
 import { CardPickData } from "./view-model";
+import {
+  BONUSTIME_CARD_PICK_BOARD_SIZE,
+  BONUSTIME_REWARD_MODAL_DELAY_MS,
+  getBonusTimeWelcomeLayout,
+  getCardPickInitialPicks,
+  isPointInBonusTimeWelcomeButton
+} from "../flow";
 
 export enum CardPickState {
   IDLE,
@@ -70,16 +77,17 @@ export function handleCardPickInteractions(
 
   const gridStartX = gameRect.x + (gameRect.width - totalGridWidth) / 2;
   const gridStartY = gameRect.y + 100;
+  const welcomeLayout = getBonusTimeWelcomeLayout(gameRect, {
+    cardWidth: 560,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
 
   if (internalState === CardPickState.IDLE) {
-    // Play button location (centered)
-    const centerX = gameRect.x + gameRect.width / 2;
-    const centerY = gameRect.y + gameRect.height / 2;
-    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
-
-    const isOverBtn = pointerOverRect(input.pointer, btnRect);
-
-    if (isOverBtn && input.clicked && !input.consumed && data.hasToken && channel && !claimSent) {
+    if (isPointInBonusTimeWelcomeButton(input.pointer, welcomeLayout) && input.clicked && !input.consumed && data.hasToken && channel && !claimSent) {
       claimSent = true;
       internalState = CardPickState.PLAYING;
       flippedIndices.clear();
@@ -88,7 +96,7 @@ export function handleCardPickInteractions(
       clickedSequence = [];
       remainingIndices = [];
       finalRevealStartTime = 0;
-      currentMaxPicks = 2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7)); // baseline flips!
+      currentMaxPicks = getCardPickInitialPicks(data.streak);
       bonusPhaseStartTime = 0;
 
       if (runCommand) {
@@ -106,7 +114,7 @@ export function handleCardPickInteractions(
 
     // Set initial baseline maximum picks if we loaded back in playing state
     if (currentMaxPicks === 0) {
-      currentMaxPicks = 2 + Math.min(7, Math.floor(Math.max(0, data.streak) / 7));
+      currentMaxPicks = getCardPickInitialPicks(data.streak);
     }
 
     // Track hovered index across all 36 tiles
@@ -154,7 +162,7 @@ export function handleCardPickInteractions(
             finalRevealStartTime = now;
 
             remainingIndices = [];
-            for (let i = 0; i < 36; i++) {
+            for (let i = 0; i < BONUSTIME_CARD_PICK_BOARD_SIZE; i++) {
               if (!flippedIndices.has(i)) {
                 remainingIndices.push(i);
               }
@@ -165,7 +173,7 @@ export function handleCardPickInteractions(
     }
   } else if (internalState === CardPickState.BONUS_PENDING) {
     // Wait 5 seconds after picking before starting shuffle
-    if (now - bonusPhaseStartTime >= 5000) {
+    if (now - bonusPhaseStartTime >= BONUSTIME_REWARD_MODAL_DELAY_MS) {
       internalState = CardPickState.SHUFFLING;
       bonusPhaseStartTime = now;
     }
@@ -195,7 +203,7 @@ export function handleCardPickInteractions(
     }
 
     const allRevealedDuration = 2000 + remainingIndices.length * 30;
-    if (elapsed >= allRevealedDuration + 3000) {
+    if (elapsed >= allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) {
       internalState = CardPickState.REVEALED;
     }
   } else if (internalState === CardPickState.REVEALED) {
@@ -203,10 +211,4 @@ export function handleCardPickInteractions(
   }
 
   return null;
-}
-
-function pointerOverRect(pointer: { x: number; y: number } | null, rect: { x: number; y: number; width: number; height: number }): boolean {
-  return !!(pointer &&
-            pointer.x >= rect.x && pointer.x <= rect.x + rect.width &&
-            pointer.y >= rect.y && pointer.y <= rect.y + rect.height);
 }
