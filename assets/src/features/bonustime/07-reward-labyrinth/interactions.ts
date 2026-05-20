@@ -6,7 +6,6 @@ import { RewardLabyrinthData } from "./view-model";
 export enum LabyrinthState {
   IDLE,
   PLAYING,
-  CHEST_OPENING,
   FINISHED,
   REVEALED
 }
@@ -18,7 +17,6 @@ let stepsRemaining = 0;
 const visitedRooms = new Set<string>();
 let visitedRoomsCount = 1;
 const discoveredChests: { step: number; tier: number; x: number; y: number }[] = [];
-let activeChestOpening: { tier: number; step: number; startTime: number } | null = null;
 let incomingDir: 'north' | 'south' | 'east' | 'west' | null = null;
 let claimSent = false;
 let hoveredDirection: 'north' | 'south' | 'east' | 'west' | 'enter' | null = null;
@@ -31,7 +29,6 @@ export function getCurrentCoords() { return { x: currentX, y: currentY }; }
 export function getStepsRemaining() { return stepsRemaining; }
 export function getVisitedRoomsCount() { return visitedRoomsCount; }
 export function getDiscoveredChests() { return discoveredChests; }
-export function getActiveChestOpening() { return activeChestOpening; }
 export function getIncomingDir() { return incomingDir; }
 export function getHoveredDirection() { return hoveredDirection; }
 export function getMazeSeed() { return mazeSeed; }
@@ -45,7 +42,6 @@ export function resetLabyrinthState() {
   visitedRooms.clear();
   visitedRoomsCount = 1;
   discoveredChests.length = 0;
-  activeChestOpening = null;
   incomingDir = null;
   claimSent = false;
   hoveredDirection = null;
@@ -126,7 +122,7 @@ export function handleLabyrinthInteractions(
 
   if (internalState === LabyrinthState.IDLE) {
     const cardRectY = centerY - 200;
-    const btnRect = { x: centerX - 120, y: cardRectY + 240, width: 240, height: 50 };
+    const btnRect = { x: centerX - 120, y: cardRectY + 270, width: 240, height: 50 };
     const isOverBtn = pointerOverRect(input.pointer, btnRect);
 
     if (isOverBtn) {
@@ -139,7 +135,6 @@ export function handleLabyrinthInteractions(
       visitedRooms.clear();
       visitedRoomsCount = 1;
       discoveredChests.length = 0;
-      activeChestOpening = null;
       incomingDir = null;
       mazeSeed = Math.floor(now) ^ 104297;
 
@@ -183,20 +178,6 @@ export function handleLabyrinthInteractions(
     else if (isEastWalkable && pointerOverRect(input.pointer, eastRect)) hoveredDirection = 'east';
     else if (isWestWalkable && pointerOverRect(input.pointer, westRect)) hoveredDirection = 'west';
 
-    // Finish Run button interaction
-    const finishBtn = { x: centerX - 80, y: centerY + 145, width: 160, height: 35 };
-    const isOverFinish = pointerOverRect(input.pointer, finishBtn);
-
-    if (isOverFinish && input.clicked && !input.consumed) {
-      input.consumed = true;
-      internalState = LabyrinthState.FINISHED;
-      return null;
-    }
-
-    if (isOverFinish) {
-      hoveredDirection = null; // Don't hover maze direction when hovering finish button
-    }
-
     if (hoveredDirection && input.clicked && !input.consumed) {
       const dir = hoveredDirection;
       let nextX = currentX;
@@ -227,14 +208,6 @@ export function handleLabyrinthInteractions(
             x: currentX,
             y: currentY
           });
-
-          // Trigger chest opening cinematic!
-          internalState = LabyrinthState.CHEST_OPENING;
-          activeChestOpening = {
-            tier: matchingChest.tier,
-            step: matchingChest.step,
-            startTime: now
-          };
         }
       }
 
@@ -245,19 +218,10 @@ export function handleLabyrinthInteractions(
         internalState = LabyrinthState.FINISHED;
       }
     }
-  } else if (internalState === LabyrinthState.CHEST_OPENING) {
-    if (activeChestOpening && now - activeChestOpening.startTime >= 2500) {
-      activeChestOpening = null;
-      if (stepsRemaining <= 0) {
-        internalState = LabyrinthState.FINISHED;
-      } else {
-        internalState = LabyrinthState.PLAYING;
-      }
-    }
   } else if (internalState === LabyrinthState.FINISHED) {
-    // Finished state shows summary. Clicking anywhere or clicking claim goes to unified modal.
+    // Finished state shows summary. Clicking the claim button opens the unified modal.
     const cardRectY = centerY - 200;
-    const closeBtn = { x: centerX - 100, y: cardRectY + 255, width: 200, height: 45 };
+    const closeBtn = { x: centerX - 100, y: cardRectY + 275, width: 200, height: 45 };
     if (pointerOverRect(input.pointer, closeBtn) && input.clicked && !input.consumed) {
       input.consumed = true;
       internalState = LabyrinthState.REVEALED;

@@ -67,9 +67,7 @@ defmodule Incrementalist.Game.Constants do
   end
 
   def bonustime_checklist_entries do
-    bonustime_checklist()
-    |> Map.fetch!("entries")
-    |> Enum.map(&Map.fetch!(&1, "tier"))
+    Map.fetch!(bonustime_checklist(), "entries")
   end
 
   def bonustime_slot_ms, do: 43_200_000

@@ -86,21 +86,21 @@
     "grid_columns": 5,
     "grid_rows": 3,
     "entries": [
-      { "tier": 1 },
-      { "tier": 1 },
-      { "tier": 2 },
-      { "tier": 2 },
-      { "tier": 3 },
-      { "tier": 2 },
-      { "tier": 3 },
-      { "tier": 4 },
-      { "tier": 2 },
-      { "tier": 3 },
-      { "tier": 5 },
-      { "tier": 4 },
-      { "tier": 6 },
-      { "tier": 5 },
-      { "tier": 7 }
+      1,
+      1,
+      2,
+      2,
+      3,
+      2,
+      3,
+      4,
+      2,
+      3,
+      5,
+      4,
+      6,
+      5,
+      7
     ]
   },
   "reward_tiers": {
@@ -225,35 +225,30 @@
         "base": 1,
         "streak_divisor": 45,
         "max": 3
-      },
-      "path_wobble_chance": 0.35,
-      "board": {
-        "rows": 12,
-        "lanes": 7,
-        "start_lane": 3,
-        "tier_lanes": {
-          "1": [
-            3
-          ],
-          "2": [
-            2
-          ],
-          "3": [
-            4
-          ],
-          "4": [
-            1
-          ],
-          "5": [
-            5
-          ],
-          "6": [
-            0
-          ],
-          "7": [
-            6
-          ]
+      }
+    },
+    "reward_labyrinth": {
+      "chances": [
+        0.55,
+        0.25,
+        0.12,
+        0.05,
+        0.02,
+        0.009,
+        0.001
+      ],
+      "step_budget": {
+        "base_min": 10,
+        "base_max": 15,
+        "streak_scaling": {
+          "interval": 15,
+          "max_bonus": 20
         }
+      },
+      "chest_count": {
+        "base_min": 1,
+        "base_max": 2,
+        "step_divisor": 7
       }
     },
     "jackpot_meter": {

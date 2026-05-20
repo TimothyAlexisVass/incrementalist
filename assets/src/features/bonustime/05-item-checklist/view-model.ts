@@ -18,7 +18,7 @@ export interface ItemChecklistData {
   lastRewardAmount: BigNum | null;
 }
 
-const CHECKLIST_ENTRIES = bonustimeConfig.checklists.entries as Array<{ tier: number }>;
+const CHECKLIST_ENTRIES = bonustimeConfig.checklists.entries as number[];
 
 function normalizeChecklistEntryIndex(value: unknown, entryCount: number): number {
   const index = typeof value === "number" ? Math.floor(value) : Number(value);
@@ -35,11 +35,11 @@ export function getItemChecklistData(state: ServerState): ItemChecklistData | nu
     CHECKLIST_ENTRIES.length
   );
 
-  const entries: ItemChecklistEntry[] = CHECKLIST_ENTRIES.map((entry, i) => {
+  const entries: ItemChecklistEntry[] = CHECKLIST_ENTRIES.map((tier, i) => {
     return {
       entryIndex: i,
       entryNumber: i + 1,
-      tier: entry.tier,
+      tier,
       completed: i < nextEntryIndex,
       active: i === nextEntryIndex
     };

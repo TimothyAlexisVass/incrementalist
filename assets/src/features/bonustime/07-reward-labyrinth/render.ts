@@ -1,13 +1,13 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
 import { RewardLabyrinthData } from "./view-model";
+import { drawButton } from "../../../ui/components/button";
 import {
   LabyrinthState, getLabyrinthState, getCurrentCoords, getStepsRemaining,
-  getDiscoveredChests, getActiveChestOpening,
-  getIncomingDir, getHoveredDirection, getSymmetricConnections, getMazeSeed, getVisitedRooms
+  getDiscoveredChests, getHoveredDirection, getSymmetricConnections, getMazeSeed, getVisitedRooms
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
-import { drawButton } from "../../../ui/components/button";
+import { pluralize } from "../../../utils/format";
 import {
   BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, BONUSTIME_BUTTON_FONT,
   BONUSTIME_BODY_FONT
@@ -15,6 +15,24 @@ import {
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
+}
+
+function getMaxRewardLabyrinthChestSlots() {
+  const rules = bonusTimeConfig.game_rules.reward_labyrinth as {
+    step_budget: {
+      base_max: number;
+      streak_scaling: {
+        max_bonus: number;
+      };
+    };
+    chest_count: {
+      base_max: number;
+      step_divisor: number;
+    };
+  };
+
+  const maxSteps = rules.step_budget.base_max + rules.step_budget.streak_scaling.max_bonus;
+  return rules.chest_count.base_max + Math.floor(maxSteps / rules.chest_count.step_divisor);
 }
 
 export function renderRewardLabyrinth(
@@ -42,72 +60,47 @@ export function renderRewardLabyrinth(
       height: cardHeight
     };
 
-    // Deep glassmorphic outer panel
     renderer.drawGlowRect({
-      x: cardRect.x,
-      y: cardRect.y,
-      width: cardRect.width,
-      height: cardRect.height,
-      color: to255(hexToRgba("#4FD1C5")), // glowing teal outline
-      intensity: 0.35,
-      radius: 20,
-      innerAlpha: 0.1,
-      outerAlpha: 0.4
+      x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
+      color: [255, 190, 77, 255], radius: 16, intensity: 0.3, outerAlpha: 0.15
     });
     renderer.drawRect({
       x: cardRect.x, y: cardRect.y, width: cardRect.width, height: cardRect.height,
-      color: hexToRgba("#1A202C", 0.95)
+      color: hexToRgba("#120d24", 0.98)
     });
 
-    // Decorative procedural maze border background lines
-    for (let i = 0; i < 4; i++) {
-      const lineOffset = 15 + i * 8;
-      renderer.drawRect({
-        x: cardRect.x + lineOffset, y: cardRect.y + lineOffset, width: cardRect.width - lineOffset * 2, height: 2,
-        color: hexToRgba("#4FD1C5", 0.08)
-      });
-      renderer.drawRect({
-        x: cardRect.x + lineOffset, y: cardRect.y + cardRect.height - lineOffset - 2, width: cardRect.width - lineOffset * 2, height: 2,
-        color: hexToRgba("#4FD1C5", 0.08)
-      });
-    }
+    renderer.drawRect({ x: cardRect.x, y: cardRect.y, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
+    renderer.drawRect({ x: cardRect.x, y: cardRect.y + cardRect.height - 3, width: cardRect.width, height: 3, color: hexToRgba("#ffbe4d", 0.8) });
 
     renderer.drawText({
       text: "REWARD LABYRINTH",
       x: centerX, y: cardRect.y + 60, font: BONUSTIME_TITLE_FONT,
-      color: "#E2E8F0", align: 'center', baseline: 'middle'
+      color: "#ffbe4d", align: 'center', baseline: 'middle'
     });
 
     renderer.drawText({
-      text: "Enter the labyrinth to discover hidden treasures",
+      text: "Navigate a hidden maze of rewards.",
       x: centerX, y: cardRect.y + 130, font: BONUSTIME_BODY_FONT,
-      color: "#A0AEC0", align: 'center', baseline: 'middle'
+      color: "#edf2f7", align: 'center', baseline: 'middle'
     });
 
-    if (data.streak >= 15) {
-      renderer.drawText({
-        text: `Your login streak of ${data.streak} grants bonus steps!`,
-        x: centerX, y: cardRect.y + 175, font: BONUSTIME_BODY_FONT,
-        color: "#4FD1C5", align: 'center', baseline: 'middle'
-      });
-    }
+    const dayLabel = pluralize(data.streak, "day");
+    renderer.drawText({
+      text: `Current Streak: ${data.streak} ${dayLabel}`,
+      x: centerX, y: cardRect.y + 195, font: BONUSTIME_BODY_FONT,
+      color: "#52df87", align: 'center', baseline: 'middle'
+    });
 
-    // Enter button
-    const btnRect = { x: centerX - 120, y: cardRect.y + 240, width: 240, height: 50 };
+    const btnRect = { x: centerX - 120, y: centerY + 70, width: 240, height: 50 };
     const hovered = getHoveredDirection() === 'enter';
     drawButton(btnRect, "ENTER LABYRINTH", {
       font: BONUSTIME_BUTTON_FONT,
       active: hovered,
-      activeSurface: "#319795",
-      inactiveSurface: "#1A202C",
-      activeBorder: "#4FD1C5",
-      inactiveBorder: "#2D3748",
-      textColor: "#ffffff"
     });
   }
 
-  // 2. Main PLAYING exploration / CHEST_OPENING view
-  else if (state === LabyrinthState.PLAYING || state === LabyrinthState.CHEST_OPENING) {
+  // 2. Main PLAYING exploration view
+  else if (state === LabyrinthState.PLAYING) {
     const coords = getCurrentCoords();
     const steps = getStepsRemaining();
     const seed = getMazeSeed();
@@ -317,7 +310,7 @@ export function renderRewardLabyrinth(
     // BOTTOM DISCOVERED CHEST SLOT ROW
     const chests = getDiscoveredChests();
     const inventoryY = rect.y + rect.height - 85;
-    const maxSlots = 5;
+    const maxSlots = getMaxRewardLabyrinthChestSlots();
     const slotSize = 52;
     const slotGap = 15;
     const rowWidth = maxSlots * slotSize + (maxSlots - 1) * slotGap;
@@ -366,77 +359,6 @@ export function renderRewardLabyrinth(
       }
     }
 
-    // Finish Run button (draw only in playing state)
-    if (state === LabyrinthState.PLAYING) {
-      const finishBtn = { x: centerX - 80, y: centerY + 145, width: 160, height: 35 };
-      const hovered = pointer &&
-        pointer.x >= finishBtn.x && pointer.x <= finishBtn.x + finishBtn.width &&
-        pointer.y >= finishBtn.y && pointer.y <= finishBtn.y + finishBtn.height;
-      drawButton(finishBtn, "FINISH RUN", {
-        font: BONUSTIME_BUTTON_FONT,
-        active: !!hovered,
-        activeSurface: "#E53E3E",
-        inactiveSurface: "#1A202C",
-        activeBorder: "#FC8181",
-        inactiveBorder: "#2D3748",
-        textColor: "#ffffff"
-      });
-    }
-
-    // 3. CHEST OPENING CINEMATIC OVERLAY
-    const opening = getActiveChestOpening();
-    if (state === LabyrinthState.CHEST_OPENING && opening) {
-      // Dim background
-      renderer.drawRect({
-        x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-        color: hexToRgba("#0B0C10", 0.75)
-      });
-
-      const tierCfg = getTierConfig(opening.tier);
-      const rColor = tierCfg ? tierCfg.color : "#FFFFFF";
-      const elapsed = now - opening.startTime;
-
-      // Smooth floating floating sine wave
-      const floatY = centerY - 50 + Math.sin(now * 0.005) * 15;
-
-      // Expand ring burst shockwaves
-      if (elapsed < 1200) {
-        const burstRadius = (elapsed / 1200) * 220;
-        const burstAlpha = 1 - (elapsed / 1200);
-        renderer.drawRing(centerX, floatY, burstRadius, 4, hexToRgba(rColor, burstAlpha), 0.1);
-      }
-
-      // Golden aura ray beams
-      const auraPulse = 1.0 + Math.sin(now * 0.01) * 0.1;
-      renderer.drawCircle(centerX, floatY, 80 * auraPulse, hexToRgba(rColor, 0.12));
-      renderer.drawCircle(centerX, floatY, 40 * auraPulse, hexToRgba(rColor, 0.25));
-
-      // Visual Chest Box
-      renderer.drawRect({
-        x: centerX - 35, y: floatY - 35, width: 70, height: 70,
-        color: hexToRgba("#1A202C", 1)
-      });
-      renderer.drawRing(centerX, floatY, 35, 3, hexToRgba(rColor, 1));
-
-      // Glowing text banner
-      renderer.drawText({
-        text: "CHEST DISCOVERED!",
-        x: centerX, y: floatY - 90, font: BONUSTIME_TITLE_FONT,
-        color: "#E2E8F0", align: 'center', baseline: 'middle'
-      });
-
-      renderer.drawText({
-        text: `${tierCfg?.rarity.toUpperCase()} CHEST`,
-        x: centerX, y: floatY + 95, font: BONUSTIME_TITLE_FONT,
-        color: rColor, align: 'center', baseline: 'middle'
-      });
-
-      renderer.drawText({
-        text: `Unlocked on Step ${opening.step}`,
-        x: centerX, y: floatY + 130, font: BONUSTIME_BODY_FONT,
-        color: "#718096", align: 'center', baseline: 'middle'
-      });
-    }
   }
 
   // 3. FINISHED STATE
@@ -469,26 +391,20 @@ export function renderRewardLabyrinth(
 
     renderer.drawText({
       text: "LABYRINTH DONE!",
-      x: centerX, y: cardRect.y + 50, font: BONUSTIME_TITLE_FONT,
+      x: centerX, y: cardRect.y + 60, font: BONUSTIME_TITLE_FONT,
       color: "#D69E2E", align: 'center', baseline: 'middle'
     });
 
-    const chests = getDiscoveredChests();
+    const chests = data.lastResult?.chests ?? [];
 
     renderer.drawText({
-      text: `You have successfully completed exploration.`,
-      x: centerX, y: cardRect.y + 95, font: BONUSTIME_BODY_FONT,
-      color: "#A0AEC0", align: 'center', baseline: 'middle'
-    });
-
-    renderer.drawText({
-      text: `You found ${chests.length} reward chests`,
-      x: centerX, y: cardRect.y + 125, font: BONUSTIME_TITLE_FONT,
+      text: `You found these items:`,
+      x: centerX, y: cardRect.y + 160, font: BONUSTIME_BODY_FONT,
       color: "#E2E8F0", align: 'center', baseline: 'middle'
     });
 
     // Row of discovered chests inside results panel
-    const rowY = cardRect.y + 160;
+    const rowY = cardRect.y + 180;
     const slotSize = 48;
     const slotGap = 12;
     const totalRowWidth = chests.length * slotSize + (chests.length - 1) * slotGap;
@@ -512,17 +428,8 @@ export function renderRewardLabyrinth(
       });
     }
 
-    // Consolation reward note if applicable
-    if (chests.length === 0) {
-      renderer.drawText({
-        text: "+ Tier 1 Consolation Chest Awarded",
-        x: centerX, y: cardRect.y + 225, font: BONUSTIME_BODY_FONT,
-        color: "#A0AEC0", align: 'center', baseline: 'middle'
-      });
-    }
-
     // Claim rewards button
-    const claimBtn = { x: centerX - 100, y: cardRect.y + 255, width: 200, height: 45 };
+    const claimBtn = { x: centerX - 100, y: cardRect.y + 275, width: 200, height: 45 };
     const hovered = pointer &&
       pointer.x >= claimBtn.x && pointer.x <= claimBtn.x + claimBtn.width &&
       pointer.y >= claimBtn.y && pointer.y <= claimBtn.y + claimBtn.height;
