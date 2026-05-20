@@ -1,5 +1,6 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
+import { getRewardTierLabelColor } from "../../../colors";
 import { RewardLabyrinthData } from "./view-model";
 import {
   LabyrinthState, getLabyrinthState, getCurrentCoords, getStepsRemaining,
@@ -229,7 +230,7 @@ export function renderRewardLabyrinth(
             renderer.drawText({
               text: `T${chest.tier}`,
               x: cellX, y: cellY, font: BONUSTIME_BODY_FONT,
-              color: rColor, align: 'center', baseline: 'middle'
+              color: getRewardTierLabelColor(chest.tier), align: 'center', baseline: 'middle'
             });
           } else {
             // Empty explored room center dot
@@ -311,7 +312,7 @@ export function renderRewardLabyrinth(
         renderer.drawText({
           text: `T${chestFound.tier}`,
           x: slotX + slotSize / 2, y: inventoryY + slotSize / 2, font: BONUSTIME_BODY_FONT,
-          color: rColor, align: 'center', baseline: 'middle'
+          color: getRewardTierLabelColor(chestFound.tier), align: 'center', baseline: 'middle'
         });
       } else {
         // Empty slot dashed/dim circle
@@ -393,7 +394,7 @@ export function renderRewardLabyrinth(
       renderer.drawText({
         text: `T${ch.tier}`,
         x: slotX + slotSize / 2, y: rowY + slotSize / 2, font: BONUSTIME_BODY_FONT,
-        color: rColor, align: 'center', baseline: 'middle'
+        color: getRewardTierLabelColor(ch.tier), align: 'center', baseline: 'middle'
       });
     }
 

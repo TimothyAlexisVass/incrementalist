@@ -132,6 +132,8 @@ export const COLORS = Object.freeze({
   }
 } as const);
 
+const BONUS_TIER_1_LABEL_COLOR = "#2d3748";
+
 const CSS_COLOR_VARIABLES = Object.freeze({
   '--app-bg-color': COLORS.app.background,
   '--canvas-border-color': COLORS.app.canvasBorder,
@@ -146,4 +148,17 @@ export function applyCssThemeVariables(root = document.documentElement) {
   for (const [name, value] of Object.entries(CSS_COLOR_VARIABLES)) {
     root.style.setProperty(name, value);
   }
+}
+
+function normalizeBonusTier(tier: number | string): number {
+  if (typeof tier === "number") return tier;
+
+  const tierMatch = tier.match(/^tier_(\d+)$/);
+  if (tierMatch) return Number(tierMatch[1]);
+
+  return Number(tier);
+}
+
+export function getRewardTierLabelColor(tier: number | string): string {
+  return normalizeBonusTier(tier) === 1 ? BONUS_TIER_1_LABEL_COLOR : "#ffffff";
 }

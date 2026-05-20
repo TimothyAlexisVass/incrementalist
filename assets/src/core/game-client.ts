@@ -72,6 +72,7 @@ import { resetItsBonusTimeState } from "../features/bonustime/18-its-bonus-time/
 import { resetCardPickState } from "../features/bonustime/09-card-pick/interactions";
 import { resetLabyrinthState } from "../features/bonustime/07-reward-labyrinth/interactions";
 import { getActiveGameId, getBonusTimeTooltipData } from "../features/bonustime/view-model";
+import { resetMatchPairsState } from "../features/bonustime/13-match-pairs/interactions";
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
@@ -593,6 +594,7 @@ export class GameClient {
           resetItsBonusTimeState();
           resetCardPickState();
           resetLabyrinthState();
+          resetMatchPairsState();
           sceneInput.consumed = true;
         }
       }

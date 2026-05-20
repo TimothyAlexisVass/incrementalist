@@ -42,6 +42,9 @@ import { getCardPickState, CardPickState } from "./09-card-pick/interactions";
 import { renderRewardLabyrinth } from "./07-reward-labyrinth/render";
 import { getRewardLabyrinthData } from "./07-reward-labyrinth/view-model";
 import { getLabyrinthState, LabyrinthState } from "./07-reward-labyrinth/interactions";
+import { renderMatchPairs } from "./13-match-pairs/render";
+import { getMatchPairsData } from "./13-match-pairs/view-model";
+import { getMatchPairsState, MatchPairsState } from "./13-match-pairs/interactions";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -77,7 +80,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
                            (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
                            (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE) ||
-                           (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE);
+                           (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
+                           (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
 
@@ -174,6 +178,11 @@ export function renderBonusTimeOverview(
     const data = getRewardLabyrinthData(state);
     if (data) {
       renderRewardLabyrinth(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "match_pairs") {
+    const data = getMatchPairsData(state);
+    if (data) {
+      renderMatchPairs(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({

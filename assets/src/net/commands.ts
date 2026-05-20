@@ -81,6 +81,21 @@ export function claimCoinRain(channel: GameChannel, path: [number, number][]) {
   });
 }
 
+export function startMatchPairs(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
+    game: "match_pairs",
+    action: "start"
+  });
+}
+
+export function claimMatchPairs(channel: GameChannel, discardedTiers: string[]) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
+    game: "match_pairs",
+    action: "claim",
+    discarded: discardedTiers
+  });
+}
+
 export async function ackAppliedResult(
   channel: GameChannel,
   commandId: number

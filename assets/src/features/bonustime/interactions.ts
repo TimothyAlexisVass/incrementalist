@@ -22,6 +22,8 @@ import { getCardPickData } from "./09-card-pick/view-model";
 import { handleCardPickInteractions, getCardPickState, CardPickState } from "./09-card-pick/interactions";
 import { getRewardLabyrinthData } from "./07-reward-labyrinth/view-model";
 import { handleLabyrinthInteractions, getLabyrinthState, LabyrinthState } from "./07-reward-labyrinth/interactions";
+import { getMatchPairsData } from "./13-match-pairs/view-model";
+import { handleMatchPairsInteractions, getMatchPairsState, MatchPairsState } from "./13-match-pairs/interactions";
 import { GameChannel } from "../../net/game-channel";
 
 export interface BonusTimeInteractionsResult {
@@ -54,7 +56,8 @@ export function handleBonusTimeInteractions(
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
                            (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
                            (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE) ||
-                           (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE);
+                           (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
+                           (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
 
   // Intercept interaction if player is locked out (no tokens)
   if (!hasToken && !isGameInProgress) {
@@ -168,6 +171,15 @@ export function handleBonusTimeInteractions(
     const data = getRewardLabyrinthData(state);
     if (data) {
       const intent = handleLabyrinthInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
+      }
+    }
+  } else if (activeGameId === "match_pairs") {
+    const data = getMatchPairsData(state);
+    if (data) {
+      const intent = handleMatchPairsInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === "open_modal") {
         return { type: "open_chest_reward" };

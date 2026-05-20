@@ -1,5 +1,6 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
+import { getRewardTierLabelColor } from "../../../colors";
 import { CardPickData } from "./view-model";
 import {
   BONUSTIME_CARD_PICK_BOARD_SIZE,
@@ -206,7 +207,7 @@ export function renderCardPick(
         renderer.drawText({
           text: `T${tier}`,
           x: tx + tileSize / 2, y: ty + tileSize / 2,
-          font: "bold 22px 'Outfit'", color: tierColor, align: 'center', baseline: 'middle', alpha
+          font: "bold 22px 'Outfit'", color: getRewardTierLabelColor(tier), align: 'center', baseline: 'middle', alpha
         });
       } else {
         // Render CLOSED state for tile

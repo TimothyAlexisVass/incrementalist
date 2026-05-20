@@ -1,5 +1,6 @@
 import { getActiveWebGLRenderer, RGBA } from "../../../renderer/webgl";
 import { hexToRgba } from "../../../utils";
+import { getRewardTierLabelColor } from "../../../colors";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { ResourceChecklistData } from "./view-model";
 import { getResourceChecklistState, ResourceChecklistState } from "./interactions";
@@ -80,7 +81,7 @@ function drawChecklistEntry(
   const borderThickness = isActive ? 3 : 1;
   const borderAlpha = isActive ? 1 : 0.55;
   const fillAlpha = isActive ? 0.85 + (Math.sin(now / 170) * 0.15) : (isCompleted ? 1 : 0.26);
-  const textColor = entry.tier === 1 ? "#2d3748" : "#ffffff";
+  const textColor = getRewardTierLabelColor(entry.tier);
   const bgColor: RGBA = [27 / 255, 36 / 255, 53 / 255, 1];
   const borderColor: RGBA = [1, 1, 1, borderAlpha];
   const inset = Math.min(borderThickness, Math.floor(boxSize / 2));

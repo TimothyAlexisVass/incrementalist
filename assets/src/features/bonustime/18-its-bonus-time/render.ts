@@ -1,5 +1,6 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, cssToRgba, to255 } from "../../../utils";
+import { hexToRgba, to255 } from "../../../utils";
+import { getRewardTierLabelColor } from "../../../colors";
 import { ItsBonusTimeData } from "./view-model";
 import {
   ItsBonusTimeState, getItsBonusTimeState, getFlippedIndices, getRestFlippedIndices,
@@ -7,8 +8,7 @@ import {
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT,
-  BONUSTIME_BODY_FONT
+  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
 import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeWelcomeCard } from "../flow";
@@ -154,7 +154,7 @@ export function renderItsBonusTime(
         renderer.drawText({
           text: `T${tier}`,
           x: tx + tileSize / 2, y: ty + tileSize / 2,
-          font: "bold 20px 'Outfit'", color: tierColor, align: 'center', baseline: 'middle', alpha
+          font: "bold 20px 'Outfit'", color: getRewardTierLabelColor(tier), align: 'center', baseline: 'middle', alpha
         });
       } else {
         // Render CLOSED state for tile

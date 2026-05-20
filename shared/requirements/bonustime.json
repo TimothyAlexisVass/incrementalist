@@ -289,6 +289,22 @@
         "streak_divisor": 30,
         "streak_max": 5
       }
+    },
+    "match_pairs": {
+      "chances": [
+        0.629581,
+        0.25,
+        0.08,
+        0.03,
+        0.008,
+        0.002,
+        0.000419
+      ],
+      "turn_count": {
+        "base": 4,
+        "streak_divisor": 15,
+        "max_bonus": 6
+      }
     }
   }
 }
