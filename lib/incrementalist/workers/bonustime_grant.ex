@@ -24,9 +24,9 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
   @impl true
   def handle_info(:run_grant, state) do
     Logger.info("Executing BonusTime Token Grant...")
-    
+
     import Ecto.Query
-    
+
     # Efficient bulk update
     Repo.update_all(
       from(s in PlayerState, where: s.has_bonustime_token == false),
@@ -35,13 +35,16 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
 
     # If the new rotation slot is "chest_draw", reset all players' bonustime_flips to 0
     active_game_id = Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
+
     if active_game_id == "chest_draw" do
       Logger.info("Rotation reached Chest Draw. Resetting flips for all players...")
       Repo.update_all(PlayerState, set: [bonustime_flips: 0])
     end
 
     # Broadcast to active players
-    Registry.select(Incrementalist.Game.Session.PlayerRegistry, [{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    Registry.select(Incrementalist.Game.Session.PlayerRegistry, [
+      {{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}
+    ])
     |> Enum.each(fn {_player_id, pid} ->
       send(pid, :bonustime_boundary_reached)
     end)
@@ -57,8 +60,8 @@ defmodule Incrementalist.Workers.BonusTimeGrant do
 
     elapsed = max(0, now - anchor)
     next_boundary_index = div(elapsed, slot_ms) + 1
-    next_boundary_ms = anchor + (next_boundary_index * slot_ms)
-    
+    next_boundary_ms = anchor + next_boundary_index * slot_ms
+
     delay_ms = max(1000, next_boundary_ms - now)
     Process.send_after(self(), :run_grant, delay_ms)
   end

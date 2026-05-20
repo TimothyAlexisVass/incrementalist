@@ -18,11 +18,13 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime do
     scaling = rules["flip_count"]
     bonus_flips = min(scaling["streak_max"], div(streak, scaling["streak_divisor"]))
     flips = 1 + bonustime_flips + bonus_flips
-    flips = max(1, flips) # Ensure at least 1 flip
+    # Ensure at least 1 flip
+    flips = max(1, flips)
 
     # Generate 128 tiles
     # Place exactly one tier_7 tile first
-    u_idx = :rand.uniform(128) - 1 # 0 to 127
+    # 0 to 127
+    u_idx = :rand.uniform(128) - 1
 
     board_tiers =
       Enum.map(0..127, fn idx ->

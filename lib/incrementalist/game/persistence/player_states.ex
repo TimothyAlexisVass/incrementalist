@@ -15,17 +15,24 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
 
   def ensure_state(player_id, now \\ Time.now()) do
     # The unique index on player_id makes this safe on every boot.
-    Repo.insert_all(PlayerState, [%{
-      player_id: player_id,
-      inserted_at: now,
-      updated_at: now
-    }],
+    Repo.insert_all(
+      PlayerState,
+      [
+        %{
+          player_id: player_id,
+          inserted_at: now,
+          updated_at: now
+        }
+      ],
       on_conflict: :nothing,
       conflict_target: [:player_id]
     )
 
     get(player_id) ||
-      (ensure_state(player_id, now); get(player_id))
+      (
+        ensure_state(player_id, now)
+        get(player_id)
+      )
   end
 
   def get(player_id) do
@@ -114,8 +121,16 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
     ps
     |> PlayerState.changeset(%{
       state: projected_state,
-      has_bonustime_token: if(projected_state, do: PlayerState.extract_state_tokens(projected_state), else: ps.has_bonustime_token),
-      bonustime_flips: if(projected_state, do: PlayerState.extract_bonustime_flips(projected_state), else: ps.bonustime_flips),
+      has_bonustime_token:
+        if(projected_state,
+          do: PlayerState.extract_state_tokens(projected_state),
+          else: ps.has_bonustime_token
+        ),
+      bonustime_flips:
+        if(projected_state,
+          do: PlayerState.extract_bonustime_flips(projected_state),
+          else: ps.bonustime_flips
+        ),
       notices: ps.notices,
       last_saved_at: now
     })

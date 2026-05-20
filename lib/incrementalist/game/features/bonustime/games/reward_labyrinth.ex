@@ -14,7 +14,8 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth do
   def roll_reward(streak, _bonustime_flips, _now \\ Time.now()) do
     # 1. Calculate step budget based on streak
     # steps = rand(4, 10) + min(streak / 15, 20)
-    base_steps = :rand.uniform(7) + 3 # 4..10
+    # 4..10
+    base_steps = :rand.uniform(7) + 3
     streak_bonus = min(div(max(0, streak), 15), 20)
     steps_total = base_steps + streak_bonus
 
