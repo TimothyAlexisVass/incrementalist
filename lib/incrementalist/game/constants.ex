@@ -121,12 +121,16 @@ defmodule Incrementalist.Game.Constants do
   def notice_parent_menu_main, do: "parent.menu.main"
   def notice_parent_tab_shop, do: "parent.tab.shop"
   def notice_parent_tab_quest, do: "parent.tab.quest"
+  def notice_parent_tab_quest_main, do: "parent.tab.quest.main"
+  def notice_parent_tab_quest_daily, do: "parent.tab.quest.daily"
   def notice_parent_tab_achievements, do: "parent.tab.achievements"
   def notice_parent_area_dropdown, do: "parent.area.dropdown"
 
   def notice_leaf_area_dropdown_button, do: "leaf.area_dropdown.button"
   def notice_leaf_tab_shop_button, do: "leaf.tab.shop.button"
   def notice_leaf_tab_quest_button, do: "leaf.tab.quest.button"
+  def notice_leaf_tab_quest_main_button, do: "leaf.tab.quest.main.button"
+  def notice_leaf_tab_quest_daily_button, do: "leaf.tab.quest.daily.button"
   def notice_leaf_tab_achievements_button, do: "leaf.tab.achievements.button"
   def notice_leaf_tab_menu_any_button, do: "leaf.tab.menu.any.button"
 

@@ -14,6 +14,8 @@ defmodule Incrementalist.Game.Notices do
   @notice_leaf_area_dropdown_button Constants.notice_leaf_area_dropdown_button()
   @notice_leaf_tab_shop_button Constants.notice_leaf_tab_shop_button()
   @notice_leaf_tab_quest_button Constants.notice_leaf_tab_quest_button()
+  @notice_leaf_tab_quest_main_button Constants.notice_leaf_tab_quest_main_button()
+  @notice_leaf_tab_quest_daily_button Constants.notice_leaf_tab_quest_daily_button()
   @notice_leaf_tab_achievements_button Constants.notice_leaf_tab_achievements_button()
   @notice_leaf_tab_menu_any_button Constants.notice_leaf_tab_menu_any_button()
 
@@ -89,6 +91,8 @@ defmodule Incrementalist.Game.Notices do
           Constants.notice_leaf_area_dropdown_button(),
           Constants.notice_leaf_tab_shop_button(),
           Constants.notice_leaf_tab_quest_button(),
+          Constants.notice_leaf_tab_quest_main_button(),
+          Constants.notice_leaf_tab_quest_daily_button(),
           Constants.notice_leaf_tab_achievements_button(),
           Constants.notice_leaf_tab_menu_any_button()
         ]
@@ -322,8 +326,8 @@ defmodule Incrementalist.Game.Notices do
       {:shop_item, _item_id} ->
         [Constants.notice_parent_tab_shop(), Constants.notice_parent_menu_main()]
 
-      {:quest, _quest_id} ->
-        [Constants.notice_parent_tab_quest(), Constants.notice_parent_menu_main()]
+      {:quest, quest_id} ->
+        quest_notice_parent_ids(quest_id)
 
       {:achievement, _achievement_id} ->
         [Constants.notice_parent_tab_achievements(), Constants.notice_parent_menu_main()]
@@ -341,6 +345,8 @@ defmodule Incrementalist.Game.Notices do
       when static_id in [
              @notice_leaf_tab_shop_button,
              @notice_leaf_tab_quest_button,
+             @notice_leaf_tab_quest_main_button,
+             @notice_leaf_tab_quest_daily_button,
              @notice_leaf_tab_achievements_button,
              @notice_leaf_tab_menu_any_button
            ] ->
@@ -414,6 +420,8 @@ defmodule Incrementalist.Game.Notices do
         Constants.notice_leaf_area_dropdown_button(),
         Constants.notice_leaf_tab_shop_button(),
         Constants.notice_leaf_tab_quest_button(),
+        Constants.notice_leaf_tab_quest_main_button(),
+        Constants.notice_leaf_tab_quest_daily_button(),
         Constants.notice_leaf_tab_achievements_button(),
         Constants.notice_leaf_tab_menu_any_button()
       ] ->
@@ -430,6 +438,27 @@ defmodule Incrementalist.Game.Notices do
       "sisu_generator" -> state.features.sisu_generator_purchased
       "bonus_time" -> state.features.bonus_time_purchased
       _ -> false
+    end
+  end
+
+  defp quest_notice_parent_ids(quest_id) do
+    case Map.get(Constants.quest_defs(), quest_id) do
+      %{category: :daily} ->
+        [
+          Constants.notice_parent_tab_quest_daily(),
+          Constants.notice_parent_tab_quest(),
+          Constants.notice_parent_menu_main()
+        ]
+
+      %{category: :main} ->
+        [
+          Constants.notice_parent_tab_quest_main(),
+          Constants.notice_parent_tab_quest(),
+          Constants.notice_parent_menu_main()
+        ]
+
+      _ ->
+        [Constants.notice_parent_tab_quest(), Constants.notice_parent_menu_main()]
     end
   end
 

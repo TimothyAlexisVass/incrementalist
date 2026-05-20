@@ -1,6 +1,7 @@
 defmodule Incrementalist.Game.NoticesTest do
   use ExUnit.Case, async: true
 
+  alias Incrementalist.Game.Features.Quests.Rules
   alias Incrementalist.Game.{Constants, Notices, State}
 
   test "showing a sage tip marks it seen and prevents sage guidance from reactivating after area switch" do
@@ -37,5 +38,22 @@ defmodule Incrementalist.Game.NoticesTest do
 
     refute "leaf.area.sage.go_button" in after_area_switch.active_leaf_ids
     refute Constants.notice_parent_area_dropdown() in after_area_switch.active_parent_ids
+  end
+
+  test "quest notices split main and daily sub tabs" do
+    state =
+      State.new()
+      |> Map.put(:level, 50)
+      |> then(fn state -> %{state | bonustime: %{state.bonustime | streak: 2}} end)
+      |> Rules.evaluate()
+
+    notices = Notices.new(state)
+
+    assert Notices.valid_leaf_id?(Constants.notice_leaf_tab_quest_main_button())
+    assert Notices.valid_leaf_id?(Constants.notice_leaf_tab_quest_daily_button())
+
+    assert Constants.notice_parent_tab_quest_main() in notices.active_parent_ids
+    assert Constants.notice_parent_tab_quest_daily() in notices.active_parent_ids
+    assert Constants.notice_parent_tab_quest() in notices.active_parent_ids
   end
 end

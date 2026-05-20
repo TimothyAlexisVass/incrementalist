@@ -91,6 +91,8 @@ export class Notices {
     if (leafId === NOTICE_LEAF_AREA_DROPDOWN_BUTTON) return NOTICE_PARENT_AREA_DROPDOWN;
     if (leafId === NOTICE_LEAF_TAB_SHOP_BUTTON) return NOTICE_PARENT_MENU_MAIN;
     if (leafId === NOTICE_LEAF_TAB_QUEST_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    if (leafId === NOTICE_LEAF_TAB_QUEST_MAIN_BUTTON) return NOTICE_PARENT_MENU_MAIN;
+    if (leafId === NOTICE_LEAF_TAB_QUEST_DAILY_BUTTON) return NOTICE_PARENT_MENU_MAIN;
     if (leafId === NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON) return NOTICE_PARENT_MENU_MAIN;
     if (leafId === NOTICE_LEAF_TAB_MENU_ANY_BUTTON) return NOTICE_PARENT_MENU_MAIN;
 
@@ -110,9 +112,13 @@ export const NOTICE_PARENT_AREA_DROPDOWN = "parent.area.dropdown";
 export const NOTICE_PARENT_MENU_MAIN = "parent.menu.main";
 export const NOTICE_PARENT_TAB_SHOP = "parent.tab.shop";
 export const NOTICE_PARENT_TAB_QUEST = "parent.tab.quest";
+export const NOTICE_PARENT_TAB_QUEST_MAIN = "parent.tab.quest.main";
+export const NOTICE_PARENT_TAB_QUEST_DAILY = "parent.tab.quest.daily";
 export const NOTICE_PARENT_TAB_ACHIEVEMENTS = "parent.tab.achievements";
 export const NOTICE_LEAF_AREA_DROPDOWN_BUTTON = "leaf.area_dropdown.button";
 export const NOTICE_LEAF_TAB_SHOP_BUTTON = "leaf.tab.shop.button";
 export const NOTICE_LEAF_TAB_QUEST_BUTTON = "leaf.tab.quest.button";
+export const NOTICE_LEAF_TAB_QUEST_MAIN_BUTTON = "leaf.tab.quest.main.button";
+export const NOTICE_LEAF_TAB_QUEST_DAILY_BUTTON = "leaf.tab.quest.daily.button";
 export const NOTICE_LEAF_TAB_ACHIEVEMENTS_BUTTON = "leaf.tab.achievements.button";
 export const NOTICE_LEAF_TAB_MENU_ANY_BUTTON = "leaf.tab.menu.any.button";

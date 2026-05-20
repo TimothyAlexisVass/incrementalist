@@ -23,6 +23,12 @@ import {
   TOP_HUD_EXP_FONT,
   QUEST_FAME_BAR_TRUST_GAP
 } from '../../../../../config';
+import {
+  NOTICE_LEAF_TAB_QUEST_DAILY_BUTTON,
+  NOTICE_LEAF_TAB_QUEST_MAIN_BUTTON,
+  NOTICE_PARENT_TAB_QUEST_DAILY,
+  NOTICE_PARENT_TAB_QUEST_MAIN
+} from '../../../../managers/notices';
 
 const CARD_HEIGHT_PX = 92;
 const CARD_GAP_PX = 12;
@@ -59,7 +65,8 @@ export function renderQuestsTab(
     drawFameBar(snapshot, rect);
   }
   const viewModel = getQuestViewModel(state);
-  getQuestSubTabs(viewModel).render(canvas, input, state, rect);
+  const { channel, runCommand } = getNetwork();
+  getQuestSubTabs(viewModel).render(canvas, input, state, rect, channel || undefined, runCommand || undefined);
 }
 
 function getQuestSubTabs(viewModel: any): TabMenu {
@@ -68,6 +75,8 @@ function getQuestSubTabs(viewModel: any): TabMenu {
       {
         id: 'main',
         label: 'Main',
+        noticeParentId: NOTICE_PARENT_TAB_QUEST_MAIN,
+        noticeLeafId: NOTICE_LEAF_TAB_QUEST_MAIN_BUTTON,
         renderContent: (_canvas, input, state, rect) => {
           const vm = getQuestViewModel(state);
           renderQuestList(input, rect, vm.mainQuests, 'main');
@@ -76,6 +85,8 @@ function getQuestSubTabs(viewModel: any): TabMenu {
       {
         id: 'daily',
         label: 'Daily',
+        noticeParentId: NOTICE_PARENT_TAB_QUEST_DAILY,
+        noticeLeafId: NOTICE_LEAF_TAB_QUEST_DAILY_BUTTON,
         renderContent: (_canvas, input, state, rect) => {
           const vm = getQuestViewModel(state);
           renderQuestList(input, rect, vm.dailyQuests, 'daily');
