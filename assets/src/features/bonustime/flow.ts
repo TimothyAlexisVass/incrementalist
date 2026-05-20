@@ -70,7 +70,7 @@ export interface BonusTimeRewardCountdownBannerOptions {
 }
 
 const BONUS_TIME_CONFIG = bonustimeConfig as {
-  reward_modal_delay_ms?: number;
+  reward_modal_delay_ms: number;
   game_rules: {
     card_pick?: {
       board_size?: number;
@@ -83,7 +83,7 @@ const BONUS_TIME_CONFIG = bonustimeConfig as {
   };
 };
 
-export const BONUSTIME_REWARD_MODAL_DELAY_MS = BONUS_TIME_CONFIG.reward_modal_delay_ms ?? 5000;
+export const BONUSTIME_REWARD_MODAL_DELAY_MS = BONUS_TIME_CONFIG.reward_modal_delay_ms;
 export const BONUSTIME_CARD_PICK_BOARD_SIZE = BONUS_TIME_CONFIG.game_rules.card_pick?.board_size ?? 36;
 
 export function getCardPickInitialPicks(streak: number): number {
@@ -299,4 +299,62 @@ export function renderBonusTimeRewardCountdownBanner(
     align: "center",
     baseline: "middle"
   });
+}
+
+export interface BonusTimeRewardCountdownRingOptions {
+  centerX: number;
+  centerY: number;
+  remainingMs: number;
+  totalMs: number;
+  radius?: number;
+  thickness?: number;
+  backgroundColor?: string;
+  trackColor?: string;
+  fillColor?: string;
+}
+
+export function renderBonusTimeRewardCountdownRing(
+  renderer: BonusTimeRenderer,
+  options: BonusTimeRewardCountdownRingOptions
+): void {
+  const totalMs = Math.max(1, options.totalMs);
+  const remainingMs = Math.max(0, Math.min(options.remainingMs, totalMs));
+  const progress = remainingMs / totalMs;
+  const radius = options.radius ?? 18;
+  const thickness = options.thickness ?? 4;
+  const backgroundColor = options.backgroundColor ?? "#0b1220";
+  const trackColor = options.trackColor ?? "#2d3748";
+  const fillColor = options.fillColor ?? "#52df87";
+  const outerRadius = radius + thickness + 4;
+
+  renderer.drawCircle(
+    options.centerX,
+    options.centerY,
+    outerRadius,
+    hexToRgba(backgroundColor, 0.9),
+    0.16
+  );
+  renderer.drawRing(
+    options.centerX,
+    options.centerY,
+    radius,
+    thickness,
+    hexToRgba(trackColor, 0.55),
+    0.12
+  );
+
+  if (progress > 0.001) {
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + (Math.PI * 2 * progress);
+    renderer.drawArc(
+      options.centerX,
+      options.centerY,
+      radius,
+      thickness,
+      startAngle,
+      endAngle,
+      hexToRgba(fillColor, 0.98),
+      0.12
+    );
+  }
 }

@@ -20,6 +20,7 @@ let rollStartTime = 0;
 let rewardModalStartTime = 0;
 
 export function getJackpotState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetJackpotState() {
   internalState = JackpotState.IDLE;
   rollStartTime = 0;

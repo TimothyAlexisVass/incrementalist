@@ -131,13 +131,6 @@ export function renderCoinRain(
       color: "#edf2f7",
       align: 'center', baseline: 'middle'
     });
-    renderer.drawText({
-      text: "Revealing reward...",
-      x: centerX, y: centerY + 20,
-      font: COIN_RAIN_TIMER_FONT,
-      color: CAUGHT_LABEL_COLOR,
-      align: 'center', baseline: 'middle'
-    });
   } else if (state === CoinRainState.REVEALED && data.lastTier) {
     const tierColor = getTierColor(data.lastTier);
     const tierName = (bonusTimeConfig.reward_tiers as any)[`tier_${data.lastTier}`]?.rarity || "Unknown";

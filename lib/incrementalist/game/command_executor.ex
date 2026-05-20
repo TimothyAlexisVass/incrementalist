@@ -630,12 +630,20 @@ defmodule Incrementalist.Game.CommandExecutor do
                     rolled_results,
                     discarded
                   )
+                reward_tiers =
+                  Incrementalist.Game.Features.BonusTime.Games.MatchPairs.claim_reward_tiers(
+                    completed_matches
+                  )
+                reward_tier =
+                  Incrementalist.Game.Features.BonusTime.Games.MatchPairs.claim_reward_tier(
+                    completed_matches
+                  )
 
                 # Apply rewards for each completed match
                 {next_state, reward_amount} =
-                  Enum.reduce(completed_matches, {ps.state, BigNum.zero()}, fn tier,
-                                                                               {state_acc,
-                                                                                amount_acc} ->
+                  Enum.reduce(reward_tiers, {ps.state, BigNum.zero()}, fn tier,
+                                                                          {state_acc,
+                                                                           amount_acc} ->
                     {next_state_acc, amt} =
                       Incrementalist.Game.Rewards.grant_bonus_reward(state_acc, tier)
 
@@ -648,8 +656,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                 bonustime = next_state.bonustime
 
                 new_reward_counts =
-                  Enum.reduce(completed_matches, bonustime.reward_counts, fn tier, acc ->
-                    Map.update(acc, tier, 1, &(&1 + 1))
+                  Enum.reduce(reward_tiers, bonustime.reward_counts, fn tier, acc ->
+                    Map.update(acc, "tier_#{tier}", 1, &(&1 + 1))
                   end)
 
                 last_result =
@@ -657,6 +665,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                     "game_id" => game_id,
                     "completed_matches" => completed_matches,
                     "discarded_tiers" => discarded,
+                    "tier" => reward_tier,
                     "reward_amount" => reward_amount,
                     "token_type" => token_type,
                     "played_at" => Time.iso8601(now)

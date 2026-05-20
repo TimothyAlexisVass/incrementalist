@@ -2,6 +2,23 @@ import { InteractionState } from "../../../ui/managers/interactions";
 import { GameChannel } from "../../../net/game-channel";
 import { startMatchPairs, claimMatchPairs } from "../../../net/commands";
 import { MatchPairsData } from "./view-model";
+import { BONUSTIME_REWARD_MODAL_DELAY_MS } from "../flow";
+
+export interface MatchPairsGridLayout {
+  cols: number;
+  rows: number;
+  tileSize: number;
+  gap: number;
+  totalGridWidth: number;
+  totalGridHeight: number;
+  gridStartX: number;
+  gridStartY: number;
+}
+
+const MATCH_PAIRS_COLS = 8;
+const MATCH_PAIRS_ROWS = 6;
+const MATCH_PAIRS_GAP_RATIO = 0.16;
+const MATCH_PAIRS_BOARD_PADDING_PX = 24;
 
 export enum MatchPairsState {
   IDLE,
@@ -9,13 +26,14 @@ export enum MatchPairsState {
   REVEAL_PAUSE,
   MATCH_PAUSE,
   MISS_PAUSE,
-  CONSOLATION,
+  FINAL_REVEAL,
   REVEALED
 }
 
 let internalState = MatchPairsState.IDLE;
 const known = new Map<number, string>(); // index -> tier (e.g. "tier_1")
 const matched = new Set<number>();
+const restFlippedIndices = new Set<number>();
 let discarded: string[] = []; // array of tiers
 
 let currentTurn = 0;
@@ -23,27 +41,64 @@ let firstClickIndex: number | null = null;
 let secondClickIndex: number | null = null;
 
 let pauseStartTime = 0;
+let finalRevealStartTime = 0;
+let remainingIndices: number[] = [];
 let hoveredIndex: number | null = null;
 let isMatchAnimation = false;
 
 export function getMatchPairsState() { return internalState; }
 export function getKnown() { return known; }
 export function getMatched() { return matched; }
+export function getRestFlippedIndices() { return restFlippedIndices; }
 export function getDiscarded() { return discarded; }
 export function getFirstClickIndex() { return firstClickIndex; }
 export function getSecondClickIndex() { return secondClickIndex; }
 export function getHoveredIndex() { return hoveredIndex; }
 export function isMatchAnim() { return isMatchAnimation; }
+export function getFinalRevealStartTime() { return finalRevealStartTime; }
+export function getRemainingIndices() { return remainingIndices; }
+export function getMatchPairsGridLayout(gameRect: { x: number; y: number; width: number; height: number }): MatchPairsGridLayout {
+  const innerWidth = Math.max(1, gameRect.width - (MATCH_PAIRS_BOARD_PADDING_PX * 2));
+  const innerHeight = Math.max(1, gameRect.height - (MATCH_PAIRS_BOARD_PADDING_PX * 2));
+  const widthFactor = MATCH_PAIRS_COLS + ((MATCH_PAIRS_COLS - 1) * MATCH_PAIRS_GAP_RATIO);
+  const heightFactor = MATCH_PAIRS_ROWS + ((MATCH_PAIRS_ROWS - 1) * MATCH_PAIRS_GAP_RATIO);
+
+  let tileSize = Math.max(1, Math.floor(Math.min(innerWidth / widthFactor, innerHeight / heightFactor)));
+  let gap = Math.max(1, Math.floor(tileSize * MATCH_PAIRS_GAP_RATIO));
+  let totalGridWidth = (MATCH_PAIRS_COLS * tileSize) + ((MATCH_PAIRS_COLS - 1) * gap);
+  let totalGridHeight = (MATCH_PAIRS_ROWS * tileSize) + ((MATCH_PAIRS_ROWS - 1) * gap);
+
+  while ((totalGridWidth > innerWidth || totalGridHeight > innerHeight) && tileSize > 1) {
+    tileSize -= 1;
+    gap = Math.max(1, Math.floor(tileSize * MATCH_PAIRS_GAP_RATIO));
+    totalGridWidth = (MATCH_PAIRS_COLS * tileSize) + ((MATCH_PAIRS_COLS - 1) * gap);
+    totalGridHeight = (MATCH_PAIRS_ROWS * tileSize) + ((MATCH_PAIRS_ROWS - 1) * gap);
+  }
+
+  return {
+    cols: MATCH_PAIRS_COLS,
+    rows: MATCH_PAIRS_ROWS,
+    tileSize,
+    gap,
+    totalGridWidth,
+    totalGridHeight,
+    gridStartX: gameRect.x + ((gameRect.width - totalGridWidth) / 2),
+    gridStartY: gameRect.y + ((gameRect.height - totalGridHeight) / 2)
+  };
+}
 
 export function resetMatchPairsState() {
   internalState = MatchPairsState.IDLE;
   known.clear();
   matched.clear();
+  restFlippedIndices.clear();
   discarded = [];
   currentTurn = 0;
   firstClickIndex = null;
   secondClickIndex = null;
   pauseStartTime = 0;
+  finalRevealStartTime = 0;
+  remainingIndices = [];
   hoveredIndex = null;
   isMatchAnimation = false;
 }
@@ -114,16 +169,7 @@ export function handleMatchPairsInteractions(
   const now = performance.now();
   hoveredIndex = null;
 
-  // Grid layout: 6 rows, 8 cols
-  const cols = 8;
-  const rows = 6;
-  const tileSize = 60;
-  const gap = 10;
-  const totalGridWidth = cols * tileSize + (cols - 1) * gap;
-  const totalGridHeight = rows * tileSize + (rows - 1) * gap;
-
-  const gridStartX = gameRect.x + (gameRect.width - totalGridWidth) / 2;
-  const gridStartY = gameRect.y + 70;
+  const { cols, rows, tileSize, gap, gridStartX, gridStartY } = getMatchPairsGridLayout(gameRect);
 
   if (internalState === MatchPairsState.IDLE) {
     const centerX = gameRect.x + gameRect.width / 2;
@@ -230,22 +276,37 @@ export function handleMatchPairsInteractions(
 
       const results = data.lastResult?.results || [];
       if (currentTurn >= results.length) {
-        internalState = MatchPairsState.CONSOLATION;
-        pauseStartTime = now;
+        internalState = MatchPairsState.FINAL_REVEAL;
+        finalRevealStartTime = now;
+        remainingIndices = [];
+
+        for (let i = 0; i < MATCH_PAIRS_COLS * MATCH_PAIRS_ROWS; i++) {
+          if (!matched.has(i)) {
+            remainingIndices.push(i);
+          }
+        }
       } else {
         internalState = MatchPairsState.PLAYING;
       }
     }
-  } else if (internalState === MatchPairsState.CONSOLATION) {
-    if (now - pauseStartTime >= 1000) {
-      internalState = MatchPairsState.REVEALED;
-      
-      // Auto-reveal the rest of the board for visual consolation
-      for (let i = 0; i < 48; i++) {
-        if (!known.has(i)) {
-          known.set(i, getFillerTier(null));
+  } else if (internalState === MatchPairsState.FINAL_REVEAL) {
+    const elapsed = now - finalRevealStartTime;
+    const elapsedSinceFlipStart = elapsed - 2000;
+    const tilesToFlip = Math.max(0, Math.floor(elapsedSinceFlipStart / 20));
+
+    for (let i = 0; i < remainingIndices.length; i++) {
+      const idx = remainingIndices[i];
+      if (i < tilesToFlip) {
+        restFlippedIndices.add(idx);
+        if (!known.has(idx)) {
+          known.set(idx, getFillerTier(null));
         }
       }
+    }
+
+    const allRevealedDuration = 2000 + remainingIndices.length * 20;
+    if (elapsed >= allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) {
+      internalState = MatchPairsState.REVEALED;
 
       if (channel) {
         if (runCommand) {

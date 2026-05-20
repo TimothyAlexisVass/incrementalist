@@ -58,6 +58,7 @@ let bucketPath: [number, number][] = [];
 let rewardModalStartTime = 0;
 
 export function getCoinRainState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetCoinRainState() {
   internalState = CoinRainState.IDLE;
   fallingItems = [];

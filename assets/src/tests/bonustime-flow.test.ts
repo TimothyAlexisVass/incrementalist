@@ -5,6 +5,18 @@ import {
   getBonusTimeWelcomeLayout
 } from "../features/bonustime/flow";
 import {
+  MatchPairsState,
+  getFinalRevealStartTime,
+  getKnown,
+  getMatchPairsGridLayout,
+  getMatchPairsState,
+  getRemainingIndices,
+  getRestFlippedIndices,
+  handleMatchPairsInteractions,
+  resetMatchPairsState
+} from "../features/bonustime/13-match-pairs/interactions";
+import { type MatchPairsData } from "../features/bonustime/13-match-pairs/view-model";
+import {
   ChestState,
   getChestState,
   handleChestDrawInteractions,
@@ -72,6 +84,19 @@ function directionPointer(
   if (direction === "south") return { x: centerX, y: mapCenterY + offset };
   if (direction === "east") return { x: centerX + offset, y: mapCenterY };
   return { x: centerX - offset, y: mapCenterY };
+}
+
+function matchPairsTileCenter(
+  layout: ReturnType<typeof getMatchPairsGridLayout>,
+  index: number
+): Point {
+  const col = index % layout.cols;
+  const row = Math.floor(index / layout.cols);
+
+  return {
+    x: layout.gridStartX + (col * (layout.tileSize + layout.gap)) + (layout.tileSize / 2),
+    y: layout.gridStartY + (row * (layout.tileSize + layout.gap)) + (layout.tileSize / 2)
+  };
 }
 
 function runChestDrawFlow() {
@@ -192,9 +217,107 @@ function runRewardLabyrinthFlow() {
   assert(getLabyrinthState() === LabyrinthState.REVEALED, "Reward Labyrinth should enter REVEALED once the modal is ready");
 }
 
+function runMatchPairsFlow() {
+  resetMatchPairsState();
+  setClock(0);
+
+  let queuedCommands = 0;
+  const runCommand = (_cmd: () => Promise<any>) => {
+    queuedCommands += 1;
+  };
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 560,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
+  const gridLayout = getMatchPairsGridLayout(rect);
+  const data: MatchPairsData = {
+    hasToken: true,
+    streak: 0,
+    lastResult: undefined
+  };
+
+  const startResult = handleMatchPairsInteractions(
+    makeInput(centerOf(welcomeLayout.buttonRect), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(startResult === null, "Match Pairs should not open the modal on the start click");
+  assert(getMatchPairsState() === MatchPairsState.PLAYING, "Match Pairs should enter PLAYING after the start click");
+  assert(queuedCommands === 1, "Match Pairs should queue one start command");
+
+  data.lastResult = {
+    results: [{ kind: "match", tier: "tier_2" }],
+    token_type: "daily",
+    started_at: "2026-01-01T00:00:00Z"
+  };
+
+  handleMatchPairsInteractions(
+    makeInput(matchPairsTileCenter(gridLayout, 0), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  handleMatchPairsInteractions(
+    makeInput(matchPairsTileCenter(gridLayout, 1), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(getMatchPairsState() === MatchPairsState.MATCH_PAUSE, "Match Pairs should pause after the second click");
+
+  setClock(820);
+  handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+
+  assert(getMatchPairsState() === MatchPairsState.FINAL_REVEAL, "Match Pairs should enter FINAL_REVEAL after the turn limit is reached");
+
+  const revealStart = getFinalRevealStartTime();
+  const remainingIndices = getRemainingIndices();
+  assert(remainingIndices.length === 46, "Match Pairs should reveal every non-matched slot at the end");
+
+  setClock(revealStart + 2019);
+  handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(!getKnown().has(2), "Match Pairs should not reveal the next slot before 20 ms elapses");
+
+  setClock(revealStart + 2020);
+  handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(getKnown().has(2), "Match Pairs should reveal one additional slot every 20 ms");
+  assert(getRestFlippedIndices().has(2), "Match Pairs should track the revealed end-state slot");
+
+  const totalRevealDuration = 2000 + remainingIndices.length * 20;
+
+  setClock(revealStart + totalRevealDuration - 1);
+  const beforeConfirm = handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(beforeConfirm === null, "Match Pairs should keep waiting before the confirmation countdown ends");
+  assert(getMatchPairsState() === MatchPairsState.FINAL_REVEAL, "Match Pairs should stay in FINAL_REVEAL until confirmation");
+  assert(queuedCommands === 1, "Match Pairs should not claim before the confirmation countdown ends");
+
+  setClock(revealStart + totalRevealDuration + BONUSTIME_REWARD_MODAL_DELAY_MS);
+  const confirmResult = handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(confirmResult === null, "Match Pairs should transition to REVEALED before opening the modal");
+  assert(getMatchPairsState() === MatchPairsState.REVEALED, "Match Pairs should enter REVEALED after confirmation");
+  assert(Number(queuedCommands) === 2, "Match Pairs should queue the claim command after the reveal countdown");
+
+  const afterModal = handleMatchPairsInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(afterModal?.type === "open_modal", "Match Pairs should open the reward modal after confirmation");
+}
+
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
+  runMatchPairsFlow();
   console.log("bonustime flow tests passed");
 }
 
@@ -206,4 +329,3 @@ try {
     value: originalPerformanceNow
   });
 }
-

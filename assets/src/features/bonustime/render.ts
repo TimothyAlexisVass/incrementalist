@@ -10,41 +10,41 @@ import { renderRewardModal, RewardModalState } from "../../ui/components/modals/
 import { getActiveGameId, getActiveGameName, getTimeUntilNextTokenMs } from "./view-model";
 import { renderChestDraw } from "./01-chest-draw/render";
 import { getChestDrawData } from "./01-chest-draw/view-model";
+import { getChestState, ChestState, getRewardWaitStartedAt as getChestRewardWaitStartedAt } from "./01-chest-draw/interactions";
 import { renderPrizeWheel } from "./02-prize-wheel/render";
 import { getPrizeWheelData } from "./02-prize-wheel/view-model";
+import { getWheelState, WheelState, getRewardWaitStartedAt as getWheelRewardWaitStartedAt } from "./02-prize-wheel/interactions";
+import { renderResourceChecklist } from "./03-resource-checklist/render";
+import { getResourceChecklistData } from "./03-resource-checklist/view-model";
+import { getResourceChecklistState, ResourceChecklistState, getRewardWaitStartedAt as getResourceChecklistRewardWaitStartedAt } from "./03-resource-checklist/interactions";
 import { resolveUpdatingText } from "../../utils/text";
 import { drawButton } from "../../ui/components/button";
 import { InteractionState } from "../../ui/managers/interactions";
-
-import { getChestState, ChestState } from "./01-chest-draw/interactions";
-import { getWheelState, WheelState } from "./02-prize-wheel/interactions";
-import { renderResourceChecklist } from "./03-resource-checklist/render";
-import { getResourceChecklistData } from "./03-resource-checklist/view-model";
-import { getResourceChecklistState, ResourceChecklistState } from "./03-resource-checklist/interactions";
 import { renderItemChecklist } from "./05-item-checklist/render";
 import { getItemChecklistData } from "./05-item-checklist/view-model";
-import { getItemChecklistState, ItemChecklistState } from "./05-item-checklist/interactions";
+import { getItemChecklistState, ItemChecklistState, getRewardWaitStartedAt as getItemChecklistRewardWaitStartedAt } from "./05-item-checklist/interactions";
 import { renderPlinkoDrop } from "./15-plinko-drop/render";
 import { getPlinkoDropData } from "./15-plinko-drop/view-model";
-import { getPlinkoState, PlinkoState } from "./15-plinko-drop/interactions";
+import { getPlinkoState, PlinkoState, getRewardWaitStartedAt as getPlinkoRewardWaitStartedAt } from "./15-plinko-drop/interactions";
 import { renderJackpotMeter } from "./jackpot-meter/render";
 import { getJackpotMeterData } from "./jackpot-meter/view-model";
-import { getJackpotState, JackpotState } from "./jackpot-meter/interactions";
+import { getJackpotState, JackpotState, getRewardWaitStartedAt as getJackpotRewardWaitStartedAt } from "./jackpot-meter/interactions";
 import { renderCoinRain } from "./04-coin-rain/render";
 import { getCoinRainData } from "./04-coin-rain/view-model";
-import { getCoinRainState, CoinRainState } from "./04-coin-rain/interactions";
+import { getCoinRainState, CoinRainState, getRewardWaitStartedAt as getCoinRainRewardWaitStartedAt } from "./04-coin-rain/interactions";
 import { renderItsBonusTime } from "./18-its-bonus-time/render";
 import { getItsBonusTimeData } from "./18-its-bonus-time/view-model";
-import { getItsBonusTimeState, ItsBonusTimeState } from "./18-its-bonus-time/interactions";
+import { getItsBonusTimeState, ItsBonusTimeState, getFinalRevealStartTime as getItsBonusTimeFinalRevealStartTime, getRemainingIndices as getItsBonusTimeRemainingIndices } from "./18-its-bonus-time/interactions";
 import { renderCardPick } from "./09-card-pick/render";
 import { getCardPickData } from "./09-card-pick/view-model";
-import { getCardPickState, CardPickState } from "./09-card-pick/interactions";
+import { getCardPickState, CardPickState, getFinalRevealStartTime as getCardPickFinalRevealStartTime, getRemainingIndices as getCardPickRemainingIndices, getBonusPhaseStartTime as getCardPickBonusPhaseStartTime } from "./09-card-pick/interactions";
 import { renderRewardLabyrinth } from "./07-reward-labyrinth/render";
 import { getRewardLabyrinthData } from "./07-reward-labyrinth/view-model";
-import { getLabyrinthState, LabyrinthState } from "./07-reward-labyrinth/interactions";
+import { getLabyrinthState, LabyrinthState, getRewardWaitStartedAt as getLabyrinthRewardWaitStartedAt } from "./07-reward-labyrinth/interactions";
 import { renderMatchPairs } from "./13-match-pairs/render";
 import { getMatchPairsData } from "./13-match-pairs/view-model";
-import { getMatchPairsState, MatchPairsState } from "./13-match-pairs/interactions";
+import { getMatchPairsState, MatchPairsState, getFinalRevealStartTime as getMatchPairsFinalRevealStartTime, getRemainingIndices as getMatchPairsRemainingIndices } from "./13-match-pairs/interactions";
+import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeRewardCountdownRing } from "./flow";
 
 export function renderBonusTimeOverview(
   canvas: HTMLCanvasElement,
@@ -84,6 +84,7 @@ export function renderBonusTimeOverview(
                            (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
+  const now = performance.now();
 
   if (!hasToken && !isGameInProgress) {
     // Render the unified global cooldown screen instead of the active game!
@@ -196,9 +197,117 @@ export function renderBonusTimeOverview(
     });
   }
 
+  if (!(activeRewardModal && activeRewardModal.open)) {
+    renderActiveRewardCountdownOverlay(renderer, activeGameId, now);
+  }
+
   // Reward Modal
   if (activeRewardModal && activeRewardModal.open) {
     renderRewardModal(canvas, activeRewardModal);
+  }
+}
+
+function renderActiveRewardCountdownOverlay(
+  renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
+  activeGameId: string,
+  now: number
+) {
+  const ringCenterX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - 34;
+  const ringCenterY = DISPLAY_AREA_Y + 34;
+
+  const drawRing = (
+    remainingMs: number,
+    totalMs: number,
+    fillColor: string,
+    trackColor = "#2d3748",
+    backgroundColor = "#0b1220"
+  ) => {
+    renderBonusTimeRewardCountdownRing(renderer, {
+      centerX: ringCenterX,
+      centerY: ringCenterY,
+      remainingMs,
+      totalMs,
+      radius: 16,
+      thickness: 4,
+      backgroundColor,
+      trackColor,
+      fillColor
+    });
+  };
+
+  if (activeGameId === "chest_draw") {
+    const startedAt = getChestRewardWaitStartedAt();
+    if (getChestState() === ChestState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "prize_wheel") {
+    const startedAt = getWheelRewardWaitStartedAt();
+    if (getWheelState() === WheelState.SPUN && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "resource_checklist") {
+    const startedAt = getResourceChecklistRewardWaitStartedAt();
+    if (getResourceChecklistState() === ResourceChecklistState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "item_checklist") {
+    const startedAt = getItemChecklistRewardWaitStartedAt();
+    if (getItemChecklistState() === ItemChecklistState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "plinko_drop") {
+    const startedAt = getPlinkoRewardWaitStartedAt();
+    if (getPlinkoState() === PlinkoState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "jackpot_meter") {
+    const startedAt = getJackpotRewardWaitStartedAt();
+    if (getJackpotState() === JackpotState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "coin_rain") {
+    const startedAt = getCoinRainRewardWaitStartedAt();
+    if (getCoinRainState() === CoinRainState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "reward_labyrinth") {
+    const startedAt = getLabyrinthRewardWaitStartedAt();
+    if (getLabyrinthState() === LabyrinthState.FINISHED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
+    }
+  } else if (activeGameId === "card_pick") {
+    const state = getCardPickState();
+    if (state === CardPickState.BONUS_PENDING) {
+      const startedAt = getCardPickBonusPhaseStartTime();
+      if (startedAt > 0) {
+        drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#ffbe4d", "#6b4a12", "#120d24");
+      }
+    } else if (state === CardPickState.FINAL_REVEAL) {
+      const startedAt = getCardPickFinalRevealStartTime();
+      const revealMs = 2000 + (getCardPickRemainingIndices().length * 30);
+      const totalMs = revealMs + BONUSTIME_REWARD_MODAL_DELAY_MS;
+      if (startedAt > 0) {
+        drawRing(totalMs - (now - startedAt), totalMs, "#52df87");
+      }
+    }
+  } else if (activeGameId === "its_bonus_time") {
+    if (getItsBonusTimeState() === ItsBonusTimeState.FINAL_REVEAL) {
+      const revealMs = 2000 + (getItsBonusTimeRemainingIndices().length * 20);
+      const totalMs = revealMs + BONUSTIME_REWARD_MODAL_DELAY_MS;
+      const finalRevealStartTime = getItsBonusTimeFinalRevealStartTime();
+      if (finalRevealStartTime > 0) {
+        drawRing(totalMs - (now - finalRevealStartTime), totalMs, "#52df87");
+      }
+    }
+  } else if (activeGameId === "match_pairs") {
+    if (getMatchPairsState() === MatchPairsState.FINAL_REVEAL) {
+      const revealMs = 2000 + (getMatchPairsRemainingIndices().length * 20);
+      const totalMs = revealMs + BONUSTIME_REWARD_MODAL_DELAY_MS;
+      const finalRevealStartTime = getMatchPairsFinalRevealStartTime();
+      if (finalRevealStartTime > 0) {
+        drawRing(totalMs - (now - finalRevealStartTime), totalMs, "#52df87");
+      }
+    }
   }
 }
 

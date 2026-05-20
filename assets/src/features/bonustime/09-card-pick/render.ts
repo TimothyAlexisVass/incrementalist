@@ -4,19 +4,15 @@ import { getRewardTierLabelColor } from "../../../colors";
 import { CardPickData } from "./view-model";
 import {
   BONUSTIME_CARD_PICK_BOARD_SIZE,
-  BONUSTIME_REWARD_MODAL_DELAY_MS,
   getCardPickInitialPicks,
   renderBonusTimeWelcomeCard
 } from "../flow";
 import {
   CardPickState, getCardPickState, getFlippedIndices, getRestFlippedIndices,
-  getRevealIndexMap, getCardPickHoveredIndex, getFinalRevealStartTime,
-  getCurrentMaxPicks, getBonusPhaseStartTime
+  getRevealIndexMap, getCardPickHoveredIndex, getCurrentMaxPicks, getBonusPhaseStartTime
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
-import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT
-} from "../../../config";
+import { BONUSTIME_TITLE_FONT } from "../../../config";
 import { pluralize } from "../../../utils/format";
 
 function getTierConfig(tier: number) {
@@ -87,23 +83,11 @@ export function renderCardPick(
     ? (getCurrentMaxPicks() || getCardPickInitialPicks(data.streak))
     : (getCurrentMaxPicks() || flips);
 
-  const picksMade = Math.min(currentMaxPicks, Array.from(flippedIndices).filter(idx => revealMap.has(idx)).length);
-  const picksLeft = Math.max(0, currentMaxPicks - picksMade);
-
   // Status indicators at the top of display area
   renderer.drawText({
     text: "CARD PICK",
     x: rect.x + 40, y: rect.y + 40, font: BONUSTIME_TITLE_FONT,
     color: "#ffbe4d", align: 'left', baseline: 'middle'
-  });
-
-  const picksText = picksLeft > 0
-    ? `Pick ${picksLeft} ${picksLeft === currentMaxPicks ? '' : 'more '}${pluralize(picksLeft, 'card')}`
-    : '';
-  renderer.drawText({
-    text: picksText,
-    x: rect.x + rect.width - 40, y: rect.y + 40, font: BONUSTIME_TIMER_FONT,
-    color: picksLeft > 0 ? "#52df87" : "#ff5b8f", align: 'right', baseline: 'middle'
   });
 
   // 6x6 Grid rendering
@@ -249,80 +233,4 @@ export function renderCardPick(
     }
   }
 
-  // 3. Render gorgeous gold bonus count down overlay if in BONUS_PENDING state
-  if (state === CardPickState.BONUS_PENDING) {
-    const elapsed = now - getBonusPhaseStartTime();
-    const remainingMs = Math.max(0, BONUSTIME_REWARD_MODAL_DELAY_MS - elapsed);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-
-    const bannerWidth = 460;
-    const bannerHeight = 80;
-    const bannerX = centerX - bannerWidth / 2;
-    const bannerY = gridStartY + totalGridHeight + 20;
-
-    renderer.drawGlowRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: [255, 190, 77, 255], radius: 12, intensity: 0.45, outerAlpha: 0.25
-    });
-
-    renderer.drawRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: hexToRgba("#1c140a", 0.95)
-    });
-
-    renderer.drawRect({ x: bannerX, y: bannerY, width: bannerWidth, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
-    renderer.drawRect({ x: bannerX, y: bannerY + bannerHeight - 2, width: bannerWidth, height: 2, color: hexToRgba("#ffbe4d", 0.8) });
-
-    renderer.drawText({
-      text: "YOU GOT A BONUS PICK!",
-      x: centerX, y: bannerY + 28, font: "bold 15px Arial",
-      color: "#ffbe4d", align: 'center', baseline: 'middle'
-    });
-
-    renderer.drawText({
-      text: `Shuffling cards in ${remainingSeconds}s...`,
-      x: centerX, y: bannerY + 54, font: "13px Arial",
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-  }
-
-  // 4. Render final countdown overlay if in FINAL_REVEAL state
-  if (state === CardPickState.FINAL_REVEAL) {
-    const elapsed = now - getFinalRevealStartTime();
-    const remainingIndicesCount = BONUSTIME_CARD_PICK_BOARD_SIZE - flips;
-    const allRevealedDuration = 2000 + remainingIndicesCount * 30;
-
-    const remainingMs = Math.max(0, (allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) - elapsed);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-
-    const bannerWidth = 460;
-    const bannerHeight = 80;
-    const bannerX = centerX - bannerWidth / 2;
-    const bannerY = gridStartY + totalGridHeight + 20;
-
-    renderer.drawGlowRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: [82, 223, 135, 255], radius: 12, intensity: 0.45, outerAlpha: 0.25
-    });
-
-    renderer.drawRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: hexToRgba("#0b1a13", 0.95)
-    });
-
-    renderer.drawRect({ x: bannerX, y: bannerY, width: bannerWidth, height: 2, color: hexToRgba("#52df87", 0.8) });
-    renderer.drawRect({ x: bannerX, y: bannerY + bannerHeight - 2, width: bannerWidth, height: 2, color: hexToRgba("#52df87", 0.8) });
-
-    renderer.drawText({
-      text: "ALL REWARDS REVEALED!",
-      x: centerX, y: bannerY + 28, font: "bold 15px Arial",
-      color: "#52df87", align: 'center', baseline: 'middle'
-    });
-
-    renderer.drawText({
-      text: `Collecting rewards in ${remainingSeconds}s...`,
-      x: centerX, y: bannerY + 54, font: "13px Arial",
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-  }
 }

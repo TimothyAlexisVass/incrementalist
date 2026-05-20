@@ -20,6 +20,7 @@ let revealStartTime = 0;
 let rewardModalStartTime = 0;
 
 export function getChestState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetChestState() {
   internalState = ChestState.IDLE;
   revealStartTime = 0;

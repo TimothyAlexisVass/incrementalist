@@ -4,14 +4,14 @@ import { getRewardTierLabelColor } from "../../../colors";
 import { ItsBonusTimeData } from "./view-model";
 import {
   ItsBonusTimeState, getItsBonusTimeState, getFlippedIndices, getRestFlippedIndices,
-  getRevealIndexMap, getItsHoveredIndex, getFinalRevealStartTime
+  getRevealIndexMap, getItsHoveredIndex
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT
+  BONUSTIME_TITLE_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
-import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeWelcomeCard } from "../flow";
+import { renderBonusTimeWelcomeCard } from "../flow";
 
 function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
@@ -72,24 +72,11 @@ export function renderItsBonusTime(
   const revealMap = getRevealIndexMap();
   const hoveredIdx = getItsHoveredIndex();
 
-  const picksMade = Math.min(flips, Array.from(flippedIndices).filter(idx => revealMap.has(idx)).length);
-  const picksLeft = Math.max(0, flips - picksMade);
-
   // Status indicators at the top of display area
   renderer.drawText({
     text: "IT'S BONUS TIME!",
     x: rect.x + 40, y: rect.y + 40, font: BONUSTIME_TITLE_FONT,
     color: "#ffbe4d", align: 'left', baseline: 'middle'
-  });
-
-  // Single line Picks Text replacement:
-  const picksText = picksLeft > 0
-    ? `Flip ${picksLeft} ${picksLeft === flips ? '' : 'more '}${pluralize(picksLeft, 'tile')}`
-    : '';
-  renderer.drawText({
-    text: picksText,
-    x: rect.x + rect.width - 40, y: rect.y + 40, font: BONUSTIME_TIMER_FONT,
-    color: picksLeft > 0 ? "#52df87" : "#ff5b8f", align: 'right', baseline: 'middle'
   });
 
   // 16x8 Grid rendering (Exactly 128 positions, no positions skipped)
@@ -196,43 +183,4 @@ export function renderItsBonusTime(
     }
   }
 
-  // 3. Render final countdown overlay if in FINAL_REVEAL state
-  if (state === ItsBonusTimeState.FINAL_REVEAL) {
-    const elapsed = now - getFinalRevealStartTime();
-    const remainingIndicesCount = 128 - flips;
-    const allRevealedDuration = 2000 + remainingIndicesCount * 20;
-
-    const remainingMs = Math.max(0, (allRevealedDuration + BONUSTIME_REWARD_MODAL_DELAY_MS) - elapsed);
-    const remainingSeconds = Math.ceil(remainingMs / 1000);
-
-    const bannerWidth = 460;
-    const bannerHeight = 80;
-    const bannerX = centerX - bannerWidth / 2;
-    const bannerY = gridStartY + totalGridHeight + 10;
-
-    renderer.drawGlowRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: [82, 223, 135, 255], radius: 12, intensity: 0.45, outerAlpha: 0.25
-    });
-
-    renderer.drawRect({
-      x: bannerX, y: bannerY, width: bannerWidth, height: bannerHeight,
-      color: hexToRgba("#0b1a13", 0.95)
-    });
-
-    renderer.drawRect({ x: bannerX, y: bannerY, width: bannerWidth, height: 2, color: hexToRgba("#52df87", 0.8) });
-    renderer.drawRect({ x: bannerX, y: bannerY + bannerHeight - 2, width: bannerWidth, height: 2, color: hexToRgba("#52df87", 0.8) });
-
-    renderer.drawText({
-      text: "ALL REWARDS REVEALED!",
-      x: centerX, y: bannerY + 28, font: "bold 15px Arial",
-      color: "#52df87", align: 'center', baseline: 'middle'
-    });
-
-    renderer.drawText({
-      text: `Collecting rewards in ${remainingSeconds}s...`,
-      x: centerX, y: bannerY + 54, font: "13px Arial",
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
-  }
 }

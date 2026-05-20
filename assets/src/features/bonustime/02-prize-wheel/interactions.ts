@@ -20,6 +20,7 @@ let spinStartTime = 0;
 let rewardModalStartTime = 0;
 
 export function getWheelState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetWheelState() {
   internalState = WheelState.IDLE;
   spinStartTime = 0;

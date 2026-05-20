@@ -32,6 +32,10 @@ export function getPlinkoState() {
   return internalState;
 }
 
+export function getRewardWaitStartedAt() {
+  return rewardModalStartTime;
+}
+
 export function isPlinkoWaitingForResult() {
   return waitingForResult;
 }

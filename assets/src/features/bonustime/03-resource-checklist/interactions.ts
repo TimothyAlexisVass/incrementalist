@@ -24,6 +24,7 @@ let pendingEntryIndex = -1;
 let rewardModalStartTime = 0;
 
 export function getResourceChecklistState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetResourceChecklistState() {
   internalState = ResourceChecklistState.IDLE;
   pendingEntryIndex = -1;

@@ -3,13 +3,14 @@ import { hexToRgba, to255 } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { MatchPairsData } from "./view-model";
 import {
-  MatchPairsState, getMatchPairsState, getKnown, getMatched, getDiscarded,
-  getFirstClickIndex, getSecondClickIndex, getHoveredIndex, isMatchAnim
+  MatchPairsState, getMatchPairsState, getKnown, getMatched, getMatchPairsGridLayout,
+  getFirstClickIndex, getSecondClickIndex, getHoveredIndex, isMatchAnim,
+  getRestFlippedIndices
 } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { drawButton } from "../../../ui/components/button";
 import {
-  BONUSTIME_TITLE_FONT, BONUSTIME_TIMER_FONT, BONUSTIME_BUTTON_FONT,
+  BONUSTIME_TITLE_FONT, BONUSTIME_BUTTON_FONT,
   BONUSTIME_BODY_FONT
 } from "../../../config";
 import { pluralize } from "../../../utils/format";
@@ -26,10 +27,12 @@ export function renderMatchPairs(
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
 
+  const now = performance.now();
   const centerX = rect.x + rect.width / 2;
   const centerY = rect.y + rect.height / 2;
 
   const state = getMatchPairsState();
+  const { cols, rows, tileSize, gap, gridStartX, gridStartY, totalGridHeight } = getMatchPairsGridLayout(rect);
 
   // 1. Render IDLE welcome view
   if (state === MatchPairsState.IDLE) {
@@ -87,28 +90,12 @@ export function renderMatchPairs(
     return;
   }
 
-  // Header Title
-  renderer.drawText({
-    text: "MATCH PAIRS",
-    x: rect.x + 40, y: rect.y + 40, font: BONUSTIME_TITLE_FONT,
-    color: "#52df87", align: 'left', baseline: 'middle'
-  });
-
   const known = getKnown();
   const matched = getMatched();
+  const restFlippedIndices = getRestFlippedIndices();
   const firstClick = getFirstClickIndex();
   const secondClick = getSecondClickIndex();
   const hoveredIdx = getHoveredIndex();
-
-  const cols = 8;
-  const rows = 6;
-  const tileSize = 60;
-  const gap = 10;
-  const totalGridWidth = cols * tileSize + (cols - 1) * gap;
-  const totalGridHeight = rows * tileSize + (rows - 1) * gap;
-
-  const gridStartX = rect.x + (rect.width - totalGridWidth) / 2;
-  const gridStartY = rect.y + 70;
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -119,7 +106,8 @@ export function renderMatchPairs(
       const isFirst = idx === firstClick;
       const isSecond = idx === secondClick;
       const isMatched = matched.has(idx);
-      const isFlipped = isFirst || isSecond || isMatched || state === MatchPairsState.CONSOLATION || state === MatchPairsState.REVEALED;
+      const isRestFlipped = restFlippedIndices.has(idx);
+      const isFlipped = isFirst || isSecond || isMatched || isRestFlipped || state === MatchPairsState.REVEALED;
 
       if (isFlipped && known.has(idx)) {
         const tier = known.get(idx)!;
@@ -130,7 +118,7 @@ export function renderMatchPairs(
         const isCurrentlyMatching = isMatchAnim() && (isFirst || isSecond);
         const activeHighlight = isMatched || isCurrentlyMatching;
 
-        const alpha = (state === MatchPairsState.CONSOLATION || state === MatchPairsState.REVEALED) && !isMatched ? 0.4 : 1.0;
+        const alpha = (state === MatchPairsState.FINAL_REVEAL || state === MatchPairsState.REVEALED) && !isMatched ? 0.35 : 1.0;
 
         renderer.drawGlowRect({
           x: tx, y: ty, width: tileSize, height: tileSize,
@@ -152,10 +140,11 @@ export function renderMatchPairs(
 
         // Symbol
         const symbolText = tier.replace("tier_", "T");
+        const symbolFontSize = Math.max(26, Math.round(tileSize * 0.35));
         renderer.drawText({
           text: symbolText,
           x: tx + tileSize / 2, y: ty + tileSize / 2,
-          font: "bold 26px 'Outfit'", color: getRewardTierLabelColor(tier), align: 'center', baseline: 'middle', alpha
+          font: `bold ${symbolFontSize}px 'Outfit'`, color: getRewardTierLabelColor(tier), align: 'center', baseline: 'middle', alpha
         });
 
       } else {
@@ -185,16 +174,6 @@ export function renderMatchPairs(
         renderer.drawRect({ x: tx - offset, y: ty - offset + drawSize - 1.5, width: drawSize, height: 1.5, color: hexToRgba(borderColor, 0.8) });
       }
     }
-  }
-
-  // Render discarded items count
-  const discarded = getDiscarded();
-  if (discarded.length > 0) {
-    renderer.drawText({
-      text: `${discarded.length} Discarded Match(es)`,
-      x: centerX, y: rect.y + rect.height - 30, font: "bold 14px Arial",
-      color: "#ff5b8f", align: 'center', baseline: 'middle'
-    });
   }
 
   if (state === MatchPairsState.REVEALED) {

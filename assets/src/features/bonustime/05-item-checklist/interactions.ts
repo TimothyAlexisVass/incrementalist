@@ -24,6 +24,7 @@ let pendingEntryIndex = -1;
 let rewardModalStartTime = 0;
 
 export function getItemChecklistState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function resetItemChecklistState() {
   internalState = ItemChecklistState.IDLE;
   pendingEntryIndex = -1;

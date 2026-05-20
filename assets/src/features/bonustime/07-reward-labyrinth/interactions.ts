@@ -31,6 +31,7 @@ let rewardModalStartTime = 0;
 let mazeSeed = 42;
 
 export function getLabyrinthState() { return internalState; }
+export function getRewardWaitStartedAt() { return rewardModalStartTime; }
 export function getCurrentCoords() { return { x: currentX, y: currentY }; }
 export function getStepsRemaining() { return stepsRemaining; }
 export function getVisitedRoomsCount() { return visitedRoomsCount; }

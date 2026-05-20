@@ -39,6 +39,21 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.MatchPairs do
     completed_matches
   end
 
+  def claim_reward_tiers(completed_matches) do
+    completed_matches
+    |> Enum.map(&tier_index/1)
+    |> case do
+      [] -> [1]
+      tiers -> tiers
+    end
+  end
+
+  def claim_reward_tier(completed_matches) do
+    completed_matches
+    |> claim_reward_tiers()
+    |> Enum.max()
+  end
+
   defp subtract_lists(base_list, to_remove) do
     Enum.reduce(to_remove, base_list, fn item, acc ->
       delete_first(acc, item)
@@ -64,9 +79,18 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.MatchPairs do
         else
           {:cont, {new_acc, idx + 1}}
         end
-      end)
+    end)
 
     # 1-indexed tier
     "tier_#{index + 1}"
   end
+
+  defp tier_index("tier_" <> rest) do
+    case Integer.parse(rest) do
+      {tier, ""} when tier >= 1 and tier <= 7 -> tier
+      _ -> 1
+    end
+  end
+
+  defp tier_index(_), do: 1
 end

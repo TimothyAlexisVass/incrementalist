@@ -2,7 +2,7 @@
   {
     "id": "idle_mode",
     "name": "Idle Mode",
-    "description": "Allows you to claim rewards automatically, but slowly!",
+    "description": "Allows you to claim rewards automatically!",
     "cost": {
       "m": 5,
       "e": 2
@@ -13,7 +13,7 @@
   {
     "id": "sisu_generator",
     "name": "Sisu Generator",
-    "description": "Refill Sisu and upgrade Max Sisu!",
+    "description": "Multiply your progress bar fill speed!",
     "cost": {
       "m": 2,
       "e": 3
@@ -24,7 +24,7 @@
   {
     "id": "bonus_time",
     "name": "BONUSTIME",
-    "description": "Play BonusTime games when a BonusTime token is ready!",
+    "description": "Play Bonustime games and win daily prizes!",
     "cost": {
       "m": 1,
       "e": 3
