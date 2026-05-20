@@ -19,7 +19,7 @@ defmodule Incrementalist.Game.ConstantsTest do
              %{
                id: "idle_mode",
                name: "Idle Mode",
-               description: "Allows you to claim rewards automatically, but slowly!",
+               description: "Allows you to claim rewards automatically!",
                cost: %BigNum{m: 5.0, e: 2},
                currency: :coins,
                required_level: 2
@@ -27,7 +27,7 @@ defmodule Incrementalist.Game.ConstantsTest do
              %{
                id: "sisu_generator",
                name: "Sisu Generator",
-               description: "Refill Sisu and upgrade Max Sisu!",
+               description: "Multiply your progress bar fill speed!",
                cost: %BigNum{m: 2.0, e: 3},
                currency: :coins,
                required_level: 4
@@ -35,7 +35,7 @@ defmodule Incrementalist.Game.ConstantsTest do
              %{
                id: "bonus_time",
                name: "BONUSTIME",
-               description: "Play BonusTime games when a BonusTime token is ready!",
+               description: "Play Bonustime games and win daily prizes!",
                cost: %BigNum{m: 1.0, e: 3},
                currency: :shards,
                required_level: 15
