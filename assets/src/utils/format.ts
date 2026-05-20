@@ -66,7 +66,7 @@ export function formatBigNum(value: BigNum): string {
 }
 
 /**
- * Legacy support for numbers, or for values that are guaranteed to be small.
+ * Support numbers directly, or values that are guaranteed to be small.
  */
 export function formatNumber(value: number | BigNum, fallback = 0): string {
   if (typeof value === 'object' && 'm' in value && 'e' in value) {

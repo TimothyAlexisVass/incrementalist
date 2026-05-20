@@ -7,7 +7,7 @@ defmodule Incrementalist.Game.Features.Progress.SisuTest do
 
   @now ~U[2026-05-04 12:00:00Z]
 
-  test "upgrade costs are migrated from the legacy table" do
+  test "upgrade costs" do
     assert Sisu.upgrade_cost(1) == BigNum.from_number(2_500)
     assert Sisu.upgrade_cost(13) == BigNum.from_number(15_000_000)
   end

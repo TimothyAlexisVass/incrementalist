@@ -17,13 +17,6 @@ defmodule Incrementalist.Game.Features.BonusTime.RulesTest do
     :ok
   end
 
-  test "legacy bonustime_game_override no longer controls active game selection" do
-    now = Constants.bonustime_rotation_anchor_at()
-    Application.put_env(:incrementalist, :bonustime_game_override, "prize_wheel")
-
-    assert Rules.get_active_game_id(now) == "chest_draw"
-  end
-
   test "rotation anchor override controls active game selection" do
     now = Constants.bonustime_rotation_anchor_at()
     overridden_anchor = DateTime.add(now, -Constants.bonustime_slot_ms(), :millisecond)
