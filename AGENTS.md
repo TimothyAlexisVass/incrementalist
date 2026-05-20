@@ -35,7 +35,6 @@ The server owns truth. The client owns projection, rendering, input, and reversi
 
 ## Forbidden Client Authority
 Client-side truth is forbidden for reward grants, claim eligibility, purchases, unlocks, level-ups, quest completion, achievement completion, daily bonus outcomes, gameplay RNG, hidden card or board outcomes, and durable save state. LocalStorage may only hold harmless preferences, anonymous identity tokens, and non-authoritative cached gameplay snapshots. It must never store command ids, queue position, reward eligibility, hidden outcomes, or anything that can authorize durable gameplay transitions.
-Legacy client-local save-file code remains only as migration reference under `legacy/`; do not extend that model into the active `assets/src/` client.
 
 ## Hidden outcomes Contract (Showing Card pick Bonus game as example)
 The client must never receive hidden outcomes. Store selected indexes as UI intent only. The server validates the picked count against server-owned session phase and calculates reveal outcomes only when the reveal command is processed. Snapshots and responses may include only information the player is allowed to know.
@@ -93,6 +92,3 @@ For Canvas/WebGL text that changes over time, do not swap text directly in ad-ho
 
 ## Testing Expectations
 Add backend rule tests for any gameplay logic moved or introduced. Add frontend tests for protocol handling, projection state machines, and hit testing when practical. For hidden-information features, especially Card Pick, add tests that prove unrevealed outcomes are never serialized to the client.
-
-## Legacy Migration
-Refer to `plans/migrate_from_legacy_to_canvas_elixir.md` before porting features. Do not turn `legacy/game/game.js` into a new monolith. Port one feature at a time, keeping server rules and frontend presentation separate. Use `legacy/` as the behavioral specification and preserve exact player-visible functionality.
