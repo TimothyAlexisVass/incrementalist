@@ -8,10 +8,9 @@
 1. **Timing Meter**: A horizontal power meter constantly sweeps back and forth between a minimum floor and $100\%$.
 2. **Smashes**: The player gets **2 normal smashes**.
 3. **Interactive Strike**: 
-   - The player timing-clicks the `Smash` button to lock a value on the sweeping meter.
-   - To simulate a physics swing, the server rolls a random variance multiplier between $30\%$ and $200\%$ ($0.3$ and $2.0$) applied to the click timing.
-   - The final power of a single smash is:
-     $$\text{power} = \min\left(100\%, \text{click\_value} \times \text{variance}\right)$$
+   - The player timing-clicks the `Smash` button while the meter is moving.
+   - To simulate a physical swing delay, once clicked, the meter continues moving along its sweep path for a random additional distance between $30\%$ and $200\%$ of a full sweep before stopping.
+   - The stopped meter position determines the power of that smash.
 4. **Striker Accumulation**: The average power of the two normal smashes determines how high the marker rises on the striker pole:
    $$\text{pole\_height} = \min\left(100\%, \frac{\text{smash\_1\_power}}{2} + \frac{\text{smash\_2\_power}}{2}\right)$$
 5. **Bell Strike (Extra Smash)**:
@@ -76,10 +75,10 @@ The WebGL striker tower is laid out vertically:
   - `collected_rewards`: List of rewards.
 - **Actions**:
   - `start_session(streak)`: Computes the minimum floor parameter and starts in a neutral state.
-  - `submit_smash(client_time_value)`: 
-    - Validates that timing is within valid bounds.
-    - Rolls a physics timing variance between $0.3$ and $2.0$.
-    - Computes power: $\min(100\%, \text{client\_time\_value} \times \text{variance})$.
+  - `submit_smash(client_click_value, sweep_direction)`: 
+    - Validates that the click value is within valid bounds.
+    - Rolls a random overshoot distance between $30\%$ and $200\%$ of a full sweep.
+    - Computes power based on where the meter stops after moving the overshoot distance in the current sweep direction (bouncing off boundaries at the minimum floor and $100\%$).
     - If `smash_count == 0`: records `smash_1_power`.
     - If `smash_count == 1`: records `smash_2_power`, calculates final `pole_height`. If `pole_height == 100\%`, activates extra bell phase.
     - If `smash_count == 2` (extra bell phase): records `extra_smash_power` and maps the bell shatter tier.

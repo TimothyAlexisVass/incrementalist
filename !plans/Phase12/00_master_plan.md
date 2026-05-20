@@ -21,7 +21,7 @@ All games are evaluated and served within the 12-hour rotation boundaries (`00:0
 | :---: | --- | --- | --- |
 | **6** | Hammer Smash | Volatility Choice | Interactive timing bar + multiple clicks + extra smash |
 | **7** | Reward Labyrinth | Hidden Choice | Node-based maze pathfinding exploration |
-| **8** | Ladder Climb | Upgrade Choice | Upward progression push with risk of slipping |
+| **8** | Ladder Climb | Pure Chance | Upward progression with declining success chance per step |
 | **9** | Card Pick | Hidden Choice | One-shot grid precalculations and clicks (like `its_bonus_time`) |
 | **10** | Lucky Dice | Pure Chance | 7x7 dice rolls, customizable keeps and rerolls |
 | **12** | Scratch Card | Hidden Choice | Scrubbing/scratching mask area, releasing penalty |
