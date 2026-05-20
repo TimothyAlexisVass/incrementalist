@@ -38,6 +38,9 @@ import { getItsBonusTimeState, ItsBonusTimeState, getFinalRevealStartTime as get
 import { renderCardPick } from "./09-card-pick/render";
 import { getCardPickData } from "./09-card-pick/view-model";
 import { getCardPickState, CardPickState, getFinalRevealStartTime as getCardPickFinalRevealStartTime, getRemainingIndices as getCardPickRemainingIndices, getBonusPhaseStartTime as getCardPickBonusPhaseStartTime } from "./09-card-pick/interactions";
+import { renderLadderClimb } from "./08-ladder-climb/render";
+import { getLadderClimbData } from "./08-ladder-climb/view-model";
+import { getLadderClimbState, LadderClimbState, getRewardWaitStartedAt as getLadderClimbRewardWaitStartedAt } from "./08-ladder-climb/interactions";
 import { renderRewardLabyrinth } from "./07-reward-labyrinth/render";
 import { getRewardLabyrinthData } from "./07-reward-labyrinth/view-model";
 import { getLabyrinthState, LabyrinthState, getRewardWaitStartedAt as getLabyrinthRewardWaitStartedAt } from "./07-reward-labyrinth/interactions";
@@ -80,6 +83,7 @@ export function renderBonusTimeOverview(
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
                            (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
                            (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE) ||
+                           (activeGameId === "ladder_climb" && getLadderClimbState() !== LadderClimbState.IDLE) ||
                            (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
                            (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
@@ -174,6 +178,11 @@ export function renderBonusTimeOverview(
     const data = getCardPickData(state);
     if (data) {
       renderCardPick(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "ladder_climb") {
+    const data = getLadderClimbData(state);
+    if (data) {
+      renderLadderClimb(data, rect, input.pointer);
     }
   } else if (activeGameId === "reward_labyrinth") {
     const data = getRewardLabyrinthData(state);
@@ -289,6 +298,11 @@ function renderActiveRewardCountdownOverlay(
       if (startedAt > 0) {
         drawRing(totalMs - (now - startedAt), totalMs, "#52df87");
       }
+    }
+  } else if (activeGameId === "ladder_climb") {
+    const startedAt = getLadderClimbRewardWaitStartedAt();
+    if (getLadderClimbState() === LadderClimbState.REVEALED && startedAt > 0) {
+      drawRing(BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt), BONUSTIME_REWARD_MODAL_DELAY_MS, "#52df87");
     }
   } else if (activeGameId === "its_bonus_time") {
     if (getItsBonusTimeState() === ItsBonusTimeState.FINAL_REVEAL) {

@@ -20,6 +20,8 @@ import { getItsBonusTimeData } from "./18-its-bonus-time/view-model";
 import { handleItsBonusTimeInteractions, getItsBonusTimeState, ItsBonusTimeState } from "./18-its-bonus-time/interactions";
 import { getCardPickData } from "./09-card-pick/view-model";
 import { handleCardPickInteractions, getCardPickState, CardPickState } from "./09-card-pick/interactions";
+import { getLadderClimbData } from "./08-ladder-climb/view-model";
+import { handleLadderClimbInteractions, getLadderClimbState, LadderClimbState } from "./08-ladder-climb/interactions";
 import { getRewardLabyrinthData } from "./07-reward-labyrinth/view-model";
 import { handleLabyrinthInteractions, getLabyrinthState, LabyrinthState } from "./07-reward-labyrinth/interactions";
 import { getMatchPairsData } from "./13-match-pairs/view-model";
@@ -56,6 +58,7 @@ export function handleBonusTimeInteractions(
                            (activeGameId === "coin_rain" && getCoinRainState() !== CoinRainState.IDLE) ||
                            (activeGameId === "its_bonus_time" && getItsBonusTimeState() !== ItsBonusTimeState.IDLE) ||
                            (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE) ||
+                           (activeGameId === "ladder_climb" && getLadderClimbState() !== LadderClimbState.IDLE) ||
                            (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
                            (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
 
@@ -162,6 +165,15 @@ export function handleBonusTimeInteractions(
     const data = getCardPickData(state);
     if (data) {
       const intent = handleCardPickInteractions(input, data, gameRect, channel, runCommand);
+
+      if (intent?.type === "open_modal") {
+        return { type: "open_chest_reward" };
+      }
+    }
+  } else if (activeGameId === "ladder_climb") {
+    const data = getLadderClimbData(state);
+    if (data) {
+      const intent = handleLadderClimbInteractions(input, data, gameRect, channel, runCommand);
 
       if (intent?.type === "open_modal") {
         return { type: "open_chest_reward" };

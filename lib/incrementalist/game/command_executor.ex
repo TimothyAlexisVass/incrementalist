@@ -20,6 +20,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
   alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.CardPick
+  alias Incrementalist.Game.Features.BonusTime.Games.LadderClimb
   alias Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
@@ -954,14 +955,24 @@ defmodule Incrementalist.Game.CommandExecutor do
                         }
 
                         {best_tier,
-                         %{
-                           "board" =>
-                             Enum.map(final_board, fn c ->
-                               %{"tier" => c.tier, "multiplier" => c.multiplier}
-                             end),
-                           "flips" => total_picks,
-                           "coins_others" => BigNum.add(coins_others, best_remainder)
-                         }, next_state}
+                          %{
+                            "board" =>
+                              Enum.map(final_board, fn c ->
+                                %{"tier" => c.tier, "multiplier" => c.multiplier}
+                              end),
+                            "flips" => total_picks,
+                            "coins_others" => BigNum.add(coins_others, best_remainder)
+                          }, next_state}
+
+                      "ladder_climb" ->
+                        {reward_tier, path} =
+                          LadderClimb.roll_reward(
+                            next_state.bonustime.streak,
+                            next_state.bonustime.bonustime_flips,
+                            now
+                          )
+
+                        {reward_tier, path, next_state}
 
                       "reward_labyrinth" ->
                         {steps_total, chests} =

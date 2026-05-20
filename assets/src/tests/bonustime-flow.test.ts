@@ -56,6 +56,20 @@ import {
   resetLabyrinthState
 } from "../features/bonustime/07-reward-labyrinth/interactions";
 import { type RewardLabyrinthData } from "../features/bonustime/07-reward-labyrinth/view-model";
+import {
+  LadderClimbState,
+  getLadderClimbAnimationStartedAt,
+  getLadderClimbBoardRect,
+  getLadderClimbCompletedStepCount,
+  getLadderClimbState,
+  getRewardWaitStartedAt as getLadderClimbRewardWaitStartedAt,
+  handleLadderClimbInteractions,
+  resetLadderClimbState
+} from "../features/bonustime/08-ladder-climb/interactions";
+import {
+  getLadderClimbAnimationDurationMs,
+  type LadderClimbData
+} from "../features/bonustime/08-ladder-climb/view-model";
 
 type Point = { x: number; y: number };
 
@@ -261,6 +275,107 @@ function runRewardLabyrinthFlow() {
   assert(getLabyrinthState() === LabyrinthState.REVEALED, "Reward Labyrinth should enter REVEALED once the modal is ready");
 }
 
+function runLadderClimbFlow() {
+  resetLadderClimbState();
+  setClock(500);
+
+  let queuedCommands = 0;
+  const runCommand = (_cmd: () => Promise<any>) => {
+    queuedCommands += 1;
+  };
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 500,
+    cardHeight: 330,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
+  const data: LadderClimbData = {
+    hasToken: true,
+    streak: 60,
+    lastPlayedAt: null,
+    lastResult: null,
+    path: [],
+    highestRung: 1,
+    rewardTier: null,
+    rewardAmount: null
+  };
+  const boardRect = getLadderClimbBoardRect(rect);
+  const boardClick = centerOf(boardRect);
+
+  const startResult = handleLadderClimbInteractions(
+    makeInput(centerOf(welcomeLayout.buttonRect), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(startResult === null, "Ladder Climb should not open the modal on the start click");
+  assert(getLadderClimbState() === LadderClimbState.PREPARING, "Ladder Climb should enter PREPARING after the start click");
+  assert(queuedCommands === 1, "Ladder Climb should queue one play command");
+  assert(getLadderClimbAnimationStartedAt() === 0, "Ladder Climb should not start the replay animation before the result arrives");
+
+  data.lastPlayedAt = "2026-01-01T00:00:02Z";
+  data.lastResult = {
+    game_id: "ladder_climb",
+    tier: 2,
+    rolls: [
+      { from_rung: 1, target_rung: 2, success: true, chance: 0.8, reached_rung: 2 },
+      { from_rung: 2, target_rung: 3, success: false, chance: 0.5, reached_rung: 2 }
+    ],
+    reward_amount: ZERO,
+    played_at: data.lastPlayedAt
+  };
+  data.path = data.lastResult.rolls;
+  data.highestRung = 2;
+  data.rewardTier = 2;
+  data.rewardAmount = ZERO;
+
+  setClock(1000);
+  const replayStart = handleLadderClimbInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(replayStart === null, "Ladder Climb should wait for a click after the result arrives");
+  assert(getLadderClimbState() === LadderClimbState.REVEALING, "Ladder Climb should enter REVEALING once the result arrives");
+  assert(getLadderClimbAnimationStartedAt() === 0, "Ladder Climb should stay idle until the player clicks the board");
+  assert(getLadderClimbCompletedStepCount() === 0, "Ladder Climb should start with no completed click steps");
+
+  const animationMs = getLadderClimbAnimationDurationMs(data);
+  const firstStepClick = handleLadderClimbInteractions(makeInput(boardClick, true), data, rect, {} as never, runCommand);
+  assert(firstStepClick === null, "Ladder Climb should not open the modal when the first step click starts");
+  assert(getLadderClimbAnimationStartedAt() === 1000, "Ladder Climb should capture the first step animation start time on click");
+
+  setClock(1000 + animationMs - 1);
+  const beforeFirstStepFinish = handleLadderClimbInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(beforeFirstStepFinish === null, "Ladder Climb should keep waiting while the clicked step is animating");
+  assert(getLadderClimbState() === LadderClimbState.REVEALING, "Ladder Climb should stay in REVEALING while the clicked step is running");
+  assert(getLadderClimbAnimationStartedAt() === 1000, "Ladder Climb should keep the current step animation start time until it finishes");
+
+  setClock(1000 + animationMs);
+  const firstStepFinish = handleLadderClimbInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(firstStepFinish === null, "Ladder Climb should not open the modal after the first step finishes");
+  assert(getLadderClimbState() === LadderClimbState.REVEALING, "Ladder Climb should remain in REVEALING after one clicked step");
+  assert(getLadderClimbCompletedStepCount() === 1, "Ladder Climb should count the completed clicked step");
+  assert(getLadderClimbAnimationStartedAt() === 0, "Ladder Climb should clear the step animation time after the step finishes");
+
+  setClock(1000 + animationMs + 40);
+  const secondStepClick = handleLadderClimbInteractions(makeInput(boardClick, true), data, rect, {} as never, runCommand);
+  assert(secondStepClick === null, "Ladder Climb should keep the modal closed when the second step click starts");
+  assert(getLadderClimbAnimationStartedAt() === 1000 + animationMs + 40, "Ladder Climb should capture the second step animation start time on click");
+
+  setClock(1000 + (animationMs * 2) + 40);
+  const secondStepFinish = handleLadderClimbInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(secondStepFinish === null, "Ladder Climb should not open the modal immediately when the final step finishes");
+  assert(getLadderClimbState() === LadderClimbState.REVEALED, "Ladder Climb should enter REVEALED after the final clicked step");
+  assert(getLadderClimbRewardWaitStartedAt() === 1000 + (animationMs * 2) + 40, "Ladder Climb should begin the shared reward wait when the final step finishes");
+
+  setClock(1000 + (animationMs * 2) + 40 + BONUSTIME_REWARD_MODAL_DELAY_MS);
+  const openModal = handleLadderClimbInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(openModal?.type === "open_modal", "Ladder Climb should open the reward modal after the shared delay");
+}
+
 function runChecklistFlow() {
   resetResourceChecklistState();
   resetItemChecklistState();
@@ -451,6 +566,7 @@ function runMatchPairsFlow() {
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
+  runLadderClimbFlow();
   runChecklistFlow();
   runMatchPairsFlow();
   console.log("bonustime flow tests passed");

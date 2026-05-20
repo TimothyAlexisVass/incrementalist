@@ -393,6 +393,48 @@ defmodule Incrementalist.Game.CommandsTest do
     assert is_integer(last_result["plinko"]["best_drop_index"])
   end
 
+  test "bonustime.play ladder_climb includes authoritative roll payload in last_result" do
+    ladder_anchor = DateTime.add(@now, -(7 * 43_200_000), :millisecond)
+
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(ladder_anchor)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "ladder_climb"}),
+        @now
+      )
+
+    assert result["type"] == "bonustime.play.result"
+    assert result["status"] == "ok"
+    assert result["bonustime"]["active_game_id"] == "ladder_climb"
+
+    last_result = result["bonustime"]["last_result"] || result["bonustime"][:last_result]
+    assert last_result["game_id"] == "ladder_climb"
+    assert is_integer(last_result["tier"])
+    assert last_result["tier"] in 1..7
+    assert is_list(last_result["rolls"])
+    assert length(last_result["rolls"]) >= 1
+
+    first_step = hd(last_result["rolls"])
+    assert first_step["from_rung"] == 1
+    assert first_step["target_rung"] == 2
+    assert first_step["reached_rung"] in [1, 2]
+    assert is_boolean(first_step["success"])
+    assert is_number(first_step["chance"])
+  end
+
   test "cleanup deletes only ACKed command rows older than forty eight hours" do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)

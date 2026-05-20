@@ -70,6 +70,7 @@ import { resetJackpotState } from "../features/bonustime/jackpot-meter/interacti
 import { resetCoinRainState } from "../features/bonustime/04-coin-rain/interactions";
 import { resetItsBonusTimeState } from "../features/bonustime/18-its-bonus-time/interactions";
 import { resetCardPickState } from "../features/bonustime/09-card-pick/interactions";
+import { resetLadderClimbState } from "../features/bonustime/08-ladder-climb/interactions";
 import { resetLabyrinthState } from "../features/bonustime/07-reward-labyrinth/interactions";
 import { getActiveGameId, getBonusTimeTooltipData } from "../features/bonustime/view-model";
 import { resetMatchPairsState } from "../features/bonustime/13-match-pairs/interactions";
@@ -581,6 +582,7 @@ export class GameClient {
           resetCoinRainState();
           resetItsBonusTimeState();
           resetCardPickState();
+          resetLadderClimbState();
           resetLabyrinthState();
           resetMatchPairsState();
           sceneInput.consumed = true;
