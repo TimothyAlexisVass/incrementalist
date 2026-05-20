@@ -102,23 +102,26 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       is_pending ->
         {:error, "sisu_charge_pending"}
 
-      BigNum.compare(authoritative_current, BigNum.from_number(target * Constants.sisu_refill_threshold_factor())) >= 0 ->
+      BigNum.compare(
+        authoritative_current,
+        BigNum.from_number(target * Constants.sisu_refill_threshold_factor())
+      ) >= 0 ->
         {:error, "sisu_already_higher"}
 
       true ->
-      with {:ok, updated_charge_crystals} <- ChargeCrystals.spend(projected.charge_crystals, tier.id) do
-        next_sisu = BigNum.from_number(min(effective_max, target))
+        with {:ok, updated_charge_crystals} <-
+               ChargeCrystals.spend(projected.charge_crystals, tier.id) do
+          next_sisu = BigNum.from_number(min(effective_max, target))
 
-        updated_sisu =
-          projected.sisu
-          |> Map.put(:target_current, next_sisu)
-          |> Map.put(:target_cycle_decay, tier.cycle_decay)
-          |> Map.put(:active_tier, tier.id)
-          |> Map.put(:projected_at, Time.iso8601(now))
+          updated_sisu =
+            projected.sisu
+            |> Map.put(:target_current, next_sisu)
+            |> Map.put(:target_cycle_decay, tier.cycle_decay)
+            |> Map.put(:active_tier, tier.id)
+            |> Map.put(:projected_at, Time.iso8601(now))
 
-        {:ok,
-         %{projected | sisu: updated_sisu, charge_crystals: updated_charge_crystals}}
-      end
+          {:ok, %{projected | sisu: updated_sisu, charge_crystals: updated_charge_crystals}}
+        end
     end
   end
 
@@ -186,7 +189,13 @@ defmodule Incrementalist.Game.Features.Progress.Sisu do
       case state.can_claim_at do
         nil ->
           claim_at = can_claim_at(state, now)
-          %{state | sisu: updated_sisu, can_claim_at: claim_at, cycle_started_at: Time.iso8601(now)}
+
+          %{
+            state
+            | sisu: updated_sisu,
+              can_claim_at: claim_at,
+              cycle_started_at: Time.iso8601(now)
+          }
 
         _existing ->
           %{state | sisu: updated_sisu}

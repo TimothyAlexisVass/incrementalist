@@ -14,11 +14,13 @@ defmodule Incrementalist.Game.Features.ShopTest do
 
   test "purchase/2 fails if already purchased", %{state: state} do
     # Level requirements for idle_mode is 2, and costs 500 coins.
-    state = %{state |
-      level: 2,
-      coins: BigNum.from_number(500),
-      features: %{state.features | idle_mode_purchased: true}
+    state = %{
+      state
+      | level: 2,
+        coins: BigNum.from_number(500),
+        features: %{state.features | idle_mode_purchased: true}
     }
+
     assert {:error, "already_purchased"} = Shop.purchase(state, "idle_mode")
   end
 

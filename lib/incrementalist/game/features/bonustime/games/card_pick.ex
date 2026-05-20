@@ -81,7 +81,8 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.CardPick do
   end
 
   # Evaluate successive checks per card slot until failure or grid max (36 cards) is reached
-  defp evaluate_consecutive_loop(picks, board_cards, current_index) when current_index < 36 and picks < 36 do
+  defp evaluate_consecutive_loop(picks, board_cards, current_index)
+       when current_index < 36 and picks < 36 do
     r = :rand.uniform()
 
     if r <= 0.05 do

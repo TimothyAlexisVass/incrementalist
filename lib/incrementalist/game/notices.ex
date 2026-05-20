@@ -401,7 +401,8 @@ defmodule Incrementalist.Game.Notices do
 
         {:quest, quest_id}
 
-      String.starts_with?(leaf_id, "leaf.achievement.") and String.ends_with?(leaf_id, ".unlocked") ->
+      String.starts_with?(leaf_id, "leaf.achievement.") and
+          String.ends_with?(leaf_id, ".unlocked") ->
         achievement_id =
           leaf_id
           |> String.trim_leading("leaf.achievement.")

@@ -63,7 +63,13 @@ defmodule Incrementalist.Game.Persistence.PlayerState do
   def inject_state_tokens(%__MODULE__{state: %State{} = state} = ps) do
     bonustime = state.bonustime || %State.BonusTime{}
     new_bonustime = %{bonustime | bonustime_flips: ps.bonustime_flips || 0}
-    state_with_tokens = %{state | bonustime: new_bonustime, has_bonustime_token: ps.has_bonustime_token}
+
+    state_with_tokens = %{
+      state
+      | bonustime: new_bonustime,
+        has_bonustime_token: ps.has_bonustime_token
+    }
+
     %{ps | state: state_with_tokens}
   end
 

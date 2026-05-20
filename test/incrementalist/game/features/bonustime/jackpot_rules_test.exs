@@ -28,7 +28,8 @@ defmodule Incrementalist.Game.Features.BonusTime.JackpotRulesTest do
     end
   end
 
-  test "play/1 guarantees tier 7 jackpot and resets progress when starting at progress 13 (14th play)", %{state: state} do
+  test "play/1 guarantees tier 7 jackpot and resets progress when starting at progress 13 (14th play)",
+       %{state: state} do
     # Set progress to 13 (13 misses since last hit, so 14th attempt is guaranteed)
     state = put_in(state.bonustime.jackpot_progress, 13)
 
@@ -40,7 +41,9 @@ defmodule Incrementalist.Game.Features.BonusTime.JackpotRulesTest do
     assert updated_state.bonustime.jackpot_progress == 0
   end
 
-  test "play/1 rolls tier 7 and resets progress even before 14th play on lucky hits", %{state: state} do
+  test "play/1 rolls tier 7 and resets progress even before 14th play on lucky hits", %{
+    state: state
+  } do
     # Set progress to 3
     state = put_in(state.bonustime.jackpot_progress, 3)
 

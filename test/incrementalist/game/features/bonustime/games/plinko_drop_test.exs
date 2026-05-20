@@ -68,7 +68,10 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.PlinkoDropTest do
              {_position, valid?} =
                Enum.reduce(Enum.with_index(rolls), {0.0, true}, fn {roll, step}, {position, ok} ->
                  left_at_zero? = step > 0 and roll == false and position == 0.0
-                 next_position = max(0.0, min(plinko["lanes"] * 1.0, position + if(roll, do: 0.5, else: -0.5)))
+
+                 next_position =
+                   max(0.0, min(plinko["lanes"] * 1.0, position + if(roll, do: 0.5, else: -0.5)))
+
                  {next_position, ok and not left_at_zero?}
                end)
 
