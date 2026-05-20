@@ -14,17 +14,17 @@ defmodule Incrementalist.Game.Features.BonusTime.JackpotRules do
     bonustime = state.bonustime
     current_progress = bonustime.jackpot_progress || 0
 
-    rules = Constants.bonustime_game_rules()["jackpot_meter"] || %{}
-    base_chance = rules["base_chance"] || 0.005
-    miss_increment = rules["miss_increment"] || 0.005
+    rules = Map.fetch!(Constants.bonustime_game_rules(), "jackpot_meter")
+    base_chance = Map.fetch!(rules, "base_chance")
+    miss_increment = Map.fetch!(rules, "miss_increment")
 
-    # Streak bonus: 0.5% + min(floor(streak / 100), 1)%
+    # Streak bonus: 0.01% per day, capped at 100 days
     streak = bonustime.streak || 0
-    streak_bonus_rules = rules["streak_bonus"] || %{"divisor" => 100, "cap" => 0.01}
-    divisor = streak_bonus_rules["divisor"] || 100
-    cap = streak_bonus_rules["cap"] || 0.01
+    streak_bonus_rules = Map.fetch!(rules, "streak_bonus")
+    bonus_per_day = Map.fetch!(streak_bonus_rules, "per_day")
+    max_days = Map.fetch!(streak_bonus_rules, "max_days")
 
-    streak_bonus = min(div(streak, divisor) * 0.01, cap)
+    streak_bonus = min(max(0, streak), max_days) * bonus_per_day
     base_chance_total = base_chance + streak_bonus
 
     # 14th play is guaranteed jackpot (since current_progress starts at 13)

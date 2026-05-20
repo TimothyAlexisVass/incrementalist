@@ -5,13 +5,16 @@ import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
 const SLOT_MS = 43_200_000; // 12 hours
 
 type BonusTimeConfig = {
-  rotation_slot_count: number;
   rotation_anchor: string;
-  rotation: Record<string, string>;
   games: Record<string, { name: string; slot: number }>;
 };
 
 const bonusTimeConfig = bonustimeConfig as BonusTimeConfig;
+
+function getGameIdForSlot(slot: number): string {
+  const match = Object.entries(bonusTimeConfig.games).find(([, game]) => game.slot === slot);
+  return match?.[0] || "chest_draw";
+}
 
 export function getActiveGameId(state?: ServerState): string {
   const serverActiveGameId = state?.snapshot?.state.bonustime?.active_game_id;
@@ -34,10 +37,10 @@ export function getActiveGameId(state?: ServerState): string {
   }
 
   const elapsed = Math.max(0, now - anchor);
-  const slotCount = Math.max(1, bonusTimeConfig.rotation_slot_count || 15);
+  const slotCount = Math.max(1, Object.keys(bonusTimeConfig.games).length);
   const boundaryIndex = Math.floor(elapsed / SLOT_MS);
   const activeSlotIndex = (boundaryIndex % slotCount) + 1;
-  return bonusTimeConfig.rotation[activeSlotIndex.toString()] || "chest_draw";
+  return getGameIdForSlot(activeSlotIndex);
 }
 
 export function getActiveGameName(state?: ServerState): string {
@@ -48,7 +51,7 @@ export function getTimeUntilNextTokenMs(state?: ServerState): number {
   const now = getServerNow();
   let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
   if (!anchorStr) {
-    anchorStr = bonustimeConfig.rotation_anchor;
+    anchorStr = bonusTimeConfig.rotation_anchor;
   }
   if (!anchorStr) {
     return SLOT_MS;

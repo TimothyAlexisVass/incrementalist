@@ -10,6 +10,21 @@ function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
+type JackpotMeterConfig = {
+  game_rules: {
+    jackpot_meter: {
+      base_chance: number;
+      miss_increment: number;
+      streak_bonus: {
+        per_day: number;
+        max_days: number;
+      };
+    };
+  };
+};
+
+const JACKPOT_CONFIG = bonusTimeConfig as JackpotMeterConfig;
+
 export function renderJackpotMeter(
   data: JackpotMeterData,
   rect: { x: number; y: number; width: number; height: number }
@@ -60,10 +75,11 @@ export function renderJackpotMeter(
   });
 
   // Calculate win probability chance percent exactly matching the server rules
-  const baseChance = 0.005;
-  const missIncrement = 0.005;
+  const jackpotRules = JACKPOT_CONFIG.game_rules.jackpot_meter;
+  const baseChance = jackpotRules.base_chance;
+  const missIncrement = jackpotRules.miss_increment;
   const streak = data.streak || 0;
-  const streakBonus = Math.min(Math.floor(streak / 100) * 0.01, 0.01);
+  const streakBonus = Math.min(Math.max(0, streak), jackpotRules.streak_bonus.max_days) * jackpotRules.streak_bonus.per_day;
 
   // Determine progressive visual state
   let displayedProgress = data.currentProgress;

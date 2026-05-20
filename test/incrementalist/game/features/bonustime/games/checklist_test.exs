@@ -11,7 +11,13 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.ChecklistTest do
     {:ok, state: state}
   end
 
-  test "check_off/2 follows the shared 15-entry checklist shape and wraps cleanly", %{state: state} do
+  test "check_off/2 follows the shared 15-entry checklist shape under game_rules and wraps cleanly",
+       %{state: state} do
+    checklist_rules = Constants.bonustime_game_rules()["checklists"]
+
+    assert checklist_rules["grid_columns"] == 5
+    assert checklist_rules["grid_rows"] == 3
+    assert checklist_rules["entries"] == @expected_tiers
     assert Constants.bonustime_checklist_grid_columns() == 5
     assert Constants.bonustime_checklist_grid_rows() == 3
     assert Constants.bonustime_checklist_entries() == @expected_tiers

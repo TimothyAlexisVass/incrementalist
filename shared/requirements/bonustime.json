@@ -1,24 +1,6 @@
 {
-  "rotation_slot_count": 15,
   "rotation_anchor": "2026-01-11T00:00:00Z",
   "reward_modal_delay_ms": 5000,
-  "rotation": {
-    "1": "chest_draw",
-    "2": "prize_wheel",
-    "3": "resource_checklist",
-    "4": "coin_rain",
-    "5": "plinko_drop",
-    "6": "hammer_smash",
-    "7": "reward_labyrinth",
-    "8": "ladder_climb",
-    "9": "card_pick",
-    "10": "lucky_dice",
-    "11": "item_checklist",
-    "12": "scratch_card",
-    "13": "match_pairs",
-    "14": "jackpot_meter",
-    "15": "its_bonus_time"
-  },
   "games": {
     "chest_draw": {
       "name": "Chest Draw",
@@ -83,27 +65,6 @@
       "slot": 15
     }
   },
-  "checklists": {
-    "grid_columns": 5,
-    "grid_rows": 3,
-    "entries": [
-      1,
-      1,
-      2,
-      2,
-      3,
-      2,
-      3,
-      4,
-      2,
-      3,
-      5,
-      4,
-      6,
-      5,
-      7
-    ]
-  },
   "reward_tiers": {
     "tier_1": {
       "tier": 1,
@@ -142,6 +103,27 @@
     }
   },
   "game_rules": {
+    "checklists": {
+      "grid_columns": 5,
+      "grid_rows": 3,
+      "entries": [
+        1,
+        1,
+        2,
+        2,
+        3,
+        2,
+        3,
+        4,
+        2,
+        3,
+        5,
+        4,
+        6,
+        5,
+        7
+      ]
+    },
     "chest_draw": {
       "chances": [
         0.5,
@@ -281,8 +263,8 @@
     "jackpot_meter": {
       "base_chance": 0.005,
       "streak_bonus": {
-        "divisor": 100,
-        "cap": 0.01
+        "per_day": 0.0001,
+        "max_days": 100
       },
       "miss_increment": 0.005,
       "consolation_chances": [

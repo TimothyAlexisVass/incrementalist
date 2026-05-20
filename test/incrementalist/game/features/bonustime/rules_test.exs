@@ -37,6 +37,17 @@ defmodule Incrementalist.Game.Features.BonusTime.RulesTest do
     assert Rules.get_active_game_id(now) == "prize_wheel"
   end
 
+  test "rotation helpers are derived from the shared games map" do
+    games = Constants.bonustime_games()
+    rotation = Constants.bonustime_rotation()
+
+    assert Constants.bonustime_rotation_slot_count() == map_size(games)
+
+    Enum.each(games, fn {game_id, game} ->
+      assert rotation[Integer.to_string(game["slot"])] == game_id
+    end)
+  end
+
   test "its_bonus_time correctly generates 128 tile board and flips based on streak" do
     alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
 

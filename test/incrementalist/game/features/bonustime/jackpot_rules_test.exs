@@ -1,5 +1,6 @@
 defmodule Incrementalist.Game.Features.BonusTime.JackpotRulesTest do
   use ExUnit.Case, async: true
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Game.State
 
@@ -39,6 +40,33 @@ defmodule Incrementalist.Game.Features.BonusTime.JackpotRulesTest do
     assert tier == 7
     assert new_progress == 14
     assert updated_state.bonustime.jackpot_progress == 0
+  end
+
+  test "play/1 uses the configured day-based streak bonus before the 100-day cap", %{state: state} do
+    jackpot_rules = Constants.bonustime_game_rules()["jackpot_meter"]
+    streak_bonus_rules = jackpot_rules["streak_bonus"]
+
+    assert streak_bonus_rules["per_day"] == 0.0001
+    assert streak_bonus_rules["max_days"] == 100
+
+    seed = {22, 23, 24}
+
+    state_0 = put_in(state.bonustime.streak, 0)
+    state_0 = put_in(state_0.bonustime.jackpot_progress, 0)
+    :rand.seed(:exsss, seed)
+
+    {:ok, _state_0, tier_0, new_progress_0} = JackpotRules.play(state_0)
+    assert tier_0 >= 1 and tier_0 <= 6
+    assert new_progress_0 == 1
+
+    state_50 = put_in(state.bonustime.streak, 50)
+    state_50 = put_in(state_50.bonustime.jackpot_progress, 0)
+    :rand.seed(:exsss, seed)
+
+    {:ok, updated_state_50, tier_50, new_progress_50} = JackpotRules.play(state_50)
+    assert tier_50 == 7
+    assert new_progress_50 == 14
+    assert updated_state_50.bonustime.jackpot_progress == 0
   end
 
   test "play/1 rolls tier 7 and resets progress even before 14th play on lucky hits", %{

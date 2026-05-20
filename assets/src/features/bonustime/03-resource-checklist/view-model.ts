@@ -18,7 +18,13 @@ export interface ResourceChecklistData {
   lastRewardAmount: BigNum | null;
 }
 
-const CHECKLIST_ENTRIES = bonustimeConfig.checklists.entries as number[];
+const CHECKLIST_ENTRIES = (bonustimeConfig as {
+  game_rules: {
+    checklists: {
+      entries: number[];
+    };
+  };
+}).game_rules.checklists.entries;
 
 function normalizeChecklistEntryIndex(value: unknown, entryCount: number): number {
   const index = typeof value === "number" ? Math.floor(value) : Number(value);
