@@ -1,75 +1,144 @@
-# Phase 12, Step 4: Scratch Card (Huge Scratch Card)
+# Phase 12, Step 4: Scratch Card (Threshold Reveal)
 
 ## 1. Game Concept & Rules
 
-The **Scratch Card** is an interactive scrubbing mini-game. The player rubs off a protective foil overlay on a large virtual card to discover hidden reward items. They must manage a strict scrubbing brush budget and navigate a penalty for lifting their brush.
+The Scratch Card is a pre-rolled reveal game. Scratch position is cosmetic; only cumulative scratched pixels affect progress.
+
+There will be a grid of 5x5 pixel cells on the board.
+As each grid cell is touched, 25 pixels are deducted from the pixel budget, that cell is removed and replaced with a burst of particles. The particles have a slightly different color from the scratch surface so that they will show against the surface.
 
 ### Core Rules:
-1. **The Card Board**: The virtual scratch card is a rectangular board of $1000 \times 500$ pixels.
-2. **Hidden Items**: The card contains exactly 10 hidden reward items spawned at random coordinates. Each item has a bounding box of $64 \times 64$ pixels.
-3. **The Scratcher**: The player drags an $8 \times 16$ rectangular scratcher brush across the screen to erase the protective overlay.
-4. **Scratching Budget**: The player is granted a pixel-clearing budget. Each pixel cleared by the brush deducts 1 unit from the budget.
-5. **Release Penalty**: Lifting the brush (releasing the mouse button or lifting a touch finger) incurs a heavy **20,000 pixel deduction** from the remaining budget. This strongly encourages the player to scratch the card in a single continuous path.
-6. **Revealing Items**: An item is considered "fully revealed" when at least **$80\%$** of its bounding box area has been scrubbed clear. Once revealed, its reward tier is displayed on the board and added to the player's collection.
+1. The card board is `1000 x 500` pixels.
+2. The server rolls the scratch budget, and reveal schedule before play starts.
+3. The player drags a 10 pixels high times 20 pixels wide rectangular scratcher brush across the screen to erase the protective overlay.
+4. The reveal schedule is an ordered list of cumulative scratch thresholds paired with reward tiers.
+5. Scratch location does not affect reward outcome. Each newly uncovered pixel deducts `1` pixel from the scratch budget. So reward outcome is independent of where the player scratches.
+6. When cumulative scratched pixels reaches a threshold, the next scratch touch reveals the scheduled reward => the reward is placed under a square of 15x15 unscratched cells in proximity with the cell that was removed to reach the threshold. If that is not possible, the reveal is deferred until a 15x15 uncratched area exists in proximity of the newly removed cell. Then, the covering 225 cells get scratched and deducts thus deducting those `5625` pixels
+7. Once scratching has started, it continues until all pixels have been deducted from the budget.
+
+
 
 ---
 
 ## 2. Mathematical Formulas & Streak Scaling
 
-- **Pixel Budget**: The scratch budget (maximum number of pixels the player is allowed to erase) scales with their daily login streak:
-  $$\text{pixels} = 500,000 \times \left(\text{rand}(0.10, 0.20) + \min(\text{streak} \times 0.01, 0.15)\right)$$
-  - *Base budget*: Eerily $50,000$ to $100,000$ pixels.
-  - *Streak bonus*: Adds up to $15\%$ extra area budget (achieved at streak 15+).
-  - *Total range*: Allows the player to clear between $10\%$ and $35\%$ of the total card area.
-- **Hidden Item Rarity Table**:
-  Each of the 10 spawned hidden items rolls its reward tier upon card generation according to this exact weight table:
+- **Pixel Budget**: The scratch budget scales with daily login streak:
+  `pixels = 500,000 * (rand(0.10, 0.16) + min(streak * 0.001, 0.15))`
+  - This gives a base budget: `50,000` to `80,000` pixels with a Streak bonus of up to `15%` extra area budget.
+  - Total range: `10%` to `31%` of the total card area.
+- **Reveal Count**: The server rolls how many rewards the player will uncover. A maximum of 10.
+- **Reveal Tier Table**: Tier names come from `shared/requirements/bonustime.json.reward_tiers`.
 
-  | Tier | Hidden Item Outcome | Chance per Hidden Item | Placeholder Reward ID |
+## 3. Reward generation
+First roll how many rewards the player will uncover.
+The pixel budget determines the reward count range using square-root scaling.
+
+At 10% pixel budget:
+min_rewards = 1
+max_rewards = 4
+
+At 31% pixel budget:
+min_rewards = 5
+max_rewards = 8
+
+Because lower pixel budgets should be more likely to receive a higher reward count within their range, and higher pixel budgets should be less likely to receive a higher reward count within their range, the roll is biased inversely to the pixel budget.
+
+budget_t = (pixel_budget - 0.10) / (0.31 - 0.10)
+Where:
+budget_t = 0 at 10% pixel budget
+budget_t = 1 at 31% pixel budget
+
+Then define the reward roll bias:
+bias = 0.75 - (budget_t * 0.50)
+So:
+- At 10% budget, bias = 0.75, moderately favoring higher reward counts
+- At 31% budget, bias = 0.25, moderately favoring lower reward counts
+
+The reward count is then rolled inside the current reward range using this bias.
+
+Example:
+```
+const minBudget = 0.10;
+const maxBudget = 0.31;
+
+const budgetT = Math.min(
+  1,
+  Math.max(0, (pixelBudget - minBudget) / (maxBudget - minBudget))
+);
+
+const scale = Math.sqrt(pixelBudget / maxBudget);
+
+const minRewards = Math.max(1, Math.floor(3 * scale));
+const maxRewards = Math.min(8, Math.floor(8 * scale));
+
+const bias = 0.75 - (budgetT * 0.50);
+
+const r = Math.random();
+
+const shaped =
+  bias * Math.sqrt(r) +
+  (1 - bias) * (r * r);
+
+const rewardCount =
+  minRewards + Math.floor(shaped * (maxRewards - minRewards + 1));
+```
+
+Then for each reward, roll the tier:
+  | Tier | Global Tier Name | Chance per Reveal | Placeholder Reward ID |
   | :---: | --- | :---: | --- |
-  | **1** | Common item | `62.8995%` | `tier_1` |
-  | **2** | Uncommon item | `25%` | `tier_2` |
-  | **3** | Rare item | `8%` | `tier_3` |
-  | **4** | Excellent item | `3%` | `tier_4` |
-  | **5** | Unique item | `0.8%` | `tier_5` |
-  | **6** | Exotic item | `0.2%` | `tier_6` |
-  | **7** | Ultimate item | `0.1005%` | `tier_7` |
+  | **1** | `Common` | `50.9%` | `tier_1` |
+  | **2** | `Rare` | `32%` | `tier_2` |
+  | **3** | `Excellent` | 11%` | `tier_3` |
+  | **4** | `Supreme` | `4%` | `tier_4` |
+  | **5** | `Legendary` | `1.4%` | `tier_5` |
+  | **6** | `Celestial` | `0.6%` | `tier_6` |
+  | **7** | `Divine` | `0.1%` | `tier_7` |
+
+Finally set a random pixel uncover number for each item, but they must be at least 8000 pixels (320 grid cells) apart.
+
+Final result will look something like this, example for 4 rewards:
+{
+  "total_budget": 78442,
+  "rewards": [
+    {"pixels": 3014, "tier": 3},
+    {"pixels": 11434, "tier": 1},
+    {"pixels": 22120, "tier": 5},
+    {"pixels": 54227, "tier": 2}
+  ]
+}
 
 ---
 
-## 3. Grid Coordinates & Tracking System
+## 4. Reveal Schedule & Tracking
 
-To ensure smooth performance and avoid sending large raw coordinate packets:
-1. **Grid Map**: The $1000 \times 500$ pixel surface is represented by a grid of $125 \times 62$ cells (where each cell corresponds to an $8 \times 8$ pixel block).
-2. **Dragging Path**: As the player drags the cursor, the frontend computes a line segment between the previous and current coordinates. All cells in the $125 \times 62$ grid intersected by this segment are marked as "scratched/cleared."
-3. **Budget Deductions**:
-   - The server maintains the authoritative $125 \times 62$ boolean grid.
-   - For every new cell marked as cleared, the budget is decremented by $64$ pixels ($8 \times 8$).
-   - A brush release decreases the budget by $20,000$ pixels.
+To keep the game deterministic and cosmetic at the scratch layer:
+1. The result payload contains an ordered reveal schedule such as `[{ "pixels": 12346, "tier": 3 }, { "pixels": 49922, "tier": 2 }]`.
+2. Once the cumulative scratched pixel count reaches a threshold, the next scratch touch advances to the scheduled reveal.
+3. No item positions, collision grid, or coordinate-based reward validation are exposed.
 
 ---
 
-## 4. Implementation Details
+## 5. Implementation Details
 
 ### Elixir Backend (`lib/incrementalist/game/features/bonustime/games/scratch_card.ex`)
-- **Session Struct**: `ScratchSession` stores:
-  - `pixels_budget`: Remaining scratchable pixels.
-  - `spawned_items`: Array of 10 item maps, each containing: `x`, `y`, `width` ($64$), `height` ($64$), and `reward_tier`.
-  - `scratched_grid`: A 125x62 bitstring or nested boolean array representing scratched cells.
-  - `collected_rewards`: List of rewards from items that have crossed the $80\%$ cleared threshold.
-- **Actions**:
-  - `start_session(streak)`: Generates 10 randomly placed item bounding boxes (ensuring they fit inside the $1000 \times 500$ card boundaries), rolls their reward tiers, calculates the pixel budget, and initializes the grid as fully covered.
-  - `scratch_drag(points)`: Evaluates a list of coordinate lines. Marks newly cleared cells in the grid, subtracts $64$ pixels per new cell from `pixels_budget`, and checks if any item bounding boxes have reached $\ge 80\%$ clearance. If an item crosses the threshold, appends its reward to `collected_rewards`.
-  - `release_brush()`: Subtracts $20,000$ pixels from `pixels_budget`.
-  - `complete_session()`: Closes the session and transfers all earned items in `collected_rewards` to the player's inventory.
+- `roll_reward(streak)` returns:
+  - `pixels_budget`
+  - `reveal_schedule` as an ordered list of `{pixels_uncovered, tier}` entries
+  - final reward data derived from that schedule
+- The backend does not expose item positions or accept per-drag commands.
+- There is no `scratch_drag` or `release_brush` server loop.
+- The result is deterministic for replay and idempotent for reconnect.
+- Rewards are granted from the precomputed schedule, not from client geometry.
 
-### TypeScript Frontend (`assets/src/features/bonustime/scratch-card/`)
-- **`view-model.ts`**: Maintains a local copy of the $125 \times 62$ scratched cell array, remaining pixels budget, and centroids of items that have been fully revealed.
-- **`render.ts`**: WebGL Canvas rendering. Draws the textured scratch card overlay. Scratched cells are rendered transparently by drawing a textured quad using a custom shader or a grid of vertex coordinates, allowing the hidden items below to shine through.
-- **`interactions.ts`**: Binds drag/rub events. While dragging, batches coordinate points and sends them to the server as a `scratch_drag` command. Dispatches `release_brush` when dragging terminates.
+### TypeScript Frontend (`assets/src/features/bonustime/12-scratch-card/`)
+- `view-model.ts`: projects `pixels_budget`, `scratched_pixels`, `reveal_schedule`, and revealed tiers into render state.
+- `render.ts`: draws the scratch overlay, HUD, and reveal animation.
+- `interactions.ts`: updates local scratch progress from pointer motion, and advances the next scheduled reveal when the threshold is reached. Scratch location only affects presentation.
 
 ---
 
 ## 5. Verification & Testing
-- Test grid conversion calculations to verify that double-clearing the same coordinate does not double-deduct the pixel budget.
-- Verify that the 20,000 pixel release penalty is applied strictly on lift-off.
-- Assert that items are only awarded when crossing the $80\%$ clearance threshold.
+- Test that identical total scratched pixels produce identical reveal progress regardless of where the pointer moved.
+- Test that reveal thresholds are sorted and deterministic.
+- Test that each reveal consumes `5625` pixels (75x75 cells) in addition to the scratched-pixel budget.
+- Assert that no positions or other geometry-dependent hidden data appear in the payload.

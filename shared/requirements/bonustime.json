@@ -195,6 +195,32 @@
         "loop": 0.05
       }
     },
+    "scratch_card": {
+      "board_size": {
+        "width": 1000,
+        "height": 500
+      },
+      "pixel_budget": {
+        "rand_min": 0.10,
+        "rand_max": 0.16,
+        "streak_scaling": {
+          "per_day": 0.001,
+          "max_bonus": 0.15
+        }
+      },
+      "lifts_left": 10,
+      "hidden_item_count": 10,
+      "release_penalty_pixels": 5625,
+      "chances": [
+        0.509,
+        0.32,
+        0.11,
+        0.04,
+        0.014,
+        0.006,
+        0.001
+      ]
+    },
     "hammer_smash": {
       "min_power": {
         "base": 5,
