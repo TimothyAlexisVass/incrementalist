@@ -10,6 +10,7 @@ import {
 
 export enum LabyrinthState {
   IDLE,
+  PREPARING,
   PLAYING,
   FINISHED,
   REVEALED
@@ -145,6 +146,7 @@ export function handleLabyrinthInteractions(
 
     if (isOverBtn && input.clicked && !input.consumed && data.hasToken && channel && !claimSent) {
       claimSent = true;
+      internalState = LabyrinthState.PREPARING;
       stepsRemaining = 0;
       visitedRooms.clear();
       visitedRoomsCount = 1;
@@ -159,8 +161,10 @@ export function handleLabyrinthInteractions(
       }
       input.consumed = true;
     }
+  }
 
-    // transition to playing when server data loaded
+  if (internalState === LabyrinthState.PREPARING) {
+    // Transition to active play once the server-provided labyrinth payload exists.
     if (claimSent && data.lastResult) {
       stepsRemaining = data.lastResult.steps_total;
       visitedRooms.add("0,0");

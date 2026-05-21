@@ -297,6 +297,57 @@ function runRewardLabyrinthFlow() {
   assert(getLabyrinthState() === LabyrinthState.REVEALED, "Reward Labyrinth should enter REVEALED once the modal is ready");
 }
 
+function runRewardLabyrinthPendingResultFlow() {
+  resetLabyrinthState();
+  setClock(2000);
+  let queuedCommands = 0;
+  const runCommand = (_cmd: () => Promise<any>) => {
+    queuedCommands += 1;
+  };
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 560,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
+  const data: RewardLabyrinthData = {
+    hasToken: true,
+    streak: 3,
+    bonustimeFlips: 0,
+    lastResult: null
+  };
+
+  const startResult = handleLabyrinthInteractions(
+    makeInput(centerOf(welcomeLayout.buttonRect), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(startResult === null, "Reward Labyrinth should not open the modal while waiting for the result payload");
+  assert(getLabyrinthState() === LabyrinthState.PREPARING, "Reward Labyrinth should enter PREPARING immediately after the start click");
+  assert(queuedCommands === 1, "Reward Labyrinth should queue one play command while entering");
+
+  data.hasToken = false;
+  data.lastResult = {
+    game_id: "reward_labyrinth",
+    tier: 4,
+    steps_total: 2,
+    chests: [{ step: 2, tier: 4 }],
+    reward_amount: ZERO,
+    played_at: "2026-01-01T00:00:01Z"
+  };
+
+  const afterResult = handleLabyrinthInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(afterResult === null, "Reward Labyrinth should continue into active play once the payload arrives");
+  assert(getLabyrinthState() === LabyrinthState.PLAYING, "Reward Labyrinth should leave PREPARING once it receives server result data");
+}
+
 function runLadderClimbFlow() {
   resetLadderClimbState();
   setClock(500);
@@ -682,6 +733,7 @@ function runScratchCardFlow() {
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
+  runRewardLabyrinthPendingResultFlow();
   runLadderClimbFlow();
   runChecklistFlow();
   runMatchPairsFlow();

@@ -118,21 +118,24 @@ export function renderRewardLabyrinth(
   const state = getLabyrinthState();
 
   // 1. Render IDLE welcome view
-  if (state === LabyrinthState.IDLE) {
+  if (state === LabyrinthState.IDLE || state === LabyrinthState.PREPARING) {
+    const isPreparing = state === LabyrinthState.PREPARING;
     renderBonusTimeWelcomeCard(renderer, rect, {
       cardWidth: 560,
       cardHeight: 360,
       title: "REWARD LABYRINTH",
-      bodyLines: ["Navigate a hidden maze of rewards."],
+      bodyLines: isPreparing
+        ? ["Preparing your maze run..."]
+        : ["Navigate a hidden maze of rewards."],
       streakText: `Current Streak: ${data.streak} ${pluralize(data.streak, "day")}`,
-      buttonText: "ENTER LABYRINTH",
+      buttonText: isPreparing ? "ENTERING..." : "ENTER LABYRINTH",
       titleColor: "#ffbe4d",
       bodyColor: "#edf2f7",
       streakColor: "#52df87",
       accentColor: "#ffbe4d",
       glowColor: [255, 190, 77, 255],
       backgroundColor: "#120d24",
-      buttonActive: getHoveredDirection() === "enter"
+      buttonActive: !isPreparing && getHoveredDirection() === "enter"
     });
     return;
   }
