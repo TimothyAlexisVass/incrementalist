@@ -6,12 +6,14 @@ import { BONUSTIME_BODY_FONT, BONUSTIME_TITLE_FONT } from "../../../config";
 import { renderBonusTimeWelcomeCard } from "../flow";
 import {
   getScratchCardBoardRect,
+  getScratchCardEndRewards,
   getScratchCardHoverBoardPoint,
   getScratchCardParticles,
   getScratchCardRevealVisuals,
   getScratchCardScratchedIndices,
   getScratchCardScratchedPixels,
   getScratchCardState,
+  getScratchCardSurfaceAlpha,
   ScratchCardState
 } from "./interactions";
 import { ScratchCardData } from "./view-model";
@@ -119,9 +121,11 @@ export function renderScratchCard(
   const scratchedPixels = getScratchCardScratchedPixels();
   const scratchedIndices = getScratchCardScratchedIndices();
   const revealVisuals = getScratchCardRevealVisuals();
+  const endRewards = getScratchCardEndRewards();
   const particles = getScratchCardParticles();
   const budget = Math.max(1, data.lastResult.pixels_budget);
   const progressRatio = Math.min(1, scratchedPixels / budget);
+  const surfaceAlpha = getScratchCardSurfaceAlpha(performance.now());
 
   drawProgressTrack(renderer, boardRect, progressRatio);
 
@@ -138,8 +142,9 @@ export function renderScratchCard(
 
   drawScratchBackground(renderer, boardRect);
 
-  drawRevealVisuals(renderer, boardRect, revealVisuals);
-  drawScratchSurface(renderer, boardRect, scratchedIndices, revealVisuals);
+  drawRevealVisuals(renderer, boardRect, revealVisuals, 1);
+  drawScratchSurface(renderer, boardRect, scratchedIndices, revealVisuals, surfaceAlpha);
+  drawRevealVisuals(renderer, boardRect, endRewards, 0.2);
   drawParticles(renderer, boardRect, particles);
   drawBrushPreview(renderer, boardRect);
 }
@@ -203,43 +208,38 @@ function drawProgressTrack(
 function drawRevealVisuals(
   renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
   boardRect: { x: number; y: number; width: number; height: number },
-  revealVisuals: ReturnType<typeof getScratchCardRevealVisuals>
+  reveals: ReadonlyArray<{ tier: number; cellX: number; cellY: number; sizeCells: number }>,
+  alpha: number
 ) {
-  for (const reveal of revealVisuals) {
+  const drawRewardTile = (reveal: { tier: number; cellX: number; cellY: number; sizeCells: number }) => {
     const tierColor = getTierConfig(reveal.tier).color || "#ffffff";
     const x = boardRect.x + (reveal.cellX / GRID_COLS) * boardRect.width;
     const y = boardRect.y + (reveal.cellY / GRID_ROWS) * boardRect.height;
     const width = (reveal.sizeCells / GRID_COLS) * boardRect.width;
     const height = (reveal.sizeCells / GRID_ROWS) * boardRect.height;
 
-    renderer.drawGlowRect({
-      x,
-      y,
-      width,
-      height,
-      color: to255(hexToRgba(tierColor)),
-      radius: 10,
-      intensity: 0.52,
-      outerAlpha: 0.28
-    });
-
     renderer.drawRect({
       x,
       y,
       width,
       height,
-      color: hexToRgba(tierColor, 0.22)
+      color: hexToRgba(tierColor, alpha)
     });
 
     renderer.drawText({
       text: `T${reveal.tier}`,
       x: x + width / 2,
       y: y + height / 2,
-      font: "bold 24px 'Outfit'",
+      font: "bold 19px 'Outfit'",
       color: getRewardTierLabelColor(reveal.tier),
+      alpha,
       align: "center",
       baseline: "middle"
     });
+  };
+
+  for (const reveal of reveals) {
+    drawRewardTile(reveal);
   }
 }
 
@@ -247,7 +247,8 @@ function drawScratchSurface(
   renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
   boardRect: { x: number; y: number; width: number; height: number },
   scratchedIndices: readonly number[],
-  revealVisuals: ReturnType<typeof getScratchCardRevealVisuals>
+  revealVisuals: ReturnType<typeof getScratchCardRevealVisuals>,
+  surfaceAlpha: number
 ) {
   const image = scratchSurfaceImage;
   if (image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
@@ -256,7 +257,8 @@ function drawScratchSurface(
       x: boardRect.x,
       y: boardRect.y,
       width: boardRect.width,
-      height: boardRect.height
+      height: boardRect.height,
+      alpha: surfaceAlpha
     });
   } else {
     renderer.drawGradientRect({
@@ -265,7 +267,8 @@ function drawScratchSurface(
       width: boardRect.width,
       height: boardRect.height,
       colorStart: hexToRgba("#5d4a34"),
-      colorEnd: hexToRgba("#3d2f21")
+      colorEnd: hexToRgba("#3d2f21"),
+      alpha: surfaceAlpha
     });
   }
 
@@ -283,7 +286,7 @@ function drawScratchSurface(
 
     renderer.withScissorRect(revealRect, () => {
       drawScratchBackground(renderer, boardRect);
-      drawRevealVisuals(renderer, boardRect, revealVisuals);
+      drawRevealVisuals(renderer, boardRect, revealVisuals, 1);
     });
   }
 }

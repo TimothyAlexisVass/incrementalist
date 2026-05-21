@@ -70,15 +70,11 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.ScratchCard do
     offset = min(span - 1, max(0, trunc(:math.floor(shaped_roll * span))))
     rolled_count = min_rewards + offset
 
-    max_roll_count =
-      min(
-        Map.fetch!(rules, "lifts_left"),
-        Map.fetch!(rules, "hidden_item_count")
-      )
+    max_roll_count = trunc(max_scale_base)
 
     max_by_budget =
       case min_threshold_gap_pixels(rules) do
-        gap when gap > 0 -> div(max(0, pixel_budget - 1), gap) + 1
+        gap when gap > 0 -> max(1, div(max(0, pixel_budget - 1), gap))
         _ -> max_roll_count
       end
 
@@ -89,12 +85,26 @@ defmodule Incrementalist.Game.Features.BonusTime.Games.ScratchCard do
   end
 
   defp roll_reveal_schedule(pixel_budget, reward_count, min_gap_pixels, chances) do
+    last_threshold_cap =
+      if min_gap_pixels > 0 do
+        max(1, pixel_budget - min_gap_pixels)
+      else
+        pixel_budget
+      end
+
     {_, schedule_rev} =
       Enum.reduce(0..(reward_count - 1), {1, []}, fn idx, {min_threshold, acc} ->
         remaining_after_current = reward_count - idx - 1
 
+        max_threshold_base =
+          max(min_threshold, last_threshold_cap - min_gap_pixels * remaining_after_current)
+
         max_threshold =
-          max(min_threshold, pixel_budget - min_gap_pixels * remaining_after_current)
+          if idx == 0 do
+            min(max_threshold_base, max(1, min_gap_pixels))
+          else
+            max_threshold_base
+          end
 
         threshold = random_int(min_threshold, max_threshold)
         tier = generate_roll(chances) + 1

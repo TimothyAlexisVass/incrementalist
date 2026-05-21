@@ -633,6 +633,8 @@ function runScratchCardFlow() {
   const boardRect = getScratchCardBoardRect(rect);
   const touchA = { x: boardRect.x + boardRect.width * 0.5, y: boardRect.y + boardRect.height * 0.5 };
   const touchB = { x: touchA.x + 8, y: touchA.y + 4 };
+  const touchC = { x: boardRect.x + boardRect.width * 0.9, y: boardRect.y + boardRect.height * 0.8 };
+  const touchMid = { x: (touchA.x + touchC.x) * 0.5, y: (touchA.y + touchC.y) * 0.5 };
 
   handleScratchCardInteractions(makePressedInput(touchA), data, rect, {} as never, runCommand);
   assert(getScratchCardScratchedPixels() > 0, "Scratch Card should scratch pixels while dragging");
@@ -640,6 +642,14 @@ function runScratchCardFlow() {
 
   handleScratchCardInteractions(makePressedInput(touchB), data, rect, {} as never, runCommand);
   assert(getScratchCardRevealVisuals().length === 0, "Scratch Card should keep reveal deferred if no local 37x37 block includes the touch");
+
+  handleScratchCardInteractions(makePressedInput(touchC), data, rect, {} as never, runCommand);
+  const pixelsBeforeMidpointTouch = getScratchCardScratchedPixels();
+  handleScratchCardInteractions(makePressedInput(touchMid), data, rect, {} as never, runCommand);
+  assert(
+    getScratchCardScratchedPixels() === pixelsBeforeMidpointTouch,
+    "Scratch Card should interpolate fast drags so midpoint touch does not scratch new pixels"
+  );
 
   const safetyLimit = 5000;
   let iterations = 0;

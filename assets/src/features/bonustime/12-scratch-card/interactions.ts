@@ -13,6 +13,7 @@ import { ScratchCardData, ScratchCardLastResult } from "./view-model";
 type ScratchCardConfig = {
   game_rules: {
     scratch_card: {
+      chances: number[];
       board_size: {
         width: number;
         height: number;
@@ -63,6 +64,13 @@ export type ScratchParticle = {
   color: { r: number; g: number; b: number };
 };
 
+export type ScratchCardEndReward = {
+  tier: number;
+  cellX: number;
+  cellY: number;
+  sizeCells: number;
+};
+
 export enum ScratchCardState {
   IDLE,
   PLAYING,
@@ -84,6 +92,13 @@ let rewardWaitStartedAt = 0;
 let lastTickAt = 0;
 let hoverBoardPoint: { x: number; y: number } | null = null;
 let hasScratchStarted = false;
+let previousScratchBoardPoint: { x: number; y: number } | null = null;
+let endRewards: ScratchCardEndReward[] = [];
+const SCRATCH_INTERPOLATION_SPACING_PX = Math.max(1, Math.min(BRUSH_WIDTH_PX, BRUSH_HEIGHT_PX) * 0.5);
+const MAX_SCRATCH_SPEED_PX_PER_FRAME = 50;
+const SCRATCH_SURFACE_FADE_MS = 3000;
+const END_REWARD_MIN_GAP_CELLS = 6;
+const END_MISSED_TOTAL_TARGET = 15;
 
 export function getScratchCardState() {
   return internalState;
@@ -113,6 +128,19 @@ export function getScratchCardHoverBoardPoint() {
   return hoverBoardPoint;
 }
 
+export function getScratchCardEndRewards(): readonly ScratchCardEndReward[] {
+  return endRewards;
+}
+
+export function getScratchCardSurfaceAlpha(now: number): number {
+  if (internalState !== ScratchCardState.REVEALED || rewardWaitStartedAt <= 0) {
+    return 1;
+  }
+
+  const progress = clamp((now - rewardWaitStartedAt) / SCRATCH_SURFACE_FADE_MS, 0, 1);
+  return 1 - progress;
+}
+
 export function getScratchCardBoardRect(
   gameRect: { x: number; y: number; width: number; height: number }
 ): ScratchBoardRect {
@@ -136,6 +164,8 @@ export function resetScratchCardState() {
   lastTickAt = 0;
   hoverBoardPoint = null;
   hasScratchStarted = false;
+  previousScratchBoardPoint = null;
+  endRewards = [];
 }
 
 export function handleScratchCardInteractions(
@@ -181,6 +211,8 @@ export function handleScratchCardInteractions(
       rewardWaitStartedAt = 0;
       lastTickAt = now;
       hasScratchStarted = false;
+      previousScratchBoardPoint = null;
+      endRewards = [];
       internalState = ScratchCardState.PLAYING;
 
       if (runCommand) {
@@ -219,7 +251,11 @@ export function handleScratchCardInteractions(
 
   if (internalState === ScratchCardState.PLAYING) {
     if (pointerLogical && (input.isPressed || hasScratchStarted) && !isScratchRunResolved(data.lastResult)) {
-      applyScratchTouch(data.lastResult, pointerLogical, now);
+      const segmentPoints = getScratchSegmentPoints(previousScratchBoardPoint, pointerLogical);
+      for (const boardPoint of segmentPoints) {
+        applyScratchTouch(data.lastResult, boardPoint, now);
+      }
+      previousScratchBoardPoint = segmentPoints[segmentPoints.length - 1] ?? pointerLogical;
       input.consumed = true;
     }
   }
@@ -229,6 +265,13 @@ export function handleScratchCardInteractions(
     scratchedPixels >= data.lastResult.pixels_budget &&
     nextRevealIndex >= data.lastResult.reveal_schedule.length
   ) {
+    const targetMissedCount = Math.max(
+      0,
+      END_MISSED_TOTAL_TARGET - data.lastResult.reveal_schedule.length
+    );
+    const fillerTiers = Array.from({ length: targetMissedCount }, () => sampleScratchTier());
+    endRewards = createDeferredRewards(fillerTiers);
+    nextRevealIndex = data.lastResult.reveal_schedule.length;
     internalState = ScratchCardState.REVEALED;
     rewardWaitStartedAt = now;
   }
@@ -255,24 +298,203 @@ function initializeProjectedRun(lastResult: ScratchCardLastResult, now: number) 
   rewardWaitStartedAt = 0;
   lastTickAt = now;
   hasScratchStarted = false;
+  previousScratchBoardPoint = null;
+  endRewards = [];
+}
+
+function createDeferredRewards(tiers: number[]): ScratchCardEndReward[] {
+  const minAnchorX = 0;
+  const maxAnchorX = GRID_COLS - REVEAL_COVER_SIZE_CELLS;
+  const minAnchorY = 0;
+  const maxAnchorY = GRID_ROWS - REVEAL_COVER_SIZE_CELLS;
+  if (maxAnchorX < minAnchorX || maxAnchorY < minAnchorY) {
+    return [];
+  }
+
+  const candidateAnchors: Array<{ cellX: number; cellY: number }> = [];
+  for (let cellY = minAnchorY; cellY <= maxAnchorY; cellY += 1) {
+    for (let cellX = minAnchorX; cellX <= maxAnchorX; cellX += 1) {
+      if (!isUnscratchedBlock(cellX, cellY, REVEAL_COVER_SIZE_CELLS)) continue;
+      const overlapsRevealed = revealVisuals.some((revealed) =>
+        rectsOverlap(
+          cellX,
+          cellY,
+          REVEAL_COVER_SIZE_CELLS,
+          revealed.cellX,
+          revealed.cellY,
+          revealed.sizeCells
+        )
+      );
+      if (overlapsRevealed) continue;
+      candidateAnchors.push({ cellX, cellY });
+    }
+  }
+
+  if (candidateAnchors.length === 0 || tiers.length <= 0) return [];
+
+  for (let i = candidateAnchors.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = candidateAnchors[i];
+    candidateAnchors[i] = candidateAnchors[j];
+    candidateAnchors[j] = tmp;
+  }
+
+  const rewardCount = Math.min(tiers.length, candidateAnchors.length);
+  for (let gap = END_REWARD_MIN_GAP_CELLS; gap >= 0; gap -= 1) {
+    const selected: ScratchCardEndReward[] = [];
+    for (const anchor of candidateAnchors) {
+      if (selected.length >= rewardCount) break;
+      const cellX = anchor.cellX;
+      const cellY = anchor.cellY;
+      const overlapsSelected = selected.some((reward) =>
+        rectsOverlapWithGap(
+          cellX,
+          cellY,
+          REVEAL_COVER_SIZE_CELLS,
+          reward.cellX,
+          reward.cellY,
+          reward.sizeCells,
+          gap
+        )
+      );
+      const overlapsExistingDeferred = endRewards.some((reward) =>
+        rectsOverlapWithGap(
+          cellX,
+          cellY,
+          REVEAL_COVER_SIZE_CELLS,
+          reward.cellX,
+          reward.cellY,
+          reward.sizeCells,
+          gap
+        )
+      );
+      if (overlapsSelected || overlapsExistingDeferred) continue;
+
+      selected.push({
+        tier: tiers[selected.length],
+        cellX,
+        cellY,
+        sizeCells: REVEAL_COVER_SIZE_CELLS
+      });
+    }
+
+    if (selected.length >= rewardCount) {
+      return selected;
+    }
+  }
+
+  return candidateAnchors.slice(0, rewardCount).map((anchor, idx) => ({
+    tier: tiers[idx],
+    cellX: anchor.cellX,
+    cellY: anchor.cellY,
+    sizeCells: REVEAL_COVER_SIZE_CELLS
+  }));
+}
+
+function rectsOverlapWithGap(
+  ax: number,
+  ay: number,
+  aSize: number,
+  bx: number,
+  by: number,
+  bSize: number,
+  gapCells: number
+): boolean {
+  return (
+    ax < (bx + bSize + gapCells) &&
+    (ax + aSize + gapCells) > bx &&
+    ay < (by + bSize + gapCells) &&
+    (ay + aSize + gapCells) > by
+  );
+}
+
+function rectsOverlap(
+  ax: number,
+  ay: number,
+  aSize: number,
+  bx: number,
+  by: number,
+  bSize: number
+): boolean {
+  return ax < bx + bSize && ax + aSize > bx && ay < by + bSize && ay + aSize > by;
+}
+
+function sampleScratchTier(): number {
+  const chances = SCRATCH_RULES.chances;
+  let total = 0;
+  for (const chance of chances) {
+    total += chance;
+  }
+  if (total <= 0) return 1;
+
+  let roll = Math.random() * total;
+  for (let index = 0; index < chances.length; index += 1) {
+    roll -= chances[index];
+    if (roll <= 0) return index + 1;
+  }
+
+  return chances.length;
+}
+
+function getScratchSegmentPoints(
+  fromPoint: { x: number; y: number } | null,
+  toPoint: { x: number; y: number }
+): { x: number; y: number }[] {
+  if (!fromPoint) return [toPoint];
+
+  const rawDx = toPoint.x - fromPoint.x;
+  const rawDy = toPoint.y - fromPoint.y;
+  const rawDistance = Math.hypot(rawDx, rawDy);
+  const speedScale =
+    rawDistance > MAX_SCRATCH_SPEED_PX_PER_FRAME
+      ? MAX_SCRATCH_SPEED_PX_PER_FRAME / rawDistance
+      : 1;
+
+  const dx = rawDx * speedScale;
+  const dy = rawDy * speedScale;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.001) return [toPoint];
+
+  const steps = Math.max(1, Math.ceil(distance / SCRATCH_INTERPOLATION_SPACING_PX));
+  const points: { x: number; y: number }[] = [];
+
+  for (let step = 1; step <= steps; step += 1) {
+    const t = step / steps;
+    points.push({
+      x: fromPoint.x + dx * t,
+      y: fromPoint.y + dy * t
+    });
+  }
+
+  return points;
 }
 
 function applyScratchTouch(lastResult: ScratchCardLastResult, boardPoint: { x: number; y: number }, now: number) {
-  const nextReveal = lastResult.reveal_schedule[nextRevealIndex];
-  const thresholdReachedBeforeTouch =
-    !!nextReveal && scratchedPixels >= nextReveal.pixels;
-
-  if (thresholdReachedBeforeTouch && nextReveal) {
-    tryReveal(nextReveal, boardPoint, now);
-  }
-
   const newCells = scratchWithBrush(boardPoint, now);
 
   if (newCells > 0) {
     if (!hasScratchStarted) {
       hasScratchStarted = true;
     }
-    scratchedPixels += newCells * SCRATCH_CELL_PIXELS;
+    scratchedPixels = Math.min(
+      lastResult.pixels_budget,
+      scratchedPixels + (newCells * SCRATCH_CELL_PIXELS)
+    );
+  }
+
+  resolveEligibleReveals(lastResult, boardPoint, now);
+}
+
+function resolveEligibleReveals(
+  lastResult: ScratchCardLastResult,
+  boardPoint: { x: number; y: number },
+  now: number
+) {
+  while (nextRevealIndex < lastResult.reveal_schedule.length) {
+    const nextReveal = lastResult.reveal_schedule[nextRevealIndex];
+    if (scratchedPixels < nextReveal.pixels) break;
+    const didReveal = tryReveal(lastResult, nextReveal, boardPoint, now);
+    if (!didReveal) break;
   }
 }
 
@@ -308,12 +530,13 @@ function scratchWithBrush(boardPoint: { x: number; y: number }, now: number): nu
 }
 
 function tryReveal(
+  lastResult: ScratchCardLastResult,
   nextReveal: ScratchCardLastResult["reveal_schedule"][number],
   boardPoint: { x: number; y: number },
   now: number
-) {
+): boolean {
   const anchor = findRevealAnchor(boardPoint);
-  if (!anchor) return;
+  if (!anchor) return false;
 
   revealVisuals.push({
     tier: nextReveal.tier,
@@ -323,49 +546,121 @@ function tryReveal(
     sizeCells: REVEAL_COVER_SIZE_CELLS
   });
 
+  const revealCells = pickRandomRevealCellsInRevealBlock(
+    anchor.x,
+    anchor.y,
+    REVEAL_COVER_SIZE_CELLS,
+    REVEAL_COVER_SIZE_CELLS * 10
+  );
   let blockNewCells = 0;
-  for (let y = anchor.y; y < anchor.y + REVEAL_COVER_SIZE_CELLS; y += 1) {
-    for (let x = anchor.x; x < anchor.x + REVEAL_COVER_SIZE_CELLS; x += 1) {
-      const index = y * GRID_COLS + x;
-      if (scratchedMask[index] !== 0) continue;
-      scratchedMask[index] = 1;
-      scratchedIndices.push(index);
-      blockNewCells += 1;
-    }
+  for (const cell of revealCells) {
+    const index = cell.y * GRID_COLS + cell.x;
+    if (scratchedMask[index] !== 0) continue;
+    scratchedMask[index] = 1;
+    scratchedIndices.push(index);
+    blockNewCells += 1;
   }
 
   if (blockNewCells > 0) {
-    scratchedPixels += RELEASE_PENALTY_PIXELS;
+    scratchedPixels = Math.min(
+      lastResult.pixels_budget,
+      scratchedPixels + RELEASE_PENALTY_PIXELS
+    );
   }
 
   spawnRevealBurst(anchor.x, anchor.y, now);
   nextRevealIndex += 1;
+  return true;
+}
+
+function pickRandomRevealCellsInRevealBlock(
+  anchorX: number,
+  anchorY: number,
+  blockSizeCells: number,
+  targetCount: number
+): Array<{ x: number; y: number }> {
+  const maxCount = Math.min(targetCount, blockSizeCells * blockSizeCells);
+  const centerX = anchorX + Math.floor(blockSizeCells / 2);
+  const centerY = anchorY + Math.floor(blockSizeCells / 2);
+  const minX = anchorX;
+  const maxX = anchorX + blockSizeCells - 1;
+  const minY = anchorY;
+  const maxY = anchorY + blockSizeCells - 1;
+  const selected = new Set<string>();
+  const cells: Array<{ x: number; y: number }> = [];
+
+  const tryAddCell = (x: number, y: number) => {
+    if (x < minX || y < minY || x > maxX || y > maxY) return false;
+    const key = `${x}:${y}`;
+    if (selected.has(key)) return false;
+    selected.add(key);
+    cells.push({ x, y });
+    return true;
+  };
+
+  tryAddCell(centerX, centerY);
+  let walkX = centerX;
+  let walkY = centerY;
+  const maxWalkSteps = maxCount * 10;
+
+  for (let step = 0; step < maxWalkSteps && cells.length < maxCount; step += 1) {
+    const dir = Math.floor(Math.random() * 4);
+    if (dir === 0) walkX += 1;
+    else if (dir === 1) walkX -= 1;
+    else if (dir === 2) walkY += 1;
+    else walkY -= 1;
+
+    walkX = clamp(walkX, minX, maxX);
+    walkY = clamp(walkY, minY, maxY);
+    tryAddCell(walkX, walkY);
+  }
+
+  if (cells.length >= maxCount) {
+    return cells;
+  }
+
+  for (let y = minY; y <= maxY && cells.length < maxCount; y += 1) {
+    for (let x = minX; x <= maxX && cells.length < maxCount; x += 1) {
+      tryAddCell(x, y);
+    }
+  }
+
+  if (cells.length >= maxCount) {
+    return cells;
+  }
+
+  return cells.slice(0, maxCount);
 }
 
 function findRevealAnchor(boardPoint: { x: number; y: number }): { x: number; y: number } | null {
+  const maxAnchorX = GRID_COLS - REVEAL_COVER_SIZE_CELLS;
+  const maxAnchorY = GRID_ROWS - REVEAL_COVER_SIZE_CELLS;
+  if (maxAnchorX < 0 || maxAnchorY < 0) return null;
+
   const centerCellX = clamp(Math.floor(boardPoint.x / CELL_SIZE_PX), 0, GRID_COLS - 1);
   const centerCellY = clamp(Math.floor(boardPoint.y / CELL_SIZE_PX), 0, GRID_ROWS - 1);
-  const minAnchorX = clamp(centerCellX - REVEAL_COVER_SIZE_CELLS + 1, 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
-  const maxAnchorX = clamp(centerCellX, 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
-  const minAnchorY = clamp(centerCellY - REVEAL_COVER_SIZE_CELLS + 1, 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
-  const maxAnchorY = clamp(centerCellY, 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
-  const centerAnchorX = clamp(
+  const preferredAnchorX = clamp(
     centerCellX - Math.floor(REVEAL_COVER_SIZE_CELLS / 2),
-    minAnchorX,
+    0,
     maxAnchorX
   );
-  const centerAnchorY = clamp(
+  const preferredAnchorY = clamp(
     centerCellY - Math.floor(REVEAL_COVER_SIZE_CELLS / 2),
-    minAnchorY,
+    0,
     maxAnchorY
   );
+  const localRange = REVEAL_COVER_SIZE_CELLS;
+  const minAnchorX = clamp(preferredAnchorX - localRange, 0, maxAnchorX);
+  const maxLocalAnchorX = clamp(preferredAnchorX + localRange, 0, maxAnchorX);
+  const minAnchorY = clamp(preferredAnchorY - localRange, 0, maxAnchorY);
+  const maxLocalAnchorY = clamp(preferredAnchorY + localRange, 0, maxAnchorY);
 
   const visited = new Set<string>();
   const maxRadius = Math.max(
-    Math.abs(centerAnchorX - minAnchorX),
-    Math.abs(centerAnchorX - maxAnchorX),
-    Math.abs(centerAnchorY - minAnchorY),
-    Math.abs(centerAnchorY - maxAnchorY)
+    Math.abs(preferredAnchorX - minAnchorX),
+    Math.abs(preferredAnchorX - maxLocalAnchorX),
+    Math.abs(preferredAnchorY - minAnchorY),
+    Math.abs(preferredAnchorY - maxLocalAnchorY)
   );
 
   for (let radius = 0; radius <= maxRadius; radius += 1) {
@@ -374,13 +669,16 @@ function findRevealAnchor(boardPoint: { x: number; y: number }): { x: number; y:
         const onRing = radius === 0 || Math.abs(dx) === radius || Math.abs(dy) === radius;
         if (!onRing) continue;
 
-        const anchorX = clamp(centerAnchorX + dx, minAnchorX, maxAnchorX);
-        const anchorY = clamp(centerAnchorY + dy, minAnchorY, maxAnchorY);
+        const anchorX = clamp(preferredAnchorX + dx, minAnchorX, maxLocalAnchorX);
+        const anchorY = clamp(preferredAnchorY + dy, minAnchorY, maxLocalAnchorY);
         const key = `${anchorX}:${anchorY}`;
         if (visited.has(key)) continue;
         visited.add(key);
 
-        if (isUnscratchedBlock(anchorX, anchorY, REVEAL_COVER_SIZE_CELLS)) {
+        if (
+          isUnscratchedBlock(anchorX, anchorY, REVEAL_COVER_SIZE_CELLS) &&
+          !overlapsRevealVisual(anchorX, anchorY, REVEAL_COVER_SIZE_CELLS)
+        ) {
           return { x: anchorX, y: anchorY };
         }
       }
@@ -388,6 +686,12 @@ function findRevealAnchor(boardPoint: { x: number; y: number }): { x: number; y:
   }
 
   return null;
+}
+
+function overlapsRevealVisual(anchorX: number, anchorY: number, sizeCells: number): boolean {
+  return revealVisuals.some((reveal) =>
+    rectsOverlap(anchorX, anchorY, sizeCells, reveal.cellX, reveal.cellY, reveal.sizeCells)
+  );
 }
 
 function isUnscratchedBlock(startX: number, startY: number, size: number): boolean {

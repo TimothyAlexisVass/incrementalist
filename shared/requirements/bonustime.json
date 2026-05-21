@@ -213,15 +213,13 @@
           "max_bonus": 0.15
         }
       },
-      "lifts_left": 10,
-      "hidden_item_count": 10,
-      "reveal_cover_size_cells": 37,
-      "release_penalty_pixels": 5625,
+      "reveal_cover_size_cells": 16,
+      "release_penalty_pixels": 1000,
       "reward_count": {
         "budget_min": 0.10,
         "budget_max": 0.31,
-        "min_scale_base": 3,
-        "max_scale_base": 8,
+        "min_scale_base": 2,
+        "max_scale_base": 6,
         "bias_at_min_budget": 0.75,
         "bias_at_max_budget": 0.25
       },
