@@ -498,6 +498,49 @@ defmodule Incrementalist.Game.CommandsTest do
     end)
   end
 
+  test "bonustime.play lucky_dice finalizes on the initial throw when only one throw is available" do
+    lucky_dice_anchor = DateTime.add(@now, -(9 * 43_200_000), :millisecond)
+
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(lucky_dice_anchor)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    start_result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "lucky_dice", "action" => "throw", "held_indexes" => []}),
+        @now
+      )
+
+    assert start_result["type"] == "bonustime.play.result"
+    assert start_result["status"] == "ok"
+    assert start_result["bonustime"]["active_game_id"] == "lucky_dice"
+
+    assert start_result["bonustime"]["active_session"] == nil
+
+    last_result =
+      start_result["bonustime"]["last_result"] || start_result["bonustime"][:last_result]
+
+    assert last_result["game_id"] == "lucky_dice"
+    assert last_result["tier"] in 1..7
+    assert is_list(last_result["claimed_tiers"])
+    assert length(last_result["claimed_tiers"]) == 1
+    assert is_list(last_result["dice"])
+    assert length(last_result["dice"]) == 7
+
+    start_ack = Commands.ack(player.id, 0, @now)
+    assert start_ack["released_result"] == nil
+  end
+
   test "cleanup deletes only ACKed command rows older than forty eight hours" do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)

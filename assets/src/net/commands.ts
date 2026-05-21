@@ -73,6 +73,21 @@ export function playBonusTime(channel: GameChannel, gameId: string) {
   });
 }
 
+export function throwLuckyDice(channel: GameChannel, heldIndexes: number[]) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
+    game: "lucky_dice",
+    action: "throw",
+    held_indexes: heldIndexes
+  });
+}
+
+export function claimLuckyDice(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
+    game: "lucky_dice",
+    action: "claim"
+  });
+}
+
 export function claimCoinRain(channel: GameChannel, path: [number, number][]) {
   return channel.pushCommand<CommandPushResult<BonusTimePlayResult | CommandErrorResult>>("bonustime.play", {
     game: "coin_rain",

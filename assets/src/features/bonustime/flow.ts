@@ -204,7 +204,7 @@ export function renderBonusTimeWelcomeCard(
     renderer.drawText({
       text: options.streakText,
       x: centerX,
-      y: cardRect.y + 195,
+      y: cardRect.y + 355,
       font: options.streakFont ?? BONUSTIME_BODY_FONT,
       color: streakColor,
       align: "center",

@@ -23,6 +23,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.ScratchCard
   alias Incrementalist.Game.Features.BonusTime.Games.LadderClimb
   alias Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth
+  alias Incrementalist.Game.Features.BonusTime.Games.LuckyDice
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
@@ -520,6 +521,9 @@ defmodule Incrementalist.Game.CommandExecutor do
           action = Map.get(intent_map, "action")
 
           cond do
+            game_id == "lucky_dice" ->
+              handle_lucky_dice_action(command, ps, intent_map, now, active_game_id)
+
             game_id == "coin_rain" and action == "claim" ->
               # Step 2: Coin Rain Claim
               active_session = ps.state.bonustime.active_session
@@ -1172,6 +1176,246 @@ defmodule Incrementalist.Game.CommandExecutor do
     end
   end
 
+  defp handle_lucky_dice_action(command, ps, intent_map, now, active_game_id) do
+    action = Map.get(intent_map, "action") || "throw"
+    active_session = ps.state.bonustime.active_session
+
+    cond do
+      (action == "throw" and active_session) && active_session.type == "lucky_dice" ->
+        with {:ok, held_indexes} <- fetch_held_indexes(intent_map),
+             {:ok, next_session_data} <- LuckyDice.throw(active_session.data, held_indexes) do
+          next_active_session = %{active_session | data: next_session_data}
+          next_bonustime = %{ps.state.bonustime | active_session: next_active_session}
+          next_state = %{ps.state | bonustime: next_bonustime}
+
+          if next_session_data["throws_remaining"] == 0 do
+            token_type = Map.get(active_session.data, "token_type")
+
+            with {:ok, claim_data} <- LuckyDice.claim(next_session_data) do
+              lucky_dice_claim_result(
+                command,
+                ps,
+                next_state,
+                now,
+                active_game_id,
+                action,
+                token_type,
+                claim_data
+              )
+            else
+              _ -> lucky_dice_invalid_request(command, ps)
+            end
+          else
+            lucky_dice_ok_result(
+              command,
+              ps,
+              next_state,
+              next_bonustime,
+              now,
+              active_game_id,
+              action
+            )
+          end
+        else
+          _ -> lucky_dice_invalid_request(command, ps)
+        end
+
+      action == "throw" ->
+        if active_session do
+          lucky_dice_invalid_request(command, ps)
+        else
+          with {:ok, held_indexes} <- fetch_held_indexes(intent_map),
+               {:ok, next_state, token_type} <-
+                 BonusTime.spend_token_for_game(ps.state, "lucky_dice") do
+            next_state =
+              if token_type == "daily" do
+                new_bonustime = %{
+                  next_state.bonustime
+                  | bonustime_flips: next_state.bonustime.bonustime_flips + 1
+                }
+
+                %{next_state | bonustime: new_bonustime}
+              else
+                next_state
+              end
+
+            session_data = LuckyDice.start_session(next_state.bonustime.streak, token_type, now)
+
+            with {:ok, next_session_data} <- LuckyDice.throw(session_data, held_indexes) do
+              next_active_session = %State.ActiveSession{
+                type: "lucky_dice",
+                data: next_session_data
+              }
+
+              next_bonustime = %{next_state.bonustime | active_session: next_active_session}
+              next_state = %{next_state | bonustime: next_bonustime}
+
+              if next_session_data["throws_remaining"] == 0 do
+                with {:ok, claim_data} <- LuckyDice.claim(next_session_data) do
+                  lucky_dice_claim_result(
+                    command,
+                    ps,
+                    next_state,
+                    now,
+                    active_game_id,
+                    "throw",
+                    token_type,
+                    claim_data
+                  )
+                else
+                  _ -> lucky_dice_invalid_request(command, ps)
+                end
+              else
+                lucky_dice_ok_result(
+                  command,
+                  ps,
+                  next_state,
+                  next_bonustime,
+                  now,
+                  active_game_id,
+                  "throw"
+                )
+              end
+            else
+              _ -> lucky_dice_invalid_request(command, ps)
+            end
+          else
+            {:error, _reason} ->
+              {"failed", error_result("no_tokens", command), ps.id}
+          end
+        end
+
+      (action == "claim" and active_session) && active_session.type == "lucky_dice" ->
+        with {:ok, claim_data} <- LuckyDice.claim(active_session.data) do
+          token_type = Map.get(active_session.data, "token_type")
+          lucky_dice_claim_result(command, ps, ps.state, now, active_game_id, "claim", token_type, claim_data)
+        else
+          _ -> lucky_dice_invalid_request(command, ps)
+        end
+
+      true ->
+        lucky_dice_invalid_request(command, ps)
+    end
+  end
+
+  defp lucky_dice_claim_result(command, ps, base_state, now, active_game_id, action, token_type, claim_data) do
+    tier = claim_data["tier"]
+    claimed_tiers = claim_data["claimed_tiers"] || []
+    dice = claim_data["dice"] || []
+
+    {rewarded_state, reward_amount} =
+      Incrementalist.Game.Rewards.grant_bonus_reward(base_state, tier)
+
+    bonustime_after_reward = rewarded_state.bonustime
+
+    reward_counts =
+      Map.update(bonustime_after_reward.reward_counts, "tier_#{tier}", 1, &(&1 + 1))
+
+    if claim_data["final"] do
+      streak_state = BonusTime.advance_streak(rewarded_state, now)
+      bonustime_after_streak = streak_state.bonustime
+
+      last_result = %{
+        "game_id" => "lucky_dice",
+        "tier" => tier,
+        "rolls" => claimed_tiers,
+        "claimed_tiers" => claimed_tiers,
+        "dice" => dice,
+        "outcome" => claim_data["outcome"],
+        "reward_amount" => reward_amount,
+        "token_type" => token_type,
+        "played_at" => Time.iso8601(now)
+      }
+
+      next_bonustime = %{
+        bonustime_after_streak
+        | total_games_played: bonustime_after_streak.total_games_played + 1,
+          reward_counts: reward_counts,
+          last_result: last_result,
+          active_session: nil
+      }
+
+      next_state =
+        %{streak_state | bonustime: next_bonustime}
+        |> Achievements.evaluate()
+
+      lucky_dice_ok_result(
+        command,
+        ps,
+        next_state,
+        next_bonustime,
+        now,
+        active_game_id,
+        action
+      )
+    else
+      next_active_session = %{
+        base_state.bonustime.active_session
+        | data: claim_data["session"]
+      }
+
+      next_bonustime = %{
+        bonustime_after_reward
+        | reward_counts: reward_counts,
+          active_session: next_active_session
+      }
+
+      next_state =
+        %{rewarded_state | bonustime: next_bonustime}
+        |> Achievements.evaluate()
+
+      lucky_dice_ok_result(
+        command,
+        ps,
+        next_state,
+        next_bonustime,
+        now,
+        active_game_id,
+        action
+      )
+    end
+  end
+
+  defp lucky_dice_ok_result(command, ps, next_state, next_bonustime, now, active_game_id, action) do
+    next_notices =
+      Notices.refresh_for_state_transition(
+        ps.notices || Notices.new(ps.state),
+        ps.state,
+        next_state
+      )
+
+    update_player_state(ps, %{
+      state: next_state,
+      notices: next_notices,
+      last_saved_at: now
+    })
+
+    projected_bonustime =
+      Map.merge(Map.from_struct(next_bonustime), %{
+        "rotation_anchor" =>
+          Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
+          |> Time.iso8601(),
+        "active_game_id" => active_game_id
+      })
+
+    {"succeeded",
+     %{
+       "type" => "bonustime.play.result",
+       "status" => "ok",
+       "command_id" => command.command_id,
+       "coins" => next_state.coins,
+       "has_bonustime_token" => next_state.has_bonustime_token,
+       "bonustime" => projected_bonustime,
+       "achievements" => State.visible_achievements(next_state.achievements),
+       "notices" => Notices.payload(next_notices),
+       "action" => action
+     }, ps.id}
+  end
+
+  defp lucky_dice_invalid_request(command, ps) do
+    {"failed", error_result("invalid_request", command), ps.id}
+  end
+
   defp player_state(player, now) do
     # Reloading ensures we have the latest state from the database.
     player = Repo.get!(Player, player.id)
@@ -1266,6 +1510,34 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_game_id(%{"game" => game_id}) when is_binary(game_id), do: {:ok, game_id}
   defp fetch_game_id(%{game: game_id}) when is_binary(game_id), do: {:ok, game_id}
   defp fetch_game_id(_), do: {:error, "game_id_required"}
+
+  defp fetch_held_indexes(%{"held_indexes" => held_indexes}) when is_list(held_indexes),
+    do: validate_held_indexes(held_indexes)
+
+  defp fetch_held_indexes(%{held_indexes: held_indexes}) when is_list(held_indexes),
+    do: validate_held_indexes(held_indexes)
+
+  defp fetch_held_indexes(_intent), do: {:error, "held_indexes_required"}
+
+  defp validate_held_indexes(held_indexes) when is_list(held_indexes) do
+    valid_indexes = Enum.filter(held_indexes, &is_integer/1)
+    normalized = normalize_held_indexes(valid_indexes)
+
+    if length(valid_indexes) == length(held_indexes) and length(normalized) == length(valid_indexes) do
+      {:ok, normalized}
+    else
+      {:error, "invalid_index"}
+    end
+  end
+
+  defp validate_held_indexes(_held_indexes), do: {:error, "invalid_index"}
+
+  defp normalize_held_indexes(indexes) do
+    indexes
+    |> Enum.filter(&(&1 in 0..6))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
 
   defp maybe_put_plinko_payload(last_result, rolls) when is_map(rolls) do
     Map.put(last_result, "plinko", rolls["plinko"])

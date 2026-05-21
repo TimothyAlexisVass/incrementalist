@@ -50,6 +50,9 @@ import { getMatchPairsState, MatchPairsState, getFinalRevealStartTime as getMatc
 import { renderScratchCard } from "./12-scratch-card/render";
 import { getScratchCardData } from "./12-scratch-card/view-model";
 import { getScratchCardRewardWaitStartedAt, getScratchCardState, ScratchCardState } from "./12-scratch-card/interactions";
+import { renderLuckyDice } from "./10-lucky-dice/render";
+import { getLuckyDiceData } from "./10-lucky-dice/view-model";
+import { getLuckyDiceFinalRevealStartedAt, getLuckyDiceState, LuckyDiceState } from "./10-lucky-dice/interactions";
 import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeRewardCountdownRing } from "./flow";
 
 export function renderBonusTimeOverview(
@@ -89,7 +92,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "ladder_climb" && getLadderClimbState() !== LadderClimbState.IDLE) ||
                            (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
                            (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE) ||
-                           (activeGameId === "scratch_card" && getScratchCardState() !== ScratchCardState.IDLE);
+                           (activeGameId === "scratch_card" && getScratchCardState() !== ScratchCardState.IDLE) ||
+                           (activeGameId === "lucky_dice" && getLuckyDiceState() !== LuckyDiceState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
   const now = performance.now();
@@ -202,6 +206,11 @@ export function renderBonusTimeOverview(
     const data = getScratchCardData(state);
     if (data) {
       renderScratchCard(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "lucky_dice") {
+    const data = getLuckyDiceData(state);
+    if (data) {
+      renderLuckyDice(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({
@@ -334,6 +343,15 @@ function renderActiveRewardCountdownOverlay(
   } else if (activeGameId === "scratch_card") {
     const startedAt = getScratchCardRewardWaitStartedAt();
     if (getScratchCardState() === ScratchCardState.REVEALED && startedAt > 0) {
+      drawRing(
+        BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt),
+        BONUSTIME_REWARD_MODAL_DELAY_MS,
+        "#52df87"
+      );
+    }
+  } else if (activeGameId === "lucky_dice") {
+    const startedAt = getLuckyDiceFinalRevealStartedAt();
+    if (getLuckyDiceState() === LuckyDiceState.FINAL_REVEALING && startedAt > 0) {
       drawRing(
         BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt),
         BONUSTIME_REWARD_MODAL_DELAY_MS,

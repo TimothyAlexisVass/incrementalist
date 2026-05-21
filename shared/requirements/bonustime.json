@@ -376,6 +376,15 @@
         "streak_divisor": 15,
         "max_bonus": 6
       }
+    },
+    "lucky_dice": {
+      "throw_budget": {
+        "first_max_streak": 15,
+        "second_max_streak": 30,
+        "first_throws": 1,
+        "second_throws": 2,
+        "third_throws": 3
+      }
     }
   }
 }

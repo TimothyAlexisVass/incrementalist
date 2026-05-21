@@ -98,14 +98,7 @@ export type BonusTimeState = {
   bonustime_flips?: number;
   active_session?: {
     type: string;
-    data: {
-      seed: number;
-      timer: number;
-      bucket_width: number;
-      bucket_speed: number;
-      token_type?: string;
-      started_at?: string;
-    };
+    data: Record<string, unknown>;
   } | null;
 };
 

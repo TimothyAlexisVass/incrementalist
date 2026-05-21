@@ -81,6 +81,23 @@ import {
   resetScratchCardState
 } from "../features/bonustime/12-scratch-card/interactions";
 import { type ScratchCardData } from "../features/bonustime/12-scratch-card/view-model";
+import {
+  LUCKY_DICE_WELCOME_LAYOUT_OPTIONS,
+  LuckyDiceState,
+  getLuckyDiceFinalRevealStartedAt,
+  getLuckyDiceDieFaceValue,
+  getLuckyDiceHeldIndexes,
+  getLuckyDiceLayout,
+  getLuckyDiceState,
+  getLuckyDiceThrowButtonRect,
+  handleLuckyDiceInteractions,
+  shouldCenterLuckyDiceActionButton,
+  shouldShowLuckyDiceClaimButton,
+  shouldShowLuckyDiceCurrentHand,
+  resetLuckyDiceState
+} from "../features/bonustime/10-lucky-dice/interactions";
+import { type LuckyDiceData } from "../features/bonustime/10-lucky-dice/view-model";
+import type { GameChannel } from "../net/game-channel";
 
 type Point = { x: number; y: number };
 
@@ -730,6 +747,316 @@ function runScratchCardFlow() {
   assert(afterModal?.type === "open_modal", "Scratch Card should open the reward modal after the shared delay");
 }
 
+function runLuckyDiceFlow() {
+  resetLuckyDiceState();
+  setClock(1000);
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const commands: Array<{ event: string; payload: Record<string, unknown> }> = [];
+  const channel = {
+    pushCommand(event: string, payload: Record<string, unknown>) {
+      commands.push({ event, payload });
+      return Promise.resolve(null);
+    }
+  } as unknown as GameChannel;
+
+  const data: LuckyDiceData = {
+    hasToken: true,
+    streak: 31,
+    throwsFromStreak: 3,
+    session: {
+      throwsTotal: 3,
+      throwsRemaining: 2,
+      currentDice: [1, 2, 3, 4, 5, 6, 7],
+      heldIndexes: [],
+      claimedTiers: [],
+      currentTier: 4,
+      currentOutcome: "Four-of-a-kind",
+      startedAt: "2026-01-01T00:00:00Z"
+    },
+    lastResult: null
+  };
+
+  const layout = getLuckyDiceLayout(rect);
+  const session = data.session;
+  assert(session !== null, "Lucky Dice test requires a seeded session");
+
+  assert(
+    getLuckyDiceDieFaceValue(LuckyDiceState.PLAYING, session, null, 0) === 7,
+    "Lucky Dice should show 7s before the first throw is revealed"
+  );
+  assert(
+    shouldShowLuckyDiceCurrentHand(session) === false,
+    "Lucky Dice should not show the current hand before the first throw is revealed"
+  );
+  assert(
+    shouldShowLuckyDiceClaimButton(session) === false,
+    "Lucky Dice should not show a claim button before the first throw is revealed"
+  );
+  assert(
+    shouldCenterLuckyDiceActionButton(session) === true,
+    "Lucky Dice should center the only action button before the first throw is revealed"
+  );
+
+  const preRevealHoldIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(layout.diceRects[0]), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(
+    preRevealHoldIntent === null,
+    "Lucky Dice should not dispatch a command when the board has not been revealed yet"
+  );
+  assert(
+    getLuckyDiceHeldIndexes().length === 0,
+    "Lucky Dice should not track held dice before the first throw is revealed"
+  );
+  assert(commands.length === 0, "Lucky Dice should not send a hold command for local die selection");
+
+  const boardRevealIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(getLuckyDiceThrowButtonRect(layout, rect, true)), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(
+    boardRevealIntent === null,
+    "Lucky Dice should not open the modal when revealing the first board"
+  );
+  assert(
+    commands.length === 0,
+    "Lucky Dice should not send a command when revealing the first board"
+  );
+  assert(
+    getLuckyDiceDieFaceValue(LuckyDiceState.PLAYING, session, null, 0) === session.currentDice[0],
+    "Lucky Dice should show the server dice after the first reveal click"
+  );
+  assert(
+    shouldShowLuckyDiceCurrentHand(session) === true,
+    "Lucky Dice should show the current hand once the board is revealed"
+  );
+  assert(
+    shouldShowLuckyDiceClaimButton(session) === true,
+    "Lucky Dice should show claim on the first throw when a reroll is still available"
+  );
+  assert(
+    shouldCenterLuckyDiceActionButton(session) === false,
+    "Lucky Dice should keep the throw button offset when claim is also visible"
+  );
+
+  const holdIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(layout.diceRects[0]), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(holdIntent === null, "Lucky Dice should not dispatch a command when toggling a held die");
+  assert(
+    getLuckyDiceHeldIndexes().length === 1 && getLuckyDiceHeldIndexes()[0] === 0,
+    "Lucky Dice should track held dice locally after the board has been revealed"
+  );
+  assert(commands.length === 0, "Lucky Dice should not send a hold command for local die selection");
+
+  const rollIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(layout.rollButtonRect), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(rollIntent === null, "Lucky Dice should not open the modal on a normal throw");
+  const commandCount = Number(commands.length);
+  assert(commandCount === 1, "Lucky Dice should send one throw command after the board is revealed");
+  const throwCommand = commands[0];
+
+  assert(throwCommand.event === "bonustime.play", "Lucky Dice should use the bonustime.play channel event");
+  assert(throwCommand.payload.game === "lucky_dice", "Lucky Dice should target the lucky_dice game");
+  assert(throwCommand.payload.action === "throw", "Lucky Dice should send a throw action");
+  const heldIndexes = throwCommand.payload.held_indexes;
+  assert(Array.isArray(heldIndexes), "Lucky Dice should send the held dice indexes with the throw command");
+  assert(heldIndexes.length === 1 && heldIndexes[0] === 0, "Lucky Dice should send the held dice indexes with the throw command");
+
+  const lastThrowSession: NonNullable<LuckyDiceData["session"]> = {
+    throwsTotal: session.throwsTotal,
+    throwsRemaining: 1,
+    currentDice: session.currentDice,
+    heldIndexes: session.heldIndexes,
+    claimedTiers: session.claimedTiers,
+    currentTier: session.currentTier,
+    currentOutcome: session.currentOutcome,
+    startedAt: session.startedAt
+  };
+
+  assert(
+    shouldShowLuckyDiceClaimButton(lastThrowSession) === true,
+    "Lucky Dice should keep claim available while a reroll still remains"
+  );
+  assert(
+    shouldCenterLuckyDiceActionButton(lastThrowSession) === false,
+    "Lucky Dice should keep throw offset while claim is also available"
+  );
+  assert(
+    getLuckyDiceThrowButtonRect(layout, rect, shouldCenterLuckyDiceActionButton(lastThrowSession)).x ===
+      layout.rollButtonRect.x,
+    "Lucky Dice should keep the throw button offset while claim is available"
+  );
+
+  const claimIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(layout.claimButtonRect), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(claimIntent === null, "Lucky Dice should not open the modal when claiming a mid-game reward");
+  const claimCommandCount = Number(commands.length);
+  assert(claimCommandCount === 3, "Lucky Dice should send claim plus immediate reroll commands");
+  const claimRewardCommand = commands[1];
+  assert(claimRewardCommand.event === "bonustime.play", "Lucky Dice should use the bonustime.play channel event for claims");
+  assert(claimRewardCommand.payload.game === "lucky_dice", "Lucky Dice should target the lucky_dice game for claims");
+  assert(claimRewardCommand.payload.action === "claim", "Lucky Dice should send a claim action when claiming mid-game");
+  const rerollAfterClaimCommand = commands[2];
+  const rerollAfterClaimHeldIndexes = rerollAfterClaimCommand.payload.held_indexes;
+  assert(
+    rerollAfterClaimCommand.event === "bonustime.play",
+    "Lucky Dice should use the bonustime.play channel event for claim rerolls"
+  );
+  assert(
+    rerollAfterClaimCommand.payload.game === "lucky_dice",
+    "Lucky Dice should target lucky_dice for claim rerolls"
+  );
+  assert(
+    rerollAfterClaimCommand.payload.action === "throw",
+    "Lucky Dice should immediately reroll all dice after a claim"
+  );
+  assert(
+    Array.isArray(rerollAfterClaimHeldIndexes),
+    "Lucky Dice claim reroll should include held_indexes"
+  );
+  assert(
+    rerollAfterClaimHeldIndexes.length === 0,
+    "Lucky Dice claim reroll should reroll all dice"
+  );
+
+  data.session = null;
+  data.lastResult = {
+    game_id: "lucky_dice",
+    tier: 4,
+    dice: [1, 2, 3, 4, 5, 6, 7],
+    claimed_tiers: [4],
+    reward_amount: ZERO,
+    played_at: "2026-01-01T00:00:00Z"
+  };
+
+  const finalRevealIntent = handleLuckyDiceInteractions(makeInput(null, false), data, rect, channel);
+  assert(
+    getLuckyDiceState() === LuckyDiceState.FINAL_REVEALING,
+    "Lucky Dice should reveal the final board immediately after the last throw result arrives"
+  );
+  assert(finalRevealIntent === null, "Lucky Dice should not open the modal immediately when final reveal starts");
+  assert(
+    getLuckyDiceFinalRevealStartedAt() === 1000,
+    "Lucky Dice should arm the shared reward countdown when the final reveal starts"
+  );
+
+  setClock(1000 + BONUSTIME_REWARD_MODAL_DELAY_MS - 1);
+  const beforeModal = handleLuckyDiceInteractions(makeInput(null, false), data, rect, channel);
+  assert(beforeModal === null, "Lucky Dice should keep waiting before the shared reward delay elapses");
+  assert(
+    getLuckyDiceState() === LuckyDiceState.FINAL_REVEALING,
+    "Lucky Dice should keep the reveal visible while the reward delay is still running"
+  );
+
+  setClock(1000 + BONUSTIME_REWARD_MODAL_DELAY_MS);
+  const afterModal = handleLuckyDiceInteractions(makeInput(null, false), data, rect, channel);
+  assert(afterModal?.type === "open_modal", "Lucky Dice should open the reward modal after the shared delay");
+  assert(
+    getLuckyDiceState() === LuckyDiceState.REVEALED,
+    "Lucky Dice should mark the final reward as revealed once the delay expires"
+  );
+}
+
+function runLuckyDiceWelcomeAndLoadingFlow() {
+  resetLuckyDiceState();
+  setClock(2000);
+
+  const rect = { x: 0, y: 0, width: 800, height: 600 };
+  const commands: Array<{ event: string; payload: Record<string, unknown> }> = [];
+  const channel = {
+    pushCommand(event: string, payload: Record<string, unknown>) {
+      commands.push({ event, payload });
+      return Promise.resolve(null);
+    }
+  } as unknown as GameChannel;
+
+  const data: LuckyDiceData = {
+    hasToken: true,
+    streak: 16,
+    throwsFromStreak: 2,
+    session: null,
+    lastResult: {
+      game_id: "lucky_dice",
+      tier: 3,
+      dice: [1, 1, 1, 2, 3, 4, 5],
+      claimed_tiers: [3],
+      reward_amount: ZERO,
+      played_at: "2026-01-01T00:00:00Z"
+    }
+  };
+
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, LUCKY_DICE_WELCOME_LAYOUT_OPTIONS);
+  const welcomeClickIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(welcomeLayout.buttonRect), true),
+    data,
+    rect,
+    channel
+  );
+
+  assert(welcomeClickIntent === null, "Lucky Dice should not open modal when starting from welcome");
+  assert(commands.length === 1, "Lucky Dice should send one throw command from welcome");
+  assert(commands[0].event === "bonustime.play", "Lucky Dice welcome start should use bonustime.play");
+  assert(commands[0].payload.action === "throw", "Lucky Dice welcome start should enqueue a throw");
+  assert(getLuckyDiceState() === LuckyDiceState.LOADING, "Lucky Dice should remain loading while waiting for session");
+
+  const loadingIntent = handleLuckyDiceInteractions(makeInput(null, false), data, rect, channel);
+  assert(loadingIntent === null, "Lucky Dice loading should not open modal");
+  assert(
+    getLuckyDiceState() === LuckyDiceState.LOADING,
+    "Lucky Dice should ignore stale last_result while loading a newly started run"
+  );
+
+  data.session = {
+    throwsTotal: 2,
+    throwsRemaining: 1,
+    currentDice: [2, 3, 4, 5, 6, 7, 1],
+    heldIndexes: [],
+    claimedTiers: [],
+    currentTier: 4,
+    currentOutcome: "Small straight",
+    startedAt: "2026-01-02T00:00:00Z"
+  };
+
+  handleLuckyDiceInteractions(makeInput(null, false), data, rect, channel);
+
+  const layout = getLuckyDiceLayout(rect);
+  const revealIntent = handleLuckyDiceInteractions(
+    makeInput(centerOf(getLuckyDiceThrowButtonRect(layout, rect, true)), true),
+    data,
+    rect,
+    channel
+  );
+  assert(revealIntent === null, "Lucky Dice first in-board throw click should reveal, not send command");
+  assert(commands.length === 1, "Lucky Dice reveal click should not enqueue a second command");
+  assert(
+    getLuckyDiceDieFaceValue(LuckyDiceState.PLAYING, data.session, null, 0) === data.session.currentDice[0],
+    "Lucky Dice should reveal server-provided dice on the first in-board throw click"
+  );
+}
+
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
@@ -738,6 +1065,8 @@ function main() {
   runChecklistFlow();
   runMatchPairsFlow();
   runScratchCardFlow();
+  runLuckyDiceWelcomeAndLoadingFlow();
+  runLuckyDiceFlow();
   console.log("bonustime flow tests passed");
 }
 
