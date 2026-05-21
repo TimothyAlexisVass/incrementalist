@@ -94,11 +94,29 @@ let hoverBoardPoint: { x: number; y: number } | null = null;
 let hasScratchStarted = false;
 let previousScratchBoardPoint: { x: number; y: number } | null = null;
 let endRewards: ScratchCardEndReward[] = [];
+let deferredRevealOrigin: { x: number; y: number } | null = null;
 const SCRATCH_INTERPOLATION_SPACING_PX = Math.max(1, Math.min(BRUSH_WIDTH_PX, BRUSH_HEIGHT_PX) * 0.5);
 const MAX_SCRATCH_SPEED_PX_PER_FRAME = 50;
 const SCRATCH_SURFACE_FADE_MS = 3000;
 const END_REWARD_MIN_GAP_CELLS = 6;
 const END_MISSED_TOTAL_TARGET = 15;
+export const SCRATCH_CARD_WELCOME_LAYOUT_OPTIONS = {
+  cardWidth: 580,
+  cardHeight: 360,
+  buttonWidth: 240,
+  buttonHeight: 50,
+  cardYOffset: -20,
+  buttonOffsetY: 70
+} as const;
+
+export function getScratchCardWelcomeLayout(gameRect: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  return getBonusTimeWelcomeLayout(gameRect, SCRATCH_CARD_WELCOME_LAYOUT_OPTIONS);
+}
 
 export function getScratchCardState() {
   return internalState;
@@ -154,18 +172,7 @@ export function resetScratchCardState() {
   waitingForFreshResult = false;
   startReferencePlayedAt = null;
   activePlayedAt = null;
-  scratchedMask = new Uint8Array(GRID_TOTAL_CELLS);
-  scratchedIndices = [];
-  scratchedPixels = 0;
-  nextRevealIndex = 0;
-  revealVisuals = [];
-  particles = [];
-  rewardWaitStartedAt = 0;
-  lastTickAt = 0;
-  hoverBoardPoint = null;
-  hasScratchStarted = false;
-  previousScratchBoardPoint = null;
-  endRewards = [];
+  resetScratchRunProjection(0);
 }
 
 export function handleScratchCardInteractions(
@@ -180,14 +187,7 @@ export function handleScratchCardInteractions(
   hoverBoardPoint = null;
 
   const boardRect = getScratchCardBoardRect(gameRect);
-  const welcomeLayout = getBonusTimeWelcomeLayout(gameRect, {
-    cardWidth: 580,
-    cardHeight: 360,
-    buttonWidth: 240,
-    buttonHeight: 50,
-    cardYOffset: -20,
-    buttonOffsetY: 70
-  });
+  const welcomeLayout = getScratchCardWelcomeLayout(gameRect);
 
   if (internalState === ScratchCardState.IDLE) {
     if (
@@ -202,17 +202,7 @@ export function handleScratchCardInteractions(
       waitingForFreshResult = true;
       startReferencePlayedAt = data.lastResult?.played_at ?? null;
       activePlayedAt = null;
-      scratchedMask = new Uint8Array(GRID_TOTAL_CELLS);
-      scratchedIndices = [];
-      scratchedPixels = 0;
-      nextRevealIndex = 0;
-      revealVisuals = [];
-      particles = [];
-      rewardWaitStartedAt = 0;
-      lastTickAt = now;
-      hasScratchStarted = false;
-      previousScratchBoardPoint = null;
-      endRewards = [];
+      resetScratchRunProjection(now);
       internalState = ScratchCardState.PLAYING;
 
       if (runCommand) {
@@ -289,17 +279,7 @@ export function handleScratchCardInteractions(
 
 function initializeProjectedRun(lastResult: ScratchCardLastResult, now: number) {
   activePlayedAt = lastResult.played_at;
-  scratchedMask = new Uint8Array(GRID_TOTAL_CELLS);
-  scratchedIndices = [];
-  scratchedPixels = 0;
-  nextRevealIndex = 0;
-  revealVisuals = [];
-  particles = [];
-  rewardWaitStartedAt = 0;
-  lastTickAt = now;
-  hasScratchStarted = false;
-  previousScratchBoardPoint = null;
-  endRewards = [];
+  resetScratchRunProjection(now);
 }
 
 function createDeferredRewards(tiers: number[]): ScratchCardEndReward[] {
@@ -311,22 +291,39 @@ function createDeferredRewards(tiers: number[]): ScratchCardEndReward[] {
     return [];
   }
 
-  const candidateAnchors: Array<{ cellX: number; cellY: number }> = [];
+  const scratchPrefixSums = buildScratchPrefixSums(scratchedMask);
+  const candidateAnchors: number[] = [];
+  const revealBlockSize = REVEAL_COVER_SIZE_CELLS;
+  const anchorStride = maxAnchorX - minAnchorX + 1;
+  const hasRevealVisuals = revealVisuals.length > 0;
+
   for (let cellY = minAnchorY; cellY <= maxAnchorY; cellY += 1) {
     for (let cellX = minAnchorX; cellX <= maxAnchorX; cellX += 1) {
-      if (!isUnscratchedBlock(cellX, cellY, REVEAL_COVER_SIZE_CELLS)) continue;
-      const overlapsRevealed = revealVisuals.some((revealed) =>
-        rectsOverlap(
-          cellX,
-          cellY,
-          REVEAL_COVER_SIZE_CELLS,
-          revealed.cellX,
-          revealed.cellY,
-          revealed.sizeCells
-        )
-      );
-      if (overlapsRevealed) continue;
-      candidateAnchors.push({ cellX, cellY });
+      if (countScratchedCellsInBlock(scratchPrefixSums, cellX, cellY, revealBlockSize) !== 0) {
+        continue;
+      }
+
+      if (hasRevealVisuals) {
+        let overlapsRevealed = false;
+        for (const revealed of revealVisuals) {
+          if (
+            rectsOverlap(
+              cellX,
+              cellY,
+              revealBlockSize,
+              revealed.cellX,
+              revealed.cellY,
+              revealed.sizeCells
+            )
+          ) {
+            overlapsRevealed = true;
+            break;
+          }
+        }
+        if (overlapsRevealed) continue;
+      }
+
+      candidateAnchors.push(((cellY - minAnchorY) * anchorStride) + (cellX - minAnchorX));
     }
   }
 
@@ -342,39 +339,58 @@ function createDeferredRewards(tiers: number[]): ScratchCardEndReward[] {
   const rewardCount = Math.min(tiers.length, candidateAnchors.length);
   for (let gap = END_REWARD_MIN_GAP_CELLS; gap >= 0; gap -= 1) {
     const selected: ScratchCardEndReward[] = [];
-    for (const anchor of candidateAnchors) {
+    for (const encodedAnchor of candidateAnchors) {
       if (selected.length >= rewardCount) break;
-      const cellX = anchor.cellX;
-      const cellY = anchor.cellY;
-      const overlapsSelected = selected.some((reward) =>
-        rectsOverlapWithGap(
-          cellX,
-          cellY,
-          REVEAL_COVER_SIZE_CELLS,
-          reward.cellX,
-          reward.cellY,
-          reward.sizeCells,
-          gap
-        )
-      );
-      const overlapsExistingDeferred = endRewards.some((reward) =>
-        rectsOverlapWithGap(
-          cellX,
-          cellY,
-          REVEAL_COVER_SIZE_CELLS,
-          reward.cellX,
-          reward.cellY,
-          reward.sizeCells,
-          gap
-        )
-      );
+      const localX = encodedAnchor % anchorStride;
+      const localY = Math.floor(encodedAnchor / anchorStride);
+      const cellX = minAnchorX + localX;
+      const cellY = minAnchorY + localY;
+
+      let overlapsSelected = false;
+      for (const reward of selected) {
+        if (
+          rectsOverlapWithGap(
+            cellX,
+            cellY,
+            revealBlockSize,
+            reward.cellX,
+            reward.cellY,
+            reward.sizeCells,
+            gap
+          )
+        ) {
+          overlapsSelected = true;
+          break;
+        }
+      }
+
+      let overlapsExistingDeferred = false;
+      if (!overlapsSelected && endRewards.length > 0) {
+        for (const reward of endRewards) {
+          if (
+            rectsOverlapWithGap(
+              cellX,
+              cellY,
+              revealBlockSize,
+              reward.cellX,
+              reward.cellY,
+              reward.sizeCells,
+              gap
+            )
+          ) {
+            overlapsExistingDeferred = true;
+            break;
+          }
+        }
+      }
+
       if (overlapsSelected || overlapsExistingDeferred) continue;
 
       selected.push({
         tier: tiers[selected.length],
         cellX,
         cellY,
-        sizeCells: REVEAL_COVER_SIZE_CELLS
+        sizeCells: revealBlockSize
       });
     }
 
@@ -383,12 +399,51 @@ function createDeferredRewards(tiers: number[]): ScratchCardEndReward[] {
     }
   }
 
-  return candidateAnchors.slice(0, rewardCount).map((anchor, idx) => ({
+  return candidateAnchors.slice(0, rewardCount).map((encodedAnchor, idx) => ({
     tier: tiers[idx],
-    cellX: anchor.cellX,
-    cellY: anchor.cellY,
-    sizeCells: REVEAL_COVER_SIZE_CELLS
+    cellX: minAnchorX + (encodedAnchor % anchorStride),
+    cellY: minAnchorY + Math.floor(encodedAnchor / anchorStride),
+    sizeCells: revealBlockSize
   }));
+}
+
+function buildScratchPrefixSums(mask: Uint8Array): Uint32Array {
+  const stride = GRID_COLS + 1;
+  const prefix = new Uint32Array((GRID_ROWS + 1) * stride);
+
+  for (let row = 1; row <= GRID_ROWS; row += 1) {
+    const maskRowOffset = (row - 1) * GRID_COLS;
+    const prefixRowOffset = row * stride;
+    const prevPrefixRowOffset = (row - 1) * stride;
+    let rowSum = 0;
+
+    for (let col = 1; col <= GRID_COLS; col += 1) {
+      rowSum += mask[maskRowOffset + col - 1];
+      prefix[prefixRowOffset + col] = prefix[prevPrefixRowOffset + col] + rowSum;
+    }
+  }
+
+  return prefix;
+}
+
+function countScratchedCellsInBlock(
+  prefix: Uint32Array,
+  startX: number,
+  startY: number,
+  size: number
+): number {
+  const x0 = startX;
+  const y0 = startY;
+  const x1 = startX + size;
+  const y1 = startY + size;
+  const stride = GRID_COLS + 1;
+
+  return (
+    prefix[y1 * stride + x1] -
+    prefix[y0 * stride + x1] -
+    prefix[y1 * stride + x0] +
+    prefix[y0 * stride + x0]
+  );
 }
 
 function rectsOverlapWithGap(
@@ -470,6 +525,9 @@ function getScratchSegmentPoints(
 }
 
 function applyScratchTouch(lastResult: ScratchCardLastResult, boardPoint: { x: number; y: number }, now: number) {
+  const scratchedPixelsBeforeTouch = scratchedPixels;
+  const nextThreshold = lastResult.reveal_schedule[nextRevealIndex]?.pixels;
+
   const newCells = scratchWithBrush(boardPoint, now);
 
   if (newCells > 0) {
@@ -482,7 +540,35 @@ function applyScratchTouch(lastResult: ScratchCardLastResult, boardPoint: { x: n
     );
   }
 
+  if (typeof nextThreshold !== "number") {
+    return;
+  }
+
+  if (scratchedPixelsBeforeTouch < nextThreshold && scratchedPixels >= nextThreshold) {
+    deferredRevealOrigin = { x: boardPoint.x, y: boardPoint.y };
+    return;
+  }
+
+  if (scratchedPixelsBeforeTouch < nextThreshold) {
+    return;
+  }
+
+  if (deferredRevealOrigin) {
+    const distanceFromThresholdCross = Math.hypot(
+      boardPoint.x - deferredRevealOrigin.x,
+      boardPoint.y - deferredRevealOrigin.y
+    );
+    const minRevealDistance = REVEAL_COVER_SIZE_CELLS * CELL_SIZE_PX;
+    if (distanceFromThresholdCross < minRevealDistance) {
+      return;
+    }
+  }
+
+  const revealIndexBefore = nextRevealIndex;
   resolveEligibleReveals(lastResult, boardPoint, now);
+  if (nextRevealIndex > revealIndexBefore) {
+    deferredRevealOrigin = null;
+  }
 }
 
 function resolveEligibleReveals(
@@ -765,21 +851,38 @@ function tickParticles(now: number) {
   const dt = Math.max(0, dtMs / 1000);
   lastTickAt = now;
 
-  particles = particles
-    .map((particle) => {
-      const age = now - particle.bornAt;
-      if (age >= particle.lifeMs) return null;
+  let writeIndex = 0;
+  for (let readIndex = 0; readIndex < particles.length; readIndex += 1) {
+    const particle = particles[readIndex];
+    const age = now - particle.bornAt;
+    if (age >= particle.lifeMs) continue;
 
-      const progress = age / particle.lifeMs;
-      return {
-        ...particle,
-        x: particle.x + particle.vx * dt,
-        y: particle.y + particle.vy * dt,
-        vy: particle.vy + (80 * dt),
-        alpha: Math.max(0, 1 - (progress * 0.55))
-      };
-    })
-    .filter((particle): particle is ScratchParticle => particle !== null);
+    const progress = age / particle.lifeMs;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vy += 80 * dt;
+    particle.alpha = Math.max(0, 1 - (progress * 0.55));
+    particles[writeIndex] = particle;
+    writeIndex += 1;
+  }
+
+  particles.length = writeIndex;
+}
+
+function resetScratchRunProjection(now: number) {
+  scratchedMask = new Uint8Array(GRID_TOTAL_CELLS);
+  scratchedIndices = [];
+  scratchedPixels = 0;
+  nextRevealIndex = 0;
+  revealVisuals = [];
+  particles = [];
+  rewardWaitStartedAt = 0;
+  lastTickAt = now;
+  hoverBoardPoint = null;
+  hasScratchStarted = false;
+  previousScratchBoardPoint = null;
+  endRewards = [];
+  deferredRevealOrigin = null;
 }
 
 function toLogicalBoardPoint(

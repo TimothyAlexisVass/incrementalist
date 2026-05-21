@@ -1,11 +1,13 @@
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
 import { getActiveWebGLRenderer, type DrawPointParticle } from "../../../renderer/webgl";
-import { hexToRgba, to255 } from "../../../utils";
+import { hexToRgba } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { BONUSTIME_BODY_FONT, BONUSTIME_TITLE_FONT } from "../../../config";
-import { renderBonusTimeWelcomeCard } from "../flow";
+import { isPointInBonusTimeWelcomeButton, renderBonusTimeWelcomeCard } from "../flow";
 import {
+  getScratchCardWelcomeLayout,
   getScratchCardBoardRect,
+  SCRATCH_CARD_WELCOME_LAYOUT_OPTIONS,
   getScratchCardEndRewards,
   getScratchCardHoverBoardPoint,
   getScratchCardParticles,
@@ -42,8 +44,12 @@ let scratchSurfaceImage: HTMLImageElement | null = null;
 let scratchImagesInitialized = false;
 type CellRect = { cellX: number; cellY: number; widthCells: number; heightCells: number };
 let cachedScratchIndicesRef: readonly number[] | null = null;
-let cachedScratchIndicesLength = -1;
+let cachedProcessedScratchCount = 0;
+const cachedScratchMask = new Uint8Array(GRID_COLS * GRID_ROWS);
+const cachedDirtyRows = new Set<number>();
+const cachedRowRects: CellRect[][] = Array.from({ length: GRID_ROWS }, () => []);
 let cachedScratchedRevealRects: CellRect[] = [];
+let cachedFlattenedRectsDirty = false;
 const scratchParticleBatch: DrawPointParticle[] = [];
 
 function getTierConfig(tier: number) {
@@ -76,9 +82,9 @@ export function renderScratchCard(
   const centerY = rect.y + rect.height / 2;
 
   if (state === ScratchCardState.IDLE) {
+    const welcomeLayout = getScratchCardWelcomeLayout(rect);
     renderBonusTimeWelcomeCard(renderer, rect, {
-      cardWidth: 580,
-      cardHeight: 360,
+      ...SCRATCH_CARD_WELCOME_LAYOUT_OPTIONS,
       title: "SCRATCH CARD",
       bodyLines: [
         "Scratch to reveal hidden tiers.",
@@ -92,14 +98,7 @@ export function renderScratchCard(
       accentColor: "#ffbe4d",
       glowColor: [255, 190, 77, 255],
       backgroundColor: "#1f1a12",
-      buttonActive:
-        !!(
-          pointer &&
-          pointer.x >= centerX - 120 &&
-          pointer.x <= centerX + 120 &&
-          pointer.y >= centerY + 70 &&
-          pointer.y <= centerY + 120
-        )
+      buttonActive: isPointInBonusTimeWelcomeButton(pointer, welcomeLayout)
     });
     return;
   }
@@ -292,75 +291,85 @@ function drawScratchSurface(
 }
 
 function buildScratchedRevealRects(scratchedIndices: readonly number[]): CellRect[] {
-  if (
-    cachedScratchIndicesRef === scratchedIndices &&
-    cachedScratchIndicesLength === scratchedIndices.length
-  ) {
-    return cachedScratchedRevealRects;
+  if (cachedScratchIndicesRef !== scratchedIndices || scratchedIndices.length < cachedProcessedScratchCount) {
+    resetScratchedRevealRectCache(scratchedIndices);
   }
 
-  if (scratchedIndices.length === 0) {
-    cachedScratchIndicesRef = scratchedIndices;
-    cachedScratchIndicesLength = 0;
-    cachedScratchedRevealRects = [];
-    return cachedScratchedRevealRects;
-  }
+  if (scratchedIndices.length > cachedProcessedScratchCount) {
+    for (let i = cachedProcessedScratchCount; i < scratchedIndices.length; i += 1) {
+      const index = scratchedIndices[i];
+      if (index < 0 || index >= cachedScratchMask.length) continue;
+      if (cachedScratchMask[index] !== 0) continue;
 
-  const mask = new Uint8Array(GRID_COLS * GRID_ROWS);
-  for (const index of scratchedIndices) {
-    if (index >= 0 && index < mask.length) {
-      mask[index] = 1;
+      cachedScratchMask[index] = 1;
+      const row = Math.floor(index / GRID_COLS);
+      cachedDirtyRows.add(row);
     }
+    cachedProcessedScratchCount = scratchedIndices.length;
   }
 
-  const merged: CellRect[] = [];
-  let activeBySpan = new Map<string, CellRect>();
-
-  for (let row = 0; row < GRID_ROWS; row += 1) {
-    const nextActiveBySpan = new Map<string, CellRect>();
-    let col = 0;
-    while (col < GRID_COLS) {
-      const index = row * GRID_COLS + col;
-      if (mask[index] === 0) {
-        col += 1;
-        continue;
-      }
-
-      const startCol = col;
-      col += 1;
-      while (col < GRID_COLS && mask[row * GRID_COLS + col] !== 0) {
-        col += 1;
-      }
-
-      const widthCells = col - startCol;
-      const key = `${startCol}:${widthCells}`;
-      const active = activeBySpan.get(key);
-      if (active && active.cellY + active.heightCells === row) {
-        active.heightCells += 1;
-        nextActiveBySpan.set(key, active);
-      } else {
-        const created: CellRect = { cellX: startCol, cellY: row, widthCells, heightCells: 1 };
-        nextActiveBySpan.set(key, created);
-      }
+  if (cachedDirtyRows.size > 0) {
+    for (const row of cachedDirtyRows) {
+      rebuildRowScratchRects(row);
     }
-
-    for (const [key, rect] of activeBySpan) {
-      if (!nextActiveBySpan.has(key)) {
-        merged.push(rect);
-      }
-    }
-
-    activeBySpan = nextActiveBySpan;
+    cachedDirtyRows.clear();
+    cachedFlattenedRectsDirty = true;
   }
 
-  for (const rect of activeBySpan.values()) {
-    merged.push(rect);
+  if (cachedFlattenedRectsDirty) {
+    rebuildFlattenedScratchRects();
   }
 
+  return cachedScratchedRevealRects;
+}
+
+function resetScratchedRevealRectCache(scratchedIndices: readonly number[]) {
   cachedScratchIndicesRef = scratchedIndices;
-  cachedScratchIndicesLength = scratchedIndices.length;
-  cachedScratchedRevealRects = merged;
-  return merged;
+  cachedProcessedScratchCount = 0;
+  cachedScratchMask.fill(0);
+  cachedDirtyRows.clear();
+  for (const rowRects of cachedRowRects) {
+    rowRects.length = 0;
+  }
+  cachedScratchedRevealRects.length = 0;
+  cachedFlattenedRectsDirty = false;
+}
+
+function rebuildRowScratchRects(row: number) {
+  const rowRects = cachedRowRects[row];
+  rowRects.length = 0;
+
+  const rowStart = row * GRID_COLS;
+  let col = 0;
+  while (col < GRID_COLS) {
+    if (cachedScratchMask[rowStart + col] === 0) {
+      col += 1;
+      continue;
+    }
+
+    const startCol = col;
+    col += 1;
+    while (col < GRID_COLS && cachedScratchMask[rowStart + col] !== 0) {
+      col += 1;
+    }
+
+    rowRects.push({
+      cellX: startCol,
+      cellY: row,
+      widthCells: col - startCol,
+      heightCells: 1
+    });
+  }
+}
+
+function rebuildFlattenedScratchRects() {
+  cachedScratchedRevealRects.length = 0;
+  for (const rowRects of cachedRowRects) {
+    for (const rect of rowRects) {
+      cachedScratchedRevealRects.push(rect);
+    }
+  }
+  cachedFlattenedRectsDirty = false;
 }
 
 function drawParticles(
@@ -368,11 +377,12 @@ function drawParticles(
   boardRect: { x: number; y: number; width: number; height: number },
   particles: ReturnType<typeof getScratchCardParticles>
 ) {
+  const particleScale = Math.max(boardRect.width / BOARD_WIDTH, boardRect.height / BOARD_HEIGHT);
   let writeCount = 0;
   for (const particle of particles) {
     const x = boardRect.x + (particle.x / BOARD_WIDTH) * boardRect.width;
     const y = boardRect.y + (particle.y / BOARD_HEIGHT) * boardRect.height;
-    const diameter = (1 + Math.random()) * 10;
+    const diameter = Math.max(1, particle.size * particleScale * 4);
     const alpha = Math.max(0, Math.min(1, particle.alpha));
     if (alpha <= 0) continue;
 
@@ -381,7 +391,11 @@ function drawParticles(
       existing.x = x;
       existing.y = y;
       existing.size = diameter;
-      existing.color = [particle.color.r, particle.color.g, particle.color.b, alpha];
+      const color = existing.color as [number, number, number, number];
+      color[0] = particle.color.r;
+      color[1] = particle.color.g;
+      color[2] = particle.color.b;
+      color[3] = alpha;
     } else {
       scratchParticleBatch.push({
         x,
