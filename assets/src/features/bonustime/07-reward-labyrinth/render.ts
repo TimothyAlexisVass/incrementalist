@@ -17,6 +17,74 @@ function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
+function drawTierRewardTile(
+  renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
+  options: {
+    x: number;
+    y: number;
+    size: number;
+    tier: number;
+    alpha?: number;
+    fillAlpha?: number;
+    borderThickness?: number;
+    glow?: boolean;
+    font?: string;
+  }
+) {
+  const {
+    x,
+    y,
+    size,
+    tier,
+    alpha = 1,
+    fillAlpha = 0.15,
+    borderThickness = 2,
+    glow = false,
+    font = `bold ${Math.max(9, Math.round(size * 0.34))}px Arial`
+  } = options;
+  const tierColor = getTierConfig(tier)?.color || "#FFFFFF";
+  const stroke = Math.max(1, borderThickness);
+
+  if (glow) {
+    renderer.drawGlowRect({
+      x,
+      y,
+      width: size,
+      height: size,
+      color: to255(hexToRgba(tierColor)),
+      radius: Math.max(4, Math.round(size * 0.14)),
+      intensity: 0.45,
+      outerAlpha: 0.25,
+      alpha
+    });
+  }
+
+  renderer.drawRect({
+    x,
+    y,
+    width: size,
+    height: size,
+    color: hexToRgba(tierColor, fillAlpha),
+    alpha
+  });
+
+  renderer.drawRect({ x, y, width: size, height: stroke, color: hexToRgba(tierColor, 0.9), alpha });
+  renderer.drawRect({ x, y: y + size - stroke, width: size, height: stroke, color: hexToRgba(tierColor, 0.9), alpha });
+  renderer.drawRect({ x, y, width: stroke, height: size, color: hexToRgba(tierColor, 0.9), alpha });
+  renderer.drawRect({ x: x + size - stroke, y, width: stroke, height: size, color: hexToRgba(tierColor, 0.9), alpha });
+
+  renderer.drawText({
+    text: `T${tier}`,
+    x: x + size / 2,
+    y: y + size / 2,
+    font,
+    color: getRewardTierLabelColor(tier),
+    align: "center",
+    baseline: "middle",
+    alpha
+  });
+}
+
 function getMaxRewardLabyrinthChestSlots() {
   const rules = bonusTimeConfig.game_rules.reward_labyrinth as {
     step_budget: {
@@ -224,13 +292,16 @@ export function renderRewardLabyrinth(
           // Render small discovered chest indicator inside room cell if chest was found here
           const chest = getDiscoveredChests().find(c => c.x === ax && c.y === ay);
           if (chest) {
-            const tierCfg = getTierConfig(chest.tier);
-            const rColor = tierCfg ? tierCfg.color : "#FFFFFF";
-            renderer.drawCircle(cellX, cellY, 8, hexToRgba(rColor, 0.35 + Math.sin(now * 0.007) * 0.1));
-            renderer.drawText({
-              text: `T${chest.tier}`,
-              x: cellX, y: cellY, font: BONUSTIME_BODY_FONT,
-              color: getRewardTierLabelColor(chest.tier), align: 'center', baseline: 'middle'
+            const miniTileSize = 18;
+            drawTierRewardTile(renderer, {
+              x: cellX - miniTileSize / 2,
+              y: cellY - miniTileSize / 2,
+              size: miniTileSize,
+              tier: chest.tier,
+              fillAlpha: 0.3 + (Math.sin(now * 0.007) * 0.08),
+              borderThickness: 1.5,
+              glow: true,
+              font: "bold 10px Arial"
             });
           } else {
             // Empty explored room center dot
@@ -297,22 +368,20 @@ export function renderRewardLabyrinth(
       const chestFound = chests[i];
 
       if (chestFound) {
-        const tierCfg = getTierConfig(chestFound.tier);
-        const rColor = tierCfg ? tierCfg.color : "#FFFFFF";
-
-        // Found chest slot background and gold ring border
+        // Found chest slot background and tier tile
         renderer.drawRect({
           x: slotX, y: inventoryY, width: slotSize, height: slotSize,
           color: hexToRgba("#1A202C", 1)
         });
-        renderer.drawRing(slotX + slotSize / 2, inventoryY + slotSize / 2, slotSize / 2 - 2, 2, hexToRgba(rColor, 0.8));
-
-        // Pulsing glowing center
-        renderer.drawCircle(slotX + slotSize / 2, inventoryY + slotSize / 2, 10, hexToRgba(rColor, 0.35 + Math.sin(now * 0.007) * 0.1));
-        renderer.drawText({
-          text: `T${chestFound.tier}`,
-          x: slotX + slotSize / 2, y: inventoryY + slotSize / 2, font: BONUSTIME_BODY_FONT,
-          color: getRewardTierLabelColor(chestFound.tier), align: 'center', baseline: 'middle'
+        drawTierRewardTile(renderer, {
+          x: slotX + 6,
+          y: inventoryY + 6,
+          size: slotSize - 12,
+          tier: chestFound.tier,
+          fillAlpha: 0.22 + (Math.sin(now * 0.007) * 0.05),
+          borderThickness: 2,
+          glow: true,
+          font: "bold 14px Arial"
         });
       } else {
         // Empty slot dashed/dim circle
@@ -383,25 +452,21 @@ export function renderRewardLabyrinth(
     for (let i = 0; i < chests.length; i++) {
       const ch = chests[i];
       const slotX = startX + i * (slotSize + slotGap);
-      const tierCfg = getTierConfig(ch.tier);
-      const rColor = tierCfg ? tierCfg.color : "#FFFFFF";
 
       renderer.drawRect({
         x: slotX, y: rowY, width: slotSize, height: slotSize,
         color: hexToRgba("#2D3748", 0.6)
       });
-      renderer.drawRing(slotX + slotSize / 2, rowY + slotSize / 2, slotSize / 2 - 2, 2, hexToRgba(rColor, 1));
-      renderer.drawText({
-        text: `T${ch.tier}`,
-        x: slotX + slotSize / 2, y: rowY + slotSize / 2, font: BONUSTIME_BODY_FONT,
-        color: getRewardTierLabelColor(ch.tier), align: 'center', baseline: 'middle'
+      drawTierRewardTile(renderer, {
+        x: slotX + 5,
+        y: rowY + 5,
+        size: slotSize - 10,
+        tier: ch.tier,
+        fillAlpha: 0.2,
+        borderThickness: 2,
+        glow: true,
+        font: "bold 13px Arial"
       });
     }
-
-    renderer.drawText({
-      text: "Reward modal opens automatically...",
-      x: centerX, y: cardRect.y + 275, font: BONUSTIME_BODY_FONT,
-      color: "#a0aec0", align: 'center', baseline: 'middle'
-    });
   }
 }
