@@ -70,6 +70,17 @@ import {
   getLadderClimbAnimationDurationMs,
   type LadderClimbData
 } from "../features/bonustime/08-ladder-climb/view-model";
+import {
+  ScratchCardState,
+  getScratchCardBoardRect,
+  getScratchCardRevealVisuals,
+  getScratchCardRewardWaitStartedAt,
+  getScratchCardScratchedPixels,
+  getScratchCardState,
+  handleScratchCardInteractions,
+  resetScratchCardState
+} from "../features/bonustime/12-scratch-card/interactions";
+import { type ScratchCardData } from "../features/bonustime/12-scratch-card/view-model";
 
 type Point = { x: number; y: number };
 
@@ -96,6 +107,17 @@ function makeInput(pointer: Point | null, clicked = false): InteractionState {
     pressStartPointer: pointer,
     clicked,
     isPressed: clicked,
+    wheelDelta: 0,
+    consumed: false
+  };
+}
+
+function makePressedInput(pointer: Point | null): InteractionState {
+  return {
+    pointer,
+    pressStartPointer: pointer,
+    clicked: false,
+    isPressed: true,
     wheelDelta: 0,
     consumed: false
   };
@@ -563,12 +585,82 @@ function runMatchPairsFlow() {
   assert(afterModal?.type === "open_modal", "Match Pairs should open the reward modal after confirmation");
 }
 
+function runScratchCardFlow() {
+  resetScratchCardState();
+  setClock(1000);
+
+  let queuedCommands = 0;
+  const runCommand = (_cmd: () => Promise<any>) => {
+    queuedCommands += 1;
+  };
+
+  const rect = { x: 0, y: 0, width: 1120, height: 660 };
+  const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+    cardWidth: 580,
+    cardHeight: 360,
+    buttonWidth: 240,
+    buttonHeight: 50,
+    cardYOffset: -20,
+    buttonOffsetY: 70
+  });
+  const data: ScratchCardData = {
+    hasToken: true,
+    streak: 42,
+    lastResult: null
+  };
+
+  const startResult = handleScratchCardInteractions(
+    makeInput(centerOf(welcomeLayout.buttonRect), true),
+    data,
+    rect,
+    {} as never,
+    runCommand
+  );
+
+  assert(startResult === null, "Scratch Card should not open the modal on the start click");
+  assert(getScratchCardState() === ScratchCardState.PLAYING, "Scratch Card should enter PLAYING after the start click");
+  assert(queuedCommands === 1, "Scratch Card should queue one play command");
+
+  data.lastResult = {
+    game_id: "scratch_card",
+    tier: 3,
+    pixels_budget: 80,
+    reveal_schedule: [{ pixels: 50, tier: 3 }],
+    reward_amount: ZERO,
+    played_at: "2026-01-01T00:00:00Z"
+  };
+
+  const boardRect = getScratchCardBoardRect(rect);
+  const touchA = { x: boardRect.x + boardRect.width * 0.5, y: boardRect.y + boardRect.height * 0.5 };
+  const touchB = { x: touchA.x + 8, y: touchA.y + 4 };
+
+  handleScratchCardInteractions(makePressedInput(touchA), data, rect, {} as never, runCommand);
+  assert(getScratchCardScratchedPixels() > 0, "Scratch Card should scratch pixels while dragging");
+  assert(getScratchCardRevealVisuals().length === 0, "Scratch Card should defer reveal until the next touch after threshold");
+
+  handleScratchCardInteractions(makePressedInput(touchB), data, rect, {} as never, runCommand);
+  assert(getScratchCardRevealVisuals().length === 1, "Scratch Card should reveal one scheduled reward on the follow-up touch");
+  assert(getScratchCardState() === ScratchCardState.REVEALED, "Scratch Card should enter REVEALED when budget and reveals are complete");
+
+  const startedAt = getScratchCardRewardWaitStartedAt();
+  assert(startedAt > 0, "Scratch Card should start the shared reward wait timer");
+
+  setClock(startedAt + BONUSTIME_REWARD_MODAL_DELAY_MS - 1);
+  const beforeModal = handleScratchCardInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(beforeModal === null, "Scratch Card should keep waiting before the shared reward delay elapses");
+
+  setClock(startedAt + BONUSTIME_REWARD_MODAL_DELAY_MS);
+  const afterModal = handleScratchCardInteractions(makeInput(null, false), data, rect, {} as never, runCommand);
+  assert(afterModal?.type === "open_modal", "Scratch Card should open the reward modal after the shared delay");
+}
+
 function main() {
   runChestDrawFlow();
   runRewardLabyrinthFlow();
   runLadderClimbFlow();
   runChecklistFlow();
   runMatchPairsFlow();
+  runScratchCardFlow();
   console.log("bonustime flow tests passed");
 }
 

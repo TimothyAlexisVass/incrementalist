@@ -47,6 +47,9 @@ import { getLabyrinthState, LabyrinthState, getRewardWaitStartedAt as getLabyrin
 import { renderMatchPairs } from "./13-match-pairs/render";
 import { getMatchPairsData } from "./13-match-pairs/view-model";
 import { getMatchPairsState, MatchPairsState, getFinalRevealStartTime as getMatchPairsFinalRevealStartTime, getRemainingIndices as getMatchPairsRemainingIndices } from "./13-match-pairs/interactions";
+import { renderScratchCard } from "./12-scratch-card/render";
+import { getScratchCardData } from "./12-scratch-card/view-model";
+import { getScratchCardRewardWaitStartedAt, getScratchCardState, ScratchCardState } from "./12-scratch-card/interactions";
 import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeRewardCountdownRing } from "./flow";
 
 export function renderBonusTimeOverview(
@@ -85,7 +88,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "card_pick" && getCardPickState() !== CardPickState.IDLE) ||
                            (activeGameId === "ladder_climb" && getLadderClimbState() !== LadderClimbState.IDLE) ||
                            (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
-                           (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE);
+                           (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE) ||
+                           (activeGameId === "scratch_card" && getScratchCardState() !== ScratchCardState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
   const now = performance.now();
@@ -193,6 +197,11 @@ export function renderBonusTimeOverview(
     const data = getMatchPairsData(state);
     if (data) {
       renderMatchPairs(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "scratch_card") {
+    const data = getScratchCardData(state);
+    if (data) {
+      renderScratchCard(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({
@@ -321,6 +330,15 @@ function renderActiveRewardCountdownOverlay(
       if (finalRevealStartTime > 0) {
         drawRing(totalMs - (now - finalRevealStartTime), totalMs, "#52df87");
       }
+    }
+  } else if (activeGameId === "scratch_card") {
+    const startedAt = getScratchCardRewardWaitStartedAt();
+    if (getScratchCardState() === ScratchCardState.REVEALED && startedAt > 0) {
+      drawRing(
+        BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt),
+        BONUSTIME_REWARD_MODAL_DELAY_MS,
+        "#52df87"
+      );
     }
   }
 }

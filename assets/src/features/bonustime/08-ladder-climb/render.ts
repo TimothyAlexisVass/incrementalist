@@ -3,7 +3,11 @@ import { getRewardTierLabelColor } from "../../../colors";
 import { BONUSTIME_TIMER_FONT } from "../../../config";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { hexToRgba } from "../../../utils";
-import { isPointInWelcomeButton, renderBonusTimeWelcomeCard } from "../flow";
+import {
+  getBonusTimeWelcomeLayout,
+  isPointInBonusTimeWelcomeButton,
+  renderBonusTimeWelcomeCard
+} from "../flow";
 import {
   LadderClimbData,
   LADDER_CLIMB_REWARD_CAP_RUNG,
@@ -40,6 +44,15 @@ export function renderLadderClimb(
   const state = getLadderClimbState();
 
   if (state === LadderClimbState.IDLE) {
+    const welcomeLayout = getBonusTimeWelcomeLayout(rect, {
+      cardWidth: 500,
+      cardHeight: 330,
+      buttonWidth: 240,
+      buttonHeight: 50,
+      cardYOffset: -20,
+      buttonOffsetY: 70
+    });
+
     renderBonusTimeWelcomeCard(renderer, rect, {
       cardWidth: 500,
       cardHeight: 330,
@@ -52,7 +65,7 @@ export function renderLadderClimb(
       streakColor: "#52df87",
       accentColor: "#ffbe4d",
       backgroundColor: "#120d24",
-      buttonActive: !!pointer && isPointInWelcomeButton(pointer, rect)
+      buttonActive: isPointInBonusTimeWelcomeButton(pointer, welcomeLayout)
     });
     return;
   }

@@ -435,6 +435,69 @@ defmodule Incrementalist.Game.CommandsTest do
     assert is_number(first_step["chance"])
   end
 
+  test "bonustime.play scratch_card includes authoritative budget and reveal schedule payload" do
+    scratch_anchor = DateTime.add(@now, -(11 * 43_200_000), :millisecond)
+
+    min_threshold_gap_pixels =
+      Incrementalist.Game.Constants.bonustime_game_rules()["scratch_card"]["reveal_schedule"][
+        "min_threshold_gap_pixels"
+      ]
+
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(scratch_anchor)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "scratch_card"}),
+        @now
+      )
+
+    assert result["type"] == "bonustime.play.result"
+    assert result["status"] == "ok"
+    assert result["bonustime"]["active_game_id"] == "scratch_card"
+
+    last_result = result["bonustime"]["last_result"] || result["bonustime"][:last_result]
+    assert last_result["game_id"] == "scratch_card"
+    assert is_integer(last_result["pixels_budget"])
+    assert last_result["pixels_budget"] > 0
+    assert is_list(last_result["reveal_schedule"])
+    assert length(last_result["reveal_schedule"]) >= 1
+    refute Map.has_key?(last_result, "positions")
+    refute Map.has_key?(last_result, "cells")
+    refute Map.has_key?(last_result, "item_positions")
+
+    assert Enum.all?(last_result["reveal_schedule"], fn reveal ->
+             is_map(reveal) and
+               is_integer(reveal["pixels"]) and
+               reveal["pixels"] >= 1 and
+               reveal["pixels"] <= last_result["pixels_budget"] and
+               is_integer(reveal["tier"]) and reveal["tier"] in 1..7
+           end)
+
+    sorted =
+      last_result["reveal_schedule"]
+      |> Enum.sort_by(& &1["pixels"])
+
+    assert sorted == last_result["reveal_schedule"]
+
+    sorted
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.each(fn [left, right] ->
+      assert right["pixels"] - left["pixels"] >= min_threshold_gap_pixels
+    end)
+  end
+
   test "cleanup deletes only ACKed command rows older than forty eight hours" do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)

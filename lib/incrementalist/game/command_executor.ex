@@ -20,6 +20,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.PlinkoDrop
   alias Incrementalist.Game.Features.BonusTime.Games.ItsBonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.CardPick
+  alias Incrementalist.Game.Features.BonusTime.Games.ScratchCard
   alias Incrementalist.Game.Features.BonusTime.Games.LadderClimb
   alias Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
@@ -631,10 +632,12 @@ defmodule Incrementalist.Game.CommandExecutor do
                     rolled_results,
                     discarded
                   )
+
                 reward_tiers =
                   Incrementalist.Game.Features.BonusTime.Games.MatchPairs.claim_reward_tiers(
                     completed_matches
                   )
+
                 reward_tier =
                   Incrementalist.Game.Features.BonusTime.Games.MatchPairs.claim_reward_tier(
                     completed_matches
@@ -643,8 +646,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                 # Apply rewards for each completed match
                 {next_state, reward_amount} =
                   Enum.reduce(reward_tiers, {ps.state, BigNum.zero()}, fn tier,
-                                                                          {state_acc,
-                                                                           amount_acc} ->
+                                                                          {state_acc, amount_acc} ->
                     {next_state_acc, amt} =
                       Incrementalist.Game.Rewards.grant_bonus_reward(state_acc, tier)
 
@@ -955,14 +957,67 @@ defmodule Incrementalist.Game.CommandExecutor do
                         }
 
                         {best_tier,
-                          %{
-                            "board" =>
-                              Enum.map(final_board, fn c ->
-                                %{"tier" => c.tier, "multiplier" => c.multiplier}
-                              end),
-                            "flips" => total_picks,
-                            "coins_others" => BigNum.add(coins_others, best_remainder)
-                          }, next_state}
+                         %{
+                           "board" =>
+                             Enum.map(final_board, fn c ->
+                               %{"tier" => c.tier, "multiplier" => c.multiplier}
+                             end),
+                           "flips" => total_picks,
+                           "coins_others" => BigNum.add(coins_others, best_remainder)
+                         }, next_state}
+
+                      "scratch_card" ->
+                        {pixels_budget, reveal_schedule} =
+                          ScratchCard.roll_reward(
+                            next_state.bonustime.streak,
+                            next_state.bonustime.bonustime_flips,
+                            now
+                          )
+
+                        best_reveal = Enum.max_by(reveal_schedule, fn reveal -> reveal.tier end)
+                        best_tier = best_reveal.tier
+                        other_reveals = delete_one(reveal_schedule, best_reveal)
+
+                        # Update reward_counts for non-primary rewards first.
+                        updated_reward_counts =
+                          Enum.reduce(
+                            other_reveals,
+                            next_state.bonustime.reward_counts,
+                            fn reveal, acc ->
+                              Map.update(acc, "tier_#{reveal.tier}", 1, &(&1 + 1))
+                            end
+                          )
+
+                        next_bonustime = %{
+                          next_state.bonustime
+                          | reward_counts: updated_reward_counts
+                        }
+
+                        next_state = %{next_state | bonustime: next_bonustime}
+
+                        # Apply non-primary rewards before the best reward.
+                        {next_state, coins_others} =
+                          Enum.reduce(other_reveals, {next_state, BigNum.zero()}, fn reveal,
+                                                                                     {state_acc,
+                                                                                      coins_acc} ->
+                            {next_state_acc, base_coins} =
+                              Incrementalist.Game.Rewards.grant_bonus_reward(
+                                state_acc,
+                                reveal.tier
+                              )
+
+                            {next_state_acc, BigNum.add(coins_acc, base_coins)}
+                          end)
+
+                        {best_tier,
+                         %{
+                           "pixels_budget" => pixels_budget,
+                           "reveal_schedule" =>
+                             Enum.map(reveal_schedule, fn reveal ->
+                               %{"pixels" => reveal.pixels, "tier" => reveal.tier}
+                             end),
+                           "coins_others" => coins_others
+                         }, next_state}
 
                       "ladder_climb" ->
                         {reward_tier, path} =
@@ -1051,6 +1106,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                     |> maybe_put_plinko_payload(rolls)
                     |> maybe_adjust_its_bonus_time_result(rolls)
                     |> maybe_adjust_card_pick_result(rolls)
+                    |> maybe_adjust_scratch_card_result(rolls)
                     |> maybe_adjust_reward_labyrinth_result(rolls)
 
                   next_bonustime = %{
@@ -1293,6 +1349,22 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp maybe_adjust_card_pick_result(last_result, _), do: last_result
+
+  defp maybe_adjust_scratch_card_result(last_result, %{
+         "pixels_budget" => pixels_budget,
+         "reveal_schedule" => reveal_schedule,
+         "coins_others" => coins_others
+       }) do
+    total_coins = BigNum.add(coins_others, last_result["reward_amount"])
+
+    Map.merge(last_result, %{
+      "reward_amount" => total_coins,
+      "pixels_budget" => pixels_budget,
+      "reveal_schedule" => reveal_schedule
+    })
+  end
+
+  defp maybe_adjust_scratch_card_result(last_result, _), do: last_result
 
   defp maybe_adjust_reward_labyrinth_result(last_result, %{
          "chests" => chests,
