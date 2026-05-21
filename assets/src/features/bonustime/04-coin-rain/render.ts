@@ -123,28 +123,12 @@ export function renderCoinRain(
       height: BUCKET_HEIGHT_PX,
       color: hexToRgba(BUCKET_COLOR)
     });
-  } else if (state === CoinRainState.FINISHED) {
+  } else if (state === CoinRainState.FINISHED || state === CoinRainState.REVEALED) {
     renderer.drawText({
       text: `Caught ${getCoinRainCaughtCount()} items!`,
       x: centerX, y: centerY - 10,
       font: BONUSTIME_RESULT_FONT,
       color: "#edf2f7",
-      align: 'center', baseline: 'middle'
-    });
-  } else if (state === CoinRainState.REVEALED && data.lastTier) {
-    const tierColor = getTierColor(data.lastTier);
-    const tierName = (bonusTimeConfig.reward_tiers as any)[`tier_${data.lastTier}`]?.rarity || "Unknown";
-
-    // Big tier result box
-    renderer.drawRect({
-      x: centerX - 80, y: centerY - 50, width: 160, height: 100,
-      color: hexToRgba(tierColor)
-    });
-    renderer.drawText({
-      text: tierName,
-      x: centerX, y: centerY,
-      font: BONUSTIME_RESULT_FONT,
-      color: "#0d1117",
       align: 'center', baseline: 'middle'
     });
   }
