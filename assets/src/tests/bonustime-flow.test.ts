@@ -639,7 +639,22 @@ function runScratchCardFlow() {
   assert(getScratchCardRevealVisuals().length === 0, "Scratch Card should defer reveal until the next touch after threshold");
 
   handleScratchCardInteractions(makePressedInput(touchB), data, rect, {} as never, runCommand);
-  assert(getScratchCardRevealVisuals().length === 1, "Scratch Card should reveal one scheduled reward on the follow-up touch");
+  assert(getScratchCardRevealVisuals().length === 0, "Scratch Card should keep reveal deferred if no local 37x37 block includes the touch");
+
+  const safetyLimit = 5000;
+  let iterations = 0;
+  while (getScratchCardRevealVisuals().length === 0 && iterations < safetyLimit) {
+    const sweepRatio = (iterations % 200) / 199;
+    const hoverTouch = {
+      x: boardRect.x + boardRect.width * sweepRatio,
+      y: boardRect.y + boardRect.height * 0.15
+    };
+    setClock(1000 + iterations + 1);
+    handleScratchCardInteractions(makeInput(hoverTouch, false), data, rect, {} as never, runCommand);
+    iterations += 1;
+  }
+
+  assert(getScratchCardRevealVisuals().length === 1, "Scratch Card should auto-continue and reveal once it reaches a connected 37x37 block");
   assert(getScratchCardState() === ScratchCardState.REVEALED, "Scratch Card should enter REVEALED when budget and reveals are complete");
 
   const startedAt = getScratchCardRewardWaitStartedAt();

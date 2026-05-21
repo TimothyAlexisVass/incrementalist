@@ -122,39 +122,6 @@ export function renderScratchCard(
   const particles = getScratchCardParticles();
   const budget = Math.max(1, data.lastResult.pixels_budget);
   const progressRatio = Math.min(1, scratchedPixels / budget);
-  const nextReveal = data.lastResult.reveal_schedule[revealVisuals.length] || null;
-
-  renderer.drawText({
-    text: "SCRATCH CARD",
-    x: rect.x + 40,
-    y: rect.y + 40,
-    font: BONUSTIME_TITLE_FONT,
-    color: "#ffbe4d",
-    align: "left",
-    baseline: "middle"
-  });
-
-  renderer.drawText({
-    text: `Scratched: ${Math.min(scratchedPixels, budget)} / ${budget} px`,
-    x: rect.x + 40,
-    y: rect.y + 82,
-    font: BONUSTIME_BODY_FONT,
-    color: "#e2e8f0",
-    align: "left",
-    baseline: "middle"
-  });
-
-  renderer.drawText({
-    text: nextReveal
-      ? `Next reveal in ${Math.max(0, nextReveal.pixels - scratchedPixels)} px`
-      : "All reveals unlocked",
-    x: rect.x + 40,
-    y: rect.y + 110,
-    font: BONUSTIME_BODY_FONT,
-    color: nextReveal ? "#a0aec0" : "#52df87",
-    align: "left",
-    baseline: "middle"
-  });
 
   drawProgressTrack(renderer, boardRect, progressRatio);
 

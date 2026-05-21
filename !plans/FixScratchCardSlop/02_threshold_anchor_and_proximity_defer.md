@@ -6,8 +6,9 @@ Honor the reveal rule exactly:
 
 - threshold crossing is determined by cumulative scratch progress
 - reveal is performed on the next scratch touch
-- reveal placement is anchored to the crossing cell's local proximity
-- if placement is impossible locally, reveal remains deferred until a local block exists
+- reveal placement is anchored to where the player scratches next
+- reveal proceeds only if that scratch point is connected to a valid `37x37` unscratched block
+- if no such local connected block exists at that touch, reveal remains deferred
 
 ## Scope
 
@@ -16,23 +17,20 @@ Honor the reveal rule exactly:
 
 ## Implementation Plan
 
-1. Introduce explicit pending-reveal state:
-   - store scheduled reveal index/tier
-   - store the crossing cell coordinates that triggered threshold eligibility
-2. Change threshold detection timing:
+1. Keep threshold detection timing authoritative:
    - determine threshold crossing after new scratch cells are deducted
    - do not reveal immediately on crossing touch
-3. On the next scratch touch, resolve pending reveal:
-   - search only within configured local proximity around the stored crossing cell
-   - if no valid `15x15` unscratched block exists in that proximity, keep pending
-4. Remove/replace board-wide fallback search that violates local proximity intent.
-5. Preserve deduction behavior for reveal cover removal (`5625` pixels rule).
+2. On the next scratch touch, resolve pending reveal:
+   - evaluate only `37x37` reveal blocks that include the current scratch point
+   - if no valid `37x37` unscratched block includes that point, keep pending
+3. Remove/replace board-wide fallback search that violates local connectivity intent.
+4. Preserve deduction behavior for reveal cover removal (`5625` pixels rule).
 
 ## Verification
 
 1. Repro where threshold is crossed and confirm reveal does not occur until next touch.
-2. Confirm reveal appears near the crossing area, not far away.
-3. Force local area saturation and confirm reveal stays deferred instead of jumping across board.
+2. Confirm reveal anchor corresponds to the current scratch touch locality.
+3. Force local area saturation around the touch and confirm reveal stays deferred instead of jumping across board.
 4. Confirm completion state still resolves once pending reveals are consumed and budget is exhausted.
 
 ## Risk Notes

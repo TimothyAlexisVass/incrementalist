@@ -40,7 +40,6 @@ const GRID_COLS = Math.floor(BOARD_WIDTH / CELL_SIZE_PX);
 const GRID_ROWS = Math.floor(BOARD_HEIGHT / CELL_SIZE_PX);
 const GRID_TOTAL_CELLS = GRID_COLS * GRID_ROWS;
 const SCRATCH_CELL_PIXELS = CELL_SIZE_PX * CELL_SIZE_PX;
-const REVEAL_SEARCH_RADIUS_CELLS = Math.max(GRID_COLS, GRID_ROWS);
 
 export type ScratchBoardRect = { x: number; y: number; width: number; height: number };
 
@@ -84,6 +83,7 @@ let particles: ScratchParticle[] = [];
 let rewardWaitStartedAt = 0;
 let lastTickAt = 0;
 let hoverBoardPoint: { x: number; y: number } | null = null;
+let hasScratchStarted = false;
 
 export function getScratchCardState() {
   return internalState;
@@ -135,6 +135,7 @@ export function resetScratchCardState() {
   rewardWaitStartedAt = 0;
   lastTickAt = 0;
   hoverBoardPoint = null;
+  hasScratchStarted = false;
 }
 
 export function handleScratchCardInteractions(
@@ -179,6 +180,7 @@ export function handleScratchCardInteractions(
       particles = [];
       rewardWaitStartedAt = 0;
       lastTickAt = now;
+      hasScratchStarted = false;
       internalState = ScratchCardState.PLAYING;
 
       if (runCommand) {
@@ -215,9 +217,11 @@ export function handleScratchCardInteractions(
     hoverBoardPoint = pointerLogical;
   }
 
-  if (internalState === ScratchCardState.PLAYING && input.isPressed && pointerLogical) {
-    applyScratchTouch(data.lastResult, pointerLogical, now);
-    input.consumed = true;
+  if (internalState === ScratchCardState.PLAYING) {
+    if (pointerLogical && (input.isPressed || hasScratchStarted) && !isScratchRunResolved(data.lastResult)) {
+      applyScratchTouch(data.lastResult, pointerLogical, now);
+      input.consumed = true;
+    }
   }
 
   if (
@@ -250,6 +254,7 @@ function initializeProjectedRun(lastResult: ScratchCardLastResult, now: number) 
   particles = [];
   rewardWaitStartedAt = 0;
   lastTickAt = now;
+  hasScratchStarted = false;
 }
 
 function applyScratchTouch(lastResult: ScratchCardLastResult, boardPoint: { x: number; y: number }, now: number) {
@@ -257,13 +262,16 @@ function applyScratchTouch(lastResult: ScratchCardLastResult, boardPoint: { x: n
   const thresholdReachedBeforeTouch =
     !!nextReveal && scratchedPixels >= nextReveal.pixels;
 
-  const newCells = scratchWithBrush(boardPoint, now);
-
   if (thresholdReachedBeforeTouch && nextReveal) {
     tryReveal(nextReveal, boardPoint, now);
   }
 
+  const newCells = scratchWithBrush(boardPoint, now);
+
   if (newCells > 0) {
+    if (!hasScratchStarted) {
+      hasScratchStarted = true;
+    }
     scratchedPixels += newCells * SCRATCH_CELL_PIXELS;
   }
 }
@@ -337,19 +345,37 @@ function tryReveal(
 function findRevealAnchor(boardPoint: { x: number; y: number }): { x: number; y: number } | null {
   const centerCellX = clamp(Math.floor(boardPoint.x / CELL_SIZE_PX), 0, GRID_COLS - 1);
   const centerCellY = clamp(Math.floor(boardPoint.y / CELL_SIZE_PX), 0, GRID_ROWS - 1);
-  const centerAnchorX = clamp(centerCellX - Math.floor(REVEAL_COVER_SIZE_CELLS / 2), 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
-  const centerAnchorY = clamp(centerCellY - Math.floor(REVEAL_COVER_SIZE_CELLS / 2), 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
+  const minAnchorX = clamp(centerCellX - REVEAL_COVER_SIZE_CELLS + 1, 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
+  const maxAnchorX = clamp(centerCellX, 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
+  const minAnchorY = clamp(centerCellY - REVEAL_COVER_SIZE_CELLS + 1, 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
+  const maxAnchorY = clamp(centerCellY, 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
+  const centerAnchorX = clamp(
+    centerCellX - Math.floor(REVEAL_COVER_SIZE_CELLS / 2),
+    minAnchorX,
+    maxAnchorX
+  );
+  const centerAnchorY = clamp(
+    centerCellY - Math.floor(REVEAL_COVER_SIZE_CELLS / 2),
+    minAnchorY,
+    maxAnchorY
+  );
 
   const visited = new Set<string>();
+  const maxRadius = Math.max(
+    Math.abs(centerAnchorX - minAnchorX),
+    Math.abs(centerAnchorX - maxAnchorX),
+    Math.abs(centerAnchorY - minAnchorY),
+    Math.abs(centerAnchorY - maxAnchorY)
+  );
 
-  for (let radius = 0; radius <= REVEAL_SEARCH_RADIUS_CELLS; radius += 1) {
+  for (let radius = 0; radius <= maxRadius; radius += 1) {
     for (let dy = -radius; dy <= radius; dy += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
         const onRing = radius === 0 || Math.abs(dx) === radius || Math.abs(dy) === radius;
         if (!onRing) continue;
 
-        const anchorX = clamp(centerAnchorX + dx, 0, GRID_COLS - REVEAL_COVER_SIZE_CELLS);
-        const anchorY = clamp(centerAnchorY + dy, 0, GRID_ROWS - REVEAL_COVER_SIZE_CELLS);
+        const anchorX = clamp(centerAnchorX + dx, minAnchorX, maxAnchorX);
+        const anchorY = clamp(centerAnchorY + dy, minAnchorY, maxAnchorY);
         const key = `${anchorX}:${anchorY}`;
         if (visited.has(key)) continue;
         visited.add(key);
@@ -473,6 +499,14 @@ function toLogicalBoardPoint(
     x: clamp(x, 0, BOARD_WIDTH - 1),
     y: clamp(y, 0, BOARD_HEIGHT - 1)
   };
+}
+
+
+function isScratchRunResolved(lastResult: ScratchCardLastResult) {
+  return (
+    scratchedPixels >= lastResult.pixels_budget &&
+    nextRevealIndex >= lastResult.reveal_schedule.length
+  );
 }
 
 function clamp(value: number, minValue: number, maxValue: number) {
