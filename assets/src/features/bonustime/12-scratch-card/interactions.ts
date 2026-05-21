@@ -61,6 +61,7 @@ export type ScratchParticle = {
   bornAt: number;
   lifeMs: number;
   alpha: number;
+  color: { r: number; g: number; b: number };
 };
 
 export enum ScratchCardState {
@@ -288,9 +289,9 @@ function scratchWithBrush(boardPoint: { x: number; y: number }, now: number): nu
       scratchedIndices.push(index);
       newCells += 1;
 
-      if (spawnedParticles < 16) {
-        spawnCellParticles(x, y, now, 2);
-        spawnedParticles += 2;
+      if (spawnedParticles < 2) {
+        spawnCellParticles(x, y, now, 1);
+        spawnedParticles += 1;
       }
     }
   }
@@ -387,8 +388,9 @@ function spawnCellParticles(cellX: number, cellY: number, now: number, count: nu
       vy: Math.sin(angle) * speed,
       size: 1.3 + Math.random() * 1.8,
       bornAt: now,
-      lifeMs: 340 + Math.random() * 180,
-      alpha: 0.85
+      lifeMs: 680 + Math.random() * 360,
+      alpha: 0.85,
+      color: randomScratchParticleColor()
     });
   }
 }
@@ -407,10 +409,20 @@ function spawnRevealBurst(anchorX: number, anchorY: number, now: number) {
       vy: Math.sin(angle) * speed,
       size: 2 + Math.random() * 3,
       bornAt: now,
-      lifeMs: 520 + Math.random() * 280,
-      alpha: 0.95
+      lifeMs: 1040 + Math.random() * 560,
+      alpha: 0.95,
+      color: randomScratchParticleColor()
     });
   }
+}
+
+function randomScratchParticleColor() {
+  const t = Math.random();
+  return {
+    r: 0.82 + (0.98 - 0.82) * t,
+    g: 0.58 + (0.88 - 0.58) * t,
+    b: 0.06 + (0.36 - 0.06) * t
+  };
 }
 
 function tickParticles(now: number) {
@@ -434,7 +446,7 @@ function tickParticles(now: number) {
         x: particle.x + particle.vx * dt,
         y: particle.y + particle.vy * dt,
         vy: particle.vy + (80 * dt),
-        alpha: Math.max(0, 1 - progress)
+        alpha: Math.max(0, 1 - (progress * 0.55))
       };
     })
     .filter((particle): particle is ScratchParticle => particle !== null);

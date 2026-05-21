@@ -73,6 +73,18 @@ export interface DrawThreeSceneOptions {
   height: number;
 }
 
+export interface DrawPointParticle {
+  x: number;
+  y: number;
+  size: number;
+  color: RGBA;
+}
+
+export interface DrawPointParticlesOptions {
+  particles: readonly DrawPointParticle[];
+  blendMode?: "normal" | "additive";
+}
+
 interface ClipRect {
   x: number;
   y: number;
@@ -391,6 +403,40 @@ void main() {
 }
 `;
 
+const POINT_PARTICLE_VERTEX_SHADER_SOURCE = `
+attribute vec2 a_position;
+attribute float a_size;
+attribute vec4 a_color;
+uniform vec2 u_resolution;
+varying vec4 v_color;
+
+void main() {
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 clipSpace = zeroToOne * 2.0 - 1.0;
+  gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+  gl_PointSize = a_size;
+  v_color = a_color;
+}
+`;
+
+const POINT_PARTICLE_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+varying vec4 v_color;
+
+void main() {
+  vec2 point = gl_PointCoord * 2.0 - 1.0;
+  float dist = length(point);
+  if (dist > 1.0) {
+    discard;
+  }
+
+  float core = smoothstep(0.86, 0.0, dist);
+  float alpha = core * v_color.a;
+  vec3 rgb = v_color.rgb * (0.98 + core * 0.08);
+  gl_FragColor = vec4(rgb * alpha, alpha);
+}
+`;
+
 export class WebGLRenderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly gl: WebGLRenderingContext;
@@ -422,6 +468,14 @@ export class WebGLRenderer {
   private readonly textTextureLocation: WebGLUniformLocation;
   private readonly textPositionBuffer: WebGLBuffer;
   private readonly textTexcoordBuffer: WebGLBuffer;
+
+  private readonly pointParticleProgram: WebGLProgram;
+  private readonly pointParticlePositionLocation: number;
+  private readonly pointParticleSizeLocation: number;
+  private readonly pointParticleColorLocation: number;
+  private readonly pointParticleResolutionLocation: WebGLUniformLocation;
+  private readonly pointParticleBuffer: WebGLBuffer;
+  private pointParticleData = new Float32Array(0);
 
   private readonly shapeProgram: WebGLProgram;
   private readonly shapePositionLocation: number;
@@ -524,6 +578,13 @@ export class WebGLRenderer {
     this.textTextureLocation = mustGetUniform(gl, this.textProgram, "u_texture");
     this.textPositionBuffer = mustCreateBuffer(gl);
     this.textTexcoordBuffer = mustCreateBuffer(gl);
+
+    this.pointParticleProgram = mustCreateProgram(gl, POINT_PARTICLE_VERTEX_SHADER_SOURCE, POINT_PARTICLE_FRAGMENT_SHADER_SOURCE);
+    this.pointParticlePositionLocation = gl.getAttribLocation(this.pointParticleProgram, "a_position");
+    this.pointParticleSizeLocation = gl.getAttribLocation(this.pointParticleProgram, "a_size");
+    this.pointParticleColorLocation = gl.getAttribLocation(this.pointParticleProgram, "a_color");
+    this.pointParticleResolutionLocation = mustGetUniform(gl, this.pointParticleProgram, "u_resolution");
+    this.pointParticleBuffer = mustCreateBuffer(gl);
 
     this.shapeProgram = mustCreateProgram(gl, SHAPE_VERTEX_SHADER_SOURCE, SHAPE_FRAGMENT_SHADER_SOURCE);
     this.shapePositionLocation = gl.getAttribLocation(this.shapeProgram, "a_position");
@@ -1175,6 +1236,51 @@ export class WebGLRenderer {
       gl.activeTexture(gl.TEXTURE0);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  drawPointParticles(options: DrawPointParticlesOptions) {
+    const particles = options.particles;
+    const count = particles.length;
+    if (count === 0) return;
+
+    const floatsPerParticle = 7;
+    const needed = count * floatsPerParticle;
+    if (this.pointParticleData.length < needed) {
+      this.pointParticleData = new Float32Array(Math.max(needed, this.pointParticleData.length * 2, 1024));
+    }
+
+    let offset = 0;
+    for (let i = 0; i < count; i += 1) {
+      const particle = particles[i];
+      this.pointParticleData[offset] = particle.x;
+      this.pointParticleData[offset + 1] = particle.y;
+      this.pointParticleData[offset + 2] = Math.max(1, particle.size);
+      this.pointParticleData[offset + 3] = particle.color[0];
+      this.pointParticleData[offset + 4] = particle.color[1];
+      this.pointParticleData[offset + 5] = particle.color[2];
+      this.pointParticleData[offset + 6] = particle.color[3];
+      offset += floatsPerParticle;
+    }
+
+    const gl = this.gl;
+    this.setBlendMode(options.blendMode || "normal");
+
+    gl.useProgram(this.pointParticleProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.pointParticleBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, this.pointParticleData.subarray(0, needed), gl.DYNAMIC_DRAW);
+
+    const stride = floatsPerParticle * 4;
+    gl.enableVertexAttribArray(this.pointParticlePositionLocation);
+    gl.vertexAttribPointer(this.pointParticlePositionLocation, 2, gl.FLOAT, false, stride, 0);
+    gl.enableVertexAttribArray(this.pointParticleSizeLocation);
+    gl.vertexAttribPointer(this.pointParticleSizeLocation, 1, gl.FLOAT, false, stride, 2 * 4);
+    gl.enableVertexAttribArray(this.pointParticleColorLocation);
+    gl.vertexAttribPointer(this.pointParticleColorLocation, 4, gl.FLOAT, false, stride, 3 * 4);
+
+    gl.uniform2f(this.pointParticleResolutionLocation, this.canvas.width, this.canvas.height);
+    gl.drawArrays(gl.POINTS, 0, count);
+
+    this.setBlendMode("normal");
   }
 
   drawText(options: DrawTextOptions) {

@@ -200,7 +200,7 @@
         "width": 1000,
         "height": 500
       },
-      "grid_cell_size_px": 5,
+      "grid_cell_size_px": 2,
       "brush_size": {
         "width": 20,
         "height": 10
@@ -215,7 +215,7 @@
       },
       "lifts_left": 10,
       "hidden_item_count": 10,
-      "reveal_cover_size_cells": 15,
+      "reveal_cover_size_cells": 37,
       "release_penalty_pixels": 5625,
       "reward_count": {
         "budget_min": 0.10,

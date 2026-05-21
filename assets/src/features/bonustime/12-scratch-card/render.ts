@@ -1,5 +1,5 @@
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
-import { getActiveWebGLRenderer } from "../../../renderer/webgl";
+import { getActiveWebGLRenderer, type DrawPointParticle } from "../../../renderer/webgl";
 import { hexToRgba, to255 } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { BONUSTIME_BODY_FONT, BONUSTIME_TITLE_FONT } from "../../../config";
@@ -42,6 +42,7 @@ type CellRect = { cellX: number; cellY: number; widthCells: number; heightCells:
 let cachedScratchIndicesRef: readonly number[] | null = null;
 let cachedScratchIndicesLength = -1;
 let cachedScratchedRevealRects: CellRect[] = [];
+const scratchParticleBatch: DrawPointParticle[] = [];
 
 function getTierConfig(tier: number) {
   return SCRATCH_CONFIG.reward_tiers[`tier_${tier}`] || { color: "#ffffff" };
@@ -397,21 +398,37 @@ function drawParticles(
   boardRect: { x: number; y: number; width: number; height: number },
   particles: ReturnType<typeof getScratchCardParticles>
 ) {
+  let writeCount = 0;
   for (const particle of particles) {
     const x = boardRect.x + (particle.x / BOARD_WIDTH) * boardRect.width;
     const y = boardRect.y + (particle.y / BOARD_HEIGHT) * boardRect.height;
-    const radius = (particle.size / BOARD_WIDTH) * boardRect.width;
+    const diameter = (1 + Math.random()) * 10;
     const alpha = Math.max(0, Math.min(1, particle.alpha));
+    if (alpha <= 0) continue;
 
-    renderer.drawCircle(
-      x,
-      y,
-      Math.max(0.8, radius),
-      [255, 221, 173, Math.floor(255 * alpha)],
-      0.45,
-      "additive"
-    );
+    const existing = scratchParticleBatch[writeCount];
+    if (existing) {
+      existing.x = x;
+      existing.y = y;
+      existing.size = diameter;
+      existing.color = [particle.color.r, particle.color.g, particle.color.b, alpha];
+    } else {
+      scratchParticleBatch.push({
+        x,
+        y,
+        size: diameter,
+        color: [particle.color.r, particle.color.g, particle.color.b, alpha]
+      });
+    }
+
+    writeCount += 1;
   }
+
+  scratchParticleBatch.length = writeCount;
+  renderer.drawPointParticles({
+    particles: scratchParticleBatch,
+    blendMode: "additive"
+  });
 }
 
 function drawBrushPreview(
