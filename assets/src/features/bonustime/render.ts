@@ -53,6 +53,9 @@ import { getScratchCardRewardWaitStartedAt, getScratchCardState, ScratchCardStat
 import { renderLuckyDice } from "./10-lucky-dice/render";
 import { getLuckyDiceData } from "./10-lucky-dice/view-model";
 import { getLuckyDiceFinalRevealStartedAt, getLuckyDiceState, LuckyDiceState } from "./10-lucky-dice/interactions";
+import { renderHammerSmash } from "./06-hammer-smash/render";
+import { getHammerSmashData } from "./06-hammer-smash/view-model";
+import { getHammerSmashState, HammerSmashState, getRewardWaitStartedAt as getHammerSmashRewardWaitStartedAt } from "./06-hammer-smash/interactions";
 import { BONUSTIME_REWARD_MODAL_DELAY_MS, renderBonusTimeRewardCountdownRing } from "./flow";
 
 export function renderBonusTimeOverview(
@@ -93,7 +96,8 @@ export function renderBonusTimeOverview(
                            (activeGameId === "reward_labyrinth" && getLabyrinthState() !== LabyrinthState.IDLE) ||
                            (activeGameId === "match_pairs" && getMatchPairsState() !== MatchPairsState.IDLE) ||
                            (activeGameId === "scratch_card" && getScratchCardState() !== ScratchCardState.IDLE) ||
-                           (activeGameId === "lucky_dice" && getLuckyDiceState() !== LuckyDiceState.IDLE);
+                           (activeGameId === "lucky_dice" && getLuckyDiceState() !== LuckyDiceState.IDLE) ||
+                           (activeGameId === "hammer_smash" && getHammerSmashState() !== HammerSmashState.IDLE);
   const centerX = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
   const centerY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT / 2;
   const now = performance.now();
@@ -211,6 +215,11 @@ export function renderBonusTimeOverview(
     const data = getLuckyDiceData(state);
     if (data) {
       renderLuckyDice(data, rect, input.pointer);
+    }
+  } else if (activeGameId === "hammer_smash") {
+    const data = getHammerSmashData(state);
+    if (data) {
+      renderHammerSmash(data, rect, input.pointer);
     }
   } else {
     renderer.drawText({
@@ -352,6 +361,15 @@ function renderActiveRewardCountdownOverlay(
   } else if (activeGameId === "lucky_dice") {
     const startedAt = getLuckyDiceFinalRevealStartedAt();
     if (getLuckyDiceState() === LuckyDiceState.FINAL_REVEALING && startedAt > 0) {
+      drawRing(
+        BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt),
+        BONUSTIME_REWARD_MODAL_DELAY_MS,
+        "#52df87"
+      );
+    }
+  } else if (activeGameId === "hammer_smash") {
+    const startedAt = getHammerSmashRewardWaitStartedAt();
+    if (getHammerSmashState() === HammerSmashState.REVEALED && startedAt > 0) {
       drawRing(
         BONUSTIME_REWARD_MODAL_DELAY_MS - (now - startedAt),
         BONUSTIME_REWARD_MODAL_DELAY_MS,

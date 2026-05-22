@@ -53,6 +53,7 @@ import { renderBonusTimeOverview } from "../features/bonustime/render";
 import { handleBonusTimeInteractions } from "../features/bonustime/interactions";
 import { resetChestState } from "../features/bonustime/01-chest-draw/interactions";
 import { resetWheelState } from "../features/bonustime/02-prize-wheel/interactions";
+import { resetHammerSmashState } from "../features/bonustime/06-hammer-smash/interactions";
 import {
   getResourceChecklistState,
   ResourceChecklistState,
@@ -589,6 +590,7 @@ export class GameClient {
           resetMatchPairsState();
           resetScratchCardState();
           resetLuckyDiceState();
+          resetHammerSmashState();
           sceneInput.consumed = true;
         }
       }

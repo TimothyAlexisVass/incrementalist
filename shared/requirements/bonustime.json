@@ -237,29 +237,13 @@
       ]
     },
     "hammer_smash": {
-      "min_power": {
-        "base": 5,
-        "streak_divisor": 15,
-        "streak_cap": 15
-      },
-      "smash_power_variance": {
-        "min": 0.3,
-        "max": 2.0
-      },
-      "tiers": [
-        0.15,
-        0.30,
-        0.60,
-        0.75,
-        0.90,
-        1.0
-      ],
-      "bell_break_chances": [
-        0.5,
-        0.25,
-        0.15,
-        0.1
-      ]
+      "smash_count": 3,
+      "max_smash_power": 100,
+      "min_power_streak_factor": 0.21,
+      "min_power_streak_cap": 100,
+      "tier_thresholds": [132, 165, 196, 218, 240],
+      "bell_threshold": 263,
+      "bell_break_thresholds": [50, 75, 91]
     },
     "ladder_climb": {
       "visible_rungs": 20,

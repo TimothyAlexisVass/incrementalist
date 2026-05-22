@@ -24,6 +24,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Features.BonusTime.Games.LadderClimb
   alias Incrementalist.Game.Features.BonusTime.Games.RewardLabyrinth
   alias Incrementalist.Game.Features.BonusTime.Games.LuckyDice
+  alias Incrementalist.Game.Features.BonusTime.Games.HammerSmash
   alias Incrementalist.Game.Features.BonusTime.JackpotRules
   alias Incrementalist.Repo
   import Ecto.Query
@@ -1082,6 +1083,40 @@ defmodule Incrementalist.Game.CommandExecutor do
                            "coins_others" => coins_others
                          }, next_state}
 
+                      "hammer_smash" ->
+                        {best_tier, smash_result} =
+                          HammerSmash.roll_reward(next_state.bonustime.streak)
+
+                        bell_extra_tier = smash_result["bell_extra_tier"]
+
+                        if bell_extra_tier do
+                          # Bell hit: base is tier_6, extra is bell_extra_tier
+                          # Grant tier_6 as "other" reward, best_tier = bell_extra_tier
+                          {base_grant_state, base_coins} =
+                            Incrementalist.Game.Rewards.grant_bonus_reward(next_state, 6)
+
+                          updated_reward_counts =
+                            Map.update(
+                              base_grant_state.bonustime.reward_counts,
+                              "tier_6",
+                              1,
+                              &(&1 + 1)
+                            )
+
+                          next_bonustime = %{
+                            base_grant_state.bonustime
+                            | reward_counts: updated_reward_counts
+                          }
+
+                          base_grant_state = %{base_grant_state | bonustime: next_bonustime}
+
+                          {bell_extra_tier,
+                           %{"smashes" => smash_result, "coins_others" => base_coins},
+                           base_grant_state}
+                        else
+                          {best_tier, smash_result, next_state}
+                        end
+
                       _ ->
                         {1, [1], next_state}
                     end
@@ -1112,6 +1147,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                     |> maybe_adjust_card_pick_result(rolls)
                     |> maybe_adjust_scratch_card_result(rolls)
                     |> maybe_adjust_reward_labyrinth_result(rolls)
+                    |> maybe_adjust_hammer_smash_result(rolls)
 
                   next_bonustime = %{
                     bonustime
@@ -1653,6 +1689,24 @@ defmodule Incrementalist.Game.CommandExecutor do
   end
 
   defp maybe_adjust_reward_labyrinth_result(last_result, _), do: last_result
+
+  defp maybe_adjust_hammer_smash_result(last_result, %{
+         "smashes" => smashes,
+         "coins_others" => coins_others
+       }) do
+    total_coins = BigNum.add(coins_others, last_result["reward_amount"])
+
+    Map.merge(last_result, %{
+      "reward_amount" => total_coins,
+      "smashes" => smashes
+    })
+  end
+
+  defp maybe_adjust_hammer_smash_result(last_result, %{"smash_1_power" => _} = smashes) do
+    Map.put(last_result, "smashes", smashes)
+  end
+
+  defp maybe_adjust_hammer_smash_result(last_result, _), do: last_result
 
   defp delete_one(list, item) do
     case Enum.split_while(list, &(&1 != item)) do
