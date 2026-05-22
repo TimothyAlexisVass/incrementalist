@@ -102,7 +102,7 @@ export const RGBA_COLORS = {
 1. **Refactor `assets/src/utils/color.ts`**:
    Expose optimized, non-string numeric color converter methods (`hslToRgb`).
 2. **Refactor Daily Bonus Render Modules**:
-   * Update `assets/src/features/bonustime/jackpot-meter/render.ts`.
+   * Update `assets/src/features/bonustime/14-jackpot-meter/render.ts`.
    * Update `assets/src/features/bonustime/02-prize-wheel/render.ts` (wheel rotations).
 3. **Verify compile checks**:
    Run `npm run build` or `npx tsc --noEmit` to ensure type checks pass across all modified source files.

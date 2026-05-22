@@ -45,8 +45,8 @@ import {
   getRewardWaitStartedAt as getItemChecklistRewardWaitStartedAt,
   handleItemChecklistInteractions,
   resetItemChecklistState
-} from "../features/bonustime/05-item-checklist/interactions";
-import { type ItemChecklistData } from "../features/bonustime/05-item-checklist/view-model";
+} from "../features/bonustime/11-item-checklist/interactions";
+import { type ItemChecklistData } from "../features/bonustime/11-item-checklist/view-model";
 import {
   LabyrinthState,
   getLabyrinthState,

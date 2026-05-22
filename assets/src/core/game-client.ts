@@ -63,12 +63,12 @@ import {
   getItemChecklistState,
   ItemChecklistState,
   resetItemChecklistState
-} from "../features/bonustime/05-item-checklist/interactions";
-import { getItemChecklistData } from "../features/bonustime/05-item-checklist/view-model";
-import { resetPlinkoState } from "../features/bonustime/15-plinko-drop/interactions";
-import { resetJackpotState } from "../features/bonustime/jackpot-meter/interactions";
+} from "../features/bonustime/11-item-checklist/interactions";
+import { getItemChecklistData } from "../features/bonustime/11-item-checklist/view-model";
+import { resetPlinkoState } from "../features/bonustime/05-plinko-drop/interactions";
+import { resetJackpotState } from "../features/bonustime/14-jackpot-meter/interactions";
 import { resetCoinRainState } from "../features/bonustime/04-coin-rain/interactions";
-import { resetItsBonusTimeState } from "../features/bonustime/18-its-bonus-time/interactions";
+import { resetItsBonusTimeState } from "../features/bonustime/15-its-bonus-time/interactions";
 import { resetCardPickState } from "../features/bonustime/09-card-pick/interactions";
 import { resetLadderClimbState } from "../features/bonustime/08-ladder-climb/interactions";
 import { resetLabyrinthState } from "../features/bonustime/07-reward-labyrinth/interactions";
