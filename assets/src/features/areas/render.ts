@@ -3,6 +3,8 @@ import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT
 import { renderSageArea } from "./sage/render";
 import { getCloverfieldBackgroundBlendState } from "./cloverfield/render";
 import { handleCloverfieldInteractions } from "./cloverfield/interactions";
+import { renderOrchard } from "./orchard/render";
+import { handleOrchardInteractions } from "./orchard/interaction";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
@@ -102,6 +104,12 @@ export function renderAreaSpecifics(
 
   if (model.currentArea === "cloverfield") {
     handleCloverfieldInteractions(input, channel, runCommand, blocked);
+    return;
+  }
+
+  if (model.currentArea === "orchard") {
+    renderOrchard(input);
+    handleOrchardInteractions(input, blocked);
   }
 }
 

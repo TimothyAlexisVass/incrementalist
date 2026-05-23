@@ -18,7 +18,16 @@ export interface TooltipOptions {
   estimatedWidthFactor?: number;
   textUpdateKey?: string;
   lineColors?: string[];
+  placement?: TooltipPlacement;
 }
+
+export type TooltipPlacement =
+  | 'top-left'
+  | 'top-right'
+  | 'left'
+  | 'right'
+  | 'bottom-left'
+  | 'bottom-right';
 
 interface TooltipRequest {
   anchorPoint: { x: number; y: number };
@@ -88,7 +97,8 @@ function drawTooltipInternal(
     margin = 8,
     widthMode = 'measured',
     estimatedWidthFactor = 0.62,
-    textUpdateKey
+    textUpdateKey,
+    placement = 'top-left'
   } = options;
 
   const resolvedContent = textUpdateKey
@@ -118,8 +128,26 @@ function drawTooltipInternal(
   const width = Math.ceil(contentWidth + paddingX * 2);
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
 
+  const placementGapX = Math.max(0, offsetX);
+  const placementGapY = Math.max(0, offsetY);
   let x = anchorPoint.x - width;
-  let y = anchorPoint.y - height - offsetY;
+  let y = anchorPoint.y - height - placementGapY;
+
+  if (placement === 'top-right') {
+    x = anchorPoint.x + placementGapX;
+  } else if (placement === 'left') {
+    x = anchorPoint.x - width - placementGapX;
+    y = anchorPoint.y - (height / 2);
+  } else if (placement === 'right') {
+    x = anchorPoint.x + placementGapX;
+    y = anchorPoint.y - (height / 2);
+  } else if (placement === 'bottom-left') {
+    x = anchorPoint.x - width - placementGapX;
+    y = anchorPoint.y + placementGapY;
+  } else if (placement === 'bottom-right') {
+    x = anchorPoint.x + placementGapX;
+    y = anchorPoint.y + placementGapY;
+  }
 
   if (x < margin) {
     x = margin;
