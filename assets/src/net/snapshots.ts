@@ -8,7 +8,9 @@ import type {
   SisuState,
   QuestState,
   AchievementState,
-  StatsState
+  StatsState,
+  CloverHuntState,
+  AreaDefinition
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -81,6 +83,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     result.type === "sisu.upgrade_max.result" ||
     result.type === "quest.claim.result" ||
     result.type === "stats.update.result" ||
+    result.type === "cloverfield.search.result" ||
     result.type === "bonustime.play.result"
   ) {
     applyAuthoritativeData(state, result);
@@ -120,6 +123,9 @@ export function applyAuthoritativeData(
     quests?: Record<string, QuestState>;
     achievements?: Record<string, AchievementState>;
     stats?: StatsState;
+    area?: string;
+    areas?: AreaDefinition[];
+    clover_hunt?: CloverHuntState;
     [key: string]: any;
   }
 ) {
@@ -153,8 +159,11 @@ export function applyAuthoritativeData(
   if (data.quests !== undefined) state.snapshot.state.quests = data.quests;
   if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
+  if (data.clover_hunt !== undefined) state.snapshot.state.clover_hunt = data.clover_hunt;
   if (data.has_bonustime_token !== undefined) state.snapshot.state.has_bonustime_token = data.has_bonustime_token;
   if (data.bonustime !== undefined) state.snapshot.state.bonustime = data.bonustime;
+  if (data.area !== undefined) state.snapshot.state.area = data.area;
+  if (data.areas !== undefined) state.snapshot.state.areas = data.areas;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -175,6 +184,10 @@ export function applyAuthoritativeData(
           break;
       }
     }
+  }
+
+  if (data.area !== undefined || data.areas !== undefined || data.clover_hunt !== undefined) {
+    updateAreaViewModel(state.snapshot.state);
   }
 }
 

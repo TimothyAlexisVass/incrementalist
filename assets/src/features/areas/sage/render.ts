@@ -1,4 +1,4 @@
-import { SAGE_TIPS } from './tips';
+import { SAGE_TIP_ORDER, SAGE_TIPS } from './tips';
 import {
   BOTTOM_HUD_HEIGHT,
   DISPLAY_AREA_X,
@@ -28,9 +28,10 @@ const SAGE_HEADER_TEXT = 'The Sage:';
 const SAGE_HEADER_FONT = 'bold 14px Arial';
 const SAGE_HEADER_MARGIN_BOTTOM = 5;
 
-const tipRevealStarts = new Map<number, number>();
+const tipRevealStarts = new Map<string, number>();
 
 type SageTipRender = {
+  tipId: string;
   leafId: string;
   buttonLabel: string;
   boxX: number;
@@ -46,23 +47,23 @@ type SageTipRender = {
 export function renderSageArea(
   canvas: HTMLCanvasElement,
   input: InteractionState,
-  level: number,
+  _level: number,
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void,
   blocked: boolean = false
 ) {
   const renderer = getActiveWebGLRenderer();
-  const visibleTipLevels = getVisibleTipLevels(level);
-  const visibleLevelSet = new Set(visibleTipLevels);
+  const visibleTipIds = getVisibleTipIds();
+  const visibleIdSet = new Set(visibleTipIds);
 
-  for (const tipLevel of Array.from(tipRevealStarts.keys())) {
-    if (!visibleLevelSet.has(tipLevel)) {
-      tipRevealStarts.delete(tipLevel);
-      clearUpdatingTextKeysByPrefix(getSageTipTextKeyPrefix(tipLevel));
+  for (const tipId of Array.from(tipRevealStarts.keys())) {
+    if (!visibleIdSet.has(tipId)) {
+      tipRevealStarts.delete(tipId);
+      clearUpdatingTextKeysByPrefix(getSageTipTextKeyPrefix(tipId));
     }
   }
 
-  if (visibleTipLevels.length === 0) {
+  if (visibleTipIds.length === 0) {
     return;
   }
 
@@ -70,9 +71,9 @@ export function renderSageArea(
   const bottomHudY = canvas.height - BOTTOM_HUD_HEIGHT;
   const maxBoxWidth = DISPLAY_AREA_WIDTH - 40;
 
-  const tipsToRender = visibleTipLevels.map((tipLevel) => {
-    const tip = SAGE_TIPS[tipLevel];
-    const leafId = tipLeafId(tipLevel);
+  const tipsToRender = visibleTipIds.map((tipId) => {
+    const tip = SAGE_TIPS[tipId];
+    const leafId = tipLeafId(tipId);
     const buttonLabel = tip.confirmation || 'Alright';
     const fullLines = tip.text;
     const lineWidths = fullLines.map((line) => (renderer ? renderer.measureTextWidth({ text: line, font: SMALL_TEXT_FONT }) : 0));
@@ -95,17 +96,18 @@ export function renderSageArea(
       (fullLines.length * LINE_HEIGHT) +
       PANEL_PADDING;
 
-    if (!tipRevealStarts.has(tipLevel)) {
-      tipRevealStarts.set(tipLevel, now);
+    if (!tipRevealStarts.has(tipId)) {
+      tipRevealStarts.set(tipId, now);
     }
 
-    const revealStart = tipRevealStarts.get(tipLevel) ?? now;
+    const revealStart = tipRevealStarts.get(tipId) ?? now;
     const elapsedSeconds = (now - revealStart) / 1000;
     const lettersToShow = Math.floor(elapsedSeconds * LETTERS_PER_SECOND);
     const visibleCharCounts = getVisibleCharCounts(fullLines, lettersToShow);
 
     return {
       leafId,
+      tipId,
       buttonLabel,
       boxX: DISPLAY_AREA_X,
       boxY: DISPLAY_AREA_Y,
@@ -244,19 +246,16 @@ function renderTipPanel(
 }
 
 
-function getVisibleTipLevels(level: number): number[] {
-  return Object.keys(SAGE_TIPS)
-    .map(Number)
-    .filter((tipLevel) => tipLevel <= level && notices.hasLeafNotice(tipLeafId(tipLevel)))
-    .sort((a, b) => a - b);
+function getVisibleTipIds(): string[] {
+  return SAGE_TIP_ORDER.filter((tipId) => notices.hasLeafNotice(tipLeafId(tipId)));
 }
 
-function tipLeafId(level: number): string {
-  return `leaf.sage_tip.${level}.confirm_button`;
+function tipLeafId(tipId: string): string {
+  return `leaf.sage_tip.${tipId}.confirm_button`;
 }
 
-function getSageTipTextKeyPrefix(level: number): string {
-  return `sage.tip.${tipLeafId(level)}.`;
+function getSageTipTextKeyPrefix(tipId: string): string {
+  return `sage.tip.${tipLeafId(tipId)}.`;
 }
 
 function getSageTipLineTextKey(leafId: string, lineIndex: number): string {

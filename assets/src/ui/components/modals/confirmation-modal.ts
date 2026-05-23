@@ -179,6 +179,83 @@ export class LoadingModal implements Modal {
     }
 }
 
+export class InfoAcknowledgementModal implements Modal {
+  public readonly isBlocking = true;
+  private readonly okRect = { x: 0, y: 0, width: 120, height: 38 };
+
+  constructor(
+    private readonly title: string,
+    private readonly body: string,
+    private readonly onClose: () => void
+  ) {}
+
+  render(canvas: HTMLCanvasElement, input: InteractionState) {
+    const renderer = getActiveWebGLRenderer();
+    if (!renderer) {
+      return;
+    }
+
+    const modalWidth = 460;
+    const modalHeight = 220;
+    const modalX = (canvas.width - modalWidth) / 2;
+    const modalY = (canvas.height - modalHeight) / 2;
+
+    renderer.drawRect({
+      x: modalX,
+      y: modalY,
+      width: modalWidth,
+      height: modalHeight,
+      color: cssToRgba(COLORS.panel.bg)
+    });
+    drawRectOutline(
+      renderer,
+      modalX,
+      modalY,
+      modalWidth,
+      modalHeight,
+      2,
+      cssToRgba(COLORS.overlay.panelBorder)
+    );
+
+    renderer.drawText({
+      text: this.title,
+      x: modalX + modalWidth / 2,
+      y: modalY + 28,
+      font: MODAL_TITLE_FONT,
+      color: COLORS.overlay.titleText,
+      align: "center",
+      baseline: "top"
+    });
+
+    const lines = this.body.split("\n");
+    lines.forEach((line, index) => {
+      renderer.drawText({
+        text: line,
+        x: modalX + modalWidth / 2,
+        y: modalY + 72 + index * 20,
+        font: MODAL_BODY_FONT,
+        color: COLORS.overlay.bodyText,
+        align: "center",
+        baseline: "top"
+      });
+    });
+
+    this.okRect.x = modalX + (modalWidth - this.okRect.width) / 2;
+    this.okRect.y = modalY + modalHeight - 54;
+
+    const okClicked = doButton(input, this.okRect, "OK", {
+      activeSurface: COLORS.button.surface.active,
+      inactiveSurface: COLORS.button.surface.inactive
+    });
+
+    if (okClicked) {
+      this.onClose();
+    }
+  }
+
+  tick(_dt: number, _input: InteractionState) {}
+}
+
 function drawRectOutline(
   renderer: NonNullable<ReturnType<typeof getActiveWebGLRenderer>>,
   x: number,

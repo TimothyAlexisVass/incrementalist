@@ -31,6 +31,16 @@ defmodule Incrementalist.Game.Constants do
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
 
+  # Clover Hunt Constants
+  def clover_hunt_click_step, do: 100
+  def clover_hunt_first_four_leaf_clicks, do: 100
+  def clover_hunt_second_four_leaf_clicks, do: 200
+  def clover_hunt_first_five_leaf_clicks, do: 300
+  def clover_hunt_second_five_leaf_clicks, do: 400
+  def clover_hunt_third_five_leaf_clicks, do: 500
+  def clover_hunt_first_six_leaf_clicks, do: 600
+  def clover_hunt_max_background_stage, do: 6
+
   def area_defs do
     @area_unlocking_entries
     |> Enum.map(&normalize_area/1)
@@ -141,15 +151,33 @@ defmodule Incrementalist.Game.Constants do
   def notice_leaf_tab_menu_any_button, do: "leaf.tab.menu.any.button"
 
   def sage_tip_levels do
-    [
-      @default_sage_tip_level,
-      unlock_required_level!(@shop_item_unlock_levels, "shop-item", "idle_mode"),
-      unlock_required_level!(@shop_item_unlock_levels, "shop-item", "sisu_generator"),
-      unlock_required_level!(@area_unlock_levels, "area", "cloverfield"),
-      unlock_required_level!(@area_unlock_levels, "area", "market")
-    ]
+    sage_tip_level_unlocks()
+    |> Map.values()
     |> Enum.uniq()
     |> Enum.sort()
+  end
+
+  def sage_tip_level_unlocks do
+    %{
+      "1" => @default_sage_tip_level,
+      "2" => unlock_required_level!(@shop_item_unlock_levels, "shop-item", "idle_mode"),
+      "4" => unlock_required_level!(@shop_item_unlock_levels, "shop-item", "sisu_generator"),
+      "7" => unlock_required_level!(@area_unlock_levels, "area", "cloverfield"),
+      "15" => unlock_required_level!(@area_unlock_levels, "area", "market")
+    }
+  end
+
+  def sage_tip_event_ids do
+    [
+      "clover_4_leaf",
+      "clover_5_leaf",
+      "clover_6_leaf"
+    ]
+  end
+
+  def sage_tip_ids do
+    (Map.keys(sage_tip_level_unlocks()) ++ sage_tip_event_ids())
+    |> Enum.uniq()
   end
 
   defp normalize_area(%{

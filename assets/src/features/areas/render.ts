@@ -1,6 +1,8 @@
 import { COLORS } from "../../colors";
 import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT, HUD_LEFT_PADDING } from "../../config";
 import { renderSageArea } from "./sage/render";
+import { getCloverfieldBackgroundBlendState } from "./cloverfield/render";
+import { handleCloverfieldInteractions } from "./cloverfield/interactions";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
@@ -19,31 +21,63 @@ import { hexToRgba } from "../../utils/color";
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
 const GO_TO_AREA_BUTTON_PADDING = 3;
 
-function getAreaBackgroundImage(areaKey: string) {
-  if (!areaBackgroundImages.has(areaKey)) {
+function getAreaBackgroundImage(imageKey: string) {
+  if (!areaBackgroundImages.has(imageKey)) {
     const image = new Image();
-    image.src = `images/area/${areaKey.replace(/_/g, "-")}-background.png`;
-    areaBackgroundImages.set(areaKey, image);
+    image.src = `images/area/${imageKey}.png`;
+    areaBackgroundImages.set(imageKey, image);
   }
-  return areaBackgroundImages.get(areaKey)!;
+  return areaBackgroundImages.get(imageKey)!;
 }
 
 export function renderAreaBackground(canvas: HTMLCanvasElement) {
   const renderer = getActiveWebGLRenderer();
   const model = getAreaViewModel();
   const areaKey = model.currentArea;
-  
-  const image = getAreaBackgroundImage(areaKey);
 
-  if (image.complete && image.naturalWidth > 0) {
-    renderer.drawImage({
-      image,
-      x: DISPLAY_AREA_X,
-      y: DISPLAY_AREA_Y,
-      width: DISPLAY_AREA_WIDTH,
-      height: DISPLAY_AREA_HEIGHT
-    });
-    return;
+  if (areaKey === "cloverfield") {
+    const blend = getCloverfieldBackgroundBlendState();
+    const baseImage = getAreaBackgroundImage(`cloverfield-${blend.baseStage}`);
+    const mixImage = blend.mixStage !== null ? getAreaBackgroundImage(`cloverfield-${blend.mixStage}`) : null;
+    const hasBase = baseImage.complete && baseImage.naturalWidth > 0;
+    const hasMix = mixImage !== null && mixImage.complete && mixImage.naturalWidth > 0;
+
+    if (hasBase) {
+      renderer.drawImage({
+        image: baseImage,
+        mixImage: hasMix ? mixImage : undefined,
+        mixAmount: hasMix ? blend.mixAmount : 0,
+        x: DISPLAY_AREA_X,
+        y: DISPLAY_AREA_Y,
+        width: DISPLAY_AREA_WIDTH,
+        height: DISPLAY_AREA_HEIGHT
+      });
+      return;
+    }
+
+    if (hasMix && mixImage) {
+      renderer.drawImage({
+        image: mixImage,
+        x: DISPLAY_AREA_X,
+        y: DISPLAY_AREA_Y,
+        width: DISPLAY_AREA_WIDTH,
+        height: DISPLAY_AREA_HEIGHT
+      });
+      return;
+    }
+  } else {
+    const image = getAreaBackgroundImage(`${areaKey.replace(/_/g, "-")}-background`);
+
+    if (image.complete && image.naturalWidth > 0) {
+      renderer.drawImage({
+        image,
+        x: DISPLAY_AREA_X,
+        y: DISPLAY_AREA_Y,
+        width: DISPLAY_AREA_WIDTH,
+        height: DISPLAY_AREA_HEIGHT
+      });
+      return;
+    }
   }
 
 
@@ -57,12 +91,17 @@ export function renderAreaSpecifics(
   input: InteractionState,
   level: number,
   channel?: GameChannel,
-  runCommand?: (cmd: () => Promise<any>) => void,
+  runCommand?: (cmd: () => Promise<any>) => Promise<any> | void,
   blocked: boolean = false
 ) {
   const model = getAreaViewModel();
   if (model.currentArea === 'sage') {
     renderSageArea(canvas, input, level, channel, runCommand, blocked);
+    return;
+  }
+
+  if (model.currentArea === "cloverfield") {
+    handleCloverfieldInteractions(input, channel, runCommand, blocked);
   }
 }
 

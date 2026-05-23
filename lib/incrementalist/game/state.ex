@@ -113,6 +113,52 @@ defmodule Incrementalist.Game.State do
     end
   end
 
+  defmodule CloverHunt do
+    use Ecto.Schema
+    import Ecto.Changeset
+    alias Incrementalist.Game.Constants
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :click_count, :integer, default: 0
+      field :four_leaf_found_count, :integer, default: 0
+      field :five_leaf_found_count, :integer, default: 0
+      field :six_leaf_found, :boolean, default: false
+      field :seven_leaf_found, :boolean, default: false
+      field :background_stage, :integer, default: 1
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      schema
+      |> cast(attrs, [
+        :click_count,
+        :four_leaf_found_count,
+        :five_leaf_found_count,
+        :six_leaf_found,
+        :seven_leaf_found,
+        :background_stage
+      ])
+    end
+
+    def visible_state(nil), do: visible_state(%__MODULE__{})
+
+    def visible_state(%__MODULE__{} = clover_hunt) do
+      %{
+        "click_count" => clover_hunt.click_count || 0,
+        "four_leaf_found_count" => clover_hunt.four_leaf_found_count || 0,
+        "five_leaf_found_count" => clover_hunt.five_leaf_found_count || 0,
+        "six_leaf_found" => clover_hunt.six_leaf_found || false,
+        "seven_leaf_found" => clover_hunt.seven_leaf_found || false,
+        "background_stage" =>
+          clover_hunt.background_stage
+          |> Kernel.||(1)
+          |> min(Constants.clover_hunt_max_background_stage())
+          |> max(1)
+      }
+    end
+  end
+
   defmodule QuestState do
     use Ecto.Schema
     import Ecto.Changeset
@@ -278,6 +324,7 @@ defmodule Incrementalist.Game.State do
     embeds_one :charge_crystals, ChargeCrystals, on_replace: :update
     embeds_one :features, Features, on_replace: :update
     embeds_one :sisu, Sisu, on_replace: :update
+    embeds_one :clover_hunt, CloverHunt, on_replace: :update
 
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
@@ -315,6 +362,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:charge_crystals)
     |> cast_embed(:features)
     |> cast_embed(:sisu)
+    |> cast_embed(:clover_hunt)
     |> cast_embed(:quests)
     |> cast_embed(:stats)
     |> cast_embed(:bonustime)
@@ -352,6 +400,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:charge_crystals)
     |> maybe_put_embed(:features)
     |> maybe_put_embed(:sisu)
+    |> maybe_put_embed(:clover_hunt)
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
     |> maybe_put_embed(:bonustime)
@@ -423,6 +472,7 @@ defmodule Incrementalist.Game.State do
           Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay,
         projected_at: timestamp
       },
+      clover_hunt: %CloverHunt{},
       quests: [],
       achievements: %{},
       stats: %Stats{
@@ -544,16 +594,14 @@ defmodule Incrementalist.Game.State do
               Incrementalist.Game.Features.Progress.Sisu.Levels.refill_tier("azure").cycle_decay
           )
       },
-      "areas" =>
-        Enum.map(Incrementalist.Game.Constants.area_defs(), fn area_def ->
-          Map.put(area_def, :is_locked, (projected_state.level || 1) < area_def.unlock_level)
-        end),
+      "areas" => Incrementalist.Game.Features.Areas.visible_area_defs(projected_state),
       "features" => %{
         "idle_mode_purchased" => projected_state.features.idle_mode_purchased,
         "world_map_unlocked" => projected_state.features.world_map_unlocked,
         "sisu_generator_purchased" => projected_state.features.sisu_generator_purchased,
         "bonus_time_purchased" => projected_state.features.bonus_time_purchased
       },
+      "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "shop" =>
         Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
           is_purchased =

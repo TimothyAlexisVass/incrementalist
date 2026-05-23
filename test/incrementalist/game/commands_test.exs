@@ -4,7 +4,16 @@ defmodule Incrementalist.Game.CommandsTest do
   import Ecto.Query
 
   alias Incrementalist.Game.Commands
-  alias Incrementalist.Game.Persistence.{CommandLog, GameCommand, Player, PlayerStates}
+  alias Incrementalist.Game.Features.Quests.Rules, as: Quests
+
+  alias Incrementalist.Game.Persistence.{
+    CommandLog,
+    GameCommand,
+    Player,
+    PlayerState,
+    PlayerStates
+  }
+
   alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.{Notices, Sessions}
   alias Incrementalist.Repo
@@ -100,6 +109,59 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert locked["type"] == "command.error"
     assert locked["reason"] == "area_locked"
+  end
+
+  test "cloverfield.search only advances at threshold commands and unlocks clover discoveries" do
+    player = create_player()
+    set_player_area(player.id, "cloverfield", 10)
+
+    first = Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)
+    assert first["type"] == "cloverfield.search.result"
+    assert first["clover_hunt"]["click_count"] == 100
+    assert first["discoveries"] == ["four_leaf_1"]
+    assert first["clover_hunt"]["background_stage"] == 2
+    assert first["quests"]["clover_hunt"]["rank"] == 1
+    assert first["quests"]["clover_hunt"]["claimed_rank"] == 0
+
+    Commands.ack(player.id, 0, @now)
+
+    second = Commands.enqueue(player.id, "cloverfield.search", intent(1), @now)
+    assert second["type"] == "cloverfield.search.result"
+    assert second["clover_hunt"]["click_count"] == 200
+    assert second["discoveries"] == ["four_leaf_2"]
+    assert second["clover_hunt"]["background_stage"] == 3
+    assert second["quests"]["clover_hunt"]["rank"] == 1
+  end
+
+  test "claiming clover_hunt rank 3 removes cloverfield and forces area to sage" do
+    player = create_player()
+    set_player_area(player.id, "cloverfield", 10)
+
+    for command_id <- 0..5 do
+      result = Commands.enqueue(player.id, "cloverfield.search", intent(command_id), @now)
+      assert result["type"] == "cloverfield.search.result"
+      Commands.ack(player.id, command_id, @now)
+    end
+
+    claim =
+      Commands.enqueue(player.id, "quest.claim", intent(6, %{"quest_id" => "clover_hunt"}), @now)
+
+    assert claim["type"] == "quest.claim.result"
+    assert claim["quest_id"] == "clover_hunt"
+    assert claim["area"] == "sage"
+    assert claim["clover_hunt"]["click_count"] == 600
+
+    area_keys =
+      claim["areas"]
+      |> Enum.map(fn area -> area[:key] || area["key"] end)
+
+    refute "cloverfield" in area_keys
+
+    ps = PlayerStates.get!(player.id)
+    assert ps.state.area == "sage"
+
+    clover_hunt_quest = Enum.find(ps.state.quests, &(&1.id == "clover_hunt"))
+    assert clover_hunt_quest.claimed_rank >= 3
   end
 
   test "notice.event child_clicked clears an active sage tip leaf" do
@@ -583,5 +645,23 @@ defmodule Incrementalist.Game.CommandsTest do
         order_by: [asc: command.sequence],
         select: command.status
     )
+  end
+
+  defp set_player_area(player_id, area_key, level) do
+    ps = PlayerStates.get!(player_id)
+
+    next_state =
+      ps.state
+      |> Map.put(:level, level)
+      |> Map.put(:area, area_key)
+      |> Quests.evaluate()
+
+    ps
+    |> PlayerState.changeset(%{
+      state: next_state,
+      notices: Notices.new(next_state),
+      last_saved_at: @now
+    })
+    |> Repo.update!()
   end
 end

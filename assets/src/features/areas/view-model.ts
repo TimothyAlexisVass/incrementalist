@@ -1,4 +1,5 @@
 import { AreaDefinition } from "../../net/protocol";
+import { syncCloverfieldFromSnapshot } from "./cloverfield/view-model";
 
 export type AreaViewModel = {
   currentArea: string;
@@ -30,4 +31,5 @@ export function updateAreaViewModel(snapshotState: any) {
   areaViewModel.availableAreas = [...(snapshotState.areas || [])].sort(
     (a, b) => b.unlock_level - a.unlock_level
   );
+  syncCloverfieldFromSnapshot(snapshotState.clover_hunt);
 }

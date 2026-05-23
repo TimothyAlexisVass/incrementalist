@@ -36,6 +36,15 @@ export type SisuState = {
   cycle_decay: number;
 };
 
+export type CloverHuntState = {
+  click_count: number;
+  four_leaf_found_count: number;
+  five_leaf_found_count: number;
+  six_leaf_found: boolean;
+  seven_leaf_found: boolean;
+  background_stage: number;
+};
+
 export type ProjectionParams = {
   current_fill: number;
   can_claim_at: string | null;
@@ -129,6 +138,7 @@ export type GameSnapshot = {
     rewards_claimed: number;
     };
     sisu: SisuState;
+    clover_hunt: CloverHuntState;
     areas: AreaDefinition[];
     features: {
       idle_mode_purchased: boolean;
@@ -216,6 +226,19 @@ export type AreaSelectResult = {
   notices: NoticeState;
 };
 
+export type CloverfieldSearchResult = {
+  type: "cloverfield.search.result";
+  status: "ok";
+  command_id: number;
+  discoveries: string[];
+  clover_hunt: CloverHuntState;
+  area: string;
+  areas: AreaDefinition[];
+  quests: Record<string, QuestState>;
+  achievements: Record<string, AchievementState>;
+  notices: NoticeState;
+};
+
 export type ShopPurchaseResult = {
   type: "shop.purchase.result";
   status: "ok";
@@ -244,6 +267,9 @@ export type QuestClaimResult = {
   trust: number;
   fame: BigNum;
   required_fame: BigNum;
+  area: string;
+  areas: AreaDefinition[];
+  clover_hunt: CloverHuntState;
   quests: Record<string, QuestState>;
   achievements: Record<string, AchievementState>;
   stats: StatsState;
@@ -287,6 +313,7 @@ export type CommandErrorReason =
   | "claim_not_ready"
   | "area_locked"
   | "unknown_area"
+  | "cloverfield_only"
   | "tier_id_required"
   | "unknown_tier"
   | "sisu_generator_not_purchased"
@@ -328,6 +355,7 @@ export type AckableCommandResult =
   | SisuRefillResult
   | SisuUpgradeMaxResult
   | AreaSelectResult
+  | CloverfieldSearchResult
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
   | QuestClaimResult
@@ -380,6 +408,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "sisu.refill.result" ||
     result.type === "sisu.upgrade_max.result" ||
     result.type === "area.select.result" ||
+    result.type === "cloverfield.search.result" ||
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||
     result.type === "quest.claim.result" ||

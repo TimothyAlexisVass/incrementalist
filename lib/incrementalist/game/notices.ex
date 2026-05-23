@@ -10,6 +10,7 @@ defmodule Incrementalist.Game.Notices do
   import Ecto.Changeset
 
   alias Incrementalist.Game.{Constants, State}
+  alias Incrementalist.Game.Features.Areas
 
   @notice_leaf_area_dropdown_button Constants.notice_leaf_area_dropdown_button()
   @notice_leaf_tab_shop_button Constants.notice_leaf_tab_shop_button()
@@ -71,8 +72,8 @@ defmodule Incrementalist.Game.Notices do
       {:area, area_key} ->
         Enum.any?(Constants.area_defs(), &(&1.key == area_key))
 
-      {:sage_tip, level} ->
-        level in Constants.sage_tip_levels()
+      {:sage_tip, tip_id} ->
+        tip_id in Constants.sage_tip_ids()
 
       {:shop_item, item_id} ->
         Enum.any?(Constants.shop_item_defs(), &(&1.id == item_id))
@@ -215,7 +216,7 @@ defmodule Incrementalist.Game.Notices do
   end
 
   def leaf_area_id(area_key), do: "leaf.area.#{area_key}.go_button"
-  def leaf_sage_tip_id(level), do: "leaf.sage_tip.#{level}.confirm_button"
+  def leaf_sage_tip_id(tip_id), do: "leaf.sage_tip.#{tip_id}.confirm_button"
   def leaf_shop_item_id(item_id), do: "leaf.shop_item.#{item_id}.purchase_button"
   def leaf_quest_id(quest_id), do: "leaf.quest.#{quest_id}.claim_button"
   def leaf_achievement_id(achievement_id), do: "leaf.achievement.#{achievement_id}.unlocked"
@@ -227,20 +228,37 @@ defmodule Incrementalist.Game.Notices do
     current_area = state.area || "sage"
 
     area_leaves =
-      Enum.flat_map(Constants.area_defs(), fn area ->
-        is_unlocked = (state.level || 1) >= area.unlock_level
-
-        if is_unlocked and area.key != current_area and area.key != "sage" do
+      Areas.visible_area_defs(state)
+      |> Enum.flat_map(fn area ->
+        if !area.is_locked and area.key != current_area and area.key != "sage" do
           [leaf_area_id(area.key)]
         else
           []
         end
       end)
 
-    sage_tip_leaves =
-      Constants.sage_tip_levels()
-      |> Enum.filter(&(&1 <= (state.level || 1)))
-      |> Enum.map(&leaf_sage_tip_id/1)
+    level_tip_leaves =
+      Constants.sage_tip_level_unlocks()
+      |> Enum.filter(fn {_tip_id, required_level} ->
+        required_level <= (state.level || 1)
+      end)
+      |> Enum.sort_by(fn {tip_id, _required_level} ->
+        case Integer.parse(tip_id) do
+          {n, ""} -> n
+          _ -> 1_000_000
+        end
+      end)
+      |> Enum.map(fn {tip_id, _required_level} -> leaf_sage_tip_id(tip_id) end)
+
+    clover_hunt = state.clover_hunt || %State.CloverHunt{}
+
+    clover_tip_leaves =
+      []
+      |> maybe_add_tip((clover_hunt.four_leaf_found_count || 0) >= 1, "clover_4_leaf")
+      |> maybe_add_tip((clover_hunt.five_leaf_found_count || 0) >= 1, "clover_5_leaf")
+      |> maybe_add_tip(clover_hunt.six_leaf_found || false, "clover_6_leaf")
+
+    sage_tip_leaves = level_tip_leaves ++ clover_tip_leaves
 
     shop_item_leaves =
       Constants.shop_item_defs()
@@ -372,14 +390,15 @@ defmodule Incrementalist.Game.Notices do
 
       String.starts_with?(leaf_id, "leaf.sage_tip.") and
           String.ends_with?(leaf_id, ".confirm_button") ->
-        level_value =
+        tip_id =
           leaf_id
           |> String.trim_leading("leaf.sage_tip.")
           |> String.trim_trailing(".confirm_button")
 
-        case Integer.parse(level_value) do
-          {level, ""} -> {:sage_tip, level}
-          _ -> :unknown
+        if tip_id == "" do
+          :unknown
+        else
+          {:sage_tip, tip_id}
         end
 
       String.starts_with?(leaf_id, "leaf.shop_item.") and
@@ -469,4 +488,7 @@ defmodule Incrementalist.Game.Notices do
       _ -> false
     end
   end
+
+  defp maybe_add_tip(leaf_ids, true, tip_id), do: leaf_ids ++ [leaf_sage_tip_id(tip_id)]
+  defp maybe_add_tip(leaf_ids, false, _tip_id), do: leaf_ids
 end

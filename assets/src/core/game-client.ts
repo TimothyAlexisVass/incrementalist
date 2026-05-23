@@ -80,6 +80,7 @@ import { resetLuckyDiceState } from "../features/bonustime/10-lucky-dice/interac
 import { RewardModalState, resolveRewardModalAction, renderRewardModal, getRewardModalLayout } from "../ui/components/modals/reward-modal";
 import { Interactions, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
+import { InfoAcknowledgementModal } from "../ui/components/modals/confirmation-modal";
 import {
   NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
   NOTICE_PARENT_MENU_MAIN,
@@ -116,6 +117,7 @@ export class GameClient {
   private sisuControlLayout: SisuControlLayout | null = null;
   private bonusRewardModal: RewardModalState | null = null;
   private pendingCloseTransientUi = false;
+  private readonly cloverDiscoveryModalQueue: string[] = [];
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -255,6 +257,7 @@ export class GameClient {
     this.applyProgressEffects(result, previousAmounts);
     this.applyQuestEffects(result, previousTrust);
     this.applyMilestoneEffects(milestoneBaseline);
+    this.enqueueCloverDiscoveryModals(result);
 
     if (!isAckableCommandResult(result)) return;
 
@@ -274,6 +277,7 @@ export class GameClient {
       this.applyProgressEffects(next, previousAmounts);
       this.applyQuestEffects(next, previousTrust);
       this.applyMilestoneEffects(milestoneBaseline);
+      this.enqueueCloverDiscoveryModals(next);
       if (next.type === "game.reset.result") {
         this.closeAllTransientUi();
         if (this.store.state.snapshot) {
@@ -332,6 +336,7 @@ export class GameClient {
       result.type === "notice.event.result" ||
       result.type === "quest.claim.result" ||
       result.type === "stats.update.result" ||
+      result.type === "cloverfield.search.result" ||
       result.type === "bonustime.play.result" ||
       result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
@@ -442,6 +447,32 @@ export class GameClient {
     }
   }
 
+  private enqueueCloverDiscoveryModals(result: ServerResult) {
+    if (result.type !== "cloverfield.search.result") return;
+    if (!result.discoveries || result.discoveries.length === 0) return;
+
+    for (const discoveryId of result.discoveries) {
+      const body = cloverDiscoveryMessage(discoveryId);
+      if (body) {
+        this.cloverDiscoveryModalQueue.push(body);
+      }
+    }
+  }
+
+  private openNextCloverDiscoveryModalIfReady() {
+    if (this.cloverDiscoveryModalQueue.length === 0) return;
+    if (this.ui.modals.isOpen()) return;
+
+    const body = this.cloverDiscoveryModalQueue.shift();
+    if (!body) return;
+
+    this.ui.modals.open(
+      new InfoAcknowledgementModal("Clover Hunt", body, () => {
+        this.ui.modals.close();
+      })
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Input handlers
   // ---------------------------------------------------------------------------
@@ -507,6 +538,8 @@ export class GameClient {
       this.closeAllTransientUi();
       this.pendingCloseTransientUi = false;
     }
+
+    this.openNextCloverDiscoveryModalIfReady();
 
     // 1. Snapshot input state for this frame
     const { state: input, activity } = this.interactions.tick();
@@ -797,4 +830,23 @@ export class GameClient {
 
 function clearsCommandQueue(result: AckableCommandResult) {
   return result.type === "game.reset.result";
+}
+
+function cloverDiscoveryMessage(discoveryId: string): string | null {
+  switch (discoveryId) {
+    case "four_leaf_1":
+      return "You found a 4-leaf clover!";
+    case "four_leaf_2":
+      return "You found another 4-leaf clover!";
+    case "five_leaf_1":
+      return "You found a 5-leaf clover!";
+    case "five_leaf_2":
+      return "You found another 5-leaf clover!";
+    case "five_leaf_3":
+      return "You found a third 5-leaf clover!";
+    case "six_leaf_1":
+      return "You found a 6-leaf clover!";
+    default:
+      return null;
+  }
 }

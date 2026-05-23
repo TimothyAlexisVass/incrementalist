@@ -3,6 +3,7 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
   Handles evaluation of quest progress and claiming rewards.
   """
   alias Incrementalist.Game.Constants
+  alias Incrementalist.Game.Features.Areas
   alias Incrementalist.Game.State
   alias Incrementalist.Game.State.QuestState
 
@@ -89,7 +90,16 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
           }
 
           # Re-evaluate in case claiming one quest affects another (e.g. quest_c_rank)
-          {:ok, evaluate(new_state)}
+          reevaluated_state = evaluate(new_state)
+
+          resolved_area_state =
+            if quest_id == "clover_hunt" and quest.claimed_rank < 3 and last_claimed_rank >= 3 do
+              Areas.ensure_valid_current_area(reevaluated_state, "sage")
+            else
+              reevaluated_state
+            end
+
+          {:ok, resolved_area_state}
         else
           {:error, "rank_definition_not_found"}
         end
@@ -157,6 +167,18 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
 
   defp get_quest_value("streak", state),
     do: if(state.bonustime, do: state.bonustime.streak, else: 0)
+
+  defp get_quest_value("clover_hunt", state) do
+    clover_hunt = state.clover_hunt || %State.CloverHunt{}
+
+    cond do
+      clover_hunt.seven_leaf_found -> 4
+      clover_hunt.six_leaf_found -> 3
+      (clover_hunt.five_leaf_found_count || 0) >= 1 -> 2
+      (clover_hunt.four_leaf_found_count || 0) >= 1 -> 1
+      true -> 0
+    end
+  end
 
   defp get_quest_value("level_up_daily", state), do: state.stats.total_level_ups_daily
   defp get_quest_value(_, _), do: 0

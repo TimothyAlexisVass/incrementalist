@@ -105,6 +105,10 @@ export const HUD_LEFT_PADDING = 20;
 // TODO: when progress bar has these, set DISPLAY_AREA_WIDTH based on that instead of this hardcoded number
 export const DISPLAY_AREA_WIDTH = 1120;
 export const DISPLAY_AREA_HEIGHT = CANVAS_HEIGHT - TOP_HUD_HEIGHT - BOTTOM_HUD_HEIGHT;
+// Mirrors server Constants.clover_hunt_click_step/0.
+export const CLOVERFIELD_SEARCH_CLICK_STEP = 100;
+// Mirrors server Constants.clover_hunt_max_background_stage/0.
+export const CLOVERFIELD_MAX_BACKGROUND_STAGE = 6;
 export const TOP_HUD_EXP_BAR_X = HUD_LEFT_PADDING;
 export const TOP_HUD_EXP_BAR_Y = 10;
 export const TOP_HUD_EXP_BAR_WIDTH = 300;

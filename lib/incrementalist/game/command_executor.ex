@@ -11,6 +11,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.{Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
+  alias Incrementalist.Game.Features.CloverHunt
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
   alias Incrementalist.Game.Features.BonusTime.Rules, as: BonusTime
   alias Incrementalist.Game.Features.BonusTime.Games.ChestDraw
@@ -188,6 +189,46 @@ defmodule Incrementalist.Game.CommandExecutor do
              error_result(reason, command, %{
                "can_claim_at" => ps.state.can_claim_at
              }), ps.id}
+        end
+
+      "cloverfield.search" ->
+        ps = player_state(player, now)
+
+        with {:ok, searched_state, discoveries} <- CloverHunt.search(ps.state) do
+          next_state =
+            searched_state
+            |> Quests.evaluate()
+            |> Achievements.evaluate()
+
+          next_notices =
+            Notices.refresh_for_state_transition(
+              ps.notices || Notices.new(ps.state),
+              ps.state,
+              next_state
+            )
+
+          update_player_state(ps, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
+
+          {"succeeded",
+           %{
+             "type" => "cloverfield.search.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "discoveries" => discoveries,
+             "clover_hunt" => State.CloverHunt.visible_state(next_state.clover_hunt),
+             "quests" => State.visible_quests(next_state.quests),
+             "achievements" => State.visible_achievements(next_state.achievements),
+             "area" => next_state.area,
+             "areas" => Incrementalist.Game.Features.Areas.visible_area_defs(next_state),
+             "notices" => Notices.payload(next_notices)
+           }, ps.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
         end
 
       "progress.set_idle_mode" ->
@@ -426,6 +467,9 @@ defmodule Incrementalist.Game.CommandExecutor do
                "trust" => next_state.trust,
                "fame" => next_state.fame,
                "required_fame" => next_state.required_fame,
+               "area" => next_state.area,
+               "areas" => Incrementalist.Game.Features.Areas.visible_area_defs(next_state),
+               "clover_hunt" => State.CloverHunt.visible_state(next_state.clover_hunt),
                "quests" => State.visible_quests(next_state.quests),
                "achievements" => State.visible_achievements(next_state.achievements),
                "stats" => next_state.stats,
@@ -1324,7 +1368,17 @@ defmodule Incrementalist.Game.CommandExecutor do
       (action == "claim" and active_session) && active_session.type == "lucky_dice" ->
         with {:ok, claim_data} <- LuckyDice.claim(active_session.data) do
           token_type = Map.get(active_session.data, "token_type")
-          lucky_dice_claim_result(command, ps, ps.state, now, active_game_id, "claim", token_type, claim_data)
+
+          lucky_dice_claim_result(
+            command,
+            ps,
+            ps.state,
+            now,
+            active_game_id,
+            "claim",
+            token_type,
+            claim_data
+          )
         else
           _ -> lucky_dice_invalid_request(command, ps)
         end
@@ -1334,7 +1388,16 @@ defmodule Incrementalist.Game.CommandExecutor do
     end
   end
 
-  defp lucky_dice_claim_result(command, ps, base_state, now, active_game_id, action, token_type, claim_data) do
+  defp lucky_dice_claim_result(
+         command,
+         ps,
+         base_state,
+         now,
+         active_game_id,
+         action,
+         token_type,
+         claim_data
+       ) do
     tier = claim_data["tier"]
     claimed_tiers = claim_data["claimed_tiers"] || []
     dice = claim_data["dice"] || []
@@ -1559,7 +1622,8 @@ defmodule Incrementalist.Game.CommandExecutor do
     valid_indexes = Enum.filter(held_indexes, &is_integer/1)
     normalized = normalize_held_indexes(valid_indexes)
 
-    if length(valid_indexes) == length(held_indexes) and length(normalized) == length(valid_indexes) do
+    if length(valid_indexes) == length(held_indexes) and
+         length(normalized) == length(valid_indexes) do
       {:ok, normalized}
     else
       {:error, "invalid_index"}

@@ -174,6 +174,31 @@
           "favor": 1
         }
       }
+    },
+    "clover_hunt": {
+      "name": "Clover Hunt",
+      "ranks": {
+        "1": {
+          "requirement": 1,
+          "fame": 25,
+          "favor": 1
+        },
+        "2": {
+          "requirement": 2,
+          "fame": 50,
+          "favor": 1
+        },
+        "3": {
+          "requirement": 3,
+          "fame": 100,
+          "favor": 1
+        },
+        "4": {
+          "requirement": 4,
+          "fame": 7777,
+          "favor": 1
+        }
+      }
     }
   },
   "daily": {
