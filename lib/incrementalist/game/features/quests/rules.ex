@@ -3,7 +3,6 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
   Handles evaluation of quest progress and claiming rewards.
   """
   alias Incrementalist.Game.Constants
-  alias Incrementalist.Game.Features.Areas
   alias Incrementalist.Game.State
   alias Incrementalist.Game.State.QuestState
 
@@ -90,16 +89,7 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
           }
 
           # Re-evaluate in case claiming one quest affects another (e.g. quest_c_rank)
-          reevaluated_state = evaluate(new_state)
-
-          resolved_area_state =
-            if quest_id == "clover_hunt" and quest.claimed_rank < 3 and last_claimed_rank >= 3 do
-              Areas.ensure_valid_current_area(reevaluated_state, "sage")
-            else
-              reevaluated_state
-            end
-
-          {:ok, resolved_area_state}
+          {:ok, evaluate(new_state)}
         else
           {:error, "rank_definition_not_found"}
         end

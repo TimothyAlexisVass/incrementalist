@@ -21,6 +21,17 @@ export enum View {
   BONUSTIME = "bonustime"
 }
 
+const AUTHORITATIVE_AND_PROJECTION_RESULT_TYPES = new Set<ServerResult["type"]>([
+  "shop.purchase.result",
+  "sisu.refill.result",
+  "sisu.upgrade_max.result",
+  "quest.claim.result",
+  "stats.update.result",
+  "cloverfield.search.result",
+  "cloverfield.confirm_discovery.result",
+  "bonustime.play.result"
+]);
+
 export type ServerState = {
   snapshot: GameSnapshot | null;
   status: string;
@@ -77,15 +88,7 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyAreaResult(state, result);
   }
 
-  if (
-    result.type === "shop.purchase.result" ||
-    result.type === "sisu.refill.result" ||
-    result.type === "sisu.upgrade_max.result" ||
-    result.type === "quest.claim.result" ||
-    result.type === "stats.update.result" ||
-    result.type === "cloverfield.search.result" ||
-    result.type === "bonustime.play.result"
-  ) {
+  if (AUTHORITATIVE_AND_PROJECTION_RESULT_TYPES.has(result.type)) {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result as any);
   }
@@ -144,9 +147,11 @@ export function applyAuthoritativeData(
       item.can_purchase = !item.is_purchased && state.snapshot.state.level >= item.required_level;
     }
 
-    // Update area locks in the snapshot so updateAreaViewModel sees them
+    // Keep server-provided dynamic locks (lock_reason) authoritative.
+    // Recompute only level-gated locking locally when needed.
     for (const area of state.snapshot.state.areas) {
-      area.is_locked = state.snapshot.state.level < area.unlock_level;
+      const hasDynamicLock = typeof area.lock_reason === "string" && area.lock_reason.length > 0;
+      area.is_locked = hasDynamicLock || state.snapshot.state.level < area.unlock_level;
     }
 
     updateAreaViewModel(state.snapshot.state);

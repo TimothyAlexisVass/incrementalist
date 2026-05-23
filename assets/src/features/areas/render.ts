@@ -243,7 +243,7 @@ function renderDropdownItems(
       // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
       drawLockedElement(canvas, input, itemRect, renderItem, {
         opacity: 0,
-        criteria: formatUnlockRequirement(area.unlock_level, level),
+        criteria: area.lock_reason || formatUnlockRequirement(area.unlock_level, level),
         showNotice: hasNotice
       });
     } else {

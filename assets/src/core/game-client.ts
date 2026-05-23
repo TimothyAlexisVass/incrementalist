@@ -2,6 +2,7 @@ import { GameChannel } from "../net/game-channel";
 import { ZERO } from "../core/bignum";
 import {
   ackAppliedResult,
+  confirmCloverfieldDiscovery,
   progressClaimIn,
   selectArea,
   shopPurchase
@@ -82,6 +83,10 @@ import { Interactions, pointInRect } from "../ui/managers/interactions";
 import { beginTooltipFrame, renderQueuedTooltips } from "../ui/components/tooltip";
 import { InfoAcknowledgementModal } from "../ui/components/modals/confirmation-modal";
 import {
+  getCloverfieldViewModel,
+  startCloverfieldBackgroundTransition
+} from "../features/areas/cloverfield/view-model";
+import {
   NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
   NOTICE_PARENT_MENU_MAIN,
   notices
@@ -117,7 +122,7 @@ export class GameClient {
   private sisuControlLayout: SisuControlLayout | null = null;
   private bonusRewardModal: RewardModalState | null = null;
   private pendingCloseTransientUi = false;
-  private readonly cloverDiscoveryModalQueue: string[] = [];
+  private readonly cloverDiscoveryModalQueue: Array<{ discoveryId: string; body: string }> = [];
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -235,7 +240,9 @@ export class GameClient {
     const previousAmounts = result.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
     const previousTrust = result.type === "quest.claim.result" ? this.snapshotTrust() : null;
     const milestoneBaseline = this.snapshotMilestoneBaseline();
+    const previousCloverfieldStage = getCloverfieldViewModel().backgroundStage;
     applyResult(this.store.state, result);
+    this.applyCloverfieldBackgroundTransition(result, previousCloverfieldStage);
     if (this.store.state.snapshot) {
       notices.setSnapshot(this.store.state.snapshot);
     }
@@ -269,7 +276,9 @@ export class GameClient {
       const previousAmounts = next.type === "progress.claim_reward.result" ? this.snapshotAmounts() : null;
       const previousTrust = next.type === "quest.claim.result" ? this.snapshotTrust() : null;
       const milestoneBaseline = this.snapshotMilestoneBaseline();
+      const previousCloverfieldStage = getCloverfieldViewModel().backgroundStage;
       applyResult(this.store.state, next);
+      this.applyCloverfieldBackgroundTransition(next, previousCloverfieldStage);
       if (this.store.state.snapshot) {
         notices.setSnapshot(this.store.state.snapshot);
       }
@@ -295,6 +304,19 @@ export class GameClient {
       next = await ackAppliedResult(this.channel!, applied.command_id);
       if (clearsCommandQueue(applied)) this.channel!.clearCommandQueue();
     }
+  }
+
+  private applyCloverfieldBackgroundTransition(
+    result: ServerResult,
+    previousStage: number
+  ) {
+    if (result.type !== "cloverfield.search.result") return;
+    if (!result.discoveries || result.discoveries.length === 0) return;
+
+    const nextStage = getCloverfieldViewModel().backgroundStage;
+    if (nextStage <= previousStage) return;
+
+    startCloverfieldBackgroundTransition(previousStage, nextStage);
   }
 
   // ---------------------------------------------------------------------------
@@ -337,6 +359,7 @@ export class GameClient {
       result.type === "quest.claim.result" ||
       result.type === "stats.update.result" ||
       result.type === "cloverfield.search.result" ||
+      result.type === "cloverfield.confirm_discovery.result" ||
       result.type === "bonustime.play.result" ||
       result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
@@ -454,7 +477,7 @@ export class GameClient {
     for (const discoveryId of result.discoveries) {
       const body = cloverDiscoveryMessage(discoveryId);
       if (body) {
-        this.cloverDiscoveryModalQueue.push(body);
+        this.cloverDiscoveryModalQueue.push({ discoveryId, body });
       }
     }
   }
@@ -463,12 +486,15 @@ export class GameClient {
     if (this.cloverDiscoveryModalQueue.length === 0) return;
     if (this.ui.modals.isOpen()) return;
 
-    const body = this.cloverDiscoveryModalQueue.shift();
-    if (!body) return;
+    const nextModal = this.cloverDiscoveryModalQueue.shift();
+    if (!nextModal) return;
 
     this.ui.modals.open(
-      new InfoAcknowledgementModal("Clover Hunt", body, () => {
+      new InfoAcknowledgementModal("Clover Hunt", nextModal.body, () => {
         this.ui.modals.close();
+
+        if (!this.channel) return;
+        this.runCommand(() => confirmCloverfieldDiscovery(this.channel!, nextModal.discoveryId));
       })
     );
   }

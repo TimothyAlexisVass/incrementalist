@@ -42,7 +42,7 @@
     "id": "cloverfield",
     "name": "Cloverfield",
     "description": "A lush field where luck intertwines with every step.",
-    "required_level": 7
+    "required_level": 6
   },
   {
     "type": "area",

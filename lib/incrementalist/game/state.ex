@@ -125,6 +125,7 @@ defmodule Incrementalist.Game.State do
       field :four_leaf_found_count, :integer, default: 0
       field :five_leaf_found_count, :integer, default: 0
       field :six_leaf_found, :boolean, default: false
+      field :six_leaf_confirmed, :boolean, default: false
       field :seven_leaf_found, :boolean, default: false
       field :background_stage, :integer, default: 1
     end
@@ -136,6 +137,7 @@ defmodule Incrementalist.Game.State do
         :four_leaf_found_count,
         :five_leaf_found_count,
         :six_leaf_found,
+        :six_leaf_confirmed,
         :seven_leaf_found,
         :background_stage
       ])
@@ -149,6 +151,7 @@ defmodule Incrementalist.Game.State do
         "four_leaf_found_count" => clover_hunt.four_leaf_found_count || 0,
         "five_leaf_found_count" => clover_hunt.five_leaf_found_count || 0,
         "six_leaf_found" => clover_hunt.six_leaf_found || false,
+        "six_leaf_confirmed" => clover_hunt.six_leaf_confirmed || false,
         "seven_leaf_found" => clover_hunt.seven_leaf_found || false,
         "background_stage" =>
           clover_hunt.background_stage

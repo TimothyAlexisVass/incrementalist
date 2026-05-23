@@ -111,57 +111,199 @@ defmodule Incrementalist.Game.CommandsTest do
     assert locked["reason"] == "area_locked"
   end
 
-  test "cloverfield.search only advances at threshold commands and unlocks clover discoveries" do
+  test "cloverfield locks after first four-leaf until clover_hunt rank 1 is claimed" do
     player = create_player()
     set_player_area(player.id, "cloverfield", 10)
 
-    first = Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)
-    assert first["type"] == "cloverfield.search.result"
-    assert first["clover_hunt"]["click_count"] == 100
-    assert first["discoveries"] == ["four_leaf_1"]
-    assert first["clover_hunt"]["background_stage"] == 2
-    assert first["quests"]["clover_hunt"]["rank"] == 1
-    assert first["quests"]["clover_hunt"]["claimed_rank"] == 0
+    search = Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)
+    assert search["type"] == "cloverfield.search.result"
+    assert search["clover_hunt"]["click_count"] == 100
+    assert search["discoveries"] == ["four_leaf_1"]
+    assert search["clover_hunt"]["background_stage"] == 2
+    assert search["quests"]["clover_hunt"]["rank"] == 1
+    assert search["quests"]["clover_hunt"]["claimed_rank"] == 0
 
     Commands.ack(player.id, 0, @now)
 
-    second = Commands.enqueue(player.id, "cloverfield.search", intent(1), @now)
-    assert second["type"] == "cloverfield.search.result"
-    assert second["clover_hunt"]["click_count"] == 200
-    assert second["discoveries"] == ["four_leaf_2"]
-    assert second["clover_hunt"]["background_stage"] == 3
-    assert second["quests"]["clover_hunt"]["rank"] == 1
+    confirm =
+      Commands.enqueue(
+        player.id,
+        "cloverfield.confirm_discovery",
+        intent(1, %{"discovery_id" => "four_leaf_1"}),
+        @now
+      )
+
+    assert confirm["type"] == "cloverfield.confirm_discovery.result"
+    assert confirm["area"] == "sage"
+
+    cloverfield_area =
+      Enum.find(confirm["areas"], fn area ->
+        (area[:key] || area["key"]) == "cloverfield"
+      end)
+
+    assert cloverfield_area
+    assert (cloverfield_area[:is_locked] || cloverfield_area["is_locked"]) == true
+
+    assert (cloverfield_area[:lock_reason] || cloverfield_area["lock_reason"]) ==
+             "Claim the Quest first!"
+
+    Commands.ack(player.id, 1, @now)
+
+    locked =
+      Commands.enqueue(player.id, "area.select", intent(2, %{"area" => "cloverfield"}), @now)
+
+    assert locked["type"] == "command.error"
+    assert locked["reason"] == "area_locked"
+
+    Commands.ack(player.id, 2, @now)
+
+    claim =
+      Commands.enqueue(player.id, "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
+
+    assert claim["type"] == "quest.claim.result"
+    assert claim["quests"]["clover_hunt"]["claimed_rank"] >= 1
+
+    Commands.ack(player.id, 3, @now)
+
+    unlocked =
+      Commands.enqueue(player.id, "area.select", intent(4, %{"area" => "cloverfield"}), @now)
+
+    assert unlocked["type"] == "area.select.result"
+    assert unlocked["area"] == "cloverfield"
   end
 
-  test "claiming clover_hunt rank 3 removes cloverfield and forces area to sage" do
+  test "confirming six-leaf discovery removes cloverfield, not clover_hunt rank 3 claim" do
     player = create_player()
     set_player_area(player.id, "cloverfield", 10)
 
-    for command_id <- 0..5 do
-      result = Commands.enqueue(player.id, "cloverfield.search", intent(command_id), @now)
-      assert result["type"] == "cloverfield.search.result"
-      Commands.ack(player.id, command_id, @now)
-    end
+    # 100 -> first 4-leaf
+    assert Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)["type"] ==
+             "cloverfield.search.result"
 
-    claim =
-      Commands.enqueue(player.id, "quest.claim", intent(6, %{"quest_id" => "clover_hunt"}), @now)
+    Commands.ack(player.id, 0, @now)
 
-    assert claim["type"] == "quest.claim.result"
-    assert claim["quest_id"] == "clover_hunt"
-    assert claim["area"] == "sage"
-    assert claim["clover_hunt"]["click_count"] == 600
+    assert Commands.enqueue(
+             player.id,
+             "cloverfield.confirm_discovery",
+             intent(1, %{"discovery_id" => "four_leaf_1"}),
+             @now
+           )["type"] == "cloverfield.confirm_discovery.result"
 
-    area_keys =
-      claim["areas"]
-      |> Enum.map(fn area -> area[:key] || area["key"] end)
+    Commands.ack(player.id, 1, @now)
 
-    refute "cloverfield" in area_keys
+    assert Commands.enqueue(
+             player.id,
+             "quest.claim",
+             intent(2, %{"quest_id" => "clover_hunt"}),
+             @now
+           )[
+             "type"
+           ] == "quest.claim.result"
 
-    ps = PlayerStates.get!(player.id)
-    assert ps.state.area == "sage"
+    Commands.ack(player.id, 2, @now)
 
-    clover_hunt_quest = Enum.find(ps.state.quests, &(&1.id == "clover_hunt"))
-    assert clover_hunt_quest.claimed_rank >= 3
+    assert Commands.enqueue(player.id, "area.select", intent(3, %{"area" => "cloverfield"}), @now)[
+             "type"
+           ] == "area.select.result"
+
+    Commands.ack(player.id, 3, @now)
+
+    # 200 -> second 4-leaf
+    assert Commands.enqueue(player.id, "cloverfield.search", intent(4), @now)["type"] ==
+             "cloverfield.search.result"
+
+    Commands.ack(player.id, 4, @now)
+
+    # 300 -> first 5-leaf
+    assert Commands.enqueue(player.id, "cloverfield.search", intent(5), @now)["type"] ==
+             "cloverfield.search.result"
+
+    Commands.ack(player.id, 5, @now)
+
+    five_confirm =
+      Commands.enqueue(
+        player.id,
+        "cloverfield.confirm_discovery",
+        intent(6, %{"discovery_id" => "five_leaf_1"}),
+        @now
+      )
+
+    assert five_confirm["type"] == "cloverfield.confirm_discovery.result"
+    assert five_confirm["area"] == "sage"
+
+    Commands.ack(player.id, 6, @now)
+
+    locked_attempt =
+      Commands.enqueue(player.id, "area.select", intent(7, %{"area" => "cloverfield"}), @now)
+
+    assert locked_attempt["type"] == "command.error"
+    assert locked_attempt["reason"] == "area_locked"
+
+    Commands.ack(player.id, 7, @now)
+
+    claim_rank_2 =
+      Commands.enqueue(player.id, "quest.claim", intent(8, %{"quest_id" => "clover_hunt"}), @now)
+
+    assert claim_rank_2["type"] == "quest.claim.result"
+    assert claim_rank_2["quests"]["clover_hunt"]["claimed_rank"] >= 2
+
+    Commands.ack(player.id, 8, @now)
+
+    assert Commands.enqueue(player.id, "area.select", intent(9, %{"area" => "cloverfield"}), @now)[
+             "type"
+           ] == "area.select.result"
+
+    Commands.ack(player.id, 9, @now)
+
+    # 400, 500, 600
+    assert Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)["type"] ==
+             "cloverfield.search.result"
+
+    Commands.ack(player.id, 0, @now)
+
+    assert Commands.enqueue(player.id, "cloverfield.search", intent(1), @now)["type"] ==
+             "cloverfield.search.result"
+
+    Commands.ack(player.id, 1, @now)
+
+    six_discovery = Commands.enqueue(player.id, "cloverfield.search", intent(2), @now)
+    assert six_discovery["type"] == "cloverfield.search.result"
+    assert "six_leaf_1" in six_discovery["discoveries"]
+
+    Commands.ack(player.id, 2, @now)
+
+    claim_rank_3 =
+      Commands.enqueue(player.id, "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
+
+    assert claim_rank_3["type"] == "quest.claim.result"
+    assert claim_rank_3["quests"]["clover_hunt"]["claimed_rank"] >= 3
+
+    area_keys_before_confirmation = Enum.map(claim_rank_3["areas"], &(&1[:key] || &1["key"]))
+    assert "cloverfield" in area_keys_before_confirmation
+
+    Commands.ack(player.id, 3, @now)
+
+    six_confirm =
+      Commands.enqueue(
+        player.id,
+        "cloverfield.confirm_discovery",
+        intent(4, %{"discovery_id" => "six_leaf_1"}),
+        @now
+      )
+
+    assert six_confirm["type"] == "cloverfield.confirm_discovery.result"
+    assert six_confirm["area"] == "sage"
+
+    area_keys_after_confirmation = Enum.map(six_confirm["areas"], &(&1[:key] || &1["key"]))
+    refute "cloverfield" in area_keys_after_confirmation
+
+    Commands.ack(player.id, 4, @now)
+
+    unavailable =
+      Commands.enqueue(player.id, "area.select", intent(5, %{"area" => "cloverfield"}), @now)
+
+    assert unavailable["type"] == "command.error"
+    assert unavailable["reason"] == "unknown_area"
   end
 
   test "notice.event child_clicked clears an active sage tip leaf" do

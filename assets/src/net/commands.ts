@@ -10,6 +10,7 @@ import type {
   SisuUpgradeMaxResult,
   AreaSelectResult,
   CloverfieldSearchResult,
+  CloverfieldConfirmDiscoveryResult,
   ShopPurchaseResult,
   StatsUpdateResult,
   NoticeEventResult,
@@ -49,6 +50,13 @@ export function selectArea(channel: GameChannel, areaKey: string) {
 
 export function searchCloverfield(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<CloverfieldSearchResult | CommandErrorResult>>("cloverfield.search");
+}
+
+export function confirmCloverfieldDiscovery(channel: GameChannel, discoveryId: string) {
+  return channel.pushCommand<CommandPushResult<CloverfieldConfirmDiscoveryResult | CommandErrorResult>>(
+    "cloverfield.confirm_discovery",
+    { discovery_id: discoveryId }
+  );
 }
 
 export function shopPurchase(channel: GameChannel, itemId: string) {

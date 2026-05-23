@@ -15,6 +15,7 @@ export type AreaDefinition = {
   description: string;
   unlock_level: number;
   is_locked: boolean;
+  lock_reason?: string;
 };
 
 export type ShopItemDefinition = {
@@ -41,6 +42,7 @@ export type CloverHuntState = {
   four_leaf_found_count: number;
   five_leaf_found_count: number;
   six_leaf_found: boolean;
+  six_leaf_confirmed: boolean;
   seven_leaf_found: boolean;
   background_stage: number;
 };
@@ -239,6 +241,19 @@ export type CloverfieldSearchResult = {
   notices: NoticeState;
 };
 
+export type CloverfieldConfirmDiscoveryResult = {
+  type: "cloverfield.confirm_discovery.result";
+  status: "ok";
+  command_id: number;
+  discovery_id: string;
+  clover_hunt: CloverHuntState;
+  area: string;
+  areas: AreaDefinition[];
+  quests: Record<string, QuestState>;
+  achievements: Record<string, AchievementState>;
+  notices: NoticeState;
+};
+
 export type ShopPurchaseResult = {
   type: "shop.purchase.result";
   status: "ok";
@@ -314,6 +329,8 @@ export type CommandErrorReason =
   | "area_locked"
   | "unknown_area"
   | "cloverfield_only"
+  | "discovery_id_required"
+  | "invalid_discovery_confirmation"
   | "tier_id_required"
   | "unknown_tier"
   | "sisu_generator_not_purchased"
@@ -356,6 +373,7 @@ export type AckableCommandResult =
   | SisuUpgradeMaxResult
   | AreaSelectResult
   | CloverfieldSearchResult
+  | CloverfieldConfirmDiscoveryResult
   | ShopPurchaseResult
   | ProgressSetIdleModeResult
   | QuestClaimResult
@@ -409,6 +427,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "sisu.upgrade_max.result" ||
     result.type === "area.select.result" ||
     result.type === "cloverfield.search.result" ||
+    result.type === "cloverfield.confirm_discovery.result" ||
     result.type === "shop.purchase.result" ||
     result.type === "progress.set_idle_mode.result" ||
     result.type === "quest.claim.result" ||

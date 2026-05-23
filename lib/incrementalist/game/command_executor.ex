@@ -231,6 +231,47 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result(reason, command), ps.id}
         end
 
+      "cloverfield.confirm_discovery" ->
+        ps = player_state(player, now)
+
+        with {:ok, discovery_id} <- fetch_discovery_id(command.intent),
+             {:ok, confirmed_state} <- CloverHunt.confirm_discovery(ps.state, discovery_id) do
+          next_state =
+            confirmed_state
+            |> Quests.evaluate()
+            |> Achievements.evaluate()
+
+          next_notices =
+            Notices.refresh_for_state_transition(
+              ps.notices || Notices.new(ps.state),
+              ps.state,
+              next_state
+            )
+
+          update_player_state(ps, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
+
+          {"succeeded",
+           %{
+             "type" => "cloverfield.confirm_discovery.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "discovery_id" => discovery_id,
+             "clover_hunt" => State.CloverHunt.visible_state(next_state.clover_hunt),
+             "quests" => State.visible_quests(next_state.quests),
+             "achievements" => State.visible_achievements(next_state.achievements),
+             "area" => next_state.area,
+             "areas" => Incrementalist.Game.Features.Areas.visible_area_defs(next_state),
+             "notices" => Notices.payload(next_notices)
+           }, ps.id}
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
       "progress.set_idle_mode" ->
         ps = player_state(player, now)
 
@@ -1592,6 +1633,14 @@ defmodule Incrementalist.Game.CommandExecutor do
   defp fetch_quest_id(%{"quest_id" => quest_id}) when is_binary(quest_id), do: {:ok, quest_id}
   defp fetch_quest_id(%{quest_id: quest_id}) when is_binary(quest_id), do: {:ok, quest_id}
   defp fetch_quest_id(_intent), do: {:error, "quest_id_required"}
+
+  defp fetch_discovery_id(%{"discovery_id" => discovery_id}) when is_binary(discovery_id),
+    do: {:ok, discovery_id}
+
+  defp fetch_discovery_id(%{discovery_id: discovery_id}) when is_binary(discovery_id),
+    do: {:ok, discovery_id}
+
+  defp fetch_discovery_id(_intent), do: {:error, "discovery_id_required"}
 
   defp fetch_screen_id(%{"screen_id" => screen_id}) when is_binary(screen_id),
     do: validate_screen_id(screen_id)
