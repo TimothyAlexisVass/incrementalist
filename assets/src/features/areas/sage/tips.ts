@@ -1,7 +1,12 @@
+import { AREA_UNLOCK_REQUIRED_LEVELS } from "../../requirements";
+
 export type SageTip = {
   text: string[];
   confirmation?: string;
 };
+
+const CLOVERFIELD_UNLOCK_LEVEL = AREA_UNLOCK_REQUIRED_LEVELS.cloverfield;
+const MARKET_UNLOCK_LEVEL = AREA_UNLOCK_REQUIRED_LEVELS.market;
 
 export const SAGE_TIPS: Record<number, SageTip> = {
   1: {
@@ -29,7 +34,7 @@ export const SAGE_TIPS: Record<number, SageTip> = {
     ],
     confirmation: "I've got the power!"
   },
-  10: {
+  [CLOVERFIELD_UNLOCK_LEVEL]: {
     text: [
       "Harvest season has come!",
       "Before we release you fully into the Incrementiverse, we are going to have to improve your luck.",
@@ -37,7 +42,7 @@ export const SAGE_TIPS: Record<number, SageTip> = {
     ],
     confirmation: "Lucky number 7!"
   },
-  15: {
+  [MARKET_UNLOCK_LEVEL]: {
     text: [
       "Fortuna favet audacibus!",
       "You have collected many resources on your journey.",

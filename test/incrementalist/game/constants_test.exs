@@ -7,6 +7,7 @@ defmodule Incrementalist.Game.ConstantsTest do
   test "shared area and tip requirements are loaded from the manifest" do
     assert [
              %{key: "sage", unlock_level: 1},
+             %{key: "orchard", unlock_level: 1},
              %{key: "cloverfield", unlock_level: 10},
              %{key: "market", unlock_level: 15}
            ] = Constants.area_defs()
