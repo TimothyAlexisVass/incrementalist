@@ -9,7 +9,7 @@ function getCurrencyIconImage(currencyKey: string) {
   if (!currencyKey || typeof Image === 'undefined') return null;
   if (!currencyIconImages.has(currencyKey)) {
     const image = new Image();
-    image.src = `images/${currencyKey}.png`;
+    image.src = `images/resource/${currencyKey.replace(/_/g, '-')}.png`;
     currencyIconImages.set(currencyKey, image);
   }
   return currencyIconImages.get(currencyKey) || null;

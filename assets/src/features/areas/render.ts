@@ -22,7 +22,7 @@ const GO_TO_AREA_BUTTON_PADDING = 3;
 function getAreaBackgroundImage(areaKey: string) {
   if (!areaBackgroundImages.has(areaKey)) {
     const image = new Image();
-    image.src = `images/${areaKey}_background.png`;
+    image.src = `images/area/${areaKey.replace(/_/g, "-")}-background.png`;
     areaBackgroundImages.set(areaKey, image);
   }
   return areaBackgroundImages.get(areaKey)!;

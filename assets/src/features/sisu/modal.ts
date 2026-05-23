@@ -60,24 +60,24 @@ type CrystalButtonSpriteSet = Record<CrystalButtonSpriteState, HTMLImageElement>
 
 const SISU_CRYSTAL_BUTTON_SOURCES: Record<TierId, Record<CrystalButtonSpriteState, string>> = Object.freeze({
   azure: {
-    deactivated: "images/azure_deactivated.png",
-    activated: "images/azure_activated.png",
-    hover: "images/azure_hover.png"
+    deactivated: "images/ui/sisu/azure-deactivated.png",
+    activated: "images/ui/sisu/azure-activated.png",
+    hover: "images/ui/sisu/azure-hover.png"
   },
   aether: {
-    deactivated: "images/aether_deactivated.png",
-    activated: "images/aether_activated.png",
-    hover: "images/aether_hover.png"
+    deactivated: "images/ui/sisu/aether-deactivated.png",
+    activated: "images/ui/sisu/aether-activated.png",
+    hover: "images/ui/sisu/aether-hover.png"
   },
   lucent: {
-    deactivated: "images/lucent_deactivated.png",
-    activated: "images/lucent_activated.png",
-    hover: "images/lucent_hover.png"
+    deactivated: "images/ui/sisu/lucent-deactivated.png",
+    activated: "images/ui/sisu/lucent-activated.png",
+    hover: "images/ui/sisu/lucent-hover.png"
   },
   transcendent: {
-    deactivated: "images/transcendent_deactivated.png",
-    activated: "images/transcendent_activated.png",
-    hover: "images/transcendent_hover.png"
+    deactivated: "images/ui/sisu/transcendent-deactivated.png",
+    activated: "images/ui/sisu/transcendent-activated.png",
+    hover: "images/ui/sisu/transcendent-hover.png"
   }
 });
 
@@ -87,7 +87,7 @@ let sisuCrystalButtonSprites: Record<TierId, CrystalButtonSpriteSet> | null = nu
 function getSisuModalBackgroundImage() {
   if (!sisuModalBackgroundImage) {
     sisuModalBackgroundImage = new Image();
-    sisuModalBackgroundImage.src = "images/sisu_modal.png";
+    sisuModalBackgroundImage.src = "images/ui/sisu/sisu-modal.png";
   }
 
   return sisuModalBackgroundImage;

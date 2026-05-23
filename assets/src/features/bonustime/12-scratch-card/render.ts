@@ -60,10 +60,10 @@ function ensureScratchImagesLoaded() {
   if (scratchImagesInitialized || typeof Image === "undefined") return;
 
   scratchBackgroundImage = new Image();
-  scratchBackgroundImage.src = "images/scratch_background.png";
+  scratchBackgroundImage.src = "images/bonustime/scratch-background.png";
 
   scratchSurfaceImage = new Image();
-  scratchSurfaceImage.src = "images/scratch_surface.png";
+  scratchSurfaceImage.src = "images/bonustime/scratch-surface.png";
 
   scratchImagesInitialized = true;
 }

@@ -109,7 +109,7 @@ let progressBarBackgroundImage: HTMLImageElement | null = null;
 function getProgressBarBackgroundImage() {
   if (!progressBarBackgroundImage) {
     progressBarBackgroundImage = new Image();
-    progressBarBackgroundImage.src = 'images/progress_bar_background.png';
+    progressBarBackgroundImage.src = 'images/ui/progress-bar/progress-bar-background.png';
   }
   return progressBarBackgroundImage;
 }
@@ -118,7 +118,7 @@ let progressBarForegroundImage: HTMLImageElement | null = null;
 function getProgressBarForegroundImage() {
   if (!progressBarForegroundImage) {
     progressBarForegroundImage = new Image();
-    progressBarForegroundImage.src = 'images/progress_bar_foreground.png';
+    progressBarForegroundImage.src = 'images/ui/progress-bar/progress-bar-foreground.png';
   }
   return progressBarForegroundImage;
 }
