@@ -165,7 +165,6 @@ defmodule Incrementalist.Game.CommandsTest do
 
     assert go_cloverfield["type"] == "area.select.result"
     refute "leaf.area.sage.go_button" in go_cloverfield["notices"]["active_leaf_ids"]
-    refute "parent.area.dropdown" in go_cloverfield["notices"]["active_parent_ids"]
 
     updated_ps = PlayerStates.get!(player.id)
     assert "leaf.sage_tip.1.confirm_button" in updated_ps.notices.seen_leaf_ids

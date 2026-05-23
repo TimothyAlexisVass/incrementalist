@@ -1,11 +1,22 @@
-import areas from "../../../shared/requirements/areas.json";
-import sageTipLevels from "../../../shared/requirements/sage-tip-levels.json";
-import shopItems from "../../../shared/requirements/shop-items.json";
+import unlocking from "../../../shared/requirements/unlocking.json";
 import type { BigNum } from "../core/bignum";
 
 type ShopCurrency = "coins" | "shards" | "cores";
 
-type SharedShopItem = {
+export type ShopItemId = "idle_mode" | "sisu_generator" | "bonus_time";
+export type ShopUnlockableItemId = ShopItemId;
+export type ShopPricedItemId = ShopItemId;
+
+type SharedAreaUnlockEntry = {
+  type: "area";
+  id: string;
+  name: string;
+  description: string;
+  required_level: number;
+};
+
+type SharedShopUnlockEntry = {
+  type: "shop-item";
   id: ShopItemId;
   name: string;
   description: string;
@@ -14,36 +25,33 @@ type SharedShopItem = {
   required_level: number;
 };
 
-type SharedArea = {
-  key: string;
-  name: string;
-  description: string;
-  unlock_level: number;
-};
+type SharedUnlockEntry = SharedAreaUnlockEntry | SharedShopUnlockEntry;
 
-export type ShopItemId = "idle_mode" | "sisu_generator" | "bonus_time";
-export type ShopUnlockableItemId = ShopItemId;
-export type ShopPricedItemId = ShopItemId;
+const sharedUnlocking = unlocking as SharedUnlockEntry[];
 
-const sharedAreas = areas as SharedArea[];
-const sharedSageTipLevels = sageTipLevels as number[];
-const sharedShopItems = shopItems as SharedShopItem[];
-
-export const AREA_UNLOCK_REQUIRED_LEVELS = Object.freeze(
-  Object.fromEntries(sharedAreas.map((area) => [area.key, area.unlock_level])) as Record<string, number>
+const sharedAreaUnlocking = sharedUnlocking.filter(
+  (entry): entry is SharedAreaUnlockEntry => entry.type === "area"
 );
 
-export const SAGE_TIP_LEVELS = Object.freeze([...sharedSageTipLevels]);
+const sharedShopUnlocking = sharedUnlocking.filter(
+  (entry): entry is SharedShopUnlockEntry => entry.type === "shop-item"
+);
+
+export const AREA_UNLOCK_REQUIRED_LEVELS = Object.freeze(
+  Object.fromEntries(sharedAreaUnlocking.map((area) => [area.id, area.required_level])) as Record<string, number>
+);
 
 export const SHOP_UNLOCK_REQUIRED_LEVELS = Object.freeze(
-  Object.fromEntries(sharedShopItems.map((item) => [item.id, item.required_level])) as Record<ShopUnlockableItemId, number>
+  Object.fromEntries(sharedShopUnlocking.map((item) => [item.id, item.required_level])) as Record<
+    ShopUnlockableItemId,
+    number
+  >
 );
 
 export const SHOP_ITEM_COSTS = Object.freeze(
-  Object.fromEntries(sharedShopItems.map((item) => [item.id, { cost: item.cost, currency: item.currency }])) as Record<
-    ShopPricedItemId,
-    { cost: BigNum; currency: ShopCurrency }
-  >
+  Object.fromEntries(
+    sharedShopUnlocking.map((item) => [item.id, { cost: item.cost, currency: item.currency }])
+  ) as Record<ShopPricedItemId, { cost: BigNum; currency: ShopCurrency }>
 );
 
 export function getShopItemRequiredLevel(

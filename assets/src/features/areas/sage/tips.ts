@@ -1,10 +1,12 @@
-import { AREA_UNLOCK_REQUIRED_LEVELS } from "../../requirements";
+import { AREA_UNLOCK_REQUIRED_LEVELS, SHOP_UNLOCK_REQUIRED_LEVELS } from "../../requirements";
 
 export type SageTip = {
   text: string[];
   confirmation?: string;
 };
 
+const IDLE_MODE_UNLOCK_LEVEL = SHOP_UNLOCK_REQUIRED_LEVELS.idle_mode;
+const SISU_GENERATOR_UNLOCK_LEVEL = SHOP_UNLOCK_REQUIRED_LEVELS.sisu_generator;
 const CLOVERFIELD_UNLOCK_LEVEL = AREA_UNLOCK_REQUIRED_LEVELS.cloverfield;
 const MARKET_UNLOCK_LEVEL = AREA_UNLOCK_REQUIRED_LEVELS.market;
 
@@ -17,7 +19,7 @@ export const SAGE_TIPS: Record<number, SageTip> = {
     ],
     confirmation: "Yes Master"
   },
-  2: {
+  [IDLE_MODE_UNLOCK_LEVEL]: {
     text: [
       "You can unlock new capabilities in the shop. Go now and unlock Idle mode.",
       "When you idle, the progress bar rewards will be collected automatically, but at a reduced speed.",
@@ -25,7 +27,7 @@ export const SAGE_TIPS: Record<number, SageTip> = {
     ],
     confirmation: "I Do Like Earnings"
   },
-  4: {
+  [SISU_GENERATOR_UNLOCK_LEVEL]: {
     text: [
       "I can sense an immense power dormant in you. You are now ready to unlock some of that potential.",
       "We are going to have to release your inner nature gradually.",

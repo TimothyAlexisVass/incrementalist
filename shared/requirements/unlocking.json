@@ -1,0 +1,66 @@
+[
+  {
+    "type": "area",
+    "id": "sage",
+    "name": "The Sage",
+    "description": "A quiet, ancient place of wisdom and incremental growth.",
+    "required_level": 1
+  },
+  {
+    "type": "area",
+    "id": "orchard",
+    "name": "Orchard",
+    "description": "A serene orchard where growth comes naturally.",
+    "required_level": 1
+  },
+  {
+    "type": "shop-item",
+    "id": "idle_mode",
+    "name": "Idle Mode",
+    "description": "Allows you to claim rewards automatically!",
+    "cost": {
+      "m": 5,
+      "e": 2
+    },
+    "currency": "coins",
+    "required_level": 2
+  },
+  {
+    "type": "shop-item",
+    "id": "sisu_generator",
+    "name": "Sisu Generator",
+    "description": "Multiply your progress bar fill speed!",
+    "cost": {
+      "m": 2,
+      "e": 3
+    },
+    "currency": "coins",
+    "required_level": 4
+  },
+  {
+    "type": "area",
+    "id": "cloverfield",
+    "name": "Cloverfield",
+    "description": "A lush field where luck intertwines with every step.",
+    "required_level": 7
+  },
+  {
+    "type": "area",
+    "id": "market",
+    "name": "The Market",
+    "description": "A bustling market to trade your hard earned goods.",
+    "required_level": 15
+  },
+  {
+    "type": "shop-item",
+    "id": "bonus_time",
+    "name": "BONUSTIME",
+    "description": "Play Bonustime games and win daily prizes!",
+    "cost": {
+      "m": 1,
+      "e": 3
+    },
+    "currency": "shards",
+    "required_level": 15
+  }
+]

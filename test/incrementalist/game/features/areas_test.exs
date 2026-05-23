@@ -1,5 +1,6 @@
 defmodule Incrementalist.Game.Features.AreasTest do
   use Incrementalist.DataCase
+  alias Incrementalist.Game.Constants
   alias Incrementalist.Game.State
   alias Incrementalist.Game.Features.Areas
 
@@ -12,9 +13,7 @@ defmodule Incrementalist.Game.Features.AreasTest do
   end
 
   test "select_area/2 rejects a locked area" do
-    # level 1
     state = State.new()
-    # Cloverfield is unlock_level 10
     assert {:error, :area_locked} = Areas.select_area(state, "cloverfield")
   end
 
@@ -23,8 +22,13 @@ defmodule Incrementalist.Game.Features.AreasTest do
     assert {:error, :unknown_area} = Areas.select_area(state, "non_existent")
   end
 
-  test "select_area/2 allows selecting cloverfield at level 10" do
-    state = %{State.new() | level: 10}
+  test "select_area/2 allows selecting cloverfield at its unlock level" do
+    cloverfield_unlock_level =
+      Constants.area_defs()
+      |> Enum.find(&(&1.key == "cloverfield"))
+      |> Map.fetch!(:unlock_level)
+
+    state = %{State.new() | level: cloverfield_unlock_level}
     assert {:ok, next_state} = Areas.select_area(state, "cloverfield")
     assert next_state.area == "cloverfield"
   end

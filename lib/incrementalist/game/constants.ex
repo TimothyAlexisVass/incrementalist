@@ -4,36 +4,41 @@ defmodule Incrementalist.Game.Constants do
   """
 
   @requirements_dir Path.expand("../../../shared/requirements", __DIR__)
-  @areas_path Path.join(@requirements_dir, "areas.json")
-  @sage_tip_levels_path Path.join(@requirements_dir, "sage-tip-levels.json")
-  @shop_items_path Path.join(@requirements_dir, "shop-items.json")
+  @unlocking_path Path.join(@requirements_dir, "unlocking.json")
   @quests_path Path.join(@requirements_dir, "quests.json")
   @achievements_path Path.join(@requirements_dir, "achievements.json")
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
-  @external_resource @areas_path
-  @external_resource @sage_tip_levels_path
-  @external_resource @shop_items_path
+  @external_resource @unlocking_path
   @external_resource @quests_path
   @external_resource @achievements_path
   @external_resource @bonustime_path
-  @areas @areas_path |> File.read!() |> Jason.decode!()
-  @sage_tip_levels @sage_tip_levels_path |> File.read!() |> Jason.decode!()
-  @shop_items @shop_items_path |> File.read!() |> Jason.decode!()
+  @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
+  @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
+  @shop_item_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "shop-item"))
+  @default_sage_tip_level 1
+  @area_unlock_levels @area_unlocking_entries
+                      |> Map.new(fn %{"id" => id, "required_level" => required_level} ->
+                        {id, required_level}
+                      end)
+  @shop_item_unlock_levels @shop_item_unlocking_entries
+                           |> Map.new(fn %{"id" => id, "required_level" => required_level} ->
+                             {id, required_level}
+                           end)
 
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
 
   def area_defs do
-    @areas
+    @area_unlocking_entries
     |> Enum.map(&normalize_area/1)
     |> Enum.sort_by(& &1.unlock_level)
   end
 
   def shop_item_defs do
-    Enum.map(@shop_items, &normalize_shop_item/1)
+    Enum.map(@shop_item_unlocking_entries, &normalize_shop_item/1)
   end
 
   def quest_defs do
@@ -136,20 +141,28 @@ defmodule Incrementalist.Game.Constants do
   def notice_leaf_tab_menu_any_button, do: "leaf.tab.menu.any.button"
 
   def sage_tip_levels do
-    @sage_tip_levels
+    [
+      @default_sage_tip_level,
+      unlock_required_level!(@shop_item_unlock_levels, "shop-item", "idle_mode"),
+      unlock_required_level!(@shop_item_unlock_levels, "shop-item", "sisu_generator"),
+      unlock_required_level!(@area_unlock_levels, "area", "cloverfield"),
+      unlock_required_level!(@area_unlock_levels, "area", "market")
+    ]
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   defp normalize_area(%{
-         "key" => key,
+         "id" => id,
          "name" => name,
          "description" => description,
-         "unlock_level" => unlock_level
+         "required_level" => required_level
        }) do
     %{
-      key: key,
+      key: id,
       name: name,
       description: description,
-      unlock_level: unlock_level
+      unlock_level: required_level
     }
   end
 
@@ -169,6 +182,17 @@ defmodule Incrementalist.Game.Constants do
       currency: normalize_shop_currency(currency),
       required_level: required_level
     }
+  end
+
+  defp unlock_required_level!(unlock_levels, unlock_type, unlock_id) do
+    case Map.fetch(unlock_levels, unlock_id) do
+      {:ok, required_level} ->
+        required_level
+
+      :error ->
+        raise ArgumentError,
+              "missing unlock requirement for #{unlock_type} #{inspect(unlock_id)}"
+    end
   end
 
   defp normalize_shop_currency("coins"), do: :coins

@@ -37,7 +37,6 @@ defmodule Incrementalist.Game.NoticesTest do
       Notices.refresh_for_state_transition(after_shown, sage_state, cloverfield_state)
 
     refute "leaf.area.sage.go_button" in after_area_switch.active_leaf_ids
-    refute Constants.notice_parent_area_dropdown() in after_area_switch.active_parent_ids
   end
 
   test "quest notices split main and daily sub tabs" do

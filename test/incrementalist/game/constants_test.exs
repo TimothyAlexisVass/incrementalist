@@ -8,11 +8,11 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert [
              %{key: "sage", unlock_level: 1},
              %{key: "orchard", unlock_level: 1},
-             %{key: "cloverfield", unlock_level: 10},
+             %{key: "cloverfield", unlock_level: 7},
              %{key: "market", unlock_level: 15}
            ] = Constants.area_defs()
 
-    assert [1, 2, 4, 10, 15] = Constants.sage_tip_levels()
+    assert [1, 2, 4, 7, 15] = Constants.sage_tip_levels()
   end
 
   test "shop_item_defs/0 loads the shared shop requirements manifest" do
