@@ -178,10 +178,9 @@ Plant Matter should therefore have two uses:
 | 1 **Campfire**       | Ash                 |
 | 2 **Small Furnace**  | Charcoal            |
 | 3 **Large Furnace**  | Bricks              |
-| 4 **Coal Furnace**   | Coke, Smelting      |
-| 5 **Coke Furnace**   | Alloys              |
-| 6 **Arc Furnace**    | Advanced Alloys     |
-| 7 **Plasma Furnace** | Space Age materials |
+| 4 **Coal Furnace**   | Coking, Smelting, Alloys |
+| 5 **Arc Furnace**    | Advanced Alloys     |
+| 6 **Plasma Furnace** | Space Age materials |
 
 ---
 
