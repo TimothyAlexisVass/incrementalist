@@ -43,9 +43,19 @@ export function plotModal(plotId: string) {
   const app = (window as any).app;
   if (app && app.ui && app.ui.modals) {
     app.ui.modals.open(
-      new InfoAcknowledgementModal(title, "Plot details", () => {
-        app.ui.modals.close();
-      })
+      new InfoAcknowledgementModal(
+        title,
+        "Plot details",
+        () => {
+          app.ui.modals.close();
+        },
+        {
+          x: DISPLAY_AREA_X + 50,
+          y: DISPLAY_AREA_Y + 50,
+          width: DISPLAY_AREA_WIDTH - 100,
+          height: 400
+        }
+      )
     );
   }
 }

@@ -186,7 +186,13 @@ export class InfoAcknowledgementModal implements Modal {
   constructor(
     private readonly title: string,
     private readonly body: string,
-    private readonly onClose: () => void
+    private readonly onClose: () => void,
+    private readonly options?: {
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+    }
   ) {}
 
   render(canvas: HTMLCanvasElement, input: InteractionState) {
@@ -195,10 +201,10 @@ export class InfoAcknowledgementModal implements Modal {
       return;
     }
 
-    const modalWidth = 460;
-    const modalHeight = 220;
-    const modalX = (canvas.width - modalWidth) / 2;
-    const modalY = (canvas.height - modalHeight) / 2;
+    const modalWidth = this.options?.width ?? 460;
+    const modalHeight = this.options?.height ?? 220;
+    const modalX = this.options?.x ?? (canvas.width - modalWidth) / 2;
+    const modalY = this.options?.y ?? (canvas.height - modalHeight) / 2;
 
     renderer.drawRect({
       x: modalX,
