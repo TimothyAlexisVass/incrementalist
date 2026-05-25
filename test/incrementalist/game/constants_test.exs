@@ -8,11 +8,12 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert [
              %{key: "sage", unlock_level: 1},
              %{key: "orchard", unlock_level: 1},
-             %{key: "cloverfield", unlock_level: 7},
+             %{key: "furnace", unlock_level: 1},
+             %{key: "cloverfield", unlock_level: 6},
              %{key: "market", unlock_level: 15}
            ] = Constants.area_defs()
 
-    assert [1, 2, 4, 7, 15] = Constants.sage_tip_levels()
+    assert [1, 2, 4, 6, 15] = Constants.sage_tip_levels()
   end
 
   test "shop_item_defs/0 loads the shared shop requirements manifest" do
@@ -42,6 +43,11 @@ defmodule Incrementalist.Game.ConstantsTest do
                required_level: 15
              }
            ] = Constants.shop_item_defs()
+  end
+
+  test "furnace levels load from shared furnace requirements" do
+    assert Constants.furnace_min_level() == 1
+    assert Constants.furnace_max_level() == 6
   end
 
   test "sisu levels load the shared upgrade table" do

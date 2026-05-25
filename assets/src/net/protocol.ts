@@ -123,21 +123,22 @@ export type GameSnapshot = {
   server_time: string;
   state: {
     area: string;
-  level: number;
-  trust: number;
-  exp: BigNum;
-  required_exp: BigNum;
-  fame: BigNum;
-  required_fame: BigNum;
-  coins: BigNum;
-  shards: BigNum;
-  cores: BigNum;
-  charge_crystals: ChargeCrystalsState;
-  idle_mode: boolean;
-  first_played_at: string | null;
-  progress_bar: {
-    reward_multiplier: number;
-    rewards_claimed: number;
+    level: number;
+    furnace_level: number;
+    trust: number;
+    exp: BigNum;
+    required_exp: BigNum;
+    fame: BigNum;
+    required_fame: BigNum;
+    coins: BigNum;
+    shards: BigNum;
+    cores: BigNum;
+    charge_crystals: ChargeCrystalsState;
+    idle_mode: boolean;
+    first_played_at: string | null;
+    progress_bar: {
+      reward_multiplier: number;
+      rewards_claimed: number;
     };
     sisu: SisuState;
     clover_hunt: CloverHuntState;
@@ -225,6 +226,16 @@ export type AreaSelectResult = {
   status: "ok";
   command_id: number;
   area: string;
+  notices: NoticeState;
+};
+
+export type FurnaceUpgradeResult = {
+  type: "furnace.upgrade.result";
+  status: "ok";
+  command_id: number;
+  area: string;
+  areas: AreaDefinition[];
+  furnace_level: number;
   notices: NoticeState;
 };
 
@@ -352,6 +363,8 @@ export type CommandErrorReason =
   | "no_tokens"
   | "game_not_available"
   | "game_id_required"
+  | "furnace_only"
+  | "furnace_max_level_reached"
   | "invalid_request";
 
 export type CommandErrorResult = {
@@ -372,6 +385,7 @@ export type AckableCommandResult =
   | SisuRefillResult
   | SisuUpgradeMaxResult
   | AreaSelectResult
+  | FurnaceUpgradeResult
   | CloverfieldSearchResult
   | CloverfieldConfirmDiscoveryResult
   | ShopPurchaseResult
@@ -426,6 +440,7 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "sisu.refill.result" ||
     result.type === "sisu.upgrade_max.result" ||
     result.type === "area.select.result" ||
+    result.type === "furnace.upgrade.result" ||
     result.type === "cloverfield.search.result" ||
     result.type === "cloverfield.confirm_discovery.result" ||
     result.type === "shop.purchase.result" ||

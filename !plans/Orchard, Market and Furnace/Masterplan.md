@@ -107,18 +107,22 @@ First required splice:
 
 # Phase 4: Soil Quality Mechanics
 
-## Soil stats (whole orchard)
+## Soil stats
+All properties apply to the entire orchard except for Depth which is plot specific.
 
 | Soil stat          | Improved by                        |
 | ------------------ | ---------------------------------- |
-| **Nitrogen**              | Clover and legumes                 |
-| **Potassium**              | Mushrooms and fruit                | 
-| **Phosphorus**              | Ash from furnace                   |
+| **Nitrogen**              | Clover and legumes |
+| **Phosphorus**              | Mushrooms and fruit | 
+| **Potassium**              | Ash from furnace | Improved composting |
 | **Organic Matter** | Each decomposition cycle increases amount |
 | **Depth**          | Increases to max(current_depth, plant_debth + 1) at harvest of a plant |
 | **Water**          | Increases during rain, decreases every real-time hour when not raining |
 
-Organic matter, Nitrogen, Potassium, Phosphorus and Water decrease every real-time hour when it is not raining.
+Organic matter, Phosphorus, Potassium and Water decrease every real-time hour when it is not raining.
+Nitrogen decreases only when no nitrogen fixers are growing.
+Phosphorous leaches half as fast as Potassium and Nitrogen.
+At the point where the furnace is upgraded to Clean Smelter, burning stops and the only way to get Potassium will be to research improved composting. We will defer that specific part, as the research part of the game is not yet planned.
 
 ## Soil loop
 
@@ -147,18 +151,16 @@ Plant Matter should therefore have two uses:
 | ---------------- | ----------------------- | ---------: | --------: |
 | **Plant Matter** | Direct burn only        | Very short |       80% |
 | **Wood**         | Direct burn or charring |     Medium |        5% |
-| **Charcoal**     | Direct burn only        |       Long |        0% |
-| **Coal**         | Direct burn or coking   |       Long |        0% |
-| **Coke**         | Direct burn only        |  Very long |        0% |
+| **Charcoal**     | Direct burn or biocoke  |       Long |        0% |
+| **Biocoke**      | Direct burn only.       |  Very long |        0% |
 
 ## Fuel equivalence
 
 | Fuel              |    Burn-time value |
 | ----------------- | -----------------: |
 | 100 Plant Matter  |           = 5 Wood |
-| 5 Wood            |       = 1 Charcoal |
-| 2 Charcoal        |           = 1 Coal |
-| 5 Coal            |           = 1 Coke |
+| 10 Wood           |       = 1 Charcoal |
+| 5 Charcoal        |        = 1 Biocoke |
 
 ## Furnace rules
 
@@ -166,21 +168,26 @@ Plant Matter should therefore have two uses:
 | --------------- | ------------------------------------ |
 | Making charcoal | Wood                                 |
 | Firing bricks   | Any                                  |
-| Smelting ore    | Charcoal/Coal required               |
-| Alloys          | Coke required.                       |
+| Smelting ore    | Charcoal/Biocoke                     |
+| Alloys          | Biocoke                              |
 
 ---
 
 # Phase 8: Furnace Levels
+Important thing. After the player has generated 100 Metal, the Coal Furnace will be shut down and the furnace
+is automatically downgraded back to Large Furnace (it seems to the player, it's actually upgraded to the "next"
+Large Furnace) until Clean Smelting has been researched. The metal and some stone will then be used to build the clean smelter.
 
 | Furnace level        | Unlocks             |
 | -------------------- | ------------------- |
 | 1 **Campfire**       | Ash                 |
 | 2 **Small Furnace**  | Charcoal            |
 | 3 **Large Furnace**  | Bricks              |
-| 4 **Coal Furnace**   | Coking, Smelting, Alloys |
-| 5 **Arc Furnace**    | Advanced Alloys     |
-| 6 **Plasma Furnace** | Space Age materials |
+| 4 **Coal Furnace**   | Smelting            |
+| 5 **Large Furnace**  | Bricks              |
+| 6 **Clean Smelter**  | Smelting, Alloys    |
+| 7 **Arc Furnace**    | Advanced Alloys     |
+| 8 **Plasma Furnace** | Space Age materials |
 
 ---
 

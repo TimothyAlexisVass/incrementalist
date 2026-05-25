@@ -5,19 +5,26 @@ defmodule Incrementalist.Game.Constants do
 
   @requirements_dir Path.expand("../../../shared/requirements", __DIR__)
   @unlocking_path Path.join(@requirements_dir, "unlocking.json")
+  @furnace_path Path.join(@requirements_dir, "furnace.json")
   @quests_path Path.join(@requirements_dir, "quests.json")
   @achievements_path Path.join(@requirements_dir, "achievements.json")
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
   @external_resource @unlocking_path
+  @external_resource @furnace_path
   @external_resource @quests_path
   @external_resource @achievements_path
   @external_resource @bonustime_path
   @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
+  @furnace @furnace_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
   @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
   @shop_item_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "shop-item"))
+  @furnace_level_rows Map.fetch!(@furnace, "levels")
+  @furnace_level_numbers Enum.map(@furnace_level_rows, &Map.fetch!(&1, "level"))
+  @furnace_min_level Enum.min(@furnace_level_numbers)
+  @furnace_max_level Enum.max(@furnace_level_numbers)
   @default_sage_tip_level 1
   @area_unlock_levels @area_unlocking_entries
                       |> Map.new(fn %{"id" => id, "required_level" => required_level} ->
@@ -40,6 +47,10 @@ defmodule Incrementalist.Game.Constants do
   def clover_hunt_third_five_leaf_clicks, do: 500
   def clover_hunt_first_six_leaf_clicks, do: 600
   def clover_hunt_max_background_stage, do: 6
+
+  # Furnace Constants
+  def furnace_min_level, do: @furnace_min_level
+  def furnace_max_level, do: @furnace_max_level
 
   def area_defs do
     @area_unlocking_entries

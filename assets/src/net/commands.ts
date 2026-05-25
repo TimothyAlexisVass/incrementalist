@@ -9,6 +9,7 @@ import type {
   SisuRefillResult,
   SisuUpgradeMaxResult,
   AreaSelectResult,
+  FurnaceUpgradeResult,
   CloverfieldSearchResult,
   CloverfieldConfirmDiscoveryResult,
   ShopPurchaseResult,
@@ -46,6 +47,10 @@ export function sisuUpgradeMax(channel: GameChannel) {
 
 export function selectArea(channel: GameChannel, areaKey: string) {
   return channel.pushCommand<CommandPushResult<AreaSelectResult | CommandErrorResult>>("area.select", { area: areaKey });
+}
+
+export function upgradeFurnace(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<FurnaceUpgradeResult | CommandErrorResult>>("furnace.upgrade");
 }
 
 export function searchCloverfield(channel: GameChannel) {

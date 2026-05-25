@@ -28,7 +28,7 @@ export const SAGE_TIP_ORDER = Object.freeze([
 export const SAGE_TIPS: Readonly<Record<string, SageTip>> = {
   "1": {
     text: [
-      "Your journey to become the Incrementalist begins now.",
+      "Your journey to become the supreme Incrementalist begins now.",
       "A journey around the globe begins with one step.",
       "You collect rewards by performing any kind of action when the progress-bar is full."
     ],

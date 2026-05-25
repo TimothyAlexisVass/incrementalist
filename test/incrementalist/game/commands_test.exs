@@ -111,6 +111,24 @@ defmodule Incrementalist.Game.CommandsTest do
     assert locked["reason"] == "area_locked"
   end
 
+  test "furnace.upgrade increments furnace level and updates furnace area metadata" do
+    player = create_player()
+    set_player_area(player.id, "furnace", 1)
+
+    result = Commands.enqueue(player.id, "furnace.upgrade", intent(0), @now)
+
+    assert result["type"] == "furnace.upgrade.result"
+    assert result["furnace_level"] == 2
+    assert result["area"] == "furnace"
+
+    furnace_area =
+      Enum.find(result["areas"], fn area ->
+        (area[:key] || area["key"]) == "furnace"
+      end)
+
+    assert furnace_area
+  end
+
   test "cloverfield locks after first four-leaf until clover_hunt rank 1 is claimed" do
     player = create_player()
     set_player_area(player.id, "cloverfield", 10)
@@ -331,8 +349,9 @@ defmodule Incrementalist.Game.CommandsTest do
     unlocked_state = %{ps.state | level: 10, area: "sage"}
 
     other_tip_leaf_ids =
-      Incrementalist.Game.Constants.sage_tip_levels()
-      |> Enum.reject(&(&1 == 1))
+      Incrementalist.Game.Constants.sage_tip_level_unlocks()
+      |> Map.keys()
+      |> Enum.reject(&(&1 == "1"))
       |> Enum.map(&Notices.leaf_sage_tip_id/1)
 
     notices =

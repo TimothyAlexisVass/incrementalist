@@ -354,6 +354,7 @@ export class GameClient {
       result.type === "sisu.refill.result" ||
       result.type === "sisu.upgrade_max.result" ||
       result.type === "area.select.result" ||
+      result.type === "furnace.upgrade.result" ||
       result.type === "shop.purchase.result" ||
       result.type === "notice.event.result" ||
       result.type === "quest.claim.result" ||

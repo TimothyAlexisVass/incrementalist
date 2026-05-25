@@ -9,8 +9,9 @@ defmodule Incrementalist.Game.NoticesTest do
     sage_tip_leaf_id = "leaf.sage_tip.1.confirm_button"
 
     other_tip_leaf_ids =
-      Constants.sage_tip_levels()
-      |> Enum.reject(&(&1 == 1))
+      Constants.sage_tip_level_unlocks()
+      |> Map.keys()
+      |> Enum.reject(&(&1 == "1"))
       |> Enum.map(&Notices.leaf_sage_tip_id/1)
 
     notices =

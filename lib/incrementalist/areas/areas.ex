@@ -18,6 +18,21 @@ defmodule Incrementalist.Game.Features.Areas do
     end
   end
 
+  def upgrade_furnace(%State{} = state) do
+    furnace_level = current_furnace_level(state)
+
+    cond do
+      state.area != "furnace" ->
+        {:error, :furnace_only}
+
+      furnace_level >= Constants.furnace_max_level() ->
+        {:error, :furnace_max_level_reached}
+
+      true ->
+        {:ok, %{state | furnace_level: furnace_level + 1}}
+    end
+  end
+
   def visible_area_defs(%State{} = state) do
     Constants.area_defs()
     |> Enum.filter(&area_visible?(state, &1.key))
@@ -101,6 +116,11 @@ defmodule Incrementalist.Game.Features.Areas do
   end
 
   defp area_dynamic_lock_reason(_state, _area_def), do: nil
+
+  defp current_furnace_level(%State{} = state) do
+    level = state.furnace_level || Constants.furnace_min_level()
+    level |> max(Constants.furnace_min_level()) |> min(Constants.furnace_max_level())
+  end
 
   defp maybe_put_lock_reason(area_def, nil), do: Map.delete(area_def, :lock_reason)
 

@@ -1,5 +1,6 @@
 import { COLORS } from "../../colors";
 import { DISPLAY_AREA_X, DISPLAY_AREA_Y, DISPLAY_AREA_WIDTH, DISPLAY_AREA_HEIGHT, BOTTOM_HUD_HEIGHT, BOTTOM_HUD_BUTTON_FONT, HUD_LEFT_PADDING } from "../../config";
+import { upgradeFurnace } from "../../net/commands";
 import { renderSageArea } from "./sage/render";
 import { getCloverfieldBackgroundBlendState } from "./cloverfield/render";
 import { handleCloverfieldInteractions } from "./cloverfield/interactions";
@@ -7,10 +8,10 @@ import { renderOrchard } from "./orchard/render";
 import { handleOrchardInteractions } from "./orchard/interaction";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
-import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
+import { doButton, drawButton } from "../../ui/components/button";
 import { queueTooltip } from "../../ui/components/tooltip";
 import { drawLockedElement } from "../../ui/components/locked-element";
-import { formatUnlockRequirement } from "../requirements";
+import { FURNACE_MAX_LEVEL, FURNACE_MIN_LEVEL, formatUnlockRequirement } from "../requirements";
 import {
   NOTICE_LEAF_AREA_DROPDOWN_BUTTON,
   NOTICE_PARENT_AREA_DROPDOWN,
@@ -22,6 +23,12 @@ import { hexToRgba } from "../../utils/color";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
 const GO_TO_AREA_BUTTON_PADDING = 3;
+const FURNACE_UPGRADE_BUTTON = {
+  width: 120,
+  height: 34,
+  offsetX: 12,
+  offsetY: 12
+} as const;
 
 function getAreaBackgroundImage(imageKey: string) {
   if (!areaBackgroundImages.has(imageKey)) {
@@ -68,7 +75,8 @@ export function renderAreaBackground(canvas: HTMLCanvasElement) {
       return;
     }
   } else {
-    const image = getAreaBackgroundImage(`${areaKey.replace(/_/g, "-")}-background`);
+    const areaImageKey = getAreaImageKey(areaKey, model.furnaceLevel);
+    const image = getAreaBackgroundImage(areaImageKey);
 
     if (image.complete && image.naturalWidth > 0) {
       renderer.drawImage({
@@ -82,10 +90,17 @@ export function renderAreaBackground(canvas: HTMLCanvasElement) {
     }
   }
 
-
-
   const color = hexToRgba(COLORS.game.background);
   renderer.drawRect({ x: 0, y: 0, width: canvas.width, height: canvas.height, color });
+}
+
+function getAreaImageKey(areaKey: string, furnaceLevel: number): string {
+  if (areaKey === "furnace") {
+    const clampedLevel = Math.min(FURNACE_MAX_LEVEL, Math.max(FURNACE_MIN_LEVEL, furnaceLevel));
+    return `furnace-${clampedLevel}`;
+  }
+
+  return areaKey.replace(/_/g, "-");
 }
 
 export function renderAreaSpecifics(
@@ -110,7 +125,46 @@ export function renderAreaSpecifics(
   if (model.currentArea === "orchard") {
     renderOrchard(input);
     handleOrchardInteractions(input, blocked);
+    return;
   }
+
+  if (model.currentArea === "furnace") {
+    renderFurnaceUpgradeButton(input, model.furnaceLevel, blocked, channel, runCommand);
+  }
+}
+
+function renderFurnaceUpgradeButton(
+  input: InteractionState,
+  furnaceLevel: number,
+  blocked: boolean,
+  channel?: GameChannel,
+  runCommand?: (cmd: () => Promise<any>) => Promise<any> | void
+) {
+  const rect = {
+    x: DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - FURNACE_UPGRADE_BUTTON.width - FURNACE_UPGRADE_BUTTON.offsetX,
+    y: DISPLAY_AREA_Y + FURNACE_UPGRADE_BUTTON.offsetY,
+    width: FURNACE_UPGRADE_BUTTON.width,
+    height: FURNACE_UPGRADE_BUTTON.height
+  };
+  const canUpgrade = furnaceLevel < FURNACE_MAX_LEVEL;
+
+  if (canUpgrade && !blocked && channel && runCommand) {
+    if (doButton(input, rect, "Upgrade", { font: BOTTOM_HUD_BUTTON_FONT })) {
+      runCommand(() => upgradeFurnace(channel));
+    }
+    return;
+  }
+
+  const isHovered = pointInRect(input.pointer, rect);
+  const label = canUpgrade ? "Upgrade" : "Max Level";
+
+  drawButton(rect, label, {
+    active: isHovered,
+    font: BOTTOM_HUD_BUTTON_FONT,
+    inactiveSurface: COLORS.panel.bg,
+    inactiveBorder: COLORS.panel.border,
+    textColor: canUpgrade ? COLORS.panel.textPrimary : COLORS.panel.textDisabled
+  });
 }
 
 // Dropdown UI state

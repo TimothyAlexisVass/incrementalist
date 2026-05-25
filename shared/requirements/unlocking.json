@@ -10,7 +10,14 @@
     "type": "area",
     "id": "orchard",
     "name": "Orchard",
-    "description": "A serene orchard where growth comes naturally.",
+    "description": "A serene place of presence and growth.",
+    "required_level": 1
+  },
+  {
+    "type": "area",
+    "id": "furnace",
+    "name": "Campfire",
+    "description": "A place where travelers gather to rest, share stories, and prepare for the journey ahead.",
     "required_level": 1
   },
   {

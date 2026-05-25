@@ -25,6 +25,7 @@ const AUTHORITATIVE_AND_PROJECTION_RESULT_TYPES = new Set<ServerResult["type"]>(
   "shop.purchase.result",
   "sisu.refill.result",
   "sisu.upgrade_max.result",
+  "furnace.upgrade.result",
   "quest.claim.result",
   "stats.update.result",
   "cloverfield.search.result",
@@ -128,6 +129,7 @@ export function applyAuthoritativeData(
     stats?: StatsState;
     area?: string;
     areas?: AreaDefinition[];
+    furnace_level?: number;
     clover_hunt?: CloverHuntState;
     [key: string]: any;
   }
@@ -165,6 +167,7 @@ export function applyAuthoritativeData(
   if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
   if (data.clover_hunt !== undefined) state.snapshot.state.clover_hunt = data.clover_hunt;
+  if (data.furnace_level !== undefined) state.snapshot.state.furnace_level = data.furnace_level;
   if (data.has_bonustime_token !== undefined) state.snapshot.state.has_bonustime_token = data.has_bonustime_token;
   if (data.bonustime !== undefined) state.snapshot.state.bonustime = data.bonustime;
   if (data.area !== undefined) state.snapshot.state.area = data.area;
@@ -271,6 +274,7 @@ function statusForResult(result: ServerResult): string {
   if (result.type === "game.noop.result") return "Synced";
   if (result.type === "game.reset.result") return "Game reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";
+  if (result.type === "furnace.upgrade.result") return "Furnace upgraded";
   return "Ready";
 }
 

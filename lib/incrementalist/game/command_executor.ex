@@ -191,6 +191,41 @@ defmodule Incrementalist.Game.CommandExecutor do
              }), ps.id}
         end
 
+      "furnace.upgrade" ->
+        ps = player_state(player, now)
+
+        with {:ok, next_state} <- Incrementalist.Game.Features.Areas.upgrade_furnace(ps.state) do
+          next_notices =
+            Notices.refresh_for_state_transition(
+              ps.notices || Notices.new(ps.state),
+              ps.state,
+              next_state
+            )
+
+          update_player_state(ps, %{
+            state: next_state,
+            notices: next_notices,
+            last_saved_at: now
+          })
+
+          {"succeeded",
+           %{
+             "type" => "furnace.upgrade.result",
+             "status" => "ok",
+             "command_id" => command.command_id,
+             "area" => next_state.area,
+             "areas" => Incrementalist.Game.Features.Areas.visible_area_defs(next_state),
+             "furnace_level" => next_state.furnace_level,
+             "notices" => Notices.payload(next_notices)
+           }, ps.id}
+        else
+          {:error, reason} ->
+            {"failed",
+             error_result(reason, command, %{
+               "can_claim_at" => ps.state.can_claim_at
+             }), ps.id}
+        end
+
       "cloverfield.search" ->
         ps = player_state(player, now)
 
