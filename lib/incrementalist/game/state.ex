@@ -9,7 +9,7 @@ defmodule Incrementalist.Game.State do
 
   use Ecto.Schema
   import Ecto.Changeset
-  alias Incrementalist.Game.Time
+  alias Incrementalist.Game.{Climate, Time}
 
   @current_version 1
 
@@ -608,6 +608,7 @@ defmodule Incrementalist.Game.State do
         "sisu_generator_purchased" => projected_state.features.sisu_generator_purchased,
         "bonus_time_purchased" => projected_state.features.bonus_time_purchased
       },
+      "climate" => Climate.visible_state(now),
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "shop" =>
         Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
@@ -631,9 +632,6 @@ defmodule Incrementalist.Game.State do
         if(projected_state.bonustime,
           do:
             Map.merge(Map.from_struct(projected_state.bonustime), %{
-              "rotation_anchor" =>
-                Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-                |> Incrementalist.Game.Time.iso8601(),
               "active_game_id" =>
                 Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id()
             }),

@@ -1,0 +1,81 @@
+{
+  "epoch_utc": "2026-01-11T00:00:00Z",
+  "year_start": 1008,
+  "hour_ms": 3600000,
+  "day_hours": 2,
+  "game_day_start_hour": 8,
+  "game_night_start_hour": 20,
+  "days_per_season": 84,
+  "rainfall_max_mm": 300,
+  "rain_cooling_c": 1,
+  "seasons": [
+    {
+      "id": "spring",
+      "label": "Spring",
+      "temperature": {
+        "min_c": 18,
+        "max_c": 30
+      },
+      "rain_chance_per_hour": 0.08
+    },
+    {
+      "id": "summer",
+      "label": "Summer",
+      "temperature": {
+        "min_c": 25,
+        "max_c": 40
+      },
+      "rain_chance_per_hour": 0.04
+    },
+    {
+      "id": "autumn",
+      "label": "Autumn",
+      "temperature": {
+        "min_c": 15,
+        "max_c": 27
+      },
+      "rain_chance_per_hour": 0.09
+    },
+    {
+      "id": "winter",
+      "label": "Winter",
+      "temperature": {
+        "min_c": 10,
+        "max_c": 20
+      },
+      "rain_chance_per_hour": 0.05
+    }
+  ],
+  "rain_bands": [
+    {
+      "id": "none",
+      "min_mm": 0,
+      "max_mm": 0
+    },
+    {
+      "id": "very_light",
+      "min_mm": 1,
+      "max_mm": 4
+    },
+    {
+      "id": "light",
+      "min_mm": 5,
+      "max_mm": 15
+    },
+    {
+      "id": "moderate",
+      "min_mm": 16,
+      "max_mm": 49
+    },
+    {
+      "id": "heavy",
+      "min_mm": 50,
+      "max_mm": 249
+    },
+    {
+      "id": "torrential",
+      "min_mm": 250,
+      "max_mm": 300
+    }
+  ]
+}

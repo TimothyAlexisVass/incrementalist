@@ -6,7 +6,9 @@ import { renderAreaDropdown } from '../../../features/areas/render';
 import { drawLockedElement } from '../../components/locked-element';
 import { doBonusTimeButton } from "../../components/bonustime-button";
 import { GameChannel } from "../../../net/game-channel";
+import type { GameSnapshot } from "../../../net/protocol";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
+import { renderSeasonHud } from "../../season-hud/render";
 import {
   NOTICE_PARENT_MENU_MAIN,
   notices
@@ -24,7 +26,8 @@ export function renderBottomHUD(
   hasBonusTimeToken?: boolean,
   bonusTooltip?: string[],
   isUnlocked?: boolean,
-  runCommand?: (cmd: () => Promise<any>) => void
+  runCommand?: (cmd: () => Promise<any>) => void,
+  snapshot?: GameSnapshot | null
 ) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
@@ -69,6 +72,15 @@ export function renderBottomHUD(
       font: "bold 13px Arial"
     });
   }
+
+  // Draw season/time/weather HUD to the right of BONUSTIME.
+  const seasonHudX = bonusRect.x + bonusRect.width + 160;
+  const seasonHudWidth = Math.max(0, buttonX - 12 - seasonHudX);
+  renderSeasonHud(
+    canvas,
+    { x: seasonHudX, y: buttonY, width: seasonHudWidth, height: buttonHeight },
+    snapshot?.state?.climate
+  );
 
   // Draw Area selection dropdown on the left
   renderAreaDropdown(canvas, input, (areaKey) => {

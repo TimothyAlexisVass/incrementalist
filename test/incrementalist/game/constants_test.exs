@@ -47,7 +47,20 @@ defmodule Incrementalist.Game.ConstantsTest do
 
   test "furnace levels load from shared furnace requirements" do
     assert Constants.furnace_min_level() == 1
-    assert Constants.furnace_max_level() == 6
+    assert Constants.furnace_max_level() == 8
+  end
+
+  test "climate values load from shared climate requirements" do
+    assert Constants.climate_hour_ms() == 3_600_000
+    assert Constants.climate_day_hours() == 2
+    assert Constants.climate_year_start() == 1008
+    assert Constants.climate_game_day_start_hour() == 8
+    assert Constants.climate_game_night_start_hour() == 20
+    assert Constants.climate_days_per_season() == 84
+    assert Constants.climate_rainfall_max_mm() == 300
+    assert Constants.climate_season_order() == ["spring", "summer", "autumn", "winter"]
+    assert Constants.climate_season_temperature_range("winter") == %{min_c: 10, max_c: 20}
+    assert Constants.climate_season_rain_chance_per_hour("autumn") == 0.09
   end
 
   test "sisu levels load the shared upgrade table" do

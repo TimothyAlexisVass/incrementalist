@@ -17,6 +17,7 @@ export const TOP_HUD_LEVEL_FONT = 'bold 26px Arial';
 export const TOP_HUD_EXP_FONT = '14px Arial';
 export const TOP_HUD_COINS_FONT = '18px Arial';
 export const BOTTOM_HUD_BUTTON_FONT = 'bold 12px Arial';
+export const SEASON_HUD_FONT = 'bold 13px Arial';
 
 // Reward and popup fonts
 export const ACHIEVEMENT_ANNOUNCEMENT_FONT = '30px Arial';

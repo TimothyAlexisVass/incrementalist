@@ -12,7 +12,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   import Ecto.Query
 
-  alias Incrementalist.Game.{CommandExecutor, Constants, Snapshots, Time}
+  alias Incrementalist.Game.{Climate, CommandExecutor, Constants, Snapshots, Time}
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerSupervisor
   alias Incrementalist.Repo
@@ -272,6 +272,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   defp execute_next(state, command, now) do
     {status, result, ps_id} = CommandExecutor.execute(command, state.player, now)
+    result = attach_runtime_sync_fields(result, now)
 
     completed = %{
       command
@@ -286,6 +287,14 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     refreshed_state = refresh_player_and_state(state, now)
     {result, %{refreshed_state | unacked_command: completed}}
   end
+
+  defp attach_runtime_sync_fields(result, now) when is_map(result) do
+    result
+    |> Map.put_new("server_time", Time.iso8601(now))
+    |> Map.put("climate", Climate.visible_state(now))
+  end
+
+  defp attach_runtime_sync_fields(result, _now), do: result
 
   defp process_next_queued(state, now) do
     case state.queued_commands do

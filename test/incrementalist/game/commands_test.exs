@@ -41,6 +41,49 @@ defmodule Incrementalist.Game.CommandsTest do
     assert cached_boot["snapshot"] == nil
   end
 
+  test "time.sync returns global climate for all players at the same server time" do
+    player_a = create_player()
+    player_b = create_player()
+
+    result_a = Commands.enqueue(player_a.id, "time.sync", intent(0), @now)
+    result_b = Commands.enqueue(player_b.id, "time.sync", intent(0), @now)
+
+    assert result_a["type"] == "time.sync.result"
+    assert result_b["type"] == "time.sync.result"
+    assert result_a["climate"] == result_b["climate"]
+    assert result_a["climate"]["season"] in ["spring", "summer", "autumn", "winter"]
+    assert result_a["climate"]["day_phase"] in ["day", "night"]
+  end
+
+  test "time.sync flips day phase at the next real-time hour boundary" do
+    player = create_player()
+
+    result_day = Commands.enqueue(player.id, "time.sync", intent(0), @now)
+    Commands.ack(player.id, 0, @now)
+
+    next_hour = DateTime.add(@now, 3600, :second)
+    result_next = Commands.enqueue(player.id, "time.sync", intent(1), next_hour)
+
+    assert result_day["type"] == "time.sync.result"
+    assert result_next["type"] == "time.sync.result"
+    assert result_day["climate"]["day_phase"] != result_next["climate"]["day_phase"]
+  end
+
+  test "time.sync starts climate years at 1008 on climate epoch" do
+    Application.put_env(:incrementalist, :climate_epoch_override, DateTime.to_iso8601(@now))
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :climate_epoch_override)
+    end)
+
+    player = create_player()
+    result = Commands.enqueue(player.id, "time.sync", intent(0), @now)
+
+    assert result["type"] == "time.sync.result"
+    assert result["climate"]["year"] == 1008
+    assert result["climate"]["day_in_year"] == 1
+  end
+
   test "commands are FIFO and ACK-gated" do
     player = create_player()
 
@@ -548,7 +591,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert boot["pending_result"] == result
   end
 
-  test "bonustime.play keeps projected rotation fields in command result bonustime payload" do
+  test "bonustime.play keeps projected active game id in command result bonustime payload" do
     Application.put_env(
       :incrementalist,
       :bonustime_rotation_anchor_override,
@@ -573,7 +616,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert result["status"] == "ok"
     assert is_map(result["bonustime"])
     assert result["bonustime"]["active_game_id"] == "chest_draw"
-    assert result["bonustime"]["rotation_anchor"] == DateTime.to_iso8601(@now)
+    refute Map.has_key?(result["bonustime"], "rotation_anchor")
   end
 
   test "bonustime.play plinko_drop includes authoritative roll payload in last_result" do

@@ -91,6 +91,36 @@ export type StatsState = {
   total_cores_earned: BigNum;
 };
 
+export type ClimateSeasonId = "spring" | "summer" | "autumn" | "winter";
+export type ClimateRainIntensity = "none" | "very_light" | "light" | "moderate" | "heavy" | "torrential";
+
+export type ClimateState = {
+  epoch_at: string;
+  hour_ms: number;
+  hours_per_day: number;
+  year_start: number;
+  game_day_start_hour: number;
+  game_night_start_hour: number;
+  days_per_season: number;
+  days_per_year: number;
+  year: number;
+  season_index: number;
+  season: ClimateSeasonId;
+  season_label: string;
+  day_in_season: number;
+  day_in_year: number;
+  day_phase: "day" | "night";
+  is_day: boolean;
+  temperature_c: number;
+  rain_mm: number;
+  rain_intensity: ClimateRainIntensity;
+  next_hour_at: string;
+  next_day_phase_at: string;
+  season_temperature_min_c: number;
+  season_temperature_max_c: number;
+  season_rain_chance_per_hour: number;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -104,7 +134,6 @@ export type BonusTimeState = {
   checklist_entry_indexes: Record<string, number>;
   last_result: any | null;
   jackpot_progress?: number;
-  rotation_anchor?: string;
   active_game_id?: string;
   bonustime_flips?: number;
   active_session?: {
@@ -149,6 +178,7 @@ export type GameSnapshot = {
       sisu_generator_purchased: boolean;
       bonus_time_purchased: boolean;
     };
+    climate: ClimateState;
     shop: ShopItemDefinition[];
     quests: Record<string, QuestState>;
     achievements: Record<string, AchievementState>;
@@ -166,6 +196,15 @@ export type GameNoopResult = {
   command_id: number;
   server_time: string;
   events: unknown[];
+  climate: ClimateState;
+};
+
+export type TimeSyncResult = {
+  type: "time.sync.result";
+  status: "ok";
+  command_id: number;
+  server_time: string;
+  climate: ClimateState;
 };
 
 export type GameResetResult = {
@@ -379,6 +418,7 @@ export type CommandErrorResult = {
 
 export type AckableCommandResult =
   | GameNoopResult
+  | TimeSyncResult
   | GameResetResult
   | ProgressClaimInResult
   | ProgressClaimRewardResult
@@ -434,6 +474,7 @@ export type BootResult = {
 export function isAckableCommandResult(result: ServerResult): result is AckableCommandResult {
   return (
     result.type === "game.noop.result" ||
+    result.type === "time.sync.result" ||
     result.type === "game.reset.result" ||
     result.type === "progress.claim_in.result" ||
     result.type === "progress.claim_reward.result" ||

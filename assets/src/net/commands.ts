@@ -16,7 +16,8 @@ import type {
   StatsUpdateResult,
   NoticeEventResult,
   NoticeEventKind,
-  BonusTimePlayResult
+  BonusTimePlayResult,
+  TimeSyncResult
 } from "./protocol";
 import type { GameChannel } from "./game-channel";
 
@@ -27,6 +28,10 @@ export function resetGame(channel: GameChannel) {
 
 export function progressClaimIn(channel: GameChannel) {
   return channel.pushCommand<CommandPushResult<ProgressClaimInResult>>("progress.claim_in");
+}
+
+export function timeSync(channel: GameChannel) {
+  return channel.pushCommand<CommandPushResult<TimeSyncResult>>("time.sync");
 }
 
 export function progressClaimReward(channel: GameChannel) {

@@ -64,44 +64,64 @@ The Acorn is the first purchasable seed. The Sage gives the first 50 Clover Seed
 | Plant type            | Wood | Plant Matter |
 | --------------------- | ---: | -----------: |
 | **Trees**             |  90% |          10% |
-| **Bushes**            |  50% |          50% |
+| **Bushes**            |  40% |          60% |
 | **Herbaceous plants** |   0% |         100% |
 
 Each plant should have:
 
 | Field              | Description                                |
 | ------------------ | ------------------------------------------ |
+| `seed` | seed that grows this plant |
+| `size` | determines wood and plant matter amount | 
 | `plantType`        | tree, bush, or herbaceous                  |
 | `baseGrowthTime`   | Base growth percentage per real time hour   |
-| `harvestType` | item (cointree), fruit or seed |
-| `harvestAmount` | array of integers => chance per index in array [70, 25, 5] means 70% chance of 0, 25% chance of 1, 5% chance of 2 |
+| `seedsToPlant` | Amount of seeds required to plant one plot |
+| `harvestType` | resource, fruit, seed |
+| `seedAmount` | chance of amount {"0": 70, "1": 25, "2": 5} means 70% chance of 0, 25% chance of 1, 5% chance of 2 |
+| `harvestAmount` | chance of amount {"0": 70, "1": 25, "2-5": 5} means 70% chance of 0, 25% chance of 1, 5% chance of random between 2 and 5, or null if harvestType is seed |
+| `fruit` | Which fruit this plant produces, null when harvestType != fruit |
 | `seedPerFruit` | {min: BigNum, max: BigNum} or null when harvestType != fruit|
 | `nitrogenFixing` | integer, will increase nitrogen by this much every real time hour |
-| `nitrogen`  | {min: integer, max: integer} min decides minimum required to plant seed (planting will remove half as much N), max determines cap of baseGrowthTime effect while that much N is in the soil during growth |
-| `phosphorus`  | {min: integer, max: integer} min decides minimum required to plant seed (planting will remove half as much P), max determines cap of harvestAmount effect while that much P is in the soil during growth |
-| `potassium` | {min: integer, max: integer} min decides minimum required to plant seed (planting will remove half as much K), max determines cap of growthSpeed, harvestAmount and seedPerFruit effects while that much K is in the soil during growth |
+| `nitrogen`  | {min: integer, max: integer} or null, min decides minimum required to plant seed (planting will remove half as much N), max determines cap of baseGrowthTime effect while that much N is in the soil during growth. null means unaffected by nitrogen levels |
+| `phosphorus`  | {min: integer, max: integer} or null, min decides minimum required to plant seed (planting will remove half as much P), max determines cap of harvestAmount effect while that much P is in the soil during growth. null means unaffected by phosphorus levels |
+| `potassium` | {min: integer, max: integer} min decides minimum required to plant seed (planting will remove half as much K), max determines cap of growthSpeed, harvestAmount and seedPerFruit effects while that much K is in the soil during growth. null means unaffected by potassium levels |
+| `minDepth` | Plot depth required to plant |
 | `minTemp` | Growth stops below temperature |
 | `minWater` | Growth stops below water amount |
 | `level` | Affects baseGrowthTime, harvestAmount, seedPerFruit, nitrogen, phosphorus, potassium, minTemp, minWater |
 
+v1 Plants:
+Clovers => seed: clover_seeds, size: 2, plantType: herbaceous, baseGrowthTime: 100, seedsToPlant: 50, harvestType: seed, seedAmount: {"20": 40, "30": 20, "40": 20, "50": 10, "75": 5, "100": 5}, havestAmount: null, fruit: null, seedPerFruit: null, nitrogenFixing: 2, nitrogen: null, phosphorus: null, potassium: null, minDepth: 0, minTemp: 0, minWater: 1, level: 1
+
+Oak => seed: acorn, plantType: tree, size: 50, baseGrowthTime: 50, seedsToPlant: 1, harvestType: seed, seedAmount: {"0": 50, "1": 45, "2": 5}, harvestAmount: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 4, phosphorus: null, potassium: 1, minDepth: 1, minTemp: 15, minWater: 2, level: 1
+
+Coin Tree => seed: coin_tree_seed, size: 20, plantType: tree, baseGrowthTime: 20, seedsToPlant: 1, harvestType: resource, seedAmount: {"0": 60, "1": 20, "2": 15, "3": 5}, harvestAmount: {"1000-3000": 70, "3001-8000": 25, "8001-20000": 5}, fruit: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 2, phosphorus: 2, potassium: 2, minDepth: 2, minTemp: 18, minWater: 2
+
 ---
 
-# Phase 3: Splicing
+# Phase 3: Splicing and Orchard shop
 
 ## Orchard Splicing Menu
 
-| Rule     | Description                                               |
-| -------- | --------------------------------------------------------- |
+| Rule     | Description       |
+| -------- | ----------------- |
 | Location | Splicing is done in the **Splicing modal** of the Orchard. |
-| Cost     | Splicing costs **Gold**.                                  |
-| Input    | Two seed types.                                           |
-| Output   | One resulting seed type.                                  |
+| Cost     | Splicing costs in Gold, Shards and Core |
+| Chance | Chance to successfully splice seeds |
+| seed_a    | First seed type |
+| seed_b   | second seed type |
 
 First required splice:
 
-| Seed A | Seed B      | Result         |
-| ------ | ----------- | -------------- |
-| Acorn  | Clover Seed | Coin Tree Seed |
+coin_tree_seed => cost: 2000 gold, chance: 100%, seed_a: clover_seeds, seed_b: acorn
+
+Successfully splicing a seed makes it available in the Orchard Shop Menu
+
+## Orchard Shop Menu
+
+clover_seeds => cost: 5 gold (unlocked by default)
+acorn => cost: 500 gold and 5 shards (unlocked by default)
+coin_tree_seed => cost: 3000 gold, 10 shards
 
 ---
 
@@ -112,11 +132,11 @@ All properties apply to the entire orchard except for Depth which is plot specif
 
 | Soil stat          | Improved by                        |
 | ------------------ | ---------------------------------- |
-| **Nitrogen**              | Clover and legumes |
-| **Phosphorus**              | Mushrooms and fruit | 
+| **Nitrogen**              | plants with nitrogenFixing > 0 |
+| **Phosphorus**              | leaving plant matter to decompose, Mushrooms and fruit | 
 | **Potassium**              | Ash from furnace | Improved composting |
 | **Organic Matter** | Each decomposition cycle increases amount |
-| **Depth**          | Increases to max(current_depth, plant_debth + 1) at harvest of a plant |
+| **Depth**          | Increases to max(current_depth, plant_depth + 1) at harvest of a plant |
 | **Water**          | Increases during rain, decreases every real-time hour when not raining |
 
 Organic matter, Phosphorus, Potassium and Water decrease every real-time hour when it is not raining.
@@ -130,7 +150,7 @@ At the point where the furnace is upgraded to Clean Smelter, burning stops and t
 | -------------------------- | ----------------------------------- |
 | Harvest plants             | Produces Wood and/or Plant Matter and Harvest. Decide what to do with Plant matter and/or Fruit  |
 | Leave Plant Matter and/or fruit on plot | Sets a decomposition cycle, can inoculate mycelium if player has spores |
-| Decomposition completes    | Increases Organic Matter, increases P if inoculated, increases P if fruit was left on plot, mushroom harvest chance |
+| Decomposition completes    | Increases Organic Matter, increases P by the amount that the increases P if inoculated, increases P if fruit was left on plot, mushroom harvest chance |
 | Grow plant with nitrogenFixing amount        | Increases N.                        |
 | Add Ash                    | Increases K.                        |
 
@@ -174,18 +194,17 @@ Plant Matter should therefore have two uses:
 ---
 
 # Phase 8: Furnace Levels
-Important thing. After the player has generated 100 Metal, the Coal Furnace will be shut down and the furnace
-is automatically downgraded back to Large Furnace (it seems to the player, it's actually upgraded to the "next"
-Large Furnace) until Clean Smelting has been researched. The metal and some stone will then be used to build the clean smelter.
+Important thing. After the player has generated 500 Metal at the Coal Furnace, the Coal Furnace will be shut down and the furnace
+is automatically upgrade back to the next Large Furnace, until Clean Smelting has been researched. The already stored metal, and some bricks and stone will then be used to upgrade to the "Clean Smelter".
 
 | Furnace level        | Unlocks             |
 | -------------------- | ------------------- |
-| 1 **Campfire**       | Ash                 |
-| 2 **Small Furnace**  | Charcoal            |
-| 3 **Large Furnace**  | Bricks              |
-| 4 **Coal Furnace**   | Smelting            |
-| 5 **Large Furnace**  | Bricks              |
-| 6 **Clean Smelter**  | Smelting, Alloys    |
+| 1 **Campfire**       | Ash                 | At moment of harvest, the player gets to choose if they want to keep the plant matter in storage or leave it to decompose on the plot. Plant matter in When plant matter is burned, it will produce ash, which is stored in storage and can be used to enrich the soil with K.
+| 2 **Small Furnace**  | Charcoal            | At moment of harvest, plant with wood will add wood to storage. Wood can be charred into charcoal, a more efficient fuel.
+| 3 **Large Furnace**  | Bricks              | Same as small furnace, just allows making bricks.
+| 4 **Coal Furnace**   | Smelting            | This temporary furnace level, before coal mining / burning is banned, requires coal for smelting.
+| 5 **Large Furnace**  | Bricks              | This works exactly like the previous large furnace.
+| 6 **Clean Smelter**  | Biocoking, Smelting, Alloys    | Carcoal can be used for smelting, but charcoal can also be futher enriched into biocoke, which is required for alloys.
 | 7 **Arc Furnace**    | Advanced Alloys     |
 | 8 **Plasma Furnace** | Space Age materials |
 

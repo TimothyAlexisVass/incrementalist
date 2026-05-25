@@ -1,15 +1,16 @@
 import { ServerState } from "../../net/snapshots";
 import { getServerNow } from "../../core/time";
 import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
+import climateConfig from "../../../../shared/requirements/climate.json";
 
 const SLOT_MS = 43_200_000; // 12 hours
 
 type BonusTimeConfig = {
-  rotation_anchor: string;
   games: Record<string, { name: string; slot: number }>;
 };
 
 const bonusTimeConfig = bonustimeConfig as BonusTimeConfig;
+const climateSharedConfig = climateConfig as { epoch_utc: string };
 
 function getGameIdForSlot(slot: number): string {
   const match = Object.entries(bonusTimeConfig.games).find(([, game]) => game.slot === slot);
@@ -23,10 +24,7 @@ export function getActiveGameId(state?: ServerState): string {
   }
 
   const now = getServerNow();
-  let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
-  if (!anchorStr) {
-    anchorStr = bonusTimeConfig.rotation_anchor;
-  }
+  const anchorStr = state?.snapshot?.state.climate?.epoch_at || climateSharedConfig.epoch_utc;
   if (!anchorStr) {
     return "chest_draw";
   }
@@ -49,10 +47,7 @@ export function getActiveGameName(state?: ServerState): string {
 
 export function getTimeUntilNextTokenMs(state?: ServerState): number {
   const now = getServerNow();
-  let anchorStr = state?.snapshot?.state.bonustime?.rotation_anchor;
-  if (!anchorStr) {
-    anchorStr = bonusTimeConfig.rotation_anchor;
-  }
+  const anchorStr = state?.snapshot?.state.climate?.epoch_at || climateSharedConfig.epoch_utc;
   if (!anchorStr) {
     return SLOT_MS;
   }

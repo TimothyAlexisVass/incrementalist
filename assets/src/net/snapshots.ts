@@ -10,7 +10,8 @@ import type {
   AchievementState,
   StatsState,
   CloverHuntState,
-  AreaDefinition
+  AreaDefinition,
+  ClimateState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -77,6 +78,10 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyProjectionData(state, result);
   }
 
+  if ("climate" in result && result.climate) {
+    applyAuthoritativeData(state, result as any);
+  }
+
   if (result.type === "progress.claim_in.result" || result.type === "progress.set_idle_mode.result") {
     applyProjectionData(state, result);
   }
@@ -131,6 +136,7 @@ export function applyAuthoritativeData(
     areas?: AreaDefinition[];
     furnace_level?: number;
     clover_hunt?: CloverHuntState;
+    climate?: ClimateState;
     [key: string]: any;
   }
 ) {
@@ -172,6 +178,7 @@ export function applyAuthoritativeData(
   if (data.bonustime !== undefined) state.snapshot.state.bonustime = data.bonustime;
   if (data.area !== undefined) state.snapshot.state.area = data.area;
   if (data.areas !== undefined) state.snapshot.state.areas = data.areas;
+  if (data.climate !== undefined) state.snapshot.state.climate = data.climate;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -272,6 +279,7 @@ function statusForResult(result: ServerResult): string {
   if (result.status === "error") return result.reason || "Command rejected";
   if (result.type === "command.queued") return "Queued";
   if (result.type === "game.noop.result") return "Synced";
+  if (result.type === "time.sync.result") return "Clock synced";
   if (result.type === "game.reset.result") return "Game reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";
   if (result.type === "furnace.upgrade.result") return "Furnace upgraded";

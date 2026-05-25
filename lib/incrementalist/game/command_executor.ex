@@ -8,7 +8,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   """
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerState, PlayerStates}
-  alias Incrementalist.Game.{Notices, Snapshots, State, Time}
+  alias Incrementalist.Game.{Climate, Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
   alias Incrementalist.Game.Features.CloverHunt
@@ -49,6 +49,18 @@ defmodule Incrementalist.Game.CommandExecutor do
            "command_id" => command.command_id,
            "server_time" => Time.iso8601(now),
            "events" => []
+         }, ps.id}
+
+      "time.sync" ->
+        ps = player_state(player, now)
+
+        {"succeeded",
+         %{
+           "type" => "time.sync.result",
+           "status" => "ok",
+           "command_id" => command.command_id,
+           "server_time" => Time.iso8601(now),
+           "climate" => Climate.visible_state(now)
          }, ps.id}
 
       "progress.claim_in" ->
@@ -720,12 +732,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                 })
 
                 projected_bonustime =
-                  Map.merge(Map.from_struct(next_bonustime), %{
-                    "rotation_anchor" =>
-                      Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-                      |> Time.iso8601(),
-                    "active_game_id" => active_game_id
-                  })
+                  projected_bonustime_payload(next_bonustime, active_game_id)
 
                 {"succeeded",
                  %{
@@ -825,12 +832,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                 })
 
                 projected_bonustime =
-                  Map.merge(Map.from_struct(next_bonustime), %{
-                    "rotation_anchor" =>
-                      Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-                      |> Time.iso8601(),
-                    "active_game_id" => active_game_id
-                  })
+                  projected_bonustime_payload(next_bonustime, active_game_id)
 
                 {"succeeded",
                  %{
@@ -907,12 +909,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                   })
 
                   projected_bonustime =
-                    Map.merge(Map.from_struct(next_bonustime), %{
-                      "rotation_anchor" =>
-                        Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-                        |> Time.iso8601(),
-                      "active_game_id" => active_game_id
-                    })
+                    projected_bonustime_payload(next_bonustime, active_game_id)
 
                   {"succeeded",
                    %{
@@ -1280,12 +1277,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                   next_state = Achievements.evaluate(next_state)
 
                   projected_bonustime =
-                    Map.merge(Map.from_struct(next_bonustime), %{
-                      "rotation_anchor" =>
-                        Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-                        |> Time.iso8601(),
-                      "active_game_id" => active_game_id
-                    })
+                    projected_bonustime_payload(next_bonustime, active_game_id)
 
                   next_notices =
                     Notices.refresh_for_state_transition(
@@ -1565,13 +1557,7 @@ defmodule Incrementalist.Game.CommandExecutor do
       last_saved_at: now
     })
 
-    projected_bonustime =
-      Map.merge(Map.from_struct(next_bonustime), %{
-        "rotation_anchor" =>
-          Incrementalist.Game.Constants.bonustime_rotation_anchor_at()
-          |> Time.iso8601(),
-        "active_game_id" => active_game_id
-      })
+    projected_bonustime = projected_bonustime_payload(next_bonustime, active_game_id)
 
     {"succeeded",
      %{
@@ -1589,6 +1575,12 @@ defmodule Incrementalist.Game.CommandExecutor do
 
   defp lucky_dice_invalid_request(command, ps) do
     {"failed", error_result("invalid_request", command), ps.id}
+  end
+
+  defp projected_bonustime_payload(next_bonustime, active_game_id) do
+    Map.merge(Map.from_struct(next_bonustime), %{
+      "active_game_id" => active_game_id
+    })
   end
 
   defp player_state(player, now) do

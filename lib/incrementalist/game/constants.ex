@@ -9,22 +9,28 @@ defmodule Incrementalist.Game.Constants do
   @quests_path Path.join(@requirements_dir, "quests.json")
   @achievements_path Path.join(@requirements_dir, "achievements.json")
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
+  @climate_path Path.join(@requirements_dir, "climate.json")
   @external_resource @unlocking_path
   @external_resource @furnace_path
   @external_resource @quests_path
   @external_resource @achievements_path
   @external_resource @bonustime_path
+  @external_resource @climate_path
   @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
   @furnace @furnace_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
+  @climate @climate_path |> File.read!() |> Jason.decode!()
   @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
   @shop_item_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "shop-item"))
   @furnace_level_rows Map.fetch!(@furnace, "levels")
   @furnace_level_numbers Enum.map(@furnace_level_rows, &Map.fetch!(&1, "level"))
   @furnace_min_level Enum.min(@furnace_level_numbers)
   @furnace_max_level Enum.max(@furnace_level_numbers)
+  @climate_season_rows Map.fetch!(@climate, "seasons")
+  @climate_season_order Enum.map(@climate_season_rows, &Map.fetch!(&1, "id"))
+  @climate_season_lookup Map.new(@climate_season_rows, fn row -> {Map.fetch!(row, "id"), row} end)
   @default_sage_tip_level 1
   @area_unlock_levels @area_unlocking_entries
                       |> Map.new(fn %{"id" => id, "required_level" => required_level} ->
@@ -37,6 +43,56 @@ defmodule Incrementalist.Game.Constants do
 
   def max_queued_commands, do: 10
   def valid_command_ids, do: 0..(max_queued_commands() - 1)
+
+  # Climate / Time Constants (global for all players)
+  def climate_hour_ms, do: Map.fetch!(@climate, "hour_ms")
+  def climate_day_hours, do: Map.fetch!(@climate, "day_hours")
+  def climate_year_start, do: Map.fetch!(@climate, "year_start")
+  def climate_game_day_start_hour, do: Map.fetch!(@climate, "game_day_start_hour")
+  def climate_game_night_start_hour, do: Map.fetch!(@climate, "game_night_start_hour")
+  def climate_days_per_season, do: Map.fetch!(@climate, "days_per_season")
+  def climate_rainfall_max_mm, do: Map.fetch!(@climate, "rainfall_max_mm")
+  def climate_rain_cooling_c, do: Map.fetch!(@climate, "rain_cooling_c")
+  def climate_rain_bands, do: Map.fetch!(@climate, "rain_bands")
+  def climate_season_order, do: @climate_season_order
+
+  def climate_epoch_at do
+    case Application.get_env(:incrementalist, :climate_epoch_override) do
+      %DateTime{} = dt ->
+        dt
+
+      iso when is_binary(iso) ->
+        case DateTime.from_iso8601(iso) do
+          {:ok, dt, _} -> dt
+          _ -> default_climate_epoch_at()
+        end
+
+      _ ->
+        default_climate_epoch_at()
+    end
+  end
+
+  def climate_season_temperature_range(season) do
+    season_row = climate_season_row(season)
+    temp = Map.fetch!(season_row, "temperature")
+
+    %{
+      min_c: Map.fetch!(temp, "min_c"),
+      max_c: Map.fetch!(temp, "max_c")
+    }
+  end
+
+  def climate_season_rain_chance_per_hour(season) do
+    season
+    |> climate_season_row()
+    |> Map.fetch!("rain_chance_per_hour")
+  end
+
+  def climate_season_label(season) do
+    season
+    |> climate_season_row()
+    |> Map.fetch!("label")
+  end
 
   # Clover Hunt Constants
   def clover_hunt_click_step, do: 100
@@ -119,9 +175,24 @@ defmodule Incrementalist.Game.Constants do
     end
   end
 
-  defp default_bonustime_rotation_anchor_at do
-    {:ok, dt, _} = DateTime.from_iso8601(@bonustime["rotation_anchor"])
+  defp default_bonustime_rotation_anchor_at, do: climate_epoch_at()
+
+  defp default_climate_epoch_at do
+    {:ok, dt, _} = DateTime.from_iso8601(Map.fetch!(@climate, "epoch_utc"))
     dt
+  end
+
+  defp climate_season_row(season) when is_atom(season),
+    do: climate_season_row(Atom.to_string(season))
+
+  defp climate_season_row(season) when is_binary(season) do
+    case Map.fetch(@climate_season_lookup, season) do
+      {:ok, row} ->
+        row
+
+      :error ->
+        Map.fetch!(@climate_season_lookup, hd(@climate_season_order))
+    end
   end
 
   # Progress Bar Constants
