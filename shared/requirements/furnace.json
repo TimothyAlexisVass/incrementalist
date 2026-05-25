@@ -22,11 +22,21 @@
     },
     {
       "level": 5,
+      "name": "Large Furnace",
+      "description": "A larger kiln built from brick and stone for burning bricks."
+    },
+    {
+      "level": 5,
+      "name": "Clean Smelter",
+      "description": "We now have a clean way to smelt ore and create metal alloys."
+    },
+    {
+      "level": 7,
       "name": "Arc Furnace",
       "description": "Electric arcs melt metals quickly with tight control."
     },
     {
-      "level": 6,
+      "level": 8,
       "name": "Plasma Furnace",
       "description": "Plasma heat pushes refining efficiency to the limit."
     }
