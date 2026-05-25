@@ -21,7 +21,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.3872, 0.5899], // right
         [0.3659, 0.6107], // bottom-right
         [0.3159, 0.6107], // bottom-left
-        [0.3064, 0.5906], // left
+        [0.3044, 0.5916], // left
         [0.3292, 0.5748]  // top-left
       ],
       state: "locked"
@@ -42,10 +42,10 @@ const orchardViewModel: OrchardViewModel = {
       id: "plot_3",
       points: [
         [0.6400, 0.5783], // top-right
-        [0.6615, 0.5935], // right
+        [0.6635, 0.5945], // right
         [0.6535, 0.6131], // bottom-right
         [0.6056, 0.6131], // bottom-left
-        [0.5835, 0.5918], // left
+        [0.5830, 0.5935], // left
         [0.5950, 0.5783]  // top-left
       ],
       state: "locked"
@@ -57,7 +57,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.3085, 0.6126], // right
         [0.2802, 0.6370], // bottom-right
         [0.2322, 0.6370], // bottom-left
-        [0.2235, 0.6121], // left
+        [0.2225, 0.6131], // left
         [0.2519, 0.5927]  // top-left
       ],
       state: "locked"
@@ -129,7 +129,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.6812, 0.6424], // right
         [0.6697, 0.6668], // bottom-right
         [0.6161, 0.6668], // bottom-left
-        [0.5940, 0.6396], // left
+        [0.5910, 0.6406], // left
         [0.6063, 0.6177] // top-left
       ],
       state: "locked"
@@ -138,10 +138,10 @@ const orchardViewModel: OrchardViewModel = {
       id: "plot_11",
       points: [
         [0.2779, 0.6428], // top-right
-        [0.2895, 0.6663], // right
-        [0.2569, 0.6966], // bottom-right
-        [0.2034, 0.6954], // bottom-left
-        [0.1974, 0.6682], // left
+        [0.2905, 0.6680], // right
+        [0.2575, 0.6966], // bottom-right
+        [0.2034, 0.6964], // bottom-left
+        [0.1950, 0.6700], // left
         [0.2287, 0.6428] // top-left
       ],
       state: "locked"
@@ -152,8 +152,8 @@ const orchardViewModel: OrchardViewModel = {
         [0.4340, 0.6428], // top-right
         [0.4505, 0.6699], // right
         [0.4264, 0.6966], // bottom-right
-        [0.3721, 0.6966], // bottom-left
-        [0.3578, 0.6682], // left
+        [0.3721, 0.6975], // bottom-left
+        [0.3558, 0.6692], // left
         [0.3841, 0.6428] // top-left
       ],
       state: "locked"
@@ -165,7 +165,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.6108, 0.6711], // right
         [0.5945, 0.6990], // bottom-right
         [0.5409, 0.6990], // bottom-left
-        [0.5195, 0.6682], // left
+        [0.5180, 0.6698], // left
         [0.5381, 0.6440] // top-left
       ],
       state: "locked"
@@ -177,7 +177,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.7691, 0.6723], // right
         [0.7611, 0.7002], // bottom-right
         [0.7069, 0.7002], // bottom-left
-        [0.6777, 0.6682], // left
+        [0.6767, 0.6705], // left
         [0.6886, 0.6440] // top-left
       ],
       state: "locked"
@@ -190,7 +190,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.3322, 0.7348], // bottom-right
         [0.2758, 0.7360], // bottom-left
         [0.2649, 0.7016], // left
-        [0.2976, 0.6702]  // top-left
+        [0.2976, 0.6722]  // top-left
       ],
       state: "locked"
     },
@@ -238,7 +238,7 @@ const orchardViewModel: OrchardViewModel = {
         [0.4187, 0.7778], // bottom-right
         [0.3546, 0.7790], // bottom-left
         [0.3402, 0.7398], // left
-        [0.3700, 0.7036]  // top-left
+        [0.3700, 0.7056]  // top-left
       ],
       state: "locked"
     },
@@ -273,8 +273,8 @@ const orchardViewModel: OrchardViewModel = {
         [0.3465, 0.7844], // right
         [0.3097, 0.8291], // bottom-right
         [0.2456, 0.8267], // bottom-left
-        [0.2340, 0.7816], // left
-        [0.2709, 0.7430]  // top-left
+        [0.2327, 0.7840], // left
+        [0.2709, 0.7445]  // top-left
       ],
       state: "locked"
     },
@@ -381,8 +381,8 @@ const orchardViewModel: OrchardViewModel = {
         [0.7578, 0.8978], // right
         [0.7407, 0.9496], // bottom-right
         [0.6640, 0.9496], // bottom-left
-        [0.6264, 0.8901], // left
-        [0.6499, 0.8409]  // top-left
+        [0.6264, 0.8911], // left
+        [0.6499, 0.8419]  // top-left
       ],
       state: "locked"
     }
