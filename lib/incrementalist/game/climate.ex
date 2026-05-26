@@ -5,9 +5,6 @@ defmodule Incrementalist.Game.Climate do
 
   alias Incrementalist.Game.{Constants, Time}
 
-  @lcg_modulus 2_147_483_647
-  @lcg_multiplier 48_271
-
   def visible_state(now \\ Time.now()) do
     epoch = Constants.climate_epoch_at()
     now_ms = Time.to_unix_ms(now)
@@ -57,16 +54,9 @@ defmodule Incrementalist.Game.Climate do
     max_temp_c = season_temp.max_c
     rain_chance = Constants.climate_season_rain_chance_per_hour(season)
 
-    rain_mm =
-      if deterministic_ratio(elapsed_hours, 17) < rain_chance do
-        deterministic_int(elapsed_hours, 97, 1, Constants.climate_rainfall_max_mm())
-      else
-        0
-      end
-
-    base_temp_c = deterministic_int(elapsed_hours, 211, min_temp_c, max_temp_c)
-    rain_cooling_c = if rain_mm > 0, do: Constants.climate_rain_cooling_c(), else: 0
-    temperature_c = max(min_temp_c, base_temp_c - rain_cooling_c)
+    weather_entry = Constants.climate_weather_entry(elapsed_hours)
+    rain_mm = Map.fetch!(weather_entry, "mm")
+    temperature_c = Map.fetch!(weather_entry, "c")
 
     %{
       "epoch_at" => Time.iso8601(epoch),
@@ -115,21 +105,5 @@ defmodule Incrementalist.Game.Climate do
     # Day/night alternates every one real-time hour (half of a 2-hour in-game day).
     next_phase_ms = (div(now_ms, hour_ms) + 1) * hour_ms
     next_phase_ms |> DateTime.from_unix!(:millisecond) |> Time.iso8601()
-  end
-
-  defp deterministic_int(hour_index, salt, min_value, max_value) do
-    range = max_value - min_value + 1
-    value = floor(deterministic_ratio(hour_index, salt) * range)
-    min_value + min(range - 1, max(0, value))
-  end
-
-  defp deterministic_ratio(hour_index, salt) do
-    seed = positive_mod(hour_index + salt, @lcg_modulus - 1) + 1
-    next = rem(seed * @lcg_multiplier, @lcg_modulus)
-    next / @lcg_modulus
-  end
-
-  defp positive_mod(value, modulus) do
-    rem(rem(value, modulus) + modulus, modulus)
   end
 end

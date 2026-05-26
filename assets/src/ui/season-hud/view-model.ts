@@ -16,8 +16,8 @@ export function buildSeasonHudModel(climate: ClimateState | null | undefined): S
   const isDay = climate.day_phase === "day";
 
   return {
-    leftText: `${temperature}ºC`,
-    rightText: `Year ${climate.year} Day ${day}, ${climate.season_label}    ${time}`,
+    leftText: `Year ${climate.year} Day ${day}, ${climate.season_label}`,
+    rightText: `${temperature}ºC   ${time}`,
     iconPath: resolveIconPath(climate.rain_intensity, isDay)
   };
 }

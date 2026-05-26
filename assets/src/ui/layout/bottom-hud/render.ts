@@ -74,7 +74,7 @@ export function renderBottomHUD(
   }
 
   // Draw season/time/weather HUD to the right of BONUSTIME.
-  const seasonHudX = bonusRect.x + bonusRect.width + 160;
+  const seasonHudX = bonusRect.x + bonusRect.width + 150;
   const seasonHudWidth = Math.max(0, buttonX - 12 - seasonHudX);
   renderSeasonHud(
     canvas,

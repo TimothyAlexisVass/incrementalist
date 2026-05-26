@@ -10,18 +10,23 @@ defmodule Incrementalist.Game.Constants do
   @achievements_path Path.join(@requirements_dir, "achievements.json")
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
   @climate_path Path.join(@requirements_dir, "climate.json")
+  @weather_path Path.join(@requirements_dir, "weather.json")
   @external_resource @unlocking_path
   @external_resource @furnace_path
   @external_resource @quests_path
   @external_resource @achievements_path
   @external_resource @bonustime_path
   @external_resource @climate_path
+  @external_resource @weather_path
   @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
   @furnace @furnace_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
   @achievements @achievements_path |> File.read!() |> Jason.decode!()
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
   @climate @climate_path |> File.read!() |> Jason.decode!()
+  @weather @weather_path |> File.read!() |> Jason.decode!()
+  @climate_weather_entries_tuple :erlang.list_to_tuple(@weather)
+  @climate_weather_entry_count tuple_size(@climate_weather_entries_tuple)
   @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
   @shop_item_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "shop-item"))
   @furnace_level_rows Map.fetch!(@furnace, "levels")
@@ -51,10 +56,18 @@ defmodule Incrementalist.Game.Constants do
   def climate_game_day_start_hour, do: Map.fetch!(@climate, "game_day_start_hour")
   def climate_game_night_start_hour, do: Map.fetch!(@climate, "game_night_start_hour")
   def climate_days_per_season, do: Map.fetch!(@climate, "days_per_season")
-  def climate_rainfall_max_mm, do: Map.fetch!(@climate, "rainfall_max_mm")
-  def climate_rain_cooling_c, do: Map.fetch!(@climate, "rain_cooling_c")
+  def climate_rainfall_max_mm, do: climate_torrential_band_max_mm()
   def climate_rain_bands, do: Map.fetch!(@climate, "rain_bands")
   def climate_season_order, do: @climate_season_order
+  def climate_weather_entry_count, do: @climate_weather_entry_count
+
+  def climate_weather_entry(hour_index) when is_integer(hour_index) and hour_index >= 0 do
+    if @climate_weather_entry_count == 0 do
+      raise "weather.json must contain at least one weather entry"
+    end
+
+    elem(@climate_weather_entries_tuple, rem(hour_index, @climate_weather_entry_count))
+  end
 
   def climate_epoch_at do
     case Application.get_env(:incrementalist, :climate_epoch_override) do
@@ -192,6 +205,16 @@ defmodule Incrementalist.Game.Constants do
 
       :error ->
         Map.fetch!(@climate_season_lookup, hd(@climate_season_order))
+    end
+  end
+
+  defp climate_torrential_band_max_mm do
+    @climate
+    |> Map.fetch!("rain_bands")
+    |> Enum.find(&(&1["id"] == "torrential"))
+    |> case do
+      nil -> raise "climate.rain_bands must include a torrential band"
+      band -> Map.fetch!(band, "max_mm")
     end
   end
 

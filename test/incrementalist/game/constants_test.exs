@@ -57,10 +57,22 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert Constants.climate_game_day_start_hour() == 8
     assert Constants.climate_game_night_start_hour() == 20
     assert Constants.climate_days_per_season() == 84
-    assert Constants.climate_rainfall_max_mm() == 300
+    assert Constants.climate_rainfall_max_mm() == 350
     assert Constants.climate_season_order() == ["spring", "summer", "autumn", "winter"]
     assert Constants.climate_season_temperature_range("winter") == %{min_c: 10, max_c: 20}
-    assert Constants.climate_season_rain_chance_per_hour("autumn") == 0.09
+    assert Constants.climate_season_rain_chance_per_hour("autumn") == 0.18
+  end
+
+  test "climate weather lookup wraps by modulo" do
+    count = Constants.climate_weather_entry_count()
+    assert count > 0
+
+    first = Constants.climate_weather_entry(0)
+    wrapped = Constants.climate_weather_entry(count)
+
+    assert first == wrapped
+    assert is_number(Map.fetch!(first, "mm"))
+    assert is_number(Map.fetch!(first, "c"))
   end
 
   test "sisu levels load the shared upgrade table" do

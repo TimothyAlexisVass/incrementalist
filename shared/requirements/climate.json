@@ -6,8 +6,6 @@
   "game_day_start_hour": 8,
   "game_night_start_hour": 20,
   "days_per_season": 84,
-  "rainfall_max_mm": 300,
-  "rain_cooling_c": 1,
   "seasons": [
     {
       "id": "spring",
@@ -16,7 +14,7 @@
         "min_c": 18,
         "max_c": 30
       },
-      "rain_chance_per_hour": 0.08
+      "rain_chance_per_hour": 0.16
     },
     {
       "id": "summer",
@@ -25,7 +23,7 @@
         "min_c": 25,
         "max_c": 40
       },
-      "rain_chance_per_hour": 0.04
+      "rain_chance_per_hour": 0.8
     },
     {
       "id": "autumn",
@@ -34,7 +32,7 @@
         "min_c": 15,
         "max_c": 27
       },
-      "rain_chance_per_hour": 0.09
+      "rain_chance_per_hour": 0.18
     },
     {
       "id": "winter",
@@ -43,7 +41,7 @@
         "min_c": 10,
         "max_c": 20
       },
-      "rain_chance_per_hour": 0.05
+      "rain_chance_per_hour": 0.10
     }
   ],
   "rain_bands": [
@@ -74,13 +72,13 @@
       "id": "heavy",
       "min_mm": 50,
       "max_mm": 249,
-      "weight": 15
+      "weight": 20
     },
     {
       "id": "torrential",
       "min_mm": 250,
       "max_mm": 350,
-      "weight": 10
+      "weight": 5
     }
   ]
 }
