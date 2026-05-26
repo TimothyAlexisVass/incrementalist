@@ -10,6 +10,14 @@ function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
+function getRollingTierColor(now: number): string {
+  const step = Math.floor(now / 110);
+  const noise = Math.sin(step * 12.9898) * 43758.5453123;
+  const fraction = noise - Math.floor(noise);
+  const tier = 1 + Math.floor(fraction * 7);
+  return getTierConfig(tier)?.color || "#4a5568";
+}
+
 type JackpotMeterConfig = {
   game_rules: {
     jackpot_meter: {
@@ -83,9 +91,7 @@ export function renderJackpotMeter(
 
   // Determine progressive visual state
   let displayedProgress = data.currentProgress;
-  if (state === JackpotState.ROLLING) {
-    displayedProgress = Math.floor(now / 100) % 15; // 0 to 14
-  } else if (state === JackpotState.REVEALED && data.resultProgress !== null) {
+  if (state === JackpotState.REVEALED && data.resultProgress !== null) {
     displayedProgress = data.resultProgress;
   }
 
@@ -99,6 +105,8 @@ export function renderJackpotMeter(
   let instruction = "SPEND 1 DAILY TOKEN TO TRY YOUR LUCK!";
   if (!data.hasToken && data.specialTokens > 0) {
     instruction = "DAILY TOKEN REQUIRED (SPECIALS CANNOT BE USED)";
+  } else if (state === JackpotState.ROLLING) {
+    instruction = "ROLLING...";
   } else if (isGuaranteed) {
     instruction = "14TH PLAY: 100% GUARANTEED DIVINE REWARD!";
   } else {
@@ -201,12 +209,18 @@ export function renderJackpotMeter(
   let btnText = "TRY JACKPOT";
   let btnColor = "#3182ce";
   if (state === JackpotState.ROLLING) {
-    btnText = "ROLLING...";
-    const hue = (now % 1000) / 1000 * 360;
-    btnColor = `hsl(${hue}, 70%, 50%)`;
+    btnText = "";
+    btnColor = getRollingTierColor(now);
   } else if (state === JackpotState.REVEALED) {
-    btnText = "REWARD READY";
-    if (data.lastTier) {
+    if (data.lastTier === 7) {
+      btnText = "JACKPOT!";
+    } else if (data.lastTier !== null) {
+      btnText = `TIER ${data.lastTier} REWARD`;
+    } else {
+      btnText = "PEEK-A-BOO!";
+    }
+
+    if (data.lastTier !== null) {
       const config = getTierConfig(data.lastTier);
       btnColor = config?.color || "#48bb78";
     } else {

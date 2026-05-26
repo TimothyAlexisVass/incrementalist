@@ -6,6 +6,7 @@ export interface JackpotMeterData {
   specialTokens: number;
   lastTier: number | null;
   lastRewardAmount: BigNum | null;
+  lastPlayedAt: string | null;
   currentProgress: number;
   resultProgress: number | null;
   streak: number;
@@ -27,6 +28,7 @@ export function getJackpotMeterData(state: ServerState): JackpotMeterData | null
     specialTokens: db.special_tokens || 0,
     lastTier: isJackpotMeterResult ? lastRes?.tier ?? null : null,
     lastRewardAmount: isJackpotMeterResult ? lastRes?.reward_amount ?? null : null,
+    lastPlayedAt: isJackpotMeterResult ? lastRes?.played_at ?? null : null,
     currentProgress: db.jackpot_progress || 0,
     resultProgress,
     streak: db.streak || 0
