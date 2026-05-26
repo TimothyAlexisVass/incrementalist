@@ -976,6 +976,10 @@ function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, can
     Math.ceil(clipRect.width),
     Math.ceil(clipRect.height)
   );
+
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, drawCount * BUBBLE_FLOATS), gl.DYNAMIC_DRAW);
@@ -987,6 +991,9 @@ function renderLiquidBubbles(gl: WebGLRenderingContext, canvasWidth: number, can
     canvasHeight
   );
   gl.drawArrays(gl.POINTS, 0, drawCount);
+
+  // Restore standard blend mode for the rest of renderWebGLEffects
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.disable(gl.SCISSOR_TEST);
 }
 
