@@ -162,10 +162,10 @@ defmodule Incrementalist.Game.Features.Quests.Rules do
     clover_hunt = state.clover_hunt || %State.CloverHunt{}
 
     cond do
-      clover_hunt.seven_leaf_found -> 4
-      clover_hunt.six_leaf_found -> 3
-      (clover_hunt.five_leaf_found_count || 0) >= 1 -> 2
-      (clover_hunt.four_leaf_found_count || 0) >= 1 -> 1
+      clover_hunt.seven_leaf_found -> 7
+      clover_hunt.six_leaf_found -> 6
+      (clover_hunt.five_leaf_found_count || 0) >= 1 -> 5
+      (clover_hunt.four_leaf_found_count || 0) >= 1 -> 4
       true -> 0
     end
   end

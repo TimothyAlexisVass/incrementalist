@@ -63,6 +63,8 @@ export type QuestState = {
   max_rank: number;
   progress: number;
   claimed_rank: number;
+  requirement?: number | BigNum;
+  text?: string;
   fame?: BigNum;
   favor?: number;
 };
@@ -71,6 +73,7 @@ export type AchievementState = {
   name: string;
   multiplier: number;
   condition: string;
+  condition_text?: string;
   favor: number;
   unlocked_at: string | null;
 };

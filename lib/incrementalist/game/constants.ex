@@ -317,6 +317,7 @@ defmodule Incrementalist.Game.Constants do
       id: id,
       name: quest["name"],
       category: String.to_atom(category),
+      text: quest["text"],
       ranks: normalize_quest_ranks(id, quest["ranks"])
     }
   end
@@ -345,6 +346,7 @@ defmodule Incrementalist.Game.Constants do
       name: achievement["name"],
       multiplier: achievement["multiplier"],
       condition: achievement["condition"],
+      condition_text: achievement["condition_text"],
       favor: achievement["favor"] || 1
     }
   end

@@ -650,17 +650,24 @@ defmodule Incrementalist.Game.State do
       max_rank = Enum.max(Map.keys(quest_def.ranks))
 
       active_rank = min(claimed_rank + 1, max_rank)
+      active_rank_def = quest_def.ranks[active_rank]
 
       fame =
-        case quest_def.ranks[active_rank] do
+        case active_rank_def do
           nil -> BigNum.zero()
           rank_def -> rank_def.fame
         end
 
       favor =
-        case quest_def.ranks[active_rank] do
+        case active_rank_def do
           nil -> 0
           rank_def -> rank_def.favor || 1
+        end
+
+      requirement =
+        case active_rank_def do
+          nil -> 0
+          rank_def -> rank_def.requirement
         end
 
       {id,
@@ -671,6 +678,8 @@ defmodule Incrementalist.Game.State do
          "max_rank" => max_rank,
          "progress" => if(q, do: q.progress, else: 0.0),
          "claimed_rank" => claimed_rank,
+         "requirement" => requirement,
+         "text" => quest_def.text,
          "fame" => fame,
          "favor" => favor
        }}
@@ -688,6 +697,7 @@ defmodule Incrementalist.Game.State do
          "name" => achievement_def.name,
          "multiplier" => achievement_def.multiplier,
          "condition" => achievement_def.condition,
+         "condition_text" => achievement_def.condition_text,
          "favor" => achievement_def.favor || 1,
          "unlocked_at" => unlocked_at
        }}

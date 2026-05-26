@@ -4,6 +4,7 @@
     "name": "Graduated",
     "multiplier": 0.20,
     "condition": "tutorial_graduated",
+    "condition_text": "Complete the tutorial.",
     "favor": 1
   },
   {
@@ -11,6 +12,7 @@
     "name": "Newbie Incrementalist",
     "multiplier": 0.0005,
     "condition": "level_10",
+    "condition_text": "Reach Level 10.",
     "favor": 1
   },
   {
@@ -18,6 +20,7 @@
     "name": "Good Incrementalist",
     "multiplier": 0.0005,
     "condition": "level_20",
+    "condition_text": "Reach Level 20.",
     "favor": 1
   },
   {
@@ -25,6 +28,7 @@
     "name": "Better Incrementalist",
     "multiplier": 0.0005,
     "condition": "level_40",
+    "condition_text": "Reach Level 40.",
     "favor": 1
   },
   {
@@ -32,6 +36,7 @@
     "name": "First Rewards",
     "multiplier": 0.0005,
     "condition": "rewards_50",
+    "condition_text": "Claim 50 progress rewards.",
     "favor": 1
   },
   {
@@ -39,6 +44,7 @@
     "name": "More Rewards",
     "multiplier": 0.0005,
     "condition": "rewards_250",
+    "condition_text": "Claim 250 progress rewards.",
     "favor": 1
   },
   {
@@ -46,6 +52,7 @@
     "name": "Moar Rewards",
     "multiplier": 0.0005,
     "condition": "rewards_500",
+    "condition_text": "Claim 500 progress rewards.",
     "favor": 1
   },
   {
@@ -53,6 +60,7 @@
     "name": "Even More Rewards",
     "multiplier": 0.0005,
     "condition": "rewards_1000",
+    "condition_text": "Claim 1000 progress rewards.",
     "favor": 1
   },
   {
@@ -60,6 +68,7 @@
     "name": "High Roller",
     "multiplier": 0.0005,
     "condition": "coins_50000",
+    "condition_text": "Earn 50,000 total coins.",
     "favor": 1
   },
   {
@@ -67,6 +76,7 @@
     "name": "New Digit Unlocked!",
     "multiplier": 0.0005,
     "condition": "coins_100000",
+    "condition_text": "Earn 100,000 total coins.",
     "favor": 1
   },
   {
@@ -74,6 +84,7 @@
     "name": "First Shards",
     "multiplier": 0.0005,
     "condition": "shards_2500",
+    "condition_text": "Earn 2,500 total shards.",
     "favor": 1
   },
   {
@@ -81,6 +92,7 @@
     "name": "First Cores",
     "multiplier": 0.0005,
     "condition": "cores_100",
+    "condition_text": "Earn 100 total cores.",
     "favor": 1
   },
   {
@@ -88,6 +100,7 @@
     "name": "This Screen Is Boring",
     "multiplier": 0.0005,
     "condition": "screens_viewed_stats",
+    "condition_text": "View the stats screen.",
     "favor": 1
   },
   {
@@ -95,6 +108,7 @@
     "name": "More Tasks, YAY!",
     "multiplier": 0.0005,
     "condition": "screens_viewed_quests",
+    "condition_text": "View the quests screen.",
     "favor": 1
   },
   {
@@ -102,6 +116,7 @@
     "name": "This is An Achievement!",
     "multiplier": 0.0005,
     "condition": "screens_viewed_achievements",
+    "condition_text": "View the achievements screen.",
     "favor": 1
   }
 ]

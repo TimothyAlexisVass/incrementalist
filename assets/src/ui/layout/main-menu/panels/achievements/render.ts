@@ -46,7 +46,7 @@ export function renderAchievementsTab(
     color: hexToRgba(COLORS.panel.bg)
   });
 
-  const allAchievements = getAchievementViewModel(snapshot);
+  const allAchievements = getAchievementViewModel(snapshot, (leafId) => notices.hasLeafNotice(leafId));
   const totalMultiplier = allAchievements
     .filter(a => a.unlocked_at)
     .reduce((sum, a) => sum + a.multiplier, 0);

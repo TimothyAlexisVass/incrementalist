@@ -24,7 +24,7 @@ export function drawAchievementCard(
   const isUnlocked = achievement.unlocked_at !== null;
   const bgColor = hexToRgba(isUnlocked ? COLORS.panel.bg : '#0a0a0a');
   const borderColor = hexToRgba(isUnlocked ? COLORS.panel.border : '#2a2a2a');
-  const textColor = isUnlocked ? COLORS.panel.textPrimary : COLORS.panel.textDisabled;
+  const textColor = '#ffffff';
 
   // Background
   renderer.drawRect({
@@ -54,11 +54,11 @@ export function drawAchievementCard(
 
   // Condition
   renderer.drawText({
-    text: getConditionText(achievement.condition),
+    text: achievement.condition_text || achievement.condition,
     x: rect.x + 15,
     y: rect.y + 40,
     font: '400 13px "Inter"',
-    color: isUnlocked ? COLORS.panel.textSecondary : COLORS.panel.textDisabled,
+    color: '#ffffff',
     align: 'left',
     baseline: 'top'
   });
@@ -70,7 +70,7 @@ export function drawAchievementCard(
     x: rect.x + rect.width - 15,
     y: rect.y + rect.height / 2,
     font: '500 14px "Inter"',
-    color: isUnlocked ? '#ffd700' : COLORS.panel.textDisabled,
+    color: '#ffffff',
     align: 'right',
     baseline: 'middle'
   });
@@ -90,25 +90,4 @@ export function getAchievementNoticeAnchor(rect: { x: number; y: number; width: 
     y: rect.y + 8,
     radius: 5
   };
-}
-
-function getConditionText(condition: string): string {
-  switch (condition) {
-    case "tutorial_graduated": return "Complete the tutorial.";
-    case "level_10": return "Reach Level 10.";
-    case "level_20": return "Reach Level 20.";
-    case "level_40": return "Reach Level 40.";
-    case "rewards_50": return "Claim 50 progress rewards.";
-    case "rewards_250": return "Claim 250 progress rewards.";
-    case "rewards_500": return "Claim 500 progress rewards.";
-    case "rewards_1000": return "Claim 1000 progress rewards.";
-    case "coins_50000": return "Earn 50,000 lifetime coins.";
-    case "coins_100000": return "Earn 100,000 lifetime coins.";
-    case "shards_2500": return "Earn 2,500 lifetime shards.";
-    case "cores_100": return "Earn 100 lifetime cores.";
-    case "screens_viewed_stats": return "View the stats screen.";
-    case "screens_viewed_quests": return "View the quests screen.";
-    case "screens_viewed_achievements": return "View the achievements screen.";
-    default: return condition;
-  }
 }

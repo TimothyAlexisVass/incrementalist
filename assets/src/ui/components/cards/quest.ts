@@ -2,6 +2,8 @@ import { COLORS } from '../../../colors';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { QuestState } from '../../../net/protocol';
 import { GameChannel } from '../../../net/game-channel';
+import { formatNumber } from '../../../utils';
+import { hexToRgba } from '../../../utils/color';
 import { notices } from '../../managers/notices';
 import { drawNoticeDot } from '../button';
 import { drawHorizontalBar } from '../bar';
@@ -29,7 +31,7 @@ export function drawQuestCard(options: QuestCardOptions) {
     y: rect.y,
     width: rect.width,
     height: rect.height,
-    color: [0.15, 0.15, 0.2, 1.0] as const
+    color: hexToRgba(COLORS.panel.bg)
   });
 
   // Border
@@ -45,7 +47,7 @@ export function drawQuestCard(options: QuestCardOptions) {
     x: rect.x + 12,
     y: rect.y + 12,
     font: 'bold 16px Arial',
-    color: COLORS.panel.textPrimary,
+    color: '#ffffff',
     align: 'left',
     baseline: 'top'
   });
@@ -56,7 +58,7 @@ export function drawQuestCard(options: QuestCardOptions) {
     x: rect.x + rect.width - 12,
     y: rect.y + 12,
     font: '12px Arial',
-    color: COLORS.panel.textSecondary,
+    color: '#ffffff',
     align: 'right',
     baseline: 'top'
   });
@@ -82,6 +84,19 @@ export function drawQuestCard(options: QuestCardOptions) {
       borderWidth: 1
     }
   );
+
+  const requirementText = getQuestRequirementText(quest);
+  if (requirementText) {
+    renderer.drawText({
+      text: requirementText,
+      x: rect.x + 12,
+      y: rect.y + rect.height - 12,
+      font: '400 13px "Inter"',
+      color: '#ffffff',
+      align: 'left',
+      baseline: 'bottom'
+    });
+  }
 
   // Claim Button or Status
   if (canClaim) {
@@ -124,7 +139,7 @@ export function drawQuestCard(options: QuestCardOptions) {
       x: rect.x + rect.width - 12,
       y: rect.y + rect.height - 12,
       font: 'italic 12px Arial',
-      color: '#999999',
+      color: '#ffffff',
       align: 'right',
       baseline: 'bottom'
     });
@@ -136,7 +151,7 @@ export function drawQuestCard(options: QuestCardOptions) {
       x: rect.x + rect.width - 12,
       y: rect.y + rect.height - 12,
       font: '12px Arial',
-      color: COLORS.panel.textSecondary,
+      color: '#ffffff',
       align: 'right',
       baseline: 'bottom'
     });
@@ -175,4 +190,18 @@ export function getQuestNoticeAnchor(rect: { x: number; y: number; width: number
     y: claimRect.y + 4,
     radius: 5
   };
+}
+
+function getQuestRequirementText(quest: QuestState): string {
+  const requirement = quest.requirement;
+  if (requirement === undefined) return '';
+
+  const requirementTextTemplate = quest.text;
+  const formattedRequirement = formatNumber(requirement);
+
+  if (!requirementTextTemplate) {
+    return `Requirement: ${formattedRequirement}`;
+  }
+
+  return requirementTextTemplate.replace('%{requirement}', formattedRequirement);
 }
