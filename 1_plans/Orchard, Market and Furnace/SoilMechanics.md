@@ -56,6 +56,10 @@ Then:
 ### Decomposition cap rule
 If `organic_matter >= 2000`, player cannot choose "leave plant matter to decompose".
 
+### Soil conversion rules
+- Decomposition gain: `+0.2 phosphorus` per `1` plant matter decomposed.
+- Ash enrichment gain: `+2 potassium` per `1` ash applied.
+
 ## Soil Projection Algorithm (Hourly)
 Use server-hour boundaries only.
 
@@ -85,8 +89,16 @@ Add orchard fields to `shared/requirements/orchard.json` and expose them via ser
 - Soil defaults
 - Organic matter max
 - Base dry-down rate
-- Rain-to-water gain scale
 - Nutrient leach coefficients (N/K baseline, P half-rate multiplier, organic-matter leach multiplier)
+
+Numeric tuning values:
+- Rain-to-water conversion is fixed at `1:1` (`rain_mm` adds directly to `water_level`); no coefficient.
+- Base water decrement per hour: `6` water
+- N/K leach coefficient: `0.1` per `1` effective water loss
+- Organic-matter leach coefficient: `0.05` per `1` effective water loss
+- P leach multiplier: `0.5` of N/K coefficient
+- Decomposition gain: `+0.2 phosphorus` per `1` plant matter decomposed
+- Ash enrichment gain: `+2 potassium` per `1` ash applied
 
 No inline gameplay magic numbers in feature modules.
 
@@ -154,10 +166,3 @@ TypeScript requirement:
 6. Add orchard soil UI and OM-max decomposition guard.
 7. Add backend/frontend tests.
 8. Run checks (`mix test` target set + `tsc --noEmit`).
-
-## Deferred Decisions (Explicitly not assumed here)
-Before coding, confirm numeric tuning values for:
-- Base dry-down per hour
-- Rain-to-water conversion
-- N/K leach coefficient
-- Organic-matter leach coefficient
