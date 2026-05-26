@@ -85,17 +85,18 @@ Each plant should have:
 | `nitrogen`  | {min: integer, max: integer} or null, min decides minimum required to plant seed (planting will remove half as much N), max determines cap of baseGrowthTime effect while that much N is in the soil during growth. null means unaffected by nitrogen levels |
 | `phosphorus`  | {min: integer, max: integer} or null, min decides minimum required to plant seed (planting will remove half as much P), max determines cap of harvestAmount effect while that much P is in the soil during growth. null means unaffected by phosphorus levels |
 | `potassium` | {min: integer, max: integer} min decides minimum required to plant seed (planting will remove half as much K), max determines cap of growthSpeed, harvestAmount and seedPerFruit effects while that much K is in the soil during growth. null means unaffected by potassium levels |
+| `minOrganic` | Organic matter required to plant |
 | `minDepth` | Plot depth required to plant |
 | `minTemp` | Growth stops below temperature |
 | `minWater` | Growth stops below water amount |
 | `level` | Affects baseGrowthTime, harvestAmount, seedPerFruit, nitrogen, phosphorus, potassium, minTemp, minWater |
 
 v1 Plants:
-Clovers => seed: clover_seeds, size: 2, plantType: herbaceous, baseGrowthTime: 100, seedsToPlant: 50, harvestType: seed, seedAmount: {"20": 40, "30": 20, "40": 20, "50": 10, "75": 5, "100": 5}, havestAmount: null, fruit: null, seedPerFruit: null, nitrogenFixing: 2, nitrogen: null, phosphorus: null, potassium: null, minDepth: 0, minTemp: 0, minWater: 1, level: 1
+Clovers => seed: clover_seeds, size: 2, plantType: herbaceous, baseGrowthTime: 100, seedsToPlant: 50, harvestType: seed, seedAmount: {"20": 40, "30": 20, "40": 20, "50": 10, "75": 5, "100": 5}, havestAmount: null, fruit: null, seedPerFruit: null, nitrogenFixing: 2, nitrogen: null, phosphorus: null, potassium: null, minOrganic: 5, minDepth: 0, minTemp: 0, minWater: 1, level: 1
 
-Oak => seed: acorn, plantType: tree, size: 50, baseGrowthTime: 50, seedsToPlant: 1, harvestType: seed, seedAmount: {"0": 50, "1": 45, "2": 5}, harvestAmount: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 4, phosphorus: null, potassium: 1, minDepth: 1, minTemp: 15, minWater: 2, level: 1
+Oak => seed: acorn, plantType: tree, size: 50, baseGrowthTime: 50, seedsToPlant: 1, harvestType: seed, seedAmount: {"0": 50, "1": 45, "2": 5}, harvestAmount: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 4, phosphorus: null, potassium: 1, minOrganic: 10, minDepth: 1, minTemp: 15, minWater: 2, level: 1
 
-Coin Tree => seed: coin_tree_seed, size: 20, plantType: tree, baseGrowthTime: 20, seedsToPlant: 1, harvestType: resource, seedAmount: {"0": 60, "1": 20, "2": 15, "3": 5}, harvestAmount: {"1000-3000": 70, "3001-8000": 25, "8001-20000": 5}, fruit: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 2, phosphorus: 2, potassium: 2, minDepth: 2, minTemp: 18, minWater: 2
+Coin Tree => seed: coin_tree_seed, size: 20, plantType: tree, baseGrowthTime: 20, seedsToPlant: 1, harvestType: resource, seedAmount: {"0": 60, "1": 20, "2": 15, "3": 5}, harvestAmount: {"1000-3000": 70, "3001-8000": 25, "8001-20000": 5}, fruit: null, seedPerFruit: null, nitrogenFixing: 0, nitrogen: 2, phosphorus: 2, potassium: 2, minOrganic: 0, minDepth: 2, minTemp: 18, minWater: 2
 
 ---
 
@@ -140,7 +141,6 @@ All properties apply to the entire orchard except for Depth which is plot specif
 | **Water**          | Increases during rain, decreases every real-time hour when not raining |
 
 Organic matter, Phosphorus, Potassium and Water decrease every real-time hour when it is not raining.
-Nitrogen decreases only when no nitrogen fixers are growing.
 Phosphorous leaches half as fast as Potassium and Nitrogen.
 At the point where the furnace is upgraded to Clean Smelter, burning stops and the only way to get Potassium will be to research improved composting. We will defer that specific part, as the research part of the game is not yet planned.
 

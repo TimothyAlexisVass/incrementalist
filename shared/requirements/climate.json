@@ -55,27 +55,32 @@
     {
       "id": "very_light",
       "min_mm": 1,
-      "max_mm": 4
+      "max_mm": 4,
+      "weight": 20
     },
     {
       "id": "light",
       "min_mm": 5,
-      "max_mm": 15
+      "max_mm": 15,
+      "weight": 30
     },
     {
       "id": "moderate",
       "min_mm": 16,
-      "max_mm": 49
+      "max_mm": 49,
+      "weight": 25
     },
     {
       "id": "heavy",
       "min_mm": 50,
-      "max_mm": 249
+      "max_mm": 249,
+      "weight": 15
     },
     {
       "id": "torrential",
       "min_mm": 250,
-      "max_mm": 300
+      "max_mm": 350,
+      "weight": 10
     }
   ]
 }
