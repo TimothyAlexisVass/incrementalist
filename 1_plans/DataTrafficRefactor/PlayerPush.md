@@ -1,24 +1,23 @@
 # Player Push Plan
 
 ## Goal
-Move recurring per-player projection updates to server push, while keeping durable gameplay transitions in command/result.
+Move recurring per-player non-durable projection updates to server push, while keeping durable gameplay transitions in command/result.
 
-## Scope (Feature Mapping)
+## Scope (Aligned to MasterPlan)
 Move these fields/features to `player push`:
-- `projection_params` (`current_fill`, `can_claim_at`, `current_sisu`, `current_sisu_decay`, `sisu_at_claim`, `sisu_decay_at_claim`)
-- `soil` visible state (hourly UTC projection)
-- `sisu` visible state where needed for projection consistency
-- `has_bonustime_token` boundary grant visibility
-- Optional: minimal `bonustime` projection fields affected by boundaries
 - `server_time`
+- `soil` visible state (full payload every tick)
+- `has_bonustime_token` (change-only: include only when value changed)
+- Optional future recurring per-player visible fields only when they are non-durable and server-owned
 
 Keep these out of player push:
+- `projection_params` (remains command-driven and out of scope for push lanes)
 - Purchases, claims, upgrades, unlocks, quest/achievement grants, RNG outcomes
 - Queue/ACK lifecycle data
 
 ## Current Pull Paths Being Replaced
 - Client hourly `time.sync` loop
-- Client `progress.claim_in` verification loop for recurring projection refresh
+- Any command-based recurring projection polling used only as background refresh
 
 ## Event Contract (v1)
 Event name: `player.projection.tick`
@@ -26,34 +25,36 @@ Event name: `player.projection.tick`
 Payload:
 - `type: "player.projection.tick"`
 - `server_time: ISO8601 UTC`
-- `projection_params`
-- `soil`
-- `sisu`
-- `has_bonustime_token`
-- optional `bonustime` subset (only if boundary-changed and visible)
+- `soil` (full payload every tick)
+- optional `has_bonustime_token` (only when changed)
+- optional future recurring visible projection fields (non-durable only)
 
 Rules:
 - No ACK
 - Merge-only update
-- Ignore stale events by `server_time`
+- Ignore stale events only when `server_time` is strictly older (`<`)
+- Equal `server_time` is valid and must be accepted
 
 ## Cadence
-- Hourly UTC climate boundary for soil/projection refresh.
-- BonusTime boundaries when personal visible state changes (token grant/rotation-dependent projection).
-- Optional additional server-owned recurrence boundaries only when they mutate visible per-player projection.
+- UTC minute boundaries only (`...:00.000Z` absolute time)
+- Not process-relative 60s intervals
 
 ## Backend Work
-1. In `PlayerServer`, schedule per-player tick generation on recurrence boundaries.
-2. Reuse existing projection functions (`State.projection_params`, `OrchardSoil.project_state`) for payload shaping.
-3. Route pushes through channel process (no command queue impact).
+1. In `PlayerServer`, schedule per-player minute ticks at absolute UTC minute boundaries.
+2. Build payload from authoritative projected state (`OrchardSoil.project_state` -> visible `soil`).
+3. Track last pushed token state and include `has_bonustime_token` only when changed.
+4. Route pushes via PubSub + channel `push/3` (not `phx_reply`), without touching command queue semantics.
+5. Keep command pipeline unchanged (dedupe/FIFO/replay/ACK gating remain authoritative).
 
 ## Frontend Work
 1. Add typed handling for `player.projection.tick`.
-2. Apply through centralized authoritative/projection merge path.
+2. Apply through centralized merge path (`applyPushEvent` -> `applyAuthoritativeData`), no ad-hoc mutations.
 3. Keep `synchronize(server_time)` on each push.
-4. Remove/disable command-based recurring polling only after soak.
+4. Immediate cutover: remove hourly `time.sync` fallback and dead recurring refresh polling in the same change.
+5. Keep claim resolution behavior unchanged: when `progress.claim_reward` returns `claim_not_ready`, continue waiting/retrying using `can_claim_in` until non-error result.
 
 ## Acceptance
-- Idle connected player sees bar/soil/token projection advance without sending commands.
+- Idle connected player sees `soil` and token visibility updates without sending commands.
 - Progress reward claim flow remains non-blocking and still retries on `claim_not_ready` using `can_claim_in`.
+- Pending claim resolution does not exit early; progress bar remains visually at `0%` during the wait window.
 - No durable state transition occurs from push events.
