@@ -1,5 +1,6 @@
 import {
   isGlobalTickEvent,
+  isPlayerProjectionTickEvent,
   type BootResult,
   type CommandAckResult,
   type ServerPushEvent,
@@ -195,6 +196,11 @@ export class GameChannel {
 
     if (eventName === "global.tick") {
       if (isGlobalTickEvent(payload)) this.onPushEvent?.(payload);
+      return;
+    }
+
+    if (eventName === "player.projection.tick") {
+      if (isPlayerProjectionTickEvent(payload)) this.onPushEvent?.(payload);
       return;
     }
 

@@ -41,6 +41,29 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert_in_delta BigNum.to_float(projected.organic_matter), 0.0, 1.0e-9
   end
 
+  test "minute projection accumulates fractional dry-down without losing precision" do
+    {start_time, minute_now} = first_minute_window(fn mm -> mm == 0 end)
+
+    state =
+      State.new(start_time)
+      |> with_soil(%SoilState{
+        water_level: 100.0,
+        nitrogen: BigNum.from_number(10),
+        phosphorus: BigNum.from_number(10),
+        potassium: BigNum.from_number(10),
+        organic_matter: BigNum.from_number(0),
+        projected_at: Time.iso8601(start_time)
+      })
+
+    projected = Soil.project_state(state, minute_now).soil
+
+    assert_in_delta projected.water_level, 99.9, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.nitrogen), 9.99, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.phosphorus), 9.995, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.potassium), 9.99, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.organic_matter), 0.0, 1.0e-9
+  end
+
   test "rain hour below cap does not leach nutrients or organic matter" do
     {start_time, now} = first_hour_window(fn mm -> mm > 0 and mm <= 30 end)
 
@@ -112,6 +135,37 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert once.soil.projected_at == twice.soil.projected_at
   end
 
+  test "4h3m catch-up matches four hour-steps plus three minute-steps" do
+    {start_time, _} = first_hour_window(fn _mm -> true end)
+    four_hours_ms = 4 * Constants.climate_hour_ms()
+    three_minutes_ms = 3 * 60_000
+    now = DateTime.add(start_time, four_hours_ms + three_minutes_ms, :millisecond)
+
+    state =
+      State.new(start_time)
+      |> with_soil(%SoilState{
+        water_level: 110.0,
+        nitrogen: BigNum.from_number(50),
+        phosphorus: BigNum.from_number(50),
+        potassium: BigNum.from_number(50),
+        organic_matter: BigNum.from_number(300),
+        projected_at: Time.iso8601(start_time)
+      })
+
+    direct = Soil.project_state(state, now).soil
+
+    after_hours_at = DateTime.add(start_time, four_hours_ms, :millisecond)
+    after_hours_state = Soil.project_state(state, after_hours_at)
+    split = Soil.project_state(after_hours_state, now).soil
+
+    assert split.water_level == direct.water_level
+    assert BigNum.compare(split.nitrogen, direct.nitrogen) == 0
+    assert BigNum.compare(split.phosphorus, direct.phosphorus) == 0
+    assert BigNum.compare(split.potassium, direct.potassium) == 0
+    assert BigNum.compare(split.organic_matter, direct.organic_matter) == 0
+    assert split.projected_at == direct.projected_at
+  end
+
   defp with_soil(%State{} = state, %SoilState{} = soil), do: %{state | soil: soil}
 
   defp first_hour_window(mm_predicate, hour_span \\ 1) do
@@ -131,6 +185,13 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
 
     start_time = DateTime.add(epoch, hour_index * hour_ms, :millisecond)
     now = DateTime.add(start_time, hour_span * hour_ms, :millisecond)
+    {start_time, now}
+  end
+
+  defp first_minute_window(mm_predicate) do
+    {start_time, _hour_now} = first_hour_window(mm_predicate, 1)
+    minute_ms = 60_000
+    now = DateTime.add(start_time, minute_ms, :millisecond)
     {start_time, now}
   end
 end

@@ -856,7 +856,7 @@ defmodule Incrementalist.Game.CommandExecutor do
             true ->
               # Standard single-step play OR Step 1 of Coin Rain / Match Pairs
               with {:ok, next_state, token_type} <-
-                     BonusTime.spend_token_for_game(ps.state, game_id) do
+                     BonusTime.spend_token_for_game(ps.state, game_id, now) do
                 next_state =
                   if token_type == "daily" do
                     new_bonustime = %{
@@ -1375,7 +1375,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         else
           with {:ok, held_indexes} <- fetch_held_indexes(intent_map),
                {:ok, next_state, token_type} <-
-                 BonusTime.spend_token_for_game(ps.state, "lucky_dice") do
+                 BonusTime.spend_token_for_game(ps.state, "lucky_dice", now) do
             next_state =
               if token_type == "daily" do
                 new_bonustime = %{

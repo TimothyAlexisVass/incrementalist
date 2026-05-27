@@ -170,7 +170,7 @@ defmodule Incrementalist.Game.State do
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      field :water_level, :integer, default: 0
+      field :water_level, :float, default: 0.0
       embeds_one :nitrogen, BigNum, on_replace: :update
       embeds_one :phosphorus, BigNum, on_replace: :update
       embeds_one :potassium, BigNum, on_replace: :update
@@ -513,7 +513,7 @@ defmodule Incrementalist.Game.State do
         phosphorus: Constants.orchard_soil_default_phosphorus(),
         potassium: Constants.orchard_soil_default_potassium(),
         organic_matter: Constants.orchard_soil_default_organic_matter(),
-        projected_at: climate_hour_boundary_iso(now)
+        projected_at: utc_minute_boundary_iso(now)
       },
       quests: [],
       achievements: %{},
@@ -559,8 +559,7 @@ defmodule Incrementalist.Game.State do
               last_reset_at: Time.iso8601(now)
           }
 
-          # Authoritatively grant a new daily token on the day roll-over
-          %{state | stats: new_stats, has_bonustime_token: true}
+          %{state | stats: new_stats}
         else
           state
         end
@@ -568,6 +567,24 @@ defmodule Incrementalist.Game.State do
       _ ->
         state
     end
+  end
+
+  def has_bonustime_token_available?(%__MODULE__{} = state, now) do
+    state.has_bonustime_token ||
+      bonustime_boundary_index(now) > bonustime_last_boundary_index(state)
+  end
+
+  def consume_bonustime_daily_token(%__MODULE__{} = state, now) do
+    bonustime = state.bonustime || %BonusTime{}
+    boundary_index = bonustime_boundary_index(now)
+    last_boundary_index = bonustime.last_token_boundary_index || 0
+
+    new_bonustime = %{
+      bonustime
+      | last_token_boundary_index: max(last_boundary_index, boundary_index)
+    }
+
+    %{state | has_bonustime_token: false, bonustime: new_bonustime}
   end
 
   def touch_saved_at(nil, now), do: new(now)
@@ -667,7 +684,7 @@ defmodule Incrementalist.Game.State do
       "quests" => visible_quests(projected_state.quests),
       "achievements" => visible_achievements(projected_state.achievements),
       "stats" => projected_state.stats,
-      "has_bonustime_token" => projected_state.has_bonustime_token,
+      "has_bonustime_token" => has_bonustime_token_available?(projected_state, now),
       "bonustime" =>
         if(projected_state.bonustime,
           do:
@@ -679,6 +696,21 @@ defmodule Incrementalist.Game.State do
         ),
       "projection_params" => projection_params(projected_state, now)
     }
+  end
+
+  defp bonustime_boundary_index(%DateTime{} = now) do
+    anchor_ms = Constants.bonustime_rotation_anchor_at() |> Time.to_unix_ms()
+    now_ms = Time.to_unix_ms(now)
+    elapsed = max(0, now_ms - anchor_ms)
+    div(elapsed, Constants.bonustime_slot_ms())
+  end
+
+  defp bonustime_last_boundary_index(%__MODULE__{} = state) do
+    if state.bonustime do
+      state.bonustime.last_token_boundary_index || 0
+    else
+      0
+    end
   end
 
   def visible_quests(quests) do
@@ -779,11 +811,11 @@ defmodule Incrementalist.Game.State do
 
   defp parse_iso_ms(_), do: nil
 
-  defp climate_hour_boundary_iso(%DateTime{} = now) do
+  defp utc_minute_boundary_iso(%DateTime{} = now) do
     now
     |> Time.to_unix_ms()
-    |> div(Constants.climate_hour_ms())
-    |> Kernel.*(Constants.climate_hour_ms())
+    |> div(60_000)
+    |> Kernel.*(60_000)
     |> DateTime.from_unix!(:millisecond)
     |> Time.iso8601()
   end

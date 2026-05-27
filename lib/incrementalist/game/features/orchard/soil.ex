@@ -2,12 +2,13 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
   @moduledoc """
   Server-authoritative Orchard soil projection.
 
-  Soil is projected in whole climate-hour steps (UTC) and only loses nutrients
-  and organic matter when water is lost (dry-down or overflow).
+  Soil is projected in whole UTC minute steps and only loses nutrients and
+  organic matter when water is lost (dry-down or overflow).
   """
 
   alias Incrementalist.Game.{Constants, State, Time}
   alias Incrementalist.Game.State.Soil, as: SoilState
+  @minute_ms 60_000
 
   def project_state(%State{} = state, now) do
     normalized = normalize_soil(state.soil, now)
@@ -21,7 +22,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     water_cap = water_cap_from_organic_matter(normalized.organic_matter)
 
     %{
-      "water" => clamp_water_level(normalized.water_level, water_cap),
+      "water" => normalized.water_level,
       "water_cap" => water_cap,
       "nitrogen" => normalized.nitrogen,
       "phosphorus" => normalized.phosphorus,
@@ -48,29 +49,40 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
   defp project_soil(%SoilState{} = soil, now) do
     hour_ms = Constants.climate_hour_ms()
-    projected_at = parse_projected_at(soil.projected_at, now, hour_ms)
+    projected_at = parse_projected_at(soil.projected_at, now, @minute_ms)
     projected_at_ms = Time.to_unix_ms(projected_at)
     now_ms = Time.to_unix_ms(now)
 
-    elapsed_hours =
+    elapsed_minutes =
       now_ms
       |> Kernel.-(projected_at_ms)
-      |> div(hour_ms)
+      |> div(@minute_ms)
       |> max(0)
 
-    if elapsed_hours <= 0 do
+    if elapsed_minutes <= 0 do
       %{soil | projected_at: Time.iso8601(projected_at)}
     else
-      result =
-        Enum.reduce(0..(elapsed_hours - 1), soil, fn hour_offset, current ->
+      elapsed_full_hours = div(elapsed_minutes, 60)
+      elapsed_remaining_minutes = rem(elapsed_minutes, 60)
+
+      after_hours =
+        apply_steps(soil, elapsed_full_hours, fn hour_offset, current ->
           hour_start_ms = projected_at_ms + hour_offset * hour_ms
           project_single_hour(current, hour_start_ms)
+        end)
+
+      minutes_base_ms = projected_at_ms + elapsed_full_hours * hour_ms
+
+      result =
+        apply_steps(after_hours, elapsed_remaining_minutes, fn minute_offset, current ->
+          minute_start_ms = minutes_base_ms + minute_offset * @minute_ms
+          project_single_minute(current, minute_start_ms)
         end)
 
       %{
         result
         | projected_at:
-            Time.iso8601(DateTime.add(projected_at, elapsed_hours * hour_ms, :millisecond))
+            Time.iso8601(DateTime.add(projected_at, elapsed_minutes * @minute_ms, :millisecond))
       }
     end
   end
@@ -82,7 +94,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
     runoff_rate = runoff_rate_from_organic_matter(soil.organic_matter)
     water_cap = water_cap_from_organic_matter(soil.organic_matter)
-    current_water = number(clamp_water_level(soil.water_level, water_cap))
+    current_water = clamp_number(soil.water_level, 0.0, number(water_cap))
 
     {next_water, water_lost} =
       if rain_mm > 0.0 do
@@ -105,7 +117,40 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
         }
       end
 
-    apply_water_loss(%{soil | water_level: trunc(Float.round(next_water))}, water_lost)
+    apply_water_loss(%{soil | water_level: next_water}, water_lost)
+  end
+
+  defp project_single_minute(%SoilState{} = soil, minute_start_ms) do
+    hour_index = climate_hour_index(minute_start_ms)
+    weather_entry = Constants.climate_weather_entry(hour_index)
+    rain_mm_per_minute = max(0.0, number(Map.get(weather_entry, "mm")) / 60.0)
+
+    runoff_rate = runoff_rate_from_organic_matter(soil.organic_matter)
+    water_cap = water_cap_from_organic_matter(soil.organic_matter)
+    current_water = clamp_number(soil.water_level, 0.0, number(water_cap))
+
+    {next_water, water_lost} =
+      if rain_mm_per_minute > 0.0 do
+        rain_ratio = Constants.orchard_soil_rain_mm_to_water_ratio()
+        gained_water = rain_mm_per_minute * number(rain_ratio)
+        water_after_rain = current_water + gained_water
+        overflow_loss = max(0.0, water_after_rain - water_cap)
+
+        {
+          clamp_number(water_after_rain - overflow_loss, 0.0, water_cap),
+          overflow_loss
+        }
+      else
+        dry_down_loss = Constants.orchard_soil_base_dry_down_per_hour() * runoff_rate / 60.0
+        effective_loss = min(current_water, max(0.0, dry_down_loss))
+
+        {
+          clamp_number(current_water - effective_loss, 0.0, water_cap),
+          effective_loss
+        }
+      end
+
+    apply_water_loss(%{soil | water_level: next_water}, water_lost)
   end
 
   defp apply_water_loss(%SoilState{} = soil, water_lost) when water_lost <= 0.0 do
@@ -150,8 +195,10 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
     water_cap = water_cap_from_organic_matter(normalized_organic_matter)
 
+    clamped_water = clamp_number(number(soil.water_level), 0.0, number(water_cap))
+
     %SoilState{
-      water_level: clamp_water_level(soil.water_level, water_cap),
+      water_level: clamped_water,
       nitrogen: normalized_nitrogen,
       phosphorus:
         soil.phosphorus
@@ -162,21 +209,20 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
         |> normalize_big_num(Constants.orchard_soil_default_potassium())
         |> clamp_big_num_non_negative(),
       organic_matter: normalized_organic_matter,
-      projected_at:
-        Time.iso8601(parse_projected_at(soil.projected_at, now, Constants.climate_hour_ms()))
+      projected_at: Time.iso8601(parse_projected_at(soil.projected_at, now, @minute_ms))
     }
   end
 
   defp parse_projected_at(value, now, hour_ms) when is_binary(value) do
     case Time.from_iso8601(value) do
-      {:ok, dt} -> clamp_to_hour_boundary(dt, hour_ms)
-      _ -> clamp_to_hour_boundary(now, hour_ms)
+      {:ok, dt} -> clamp_to_boundary(dt, hour_ms)
+      _ -> clamp_to_boundary(now, hour_ms)
     end
   end
 
-  defp parse_projected_at(_value, now, hour_ms), do: clamp_to_hour_boundary(now, hour_ms)
+  defp parse_projected_at(_value, now, hour_ms), do: clamp_to_boundary(now, hour_ms)
 
-  defp clamp_to_hour_boundary(%DateTime{} = dt, hour_ms) do
+  defp clamp_to_boundary(%DateTime{} = dt, hour_ms) do
     dt
     |> Time.to_unix_ms()
     |> div(hour_ms)
@@ -191,14 +237,6 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     |> Kernel.-(epoch_ms)
     |> div(Constants.climate_hour_ms())
     |> max(0)
-  end
-
-  defp clamp_water_level(value, cap) do
-    value
-    |> number()
-    |> clamp_number(0.0, number(cap))
-    |> Float.round()
-    |> trunc()
   end
 
   defp clamp_big_num_non_negative(%BigNum{} = value) do
@@ -245,6 +283,14 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     value
     |> max(min_value)
     |> min(max_value)
+  end
+
+  defp apply_steps(value, step_count, _fun) when step_count <= 0, do: value
+
+  defp apply_steps(value, step_count, fun) when is_integer(step_count) do
+    Enum.reduce(0..(step_count - 1), value, fn offset, current ->
+      fun.(offset, current)
+    end)
   end
 
   defp number(value) when is_integer(value), do: value * 1.0

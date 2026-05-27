@@ -25,4 +25,38 @@ defmodule IncrementalistWeb.GameChannelTest do
 
     assert_push "global.tick", ^payload
   end
+
+  test "forwards player.projection.tick payloads to joined clients" do
+    player = Sessions.authenticate_player(nil, @now)
+
+    token = Phoenix.Token.sign(IncrementalistWeb.Endpoint, "player_auth", player.id)
+
+    {:ok, socket} =
+      connect(UserSocket, %{"token" => token, "cache_username" => player.username})
+
+    {:ok, _boot, _channel_socket} = subscribe_and_join(socket, GameChannel, "game", %{})
+
+    payload = %{
+      "type" => "player.projection.tick",
+      "server_time" => DateTime.to_iso8601(@now),
+      "soil" => %{
+        "water" => 0,
+        "water_cap" => 100,
+        "nitrogen" => %{"m" => 1.0, "e" => 0},
+        "phosphorus" => %{"m" => 1.0, "e" => 0},
+        "potassium" => %{"m" => 1.0, "e" => 0},
+        "organic_matter" => %{"m" => 1.0, "e" => 0},
+        "organic_matter_cap" => 1000.0
+      },
+      "has_bonustime_token" => true
+    }
+
+    Phoenix.PubSub.broadcast(
+      Incrementalist.PubSub,
+      "game:player:#{player.id}",
+      {:player_projection_tick, payload}
+    )
+
+    assert_push "player.projection.tick", ^payload
+  end
 end

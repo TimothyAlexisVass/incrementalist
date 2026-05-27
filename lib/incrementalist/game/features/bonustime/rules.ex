@@ -6,10 +6,10 @@ defmodule Incrementalist.Game.Features.BonusTime.Rules do
   alias Incrementalist.Game.Time
   alias Incrementalist.Game.Constants
 
-  def spend_token(%State{} = state) do
+  def spend_token(%State{} = state, now \\ Time.now()) do
     cond do
-      state.has_bonustime_token ->
-        {:ok, %{state | has_bonustime_token: false}, "daily"}
+      State.has_bonustime_token_available?(state, now) ->
+        {:ok, State.consume_bonustime_daily_token(state, now), "daily"}
 
       state.bonustime.special_tokens > 0 ->
         new_db = %{state.bonustime | special_tokens: state.bonustime.special_tokens - 1}
@@ -20,16 +20,18 @@ defmodule Incrementalist.Game.Features.BonusTime.Rules do
     end
   end
 
-  def spend_token_for_game(%State{} = state, "jackpot_meter") do
-    if state.has_bonustime_token do
-      {:ok, %{state | has_bonustime_token: false}, "daily"}
+  def spend_token_for_game(state, game_id, now \\ Time.now())
+
+  def spend_token_for_game(%State{} = state, "jackpot_meter", now) do
+    if State.has_bonustime_token_available?(state, now) do
+      {:ok, State.consume_bonustime_daily_token(state, now), "daily"}
     else
       {:error, "daily_token_required"}
     end
   end
 
-  def spend_token_for_game(%State{} = state, _game_id) do
-    spend_token(state)
+  def spend_token_for_game(%State{} = state, _game_id, now) do
+    spend_token(state, now)
   end
 
   def advance_streak(%State{} = state, now) do

@@ -188,8 +188,6 @@ export type GameNoopResult = {
   command_id: number;
   server_time: string;
   events: unknown[];
-  climate: ClimateState;
-  soil: SoilState;
 };
 
 export type TimeSyncResult = {
@@ -198,13 +196,19 @@ export type TimeSyncResult = {
   command_id: number;
   server_time: string;
   climate: ClimateState;
-  soil: SoilState;
 };
 
 export type GlobalTickEvent = {
   type: "global.tick";
   server_time: string;
   climate: ClimateState;
+};
+
+export type PlayerProjectionTickEvent = {
+  type: "player.projection.tick";
+  server_time: string;
+  soil: SoilState;
+  has_bonustime_token?: boolean;
 };
 
 export type GameResetResult = {
@@ -460,7 +464,7 @@ export type ServerResult =
   | CommandQueuedResult
   | CommandAckResult;
 
-export type ServerPushEvent = GlobalTickEvent;
+export type ServerPushEvent = GlobalTickEvent | PlayerProjectionTickEvent;
 
 export type BootResult = {
   type: "game.boot";
@@ -504,5 +508,21 @@ export function isGlobalTickEvent(event: unknown): event is GlobalTickEvent {
     typeof candidate.server_time === "string" &&
     Boolean(candidate.climate) &&
     typeof candidate.climate === "object"
+  );
+}
+
+export function isPlayerProjectionTickEvent(event: unknown): event is PlayerProjectionTickEvent {
+  if (!event || typeof event !== "object") return false;
+  const candidate = event as Record<string, unknown>;
+
+  const hasValidOptionalToken =
+    candidate.has_bonustime_token === undefined || typeof candidate.has_bonustime_token === "boolean";
+
+  return (
+    candidate.type === "player.projection.tick" &&
+    typeof candidate.server_time === "string" &&
+    Boolean(candidate.soil) &&
+    typeof candidate.soil === "object" &&
+    hasValidOptionalToken
   );
 }

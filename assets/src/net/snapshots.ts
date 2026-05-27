@@ -129,6 +129,19 @@ export function applyPushEvent(state: ServerState, event: ServerPushEvent): void
 
     state.snapshot.server_time = event.server_time;
     applyAuthoritativeData(state, { climate: event.climate });
+    return;
+  }
+
+  if (event.type === "player.projection.tick") {
+    synchronize(event.server_time);
+    if (!state.snapshot) return;
+    if (isStrictlyOlderServerTime(event.server_time, state.snapshot.server_time)) return;
+
+    state.snapshot.server_time = event.server_time;
+    applyAuthoritativeData(state, {
+      soil: event.soil,
+      has_bonustime_token: event.has_bonustime_token
+    });
   }
 }
 

@@ -12,17 +12,19 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   import Ecto.Query
 
-  alias Incrementalist.Game.{Climate, CommandExecutor, Constants, Snapshots, State, Time}
+  alias Incrementalist.Game.{CommandExecutor, Constants, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerSupervisor
   alias Incrementalist.Repo
 
   @idle_timeout :timer.minutes(10)
+  @minute_ms 60_000
   @buffer_size 10
   @processed_statuses ["succeeded", "failed"]
   @reset_command_type "game.reset"
   @async_command_persistence Mix.env() != :test
+  @pubsub Incrementalist.PubSub
 
   def start_link(player_id) do
     GenServer.start_link(__MODULE__, [player_id: player_id], name: via_tuple(player_id))
@@ -68,6 +70,20 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     end
   end
 
+  def connect_channel(player_id, channel_pid \\ self()) do
+    ensure_started(player_id)
+    GenServer.call(via_tuple(player_id), {:connect_channel, channel_pid})
+  end
+
+  def disconnect_channel(player_id, channel_pid \\ self()) do
+    case GenServer.whereis(via_tuple(player_id)) do
+      nil -> :ok
+      pid -> GenServer.call(pid, {:disconnect_channel, channel_pid})
+    end
+  end
+
+  def player_push_topic(player_id), do: "game:player:#{player_id}"
+
   @impl true
   def init(player_id: player_id) do
     Process.flag(:trap_exit, true)
@@ -77,10 +93,14 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       player: nil,
       player_state: nil,
       idle_timer: Process.send_after(self(), :idle_timeout, @idle_timeout),
+      player_tick_timer: nil,
       queued_commands: [],
       recent_commands: [],
       unacked_command: nil,
-      sequence: 0
+      sequence: 0,
+      connected_channels: MapSet.new(),
+      include_token_on_next_tick: true,
+      last_pushed_has_bonustime_token: nil
     }
 
     {:ok, state, {:continue, :load_data}}
@@ -116,9 +136,54 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
+  def handle_call({:connect_channel, channel_pid}, _from, state) do
+    connected_channels = MapSet.put(state.connected_channels, channel_pid)
+
+    next_state =
+      if MapSet.size(state.connected_channels) == 0 and MapSet.size(connected_channels) > 0 do
+        state
+        |> Map.put(:connected_channels, connected_channels)
+        |> Map.put(:include_token_on_next_tick, true)
+        |> Map.put(:last_pushed_has_bonustime_token, nil)
+        |> schedule_next_player_tick(Time.to_unix_ms(Time.now()))
+      else
+        %{state | connected_channels: connected_channels}
+      end
+
+    {:reply, :ok, next_state}
+  end
+
+  @impl true
+  def handle_call({:disconnect_channel, channel_pid}, _from, state) do
+    connected_channels = MapSet.delete(state.connected_channels, channel_pid)
+
+    if MapSet.size(connected_channels) == 0 do
+      save_player_state(state)
+
+      next_state =
+        state
+        |> cancel_player_tick_timer()
+        |> Map.put(:player_state, nil)
+        |> Map.put(:connected_channels, connected_channels)
+        |> Map.put(:include_token_on_next_tick, true)
+        |> Map.put(:last_pushed_has_bonustime_token, nil)
+
+      {:stop, :normal, :ok, next_state}
+    else
+      {:reply, :ok, %{state | connected_channels: connected_channels}}
+    end
+  end
+
+  @impl true
   def handle_call(:disconnect, _from, state) do
     save_player_state(state)
-    {:stop, :normal, :ok, %{state | player_state: nil}}
+
+    next_state =
+      state
+      |> cancel_player_tick_timer()
+      |> Map.put(:player_state, nil)
+
+    {:stop, :normal, :ok, next_state}
   end
 
   @impl true
@@ -186,9 +251,13 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   @impl true
   def handle_info(:idle_timeout, state) do
-    Logger.info("PlayerServer #{state.player_id} shutting down due to idle timeout")
-    save_player_state(state)
-    {:stop, :normal, %{state | player_state: nil}}
+    if MapSet.size(state.connected_channels) > 0 do
+      {:noreply, %{state | idle_timer: Process.send_after(self(), :idle_timeout, @idle_timeout)}}
+    else
+      Logger.info("PlayerServer #{state.player_id} shutting down due to idle timeout")
+      save_player_state(state)
+      {:stop, :normal, %{state | player_state: nil}}
+    end
   end
 
   @impl true
@@ -213,10 +282,23 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
-  def handle_info(:bonustime_boundary_reached, state) do
-    Logger.debug("PlayerServer #{state.player_id} refreshing state for BonusTime boundary")
-    refreshed_state = refresh_player_and_state(state, Time.now())
-    {:noreply, refreshed_state}
+  def handle_info({:emit_player_tick, boundary_ms}, state) do
+    boundary_time = DateTime.from_unix!(boundary_ms, :millisecond)
+    state = %{state | player_tick_timer: nil}
+
+    if MapSet.size(state.connected_channels) == 0 do
+      {:noreply, state}
+    else
+      {payload, next_state} = player_tick_payload_with_state(state, boundary_time)
+
+      Phoenix.PubSub.broadcast(
+        @pubsub,
+        player_push_topic(state.player_id),
+        {:player_projection_tick, payload}
+      )
+
+      {:noreply, schedule_next_player_tick(next_state, Time.to_unix_ms(Time.now()))}
+    end
   end
 
   @impl true
@@ -293,16 +375,66 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     {result, %{refreshed_state | unacked_command: completed}}
   end
 
-  defp attach_runtime_sync_fields(result, now, %State{} = player_state) when is_map(result) do
-    projected_state = OrchardSoil.project_state(player_state, now)
-
-    result
-    |> Map.put_new("server_time", Time.iso8601(now))
-    |> Map.put("climate", Climate.visible_state(now))
-    |> Map.put("soil", OrchardSoil.visible_state(projected_state.soil))
+  defp attach_runtime_sync_fields(result, now, %State{}) when is_map(result) do
+    Map.put_new(result, "server_time", Time.iso8601(now))
   end
 
   defp attach_runtime_sync_fields(result, _now, _player_state), do: result
+
+  defp player_tick_payload_with_state(state, %DateTime{} = now) do
+    current_player_state = state.player_state || PlayerStates.load_or_create(state.player, now)
+
+    projected_state =
+      current_player_state.state
+      |> State.check_daily_reset(now)
+      |> OrchardSoil.project_state(now)
+
+    has_bonustime_token = State.has_bonustime_token_available?(projected_state, now)
+
+    include_token? =
+      state.include_token_on_next_tick or
+        state.last_pushed_has_bonustime_token != has_bonustime_token
+
+    payload =
+      %{
+        "type" => "player.projection.tick",
+        "server_time" => Time.iso8601(now),
+        "soil" => OrchardSoil.visible_state(projected_state.soil)
+      }
+      |> maybe_put_bonustime_token(has_bonustime_token, include_token?)
+
+    next_state =
+      state
+      |> Map.put(:player_state, %{current_player_state | state: projected_state})
+      |> Map.put(:include_token_on_next_tick, false)
+      |> Map.put(:last_pushed_has_bonustime_token, has_bonustime_token)
+
+    {payload, next_state}
+  end
+
+  defp maybe_put_bonustime_token(payload, token_value, true),
+    do: Map.put(payload, "has_bonustime_token", token_value)
+
+  defp maybe_put_bonustime_token(payload, _token_value, false), do: payload
+
+  defp next_minute_boundary_ms(now_ms) when is_integer(now_ms) do
+    (div(now_ms, @minute_ms) + 1) * @minute_ms
+  end
+
+  defp schedule_next_player_tick(state, now_ms) do
+    state = cancel_player_tick_timer(state)
+    boundary_ms = next_minute_boundary_ms(now_ms)
+    delay_ms = max(1, boundary_ms - now_ms)
+    timer_ref = Process.send_after(self(), {:emit_player_tick, boundary_ms}, delay_ms)
+    %{state | player_tick_timer: timer_ref}
+  end
+
+  defp cancel_player_tick_timer(%{player_tick_timer: nil} = state), do: state
+
+  defp cancel_player_tick_timer(%{player_tick_timer: timer_ref} = state) do
+    Process.cancel_timer(timer_ref)
+    %{state | player_tick_timer: nil}
+  end
 
   defp process_next_queued(state, now) do
     case state.queued_commands do

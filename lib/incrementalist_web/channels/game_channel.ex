@@ -20,6 +20,14 @@ defmodule IncrementalistWeb.GameChannel do
   @impl true
   def join("game", _params, socket) do
     :ok = Phoenix.PubSub.subscribe(Incrementalist.PubSub, GlobalTicker.topic())
+
+    :ok =
+      Phoenix.PubSub.subscribe(
+        Incrementalist.PubSub,
+        PlayerServer.player_push_topic(socket.assigns.player_id)
+      )
+
+    :ok = PlayerServer.connect_channel(socket.assigns.player_id, self())
     boot = Sessions.boot_player(socket.assigns.player_id, socket.assigns.has_cached_snapshot)
 
     token = Phoenix.Token.sign(socket.endpoint, "player_auth", socket.assigns.player_id)
@@ -30,7 +38,7 @@ defmodule IncrementalistWeb.GameChannel do
 
   @impl true
   def terminate(_reason, socket) do
-    PlayerServer.disconnect(socket.assigns.player_id)
+    PlayerServer.disconnect_channel(socket.assigns.player_id, self())
     :ok
   end
 
@@ -46,6 +54,12 @@ defmodule IncrementalistWeb.GameChannel do
   @impl true
   def handle_info({:global_tick, payload}, socket) when is_map(payload) do
     push(socket, "global.tick", payload)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:player_projection_tick, payload}, socket) when is_map(payload) do
+    push(socket, "player.projection.tick", payload)
     {:noreply, socket}
   end
 
