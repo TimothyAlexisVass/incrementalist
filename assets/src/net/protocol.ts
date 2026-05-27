@@ -103,7 +103,7 @@ export type ClimateState = {
 };
 
 export type SoilState = {
-  water_level: number;
+  water: number;
   water_cap: number;
   nitrogen: BigNum;
   phosphorus: BigNum;
@@ -199,6 +199,12 @@ export type TimeSyncResult = {
   server_time: string;
   climate: ClimateState;
   soil: SoilState;
+};
+
+export type GlobalTickEvent = {
+  type: "global.tick";
+  server_time: string;
+  climate: ClimateState;
 };
 
 export type GameResetResult = {
@@ -454,6 +460,8 @@ export type ServerResult =
   | CommandQueuedResult
   | CommandAckResult;
 
+export type ServerPushEvent = GlobalTickEvent;
+
 export type BootResult = {
   type: "game.boot";
   username: string;
@@ -485,5 +493,16 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "notice.event.result" ||
     result.type === "bonustime.play.result" ||
     result.type === "command.error"
+  );
+}
+
+export function isGlobalTickEvent(event: unknown): event is GlobalTickEvent {
+  if (!event || typeof event !== "object") return false;
+  const candidate = event as Record<string, unknown>;
+  return (
+    candidate.type === "global.tick" &&
+    typeof candidate.server_time === "string" &&
+    Boolean(candidate.climate) &&
+    typeof candidate.climate === "object"
   );
 }

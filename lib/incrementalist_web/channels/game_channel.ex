@@ -13,11 +13,13 @@ defmodule IncrementalistWeb.GameChannel do
 
   use Phoenix.Channel
 
+  alias Incrementalist.Game.Push.GlobalTicker
   alias Incrementalist.Game.Sessions
   alias Incrementalist.Game.Session.PlayerServer
 
   @impl true
   def join("game", _params, socket) do
+    :ok = Phoenix.PubSub.subscribe(Incrementalist.PubSub, GlobalTicker.topic())
     boot = Sessions.boot_player(socket.assigns.player_id, socket.assigns.has_cached_snapshot)
 
     token = Phoenix.Token.sign(socket.endpoint, "player_auth", socket.assigns.player_id)
@@ -39,6 +41,12 @@ defmodule IncrementalistWeb.GameChannel do
 
   def handle_in(command_type, payload, socket) when is_binary(command_type) do
     reply_command(PlayerServer.enqueue(socket.assigns.player_id, command_type, payload), socket)
+  end
+
+  @impl true
+  def handle_info({:global_tick, payload}, socket) when is_map(payload) do
+    push(socket, "global.tick", payload)
+    {:noreply, socket}
   end
 
   defp reply_command(:queue_full, socket), do: {:reply, {:error, %{}}, socket}

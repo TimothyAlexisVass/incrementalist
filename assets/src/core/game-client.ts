@@ -4,12 +4,11 @@ import {
   ackAppliedResult,
   confirmCloverfieldDiscovery,
   progressClaimIn,
-  timeSync,
   selectArea,
   shopPurchase
 } from "../net/commands";
 import { isAckableCommandResult, type AckableCommandResult, type ServerResult, type GameSnapshot } from "../net/protocol";
-import { applyResult, clearShopHighlight, createServerState, type ServerState, View } from "../net/snapshots";
+import { applyPushEvent, applyResult, clearShopHighlight, createServerState, type ServerState, View } from "../net/snapshots";
 import { SnapshotCache } from "../net/snapshot-cache";
 import {
   updateProjectedFill,
@@ -47,7 +46,7 @@ import { updateHudViewModel, syncHudInstantly } from "../ui/layout/top-hud/view-
 import { renderTopHUD } from "../ui/layout/top-hud/render";
 import { renderBottomHUD } from "../ui/layout/bottom-hud/render";
 import { Store } from "./store";
-import { getServerNow, synchronize } from "./time";
+import { synchronize } from "./time";
 import { GameLoop } from "./game-loop";
 import { UserInterface } from "../ui/managers/user-interface";
 import { MainMenu } from "../ui/layout/main-menu/render";
@@ -104,7 +103,6 @@ const usernameKey = "incrementalist.playerUsername";
 const tokenKey = "incrementalist.playerToken";
 const MILESTONE_ANNOUNCEMENT_TYPE = "milestone_announcement";
 const MILESTONE_ANNOUNCEMENT_LINE_GAP = 40;
-const MS_PER_HOUR = 3_600_000;
 let nextMilestoneAnnouncementGroupId = 1;
 
 type MilestoneBaseline = {
@@ -125,8 +123,6 @@ export class GameClient {
   private bonusRewardModal: RewardModalState | null = null;
   private pendingCloseTransientUi = false;
   private readonly cloverDiscoveryModalQueue: Array<{ discoveryId: string; body: string }> = [];
-  private nextTimeSyncAtMs: number | null = null;
-  private timeSyncInFlight = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement
@@ -183,7 +179,6 @@ export class GameClient {
       this.snapshotCache = new SnapshotCache(result.username);
 
       synchronize(result.server_time);
-      this.scheduleNextHourlyTimeSync();
       this.store.state.snapshot = result.snapshot ?? this.snapshotCache.load();
       if (this.store.state.snapshot) {
         // Ensure the bar projection is up to date even if the snapshot was cached
@@ -203,9 +198,14 @@ export class GameClient {
       if (result.pending_result) {
         await this.applyAndAck(result.pending_result);
       }
+    };
 
-      // Always revalidate time state at page load through the authoritative command path.
-      this.runHourlyTimeSync();
+    this.channel.onPushEvent = (event) => {
+      applyPushEvent(this.store.state, event);
+      if (this.store.state.snapshot) {
+        notices.setSnapshot(this.store.state.snapshot);
+        this.snapshotCache?.save(this.store.state.snapshot);
+      }
     };
 
     try {
@@ -575,8 +575,6 @@ export class GameClient {
       this.pendingCloseTransientUi = false;
     }
 
-    this.maybeRunHourlyTimeSync();
-
     this.openNextCloverDiscoveryModalIfReady();
 
     // 1. Snapshot input state for this frame
@@ -859,38 +857,6 @@ export class GameClient {
     }
 
     return true;
-  }
-
-  private scheduleNextHourlyTimeSync() {
-    const serverNow = getServerNow();
-    this.nextTimeSyncAtMs = (Math.floor(serverNow / MS_PER_HOUR) + 1) * MS_PER_HOUR;
-  }
-
-  private maybeRunHourlyTimeSync() {
-    if (!this.channel) return;
-    if (this.channel.status !== "connected") return;
-    if (this.timeSyncInFlight) return;
-    if (this.nextTimeSyncAtMs === null) {
-      this.scheduleNextHourlyTimeSync();
-      return;
-    }
-
-    if (getServerNow() < this.nextTimeSyncAtMs) return;
-    this.runHourlyTimeSync();
-  }
-
-  private runHourlyTimeSync() {
-    if (!this.channel) return;
-    if (this.channel.status !== "connected") return;
-    if (this.timeSyncInFlight) return;
-
-    this.timeSyncInFlight = true;
-
-    this.runCommand(() => timeSync(this.channel!))
-      .finally(() => {
-        this.timeSyncInFlight = false;
-        this.scheduleNextHourlyTimeSync();
-      });
   }
 
 }

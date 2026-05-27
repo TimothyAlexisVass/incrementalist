@@ -12,7 +12,8 @@ import type {
   CloverHuntState,
   AreaDefinition,
   ClimateState,
-  SoilState
+  SoilState,
+  ServerPushEvent
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -74,6 +75,10 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     updateAreaViewModel(snapshot.state);
   }
 
+  if (state.snapshot && "server_time" in result && typeof result.server_time === "string") {
+    state.snapshot.server_time = result.server_time;
+  }
+
   if (result.type === "progress.claim_reward.result") {
     applyAuthoritativeData(state, result);
     applyProjectionData(state, result);
@@ -114,6 +119,17 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 
   state.statusTone = result.status === "error" ? "error" : "ok";
   state.status = statusForResult(result);
+}
+
+export function applyPushEvent(state: ServerState, event: ServerPushEvent): void {
+  if (event.type === "global.tick") {
+    synchronize(event.server_time);
+    if (!state.snapshot) return;
+    if (isStrictlyOlderServerTime(event.server_time, state.snapshot.server_time)) return;
+
+    state.snapshot.server_time = event.server_time;
+    applyAuthoritativeData(state, { climate: event.climate });
+  }
 }
 
 export function applyAuthoritativeData(
@@ -291,4 +307,12 @@ function statusForResult(result: ServerResult): string {
 
 export function clearShopHighlight(state: ServerState) {
   state.uiHints.highlightedShopItemId = null;
+}
+
+function isStrictlyOlderServerTime(nextServerTime: string, currentServerTime: string): boolean {
+  const nextMs = Date.parse(nextServerTime);
+  const currentMs = Date.parse(currentServerTime);
+
+  if (Number.isNaN(nextMs) || Number.isNaN(currentMs)) return false;
+  return nextMs < currentMs;
 }

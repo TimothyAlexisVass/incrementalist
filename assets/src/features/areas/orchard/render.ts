@@ -13,7 +13,7 @@ import {
   getOrchardViewModel
 } from "./view-model";
 import { getAreaViewModel } from "../view-model";
-import { fromNumber } from "../../../core/bignum";
+import { fromNumber, toNumber, type BigNum } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
@@ -224,11 +224,11 @@ function renderSoilStats() {
   if (!soil) return;
 
   const lines = [
-    ["Nitrogen:", formatBigNum(soil.nitrogen)],
-    ["Phosporus:", formatBigNum(soil.phosphorus)],
-    ["Potassium:", formatBigNum(soil.potassium)],
-    ["Water:", `${Math.max(0, Math.floor(soil.water_level))}/${Math.floor(soil.water_cap)}`],
-    ["Organic Matter:", `${formatBigNum(soil.organic_matter)}/${Math.floor(soil.organic_matter_cap)}`]
+    ["Nitrogen:", formatSoilBigNum(soil.nitrogen)],
+    ["Phosporus:", formatSoilBigNum(soil.phosphorus)],
+    ["Potassium:", formatSoilBigNum(soil.potassium)],
+    ["Water:", `${formatSoilNumber(soil.water)}/${formatSoilNumber(soil.water_cap)}`],
+    ["Organic Matter:", `${formatSoilBigNum(soil.organic_matter)}/${formatSoilNumber(soil.organic_matter_cap)}`]
   ];
 
   let y = DISPLAY_AREA_Y + 55;
@@ -282,4 +282,22 @@ function isPointInPolygon(px: number, py: number, polygon: readonly (readonly [n
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+function formatSoilBigNum(value: BigNum): string {
+  const asNumber = toNumber(value);
+  if (Number.isFinite(asNumber) && Math.abs(asNumber) < 100) {
+    return asNumber.toFixed(1);
+  }
+
+  return formatBigNum(value);
+}
+
+function formatSoilNumber(value: number): string {
+  const normalized = Math.max(0, value);
+  if (normalized < 100) {
+    return normalized.toFixed(1);
+  }
+
+  return Math.floor(normalized).toString();
 }

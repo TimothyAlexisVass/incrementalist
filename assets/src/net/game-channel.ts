@@ -1,4 +1,10 @@
-import type { BootResult, CommandAckResult, ServerResult } from "./protocol";
+import {
+  isGlobalTickEvent,
+  type BootResult,
+  type CommandAckResult,
+  type ServerPushEvent,
+  type ServerResult
+} from "./protocol";
 
 // Phoenix's raw websocket frame is [joinRef, messageRef, topic, event, payload].
 // This client uses the refs only to resolve Promises. Gameplay ordering is not
@@ -26,6 +32,7 @@ export class GameChannel {
 
   public onStatusChange?: (status: ConnectionStatus) => void;
   public onBootResult?: (result: BootResult) => void;
+  public onPushEvent?: (event: ServerPushEvent) => void;
 
   constructor(
     private readonly username: string | null,
@@ -185,6 +192,11 @@ export class GameChannel {
   private handleMessage(event: MessageEvent<string>) {
     const message = JSON.parse(event.data) as PhoenixMessage;
     const [_joinRef, ref, _topic, eventName, payload] = message;
+
+    if (eventName === "global.tick") {
+      if (isGlobalTickEvent(payload)) this.onPushEvent?.(payload);
+      return;
+    }
 
     if (eventName !== "phx_reply" || !ref) return;
 

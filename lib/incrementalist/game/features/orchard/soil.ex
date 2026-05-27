@@ -21,7 +21,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     water_cap = water_cap_from_organic_matter(normalized.organic_matter)
 
     %{
-      "water_level" => clamp_water_level(normalized.water_level, water_cap),
+      "water" => clamp_water_level(normalized.water_level, water_cap),
       "water_cap" => water_cap,
       "nitrogen" => normalized.nitrogen,
       "phosphorus" => normalized.phosphorus,
