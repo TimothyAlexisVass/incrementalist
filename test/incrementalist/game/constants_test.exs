@@ -75,6 +75,24 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert is_number(Map.fetch!(first, "c"))
   end
 
+  test "orchard soil values load from shared orchard requirements" do
+    assert Constants.orchard_soil_default_water_level() == 100
+    assert Constants.orchard_soil_default_nitrogen() == %BigNum{m: 5.0, e: 0}
+    assert Constants.orchard_soil_default_phosphorus() == %BigNum{m: 5.0, e: 0}
+    assert Constants.orchard_soil_default_potassium() == %BigNum{m: 5.0, e: 0}
+    assert Constants.orchard_soil_default_organic_matter() == %BigNum{m: 2.0, e: 1}
+    assert Constants.orchard_soil_organic_matter_min() == 0
+    assert Constants.orchard_soil_organic_matter_max() == 2000
+    assert Constants.orchard_soil_runoff_retention_factor_at_max() == 0.5
+    assert Constants.orchard_soil_water_cap_base() == 150
+    assert Constants.orchard_soil_water_cap_bonus_at_max() == 100
+    assert Constants.orchard_soil_base_dry_down_per_hour() == 6
+    assert Constants.orchard_soil_rain_mm_to_water_ratio() == 1
+    assert Constants.orchard_soil_nk_leach_per_water_loss() == 0.1
+    assert Constants.orchard_soil_phosphorus_leach_multiplier() == 0.5
+    assert Constants.orchard_soil_organic_matter_leach_per_water_loss() == 0.05
+  end
+
   test "sisu levels load the shared upgrade table" do
     assert Levels.base_max() == 2.0
     assert Levels.per_level() == 0.5

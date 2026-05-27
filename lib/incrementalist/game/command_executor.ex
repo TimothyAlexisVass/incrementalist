@@ -10,6 +10,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerState, PlayerStates}
   alias Incrementalist.Game.{Climate, Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
+  alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
   alias Incrementalist.Game.Features.CloverHunt
   alias Incrementalist.Game.Features.Achievements.Rules, as: Achievements
@@ -1589,7 +1590,10 @@ defmodule Incrementalist.Game.CommandExecutor do
     ps = PlayerStates.load_or_create(player, now)
 
     if ps && ps.state do
-      new_state = State.check_daily_reset(ps.state, now)
+      new_state =
+        ps.state
+        |> State.check_daily_reset(now)
+        |> OrchardSoil.project_state(now)
 
       if new_state != ps.state do
         update_player_state(ps, %{state: new_state, last_saved_at: now})

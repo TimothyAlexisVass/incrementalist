@@ -12,26 +12,28 @@ import {
   orchardHexState,
   getOrchardViewModel
 } from "./view-model";
+import { getAreaViewModel } from "../view-model";
 import { fromNumber } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
+import { formatBigNum } from "../../../utils/format";
+import { resolveUpdatingText } from "../../../utils/text";
 
-type OrchardDebugRuntime = {
+type OrchardRuntime = {
   scene: THREE.Scene;
   camera: THREE.OrthographicCamera;
   fillMesh: THREE.Mesh;
-  outline: THREE.LineLoop;
 };
 
-const ORCHARD_DEBUG_FILL_COLOR = 0xff4da6;
-const ORCHARD_DEBUG_OUTLINE_COLOR = 0xa6ff4d;
 const ORCHARD_LOCKED_FILL_COLOR = 0x000000;
-const ORCHARD_DEBUG_FILL_OPACITY = 0.32;
 const ORCHARD_LOCKED_FILL_OPACITY = 0.52;
+const ORCHARD_SOIL_TEXT_COLOR = "#f9e7af";
+const ORCHARD_SOIL_TEXT_FONT = "bold 13px Inter";
+const ORCHARD_SOIL_TEXT_LINE_HEIGHT = 29;
 
-let orchardDebugRuntime: OrchardDebugRuntime | null = null;
+let orchardRuntime: OrchardRuntime | null = null;
 
-function ensureOrchardDebugRuntime(): OrchardDebugRuntime {
-  if (orchardDebugRuntime) return orchardDebugRuntime;
+function ensureOrchardRuntime(): OrchardRuntime {
+  if (orchardRuntime) return orchardRuntime;
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(
@@ -46,7 +48,7 @@ function ensureOrchardDebugRuntime(): OrchardDebugRuntime {
 
   const fillGeometry = new THREE.BufferGeometry();
   const fillMaterial = new THREE.MeshBasicMaterial({
-    color: ORCHARD_DEBUG_FILL_COLOR,
+    color: ORCHARD_LOCKED_FILL_COLOR,
     transparent: true,
     opacity: 0.32,
     side: THREE.DoubleSide,
@@ -55,30 +57,18 @@ function ensureOrchardDebugRuntime(): OrchardDebugRuntime {
   });
   const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial);
 
-  const outlineGeometry = new THREE.BufferGeometry();
-  const outlineMaterial = new THREE.LineBasicMaterial({
-    color: ORCHARD_DEBUG_OUTLINE_COLOR,
-    transparent: true,
-    opacity: 0.95,
-    depthTest: false,
-    depthWrite: false
-  });
-  const outline = new THREE.LineLoop(outlineGeometry, outlineMaterial);
-
   scene.add(fillMesh);
-  scene.add(outline);
 
-  orchardDebugRuntime = {
+  orchardRuntime = {
     scene,
     camera,
-    fillMesh,
-    outline
+    fillMesh
   };
 
-  return orchardDebugRuntime;
+  return orchardRuntime;
 }
 
-function setHexagonGeometry(runtime: OrchardDebugRuntime, points: readonly { x: number; y: number }[]) {
+function setHexagonGeometry(runtime: OrchardRuntime, points: readonly { x: number; y: number }[]) {
   if (points.length < 3) return;
 
   const shape = new THREE.Shape();
@@ -93,20 +83,6 @@ function setHexagonGeometry(runtime: OrchardDebugRuntime, points: readonly { x: 
   const fillGeometry = new THREE.ShapeGeometry(shape);
   runtime.fillMesh.geometry.dispose();
   runtime.fillMesh.geometry = fillGeometry;
-
-  const outlinePositions = new Float32Array(points.length * 3);
-  for (let i = 0; i < points.length; i += 1) {
-    const offset = i * 3;
-    outlinePositions[offset] = points[i].x;
-    outlinePositions[offset + 1] = points[i].y;
-    outlinePositions[offset + 2] = 0;
-  }
-
-  const outlineGeometry = new THREE.BufferGeometry();
-  outlineGeometry.setAttribute("position", new THREE.BufferAttribute(outlinePositions, 3));
-
-  runtime.outline.geometry.dispose();
-  runtime.outline.geometry = outlineGeometry;
 }
 
 export function renderOrchard(input?: InteractionState) {
@@ -115,7 +91,7 @@ export function renderOrchard(input?: InteractionState) {
 
   if (orchard.hexagons.length === 0) return;
 
-  const runtime = ensureOrchardDebugRuntime();
+  const runtime = ensureOrchardRuntime();
   const fillMaterial = runtime.fillMesh.material as THREE.MeshBasicMaterial;
 
   for (const hex of orchard.hexagons) {
@@ -139,11 +115,10 @@ export function renderOrchard(input?: InteractionState) {
     }
 
     if (isHovered) {
-      // Dynamic white slow pulsing shine with a beautiful WebGL blur/glow effect!
-      const time = performance.now() * 0.0025;
+      // Hovered unlocked plots get a soft pulse to communicate interactivity.
+      const time = performance.now() * 0.0005;
       const fillPulse = 0.16 + 0.08 * Math.sin(time);
 
-      runtime.outline.visible = false;
       fillMaterial.color.setHex(0xffffff);
 
       let sumX = 0;
@@ -155,7 +130,7 @@ export function renderOrchard(input?: InteractionState) {
       const centerX = sumX / uvPoints.length;
       const centerY = sumY / uvPoints.length;
 
-      // concentric scaling layers from 0.94 to 1.06 to feather/blur the WebGL hexagon edges
+      // Draw scaled layers to feather the edge instead of a hard single-fill highlight.
       const scales = [0.94, 0.97, 1.0, 1.03, 1.06];
       const opacities = [0.25, 0.6, 1.0, 0.6, 0.25];
 
@@ -185,17 +160,14 @@ export function renderOrchard(input?: InteractionState) {
         });
       }
     } else {
-      // Regular locked or non-hovered rendering
       setHexagonGeometry(runtime, points);
 
       if (isLocked) {
-        runtime.outline.visible = false;
         fillMaterial.color.setHex(ORCHARD_LOCKED_FILL_COLOR);
         fillMaterial.opacity = ORCHARD_LOCKED_FILL_OPACITY;
       } else {
-        runtime.outline.visible = false; // No border/outline for unlocked plots!
-        fillMaterial.color.setHex(ORCHARD_DEBUG_FILL_COLOR);
-        fillMaterial.opacity = 0; // Transparent fill for unlocked plots!
+        // Unlocked plots stay visually transparent when idle.
+        fillMaterial.opacity = 0;
       }
 
       renderer.drawThreeScene({
@@ -208,7 +180,7 @@ export function renderOrchard(input?: InteractionState) {
       });
     }
 
-    // If locked, render the price in shards at the center of the hexagon
+    // Locked plots render their shard unlock price at the hex center.
     if (isLocked) {
       const match = hex.id.match(/^plot_(\d+)$/);
       const plotIdNum = match ? parseInt(match[1], 10) : 0;
@@ -242,6 +214,59 @@ export function renderOrchard(input?: InteractionState) {
       );
     }
   }
+
+  renderSoilStats();
+}
+
+function renderSoilStats() {
+  const renderer = getActiveWebGLRenderer();
+  const soil = getAreaViewModel().orchard.soil;
+  if (!soil) return;
+
+  const lines = [
+    ["Nitrogen:", formatBigNum(soil.nitrogen)],
+    ["Phosporus:", formatBigNum(soil.phosphorus)],
+    ["Potassium:", formatBigNum(soil.potassium)],
+    ["Water:", `${Math.max(0, Math.floor(soil.water_level))}/${Math.floor(soil.water_cap)}`],
+    ["Organic Matter:", `${formatBigNum(soil.organic_matter)}/${Math.floor(soil.organic_matter_cap)}`]
+  ];
+
+  let y = DISPLAY_AREA_Y + 55;
+
+  lines.forEach((line, index) => {
+    let x = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - 236;
+    const stableLine = resolveUpdatingText(`orchard.soil.line.${index}`, line[1], (candidate) =>
+      renderer.isTextReady({
+        text: candidate,
+        font: ORCHARD_SOIL_TEXT_FONT,
+        color: ORCHARD_SOIL_TEXT_COLOR,
+        align: "left",
+        baseline: "top"
+      })
+    );
+
+    renderer.drawText({
+      text: line[0],
+      x,
+      y,
+      font: ORCHARD_SOIL_TEXT_FONT,
+      color: ORCHARD_SOIL_TEXT_COLOR,
+      align: "left",
+      baseline: "top"
+    });
+
+    x += 203
+    renderer.drawText({
+      text: stableLine,
+      x,
+      y,
+      font: ORCHARD_SOIL_TEXT_FONT,
+      color: ORCHARD_SOIL_TEXT_COLOR,
+      align: "right",
+      baseline: "top"
+    });
+    y += ORCHARD_SOIL_TEXT_LINE_HEIGHT;
+  });
 }
 
 function isPointInPolygon(px: number, py: number, polygon: readonly (readonly [number, number])[]): boolean {

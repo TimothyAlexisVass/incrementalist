@@ -9,6 +9,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
   import Ecto.Query
 
   alias Incrementalist.Game.{Snapshots, State, Time, Notices}
+  alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Features.Progress.Sisu
   alias Incrementalist.Game.Persistence.{Player, PlayerState}
   alias Incrementalist.Repo
@@ -62,6 +63,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
       now
       |> State.new()
       |> Sisu.project_state(now)
+      |> OrchardSoil.project_state(now)
 
     ps
     |> PlayerState.changeset(%{
@@ -113,6 +115,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
       if ps.state do
         ps.state
         |> Sisu.project_state(now)
+        |> OrchardSoil.project_state(now)
         |> State.touch_saved_at(now)
       else
         nil
@@ -142,6 +145,7 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
       now
       |> State.new()
       |> Sisu.project_state(now)
+      |> OrchardSoil.project_state(now)
 
     ps
     |> PlayerState.changeset(%{

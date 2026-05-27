@@ -19,4 +19,16 @@ defmodule Incrementalist.Game.ClimateTest do
     assert state_loop["rain_mm"] == state_now["rain_mm"]
     assert state_loop["temperature_c"] == state_now["temperature_c"]
   end
+
+  test "visible_state exposes only the client-consumed climate fields" do
+    state = Climate.visible_state(Constants.climate_epoch_at())
+
+    assert Map.keys(state) |> Enum.sort() == [
+             "day_in_year",
+             "epoch_at",
+             "rain_mm",
+             "temperature_c",
+             "year"
+           ]
+  end
 end

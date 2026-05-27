@@ -1,0 +1,37 @@
+{
+  "soil": {
+    "defaults": {
+      "water_level": 100,
+      "nitrogen": {
+        "m": 5,
+        "e": 0
+      },
+      "phosphorus": {
+        "m": 5,
+        "e": 0
+      },
+      "potassium": {
+        "m": 5,
+        "e": 0
+      },
+      "organic_matter": {
+        "m": 2,
+        "e": 1
+      }
+    },
+    "organic_matter": {
+      "min": 0,
+      "max": 2000,
+      "runoff_retention_factor_at_max": 0.5,
+      "water_cap_base": 150,
+      "water_cap_bonus_at_max": 100
+    },
+    "base_dry_down_per_hour": 6,
+    "rain_mm_to_water_ratio": 1,
+    "leach": {
+      "nitrogen_and_potassium_per_water_loss": 0.1,
+      "phosphorus_multiplier": 0.5,
+      "organic_matter_per_water_loss": 0.05
+    }
+  }
+}

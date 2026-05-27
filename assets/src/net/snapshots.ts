@@ -11,7 +11,8 @@ import type {
   StatsState,
   CloverHuntState,
   AreaDefinition,
-  ClimateState
+  ClimateState,
+  SoilState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -137,6 +138,7 @@ export function applyAuthoritativeData(
     furnace_level?: number;
     clover_hunt?: CloverHuntState;
     climate?: ClimateState;
+    soil?: SoilState;
     [key: string]: any;
   }
 ) {
@@ -179,6 +181,7 @@ export function applyAuthoritativeData(
   if (data.area !== undefined) state.snapshot.state.area = data.area;
   if (data.areas !== undefined) state.snapshot.state.areas = data.areas;
   if (data.climate !== undefined) state.snapshot.state.climate = data.climate;
+  if (data.soil !== undefined) state.snapshot.state.soil = data.soil;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -201,7 +204,7 @@ export function applyAuthoritativeData(
     }
   }
 
-  if (data.area !== undefined || data.areas !== undefined || data.clover_hunt !== undefined) {
+  if (data.area !== undefined || data.areas !== undefined || data.clover_hunt !== undefined || data.soil !== undefined) {
     updateAreaViewModel(state.snapshot.state);
   }
 }

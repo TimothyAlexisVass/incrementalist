@@ -9,7 +9,8 @@ defmodule Incrementalist.Game.State do
 
   use Ecto.Schema
   import Ecto.Changeset
-  alias Incrementalist.Game.{Climate, Time}
+  alias Incrementalist.Game.{Climate, Constants, Time}
+  alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
 
   @current_version 1
 
@@ -159,6 +160,30 @@ defmodule Incrementalist.Game.State do
           |> min(Constants.clover_hunt_max_background_stage())
           |> max(1)
       }
+    end
+  end
+
+  defmodule Soil do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :water_level, :integer, default: 0
+      embeds_one :nitrogen, BigNum, on_replace: :update
+      embeds_one :phosphorus, BigNum, on_replace: :update
+      embeds_one :potassium, BigNum, on_replace: :update
+      embeds_one :organic_matter, BigNum, on_replace: :update
+      field :projected_at, :string
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:water_level, :projected_at])
+      |> cast_embed(:nitrogen)
+      |> cast_embed(:phosphorus)
+      |> cast_embed(:potassium)
+      |> cast_embed(:organic_matter)
     end
   end
 
@@ -329,6 +354,7 @@ defmodule Incrementalist.Game.State do
     embeds_one :features, Features, on_replace: :update
     embeds_one :sisu, Sisu, on_replace: :update
     embeds_one :clover_hunt, CloverHunt, on_replace: :update
+    embeds_one :soil, Soil, on_replace: :update
 
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
@@ -368,6 +394,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:features)
     |> cast_embed(:sisu)
     |> cast_embed(:clover_hunt)
+    |> cast_embed(:soil)
     |> cast_embed(:quests)
     |> cast_embed(:stats)
     |> cast_embed(:bonustime)
@@ -406,6 +433,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:features)
     |> maybe_put_embed(:sisu)
     |> maybe_put_embed(:clover_hunt)
+    |> maybe_put_embed(:soil)
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
     |> maybe_put_embed(:bonustime)
@@ -479,6 +507,14 @@ defmodule Incrementalist.Game.State do
         projected_at: timestamp
       },
       clover_hunt: %CloverHunt{},
+      soil: %Soil{
+        water_level: Constants.orchard_soil_default_water_level(),
+        nitrogen: Constants.orchard_soil_default_nitrogen(),
+        phosphorus: Constants.orchard_soil_default_phosphorus(),
+        potassium: Constants.orchard_soil_default_potassium(),
+        organic_matter: Constants.orchard_soil_default_organic_matter(),
+        projected_at: climate_hour_boundary_iso(now)
+      },
       quests: [],
       achievements: %{},
       stats: %Stats{
@@ -543,7 +579,10 @@ defmodule Incrementalist.Game.State do
   def visible_state(nil, now), do: visible_state(new(now), now)
 
   def visible_state(%__MODULE__{} = state, now) do
-    projected_state = Incrementalist.Game.Features.Progress.Sisu.project_state(state, now)
+    projected_state =
+      state
+      |> Incrementalist.Game.Features.Progress.Sisu.project_state(now)
+      |> OrchardSoil.project_state(now)
 
     %{
       "area" => projected_state.area || "sage",
@@ -610,6 +649,7 @@ defmodule Incrementalist.Game.State do
       },
       "climate" => Climate.visible_state(now),
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
+      "soil" => OrchardSoil.visible_state(projected_state.soil),
       "shop" =>
         Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
           is_purchased =
@@ -738,4 +778,13 @@ defmodule Incrementalist.Game.State do
   end
 
   defp parse_iso_ms(_), do: nil
+
+  defp climate_hour_boundary_iso(%DateTime{} = now) do
+    now
+    |> Time.to_unix_ms()
+    |> div(Constants.climate_hour_ms())
+    |> Kernel.*(Constants.climate_hour_ms())
+    |> DateTime.from_unix!(:millisecond)
+    |> Time.iso8601()
+  end
 end

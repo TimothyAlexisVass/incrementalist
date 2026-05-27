@@ -94,34 +94,22 @@ export type StatsState = {
   total_cores_earned: BigNum;
 };
 
-export type ClimateSeasonId = "spring" | "summer" | "autumn" | "winter";
-export type ClimateRainIntensity = "none" | "very_light" | "light" | "moderate" | "heavy" | "torrential";
-
 export type ClimateState = {
   epoch_at: string;
-  hour_ms: number;
-  hours_per_day: number;
-  year_start: number;
-  game_day_start_hour: number;
-  game_night_start_hour: number;
-  days_per_season: number;
-  days_per_year: number;
   year: number;
-  season_index: number;
-  season: ClimateSeasonId;
-  season_label: string;
-  day_in_season: number;
   day_in_year: number;
-  day_phase: "day" | "night";
-  is_day: boolean;
   temperature_c: number;
   rain_mm: number;
-  rain_intensity: ClimateRainIntensity;
-  next_hour_at: string;
-  next_day_phase_at: string;
-  season_temperature_min_c: number;
-  season_temperature_max_c: number;
-  season_rain_chance_per_hour: number;
+};
+
+export type SoilState = {
+  water_level: number;
+  water_cap: number;
+  nitrogen: BigNum;
+  phosphorus: BigNum;
+  potassium: BigNum;
+  organic_matter: BigNum;
+  organic_matter_cap: number;
 };
 
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
@@ -182,6 +170,7 @@ export type GameSnapshot = {
       bonus_time_purchased: boolean;
     };
     climate: ClimateState;
+    soil: SoilState;
     shop: ShopItemDefinition[];
     quests: Record<string, QuestState>;
     achievements: Record<string, AchievementState>;
@@ -200,6 +189,7 @@ export type GameNoopResult = {
   server_time: string;
   events: unknown[];
   climate: ClimateState;
+  soil: SoilState;
 };
 
 export type TimeSyncResult = {
@@ -208,6 +198,7 @@ export type TimeSyncResult = {
   command_id: number;
   server_time: string;
   climate: ClimateState;
+  soil: SoilState;
 };
 
 export type GameResetResult = {

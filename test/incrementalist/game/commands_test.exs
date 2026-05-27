@@ -51,22 +51,23 @@ defmodule Incrementalist.Game.CommandsTest do
     assert result_a["type"] == "time.sync.result"
     assert result_b["type"] == "time.sync.result"
     assert result_a["climate"] == result_b["climate"]
-    assert result_a["climate"]["season"] in ["spring", "summer", "autumn", "winter"]
-    assert result_a["climate"]["day_phase"] in ["day", "night"]
+    assert is_integer(result_a["climate"]["year"])
+    assert is_integer(result_a["climate"]["day_in_year"])
+    assert is_number(result_a["climate"]["rain_mm"])
+    assert is_number(result_a["climate"]["temperature_c"])
   end
 
-  test "time.sync flips day phase at the next real-time hour boundary" do
+  test "time.sync climate payload excludes client-derived presentation fields" do
     player = create_player()
 
-    result_day = Commands.enqueue(player.id, "time.sync", intent(0), @now)
-    Commands.ack(player.id, 0, @now)
+    result = Commands.enqueue(player.id, "time.sync", intent(0), @now)
 
-    next_hour = DateTime.add(@now, 3600, :second)
-    result_next = Commands.enqueue(player.id, "time.sync", intent(1), next_hour)
-
-    assert result_day["type"] == "time.sync.result"
-    assert result_next["type"] == "time.sync.result"
-    assert result_day["climate"]["day_phase"] != result_next["climate"]["day_phase"]
+    assert result["type"] == "time.sync.result"
+    refute Map.has_key?(result["climate"], "hour_ms")
+    refute Map.has_key?(result["climate"], "hours_per_day")
+    refute Map.has_key?(result["climate"], "season")
+    refute Map.has_key?(result["climate"], "season_label")
+    refute Map.has_key?(result["climate"], "day_phase")
   end
 
   test "time.sync starts climate years at 1008 on climate epoch" do

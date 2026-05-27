@@ -12,7 +12,8 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   import Ecto.Query
 
-  alias Incrementalist.Game.{Climate, CommandExecutor, Constants, Snapshots, Time}
+  alias Incrementalist.Game.{Climate, CommandExecutor, Constants, Snapshots, State, Time}
+  alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
   alias Incrementalist.Game.Session.PlayerSupervisor
   alias Incrementalist.Repo
@@ -272,7 +273,12 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   defp execute_next(state, command, now) do
     {status, result, ps_id} = CommandExecutor.execute(command, state.player, now)
-    result = attach_runtime_sync_fields(result, now)
+    refreshed_state = refresh_player_and_state(state, now)
+
+    player_state =
+      if(refreshed_state.player_state, do: refreshed_state.player_state.state, else: nil)
+
+    result = attach_runtime_sync_fields(result, now, player_state)
 
     completed = %{
       command
@@ -284,17 +290,19 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
     async_persist_completed_command(completed)
 
-    refreshed_state = refresh_player_and_state(state, now)
     {result, %{refreshed_state | unacked_command: completed}}
   end
 
-  defp attach_runtime_sync_fields(result, now) when is_map(result) do
+  defp attach_runtime_sync_fields(result, now, %State{} = player_state) when is_map(result) do
+    projected_state = OrchardSoil.project_state(player_state, now)
+
     result
     |> Map.put_new("server_time", Time.iso8601(now))
     |> Map.put("climate", Climate.visible_state(now))
+    |> Map.put("soil", OrchardSoil.visible_state(projected_state.soil))
   end
 
-  defp attach_runtime_sync_fields(result, _now), do: result
+  defp attach_runtime_sync_fields(result, _now, _player_state), do: result
 
   defp process_next_queued(state, now) do
     case state.queued_commands do

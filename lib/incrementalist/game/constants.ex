@@ -11,6 +11,7 @@ defmodule Incrementalist.Game.Constants do
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
   @climate_path Path.join(@requirements_dir, "climate.json")
   @weather_path Path.join(@requirements_dir, "weather.json")
+  @orchard_path Path.join(@requirements_dir, "orchard.json")
   @external_resource @unlocking_path
   @external_resource @furnace_path
   @external_resource @quests_path
@@ -18,6 +19,7 @@ defmodule Incrementalist.Game.Constants do
   @external_resource @bonustime_path
   @external_resource @climate_path
   @external_resource @weather_path
+  @external_resource @orchard_path
   @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
   @furnace @furnace_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
@@ -25,6 +27,7 @@ defmodule Incrementalist.Game.Constants do
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
   @climate @climate_path |> File.read!() |> Jason.decode!()
   @weather @weather_path |> File.read!() |> Jason.decode!()
+  @orchard @orchard_path |> File.read!() |> Jason.decode!()
   @climate_weather_entries_tuple :erlang.list_to_tuple(@weather)
   @climate_weather_entry_count tuple_size(@climate_weather_entries_tuple)
   @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
@@ -105,6 +108,114 @@ defmodule Incrementalist.Game.Constants do
     season
     |> climate_season_row()
     |> Map.fetch!("label")
+  end
+
+  # Orchard / Soil Constants
+  def orchard_soil_default_water_level do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("defaults")
+    |> Map.fetch!("water_level")
+  end
+
+  def orchard_soil_default_nitrogen do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("defaults")
+    |> Map.fetch!("nitrogen")
+    |> to_big_num()
+  end
+
+  def orchard_soil_default_phosphorus do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("defaults")
+    |> Map.fetch!("phosphorus")
+    |> to_big_num()
+  end
+
+  def orchard_soil_default_potassium do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("defaults")
+    |> Map.fetch!("potassium")
+    |> to_big_num()
+  end
+
+  def orchard_soil_default_organic_matter do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("defaults")
+    |> Map.fetch!("organic_matter")
+    |> to_big_num()
+  end
+
+  def orchard_soil_organic_matter_min do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("organic_matter")
+    |> Map.fetch!("min")
+  end
+
+  def orchard_soil_organic_matter_max do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("organic_matter")
+    |> Map.fetch!("max")
+  end
+
+  def orchard_soil_runoff_retention_factor_at_max do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("organic_matter")
+    |> Map.fetch!("runoff_retention_factor_at_max")
+  end
+
+  def orchard_soil_water_cap_base do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("organic_matter")
+    |> Map.fetch!("water_cap_base")
+  end
+
+  def orchard_soil_water_cap_bonus_at_max do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("organic_matter")
+    |> Map.fetch!("water_cap_bonus_at_max")
+  end
+
+  def orchard_soil_base_dry_down_per_hour do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("base_dry_down_per_hour")
+  end
+
+  def orchard_soil_rain_mm_to_water_ratio do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("rain_mm_to_water_ratio")
+  end
+
+  def orchard_soil_nk_leach_per_water_loss do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("leach")
+    |> Map.fetch!("nitrogen_and_potassium_per_water_loss")
+  end
+
+  def orchard_soil_phosphorus_leach_multiplier do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("leach")
+    |> Map.fetch!("phosphorus_multiplier")
+  end
+
+  def orchard_soil_organic_matter_leach_per_water_loss do
+    @orchard
+    |> Map.fetch!("soil")
+    |> Map.fetch!("leach")
+    |> Map.fetch!("organic_matter_per_water_loss")
   end
 
   # Clover Hunt Constants
@@ -216,6 +327,10 @@ defmodule Incrementalist.Game.Constants do
       nil -> raise "climate.rain_bands must include a torrential band"
       band -> Map.fetch!(band, "max_mm")
     end
+  end
+
+  defp to_big_num(%{"m" => m, "e" => e}) do
+    BigNum.new(m, e)
   end
 
   # Progress Bar Constants
