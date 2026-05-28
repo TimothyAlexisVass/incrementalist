@@ -212,7 +212,7 @@ export function renderAreaDropdown(
 
   // Draw the main button
   if (doButton(input, layout.buttonRect, layout.buttonLabel, {
-    showNotice: notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)
+    showNotice: !isMainMenuOpen && notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)
   })) {
     // Click also toggles or handles selection if needed, but hover handles open.
   }
@@ -226,10 +226,16 @@ export function renderAreaDropdownAboveMenu(
   channel?: GameChannel,
   runCommand?: (cmd: () => Promise<any>) => void
 ) {
-  if (!isDropdownOpen) return;
-
   const layout = getAreaDropdownLayout(canvas);
-  renderDropdownItems(canvas, input, layout, onSelect, level, channel, runCommand);
+
+  if (isDropdownOpen) {
+    renderDropdownItems(canvas, input, layout, onSelect, level, channel, runCommand);
+  }
+
+  // Draw the main button's notice dot above the main menu so its animation is not clipped/covered.
+  if (notices.hasParentNotice(NOTICE_PARENT_AREA_DROPDOWN)) {
+    drawNoticeDot(layout.buttonRect.x + layout.buttonRect.width - 1, layout.buttonRect.y + 1, 4);
+  }
 }
 
 function getAreaDropdownLayout(canvas: HTMLCanvasElement) {
