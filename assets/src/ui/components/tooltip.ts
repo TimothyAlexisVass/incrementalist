@@ -18,6 +18,7 @@ export interface TooltipOptions {
   estimatedWidthFactor?: number;
   textUpdateKey?: string;
   lineColors?: string[];
+  lineFonts?: string[];
   placement?: TooltipPlacement;
 }
 
@@ -104,13 +105,16 @@ function drawTooltipInternal(
   const resolvedContent = textUpdateKey
     ? resolveUpdatingText(textUpdateKey, Array.isArray(content) ? content.join('\n') : content, (candidate) => {
       const candidateLines = normalizeTooltipLines(candidate);
-      return candidateLines.every((line) => renderer.isTextReady({
-        text: line,
-        font,
-        color: textColor,
-        align: 'left',
-        baseline: 'top'
-      }));
+      return candidateLines.every((line, i) => {
+        const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
+        return renderer.isTextReady({
+          text: line,
+          font: lineFont,
+          color: textColor,
+          align: 'left',
+          baseline: 'top'
+        });
+      });
     })
     : content;
 
@@ -119,10 +123,11 @@ function drawTooltipInternal(
     return null;
   }
 
-  const contentWidth = lines.reduce((widest, line) => {
+  const contentWidth = lines.reduce((widest, line, i) => {
+    const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
     const textWidth = widthMode === 'estimated'
-      ? (line.length * parseFontSizePx(font, 12) * estimatedWidthFactor)
-      : renderer.measureTextWidth({ text: line, font });
+      ? (line.length * parseFontSizePx(lineFont, 12) * estimatedWidthFactor)
+      : renderer.measureTextWidth({ text: line, font: lineFont });
     return Math.max(widest, textWidth);
   }, 0);
   const width = Math.ceil(contentWidth + paddingX * 2);
@@ -176,11 +181,12 @@ function drawTooltipInternal(
 
   for (let i = 0; i < lines.length; i += 1) {
     const lineColor = (options.lineColors && options.lineColors[i]) || textColor;
+    const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
     renderer.drawText({
       text: lines[i],
       x: x + paddingX,
       y: y + paddingY + (i * lineHeight),
-      font,
+      font: lineFont,
       color: lineColor,
       align: 'left',
       baseline: 'top'
@@ -196,8 +202,7 @@ function normalizeTooltipLines(content: string | string[]): string[] {
     : String(content ?? '').split('\n');
 
   return sourceLines
-    .map((line) => String(line ?? '').trim())
-    .filter((line) => line.length > 0);
+    .map((line) => String(line ?? '').trim());
 }
 
 function drawRectOutline(

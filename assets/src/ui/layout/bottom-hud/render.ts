@@ -78,6 +78,7 @@ export function renderBottomHUD(
   const seasonHudWidth = Math.max(0, buttonX - 12 - seasonHudX);
   renderSeasonHud(
     canvas,
+    input,
     { x: seasonHudX, y: buttonY, width: seasonHudWidth, height: buttonHeight },
     snapshot?.state?.climate
   );

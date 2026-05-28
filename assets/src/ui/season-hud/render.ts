@@ -3,7 +3,9 @@ import { BOTTOM_HUD_HEIGHT, SEASON_HUD_FONT } from "../../config";
 import type { ClimateState } from "../../net/protocol";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { resolveUpdatingText } from "../../utils/text";
-import { buildSeasonHudModel } from "./view-model";
+import { buildSeasonHudModel, buildSeasonHudTooltip } from "./view-model";
+import { InteractionState, pointInRect } from "../../ui/managers/interactions";
+import { queueTooltip } from "../../ui/components/tooltip";
 
 const SEASON_HUD_LEFT_TEXT_KEY = "bottom_hud.season.left";
 const SEASON_HUD_RIGHT_TEXT_KEY = "bottom_hud.season.right";
@@ -14,6 +16,7 @@ const climateIconImages = new Map<string, HTMLImageElement>();
 
 export function renderSeasonHud(
   canvas: HTMLCanvasElement,
+  input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   climate: ClimateState | null | undefined
 ) {
@@ -69,6 +72,19 @@ export function renderSeasonHud(
     align: "left",
     baseline: "middle"
   });
+
+  // Handle hover and queue tooltip
+  const isHovered = input.pointer && pointInRect(input.pointer, rect);
+  if (isHovered) {
+    const tooltipData = buildSeasonHudTooltip(climate);
+    if (tooltipData) {
+      queueTooltip(input.pointer!, tooltipData.lines, {
+        lineColors: tooltipData.lineColors,
+        lineFonts: tooltipData.lineFonts,
+        textUpdateKey: "bottom_hud.season.tooltip"
+      });
+    }
+  }
 }
 
 function drawClimateIcon(iconPath: string, x: number, y: number): number {

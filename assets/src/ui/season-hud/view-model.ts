@@ -1,9 +1,19 @@
 import { getServerNow } from "../../core/time";
 import type { ClimateState } from "../../net/protocol";
 import climateConfig from "../../../../shared/requirements/climate.json";
+import { COLORS } from "../../colors";
+import { SMALL_TEXT_FONT } from "../../config";
 
 type RainBandId = "none" | "very_light" | "light" | "moderate" | "heavy" | "torrential";
-type SeasonConfig = { id: string; label: string };
+type SeasonConfig = {
+  id: string;
+  label: string;
+  temperature: {
+    min_c: number;
+    max_c: number;
+  };
+  rain_chance_per_hour: number;
+};
 type ClimateSharedConfig = {
   epoch_utc: string;
   year_start: number;
@@ -23,7 +33,14 @@ type ClimateProjection = {
 };
 
 const climateSharedConfig = climateConfig as ClimateSharedConfig;
-const DEFAULT_SEASONS: SeasonConfig[] = [{ id: "spring", label: "Spring" }];
+const DEFAULT_SEASONS: SeasonConfig[] = [
+  {
+    id: "spring",
+    label: "Spring",
+    temperature: { min_c: 18, max_c: 30 },
+    rain_chance_per_hour: 0.16
+  }
+];
 
 export type SeasonHudModel = {
   leftText: string;
@@ -135,4 +152,87 @@ function resolveIconPath(rainIntensity: RainBandId, isDay: boolean): string {
     default:
       return `images/ui/climate/none-${suffix}.png`;
   }
+}
+
+export type SeasonHudTooltipData = {
+  lines: string[];
+  lineColors: string[];
+  lineFonts: string[];
+};
+
+export function buildSeasonHudTooltip(climate: ClimateState | null | undefined): SeasonHudTooltipData | null {
+  if (!climate) return null;
+
+  const projection = projectClimate(climate);
+  const isDay = projection.isDay;
+  const hoursPerDay = Math.max(1, climateSharedConfig.day_hours || 2);
+  const gameHoursPerRealHour = 24 / hoursPerDay;
+  const realMinutesPerGameHour = 60 / gameHoursPerRealHour;
+
+  // Currently weather label
+  const hourlyRainMm = climate.rain_mm * 60;
+  let weatherLabel = "sunny";
+  if (hourlyRainMm > 0) {
+    if (hourlyRainMm <= 4) weatherLabel = "very light rain";
+    else if (hourlyRainMm <= 15) weatherLabel = "light rain";
+    else if (hourlyRainMm <= 49) weatherLabel = "moderate rain";
+    else if (hourlyRainMm <= 249) weatherLabel = "heavy rain";
+    else weatherLabel = "torrential rain";
+  } else if (!isDay) {
+    weatherLabel = "clear";
+  }
+
+  const lines: string[] = [];
+  const lineColors: string[] = [];
+  const lineFonts: string[] = [];
+
+  // 1. Currently <weather>
+  lines.push(`Currently ${weatherLabel}`);
+  lineColors.push(COLORS.panel.textPrimary);
+  lineFonts.push("bold 13px Arial");
+
+  // 2. If raining, calculated mm/in-game-hour
+  if (climate.rain_mm > 0) {
+    const rainfallPerGameHour = climate.rain_mm * realMinutesPerGameHour;
+    lines.push(`${rainfallPerGameHour.toFixed(1)} mm/game-hour`);
+    lineColors.push(COLORS.panel.textSecondary);
+    lineFonts.push(SMALL_TEXT_FONT);
+  }
+
+  // 3. Separator (blank line)
+  lines.push("");
+  lineColors.push(COLORS.panel.textSecondary);
+  lineFonts.push(SMALL_TEXT_FONT);
+
+  // 4. Forecast header
+  lines.push(`Forecast for ${isDay ? "tonight" : "tomorrow"}`);
+  lineColors.push(COLORS.panel.textPrimary);
+  lineFonts.push("bold 13px Arial");
+
+  // 5. Forecast details: next season bounds & chance
+  const seasons = climateSharedConfig.seasons.length > 0 ? climateSharedConfig.seasons : DEFAULT_SEASONS;
+  const seasonsPerYear = Math.max(1, seasons.length);
+  const daysPerSeason = Math.max(1, climateSharedConfig.days_per_season || 84);
+  const seasonIndex = Math.floor((projection.dayInYear - 1) / daysPerSeason) % seasonsPerYear;
+  const nextSeasonIndex = (seasonIndex + 1) % seasonsPerYear;
+  const nextSeason = seasons[nextSeasonIndex];
+
+  // Temperature: <min>ºC to <max>ºC
+  const nextMin = nextSeason.temperature?.min_c ?? 18;
+  const nextMax = nextSeason.temperature?.max_c ?? 30;
+  lines.push(`Between ${nextMin}ºC and ${nextMax}ºC`);
+  lineColors.push(COLORS.panel.textSecondary);
+  lineFonts.push(SMALL_TEXT_FONT);
+
+  // Chance of rain <next_season chance>
+  const nextRainChance = Math.round((nextSeason.rain_chance_per_hour ?? 0.16) * 100);
+  lines.push(`${nextRainChance}% Chance of rain`);
+  lineColors.push(COLORS.panel.textSecondary);
+  lineFonts.push(SMALL_TEXT_FONT);
+
+  return {
+    lines,
+    lineColors,
+    lineFonts
+  };
 }
