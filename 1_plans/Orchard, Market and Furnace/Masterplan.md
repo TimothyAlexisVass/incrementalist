@@ -50,7 +50,7 @@ Winter: 5%
 
 | Item            | Source             | Cost / Amount         |
 | --------------- | ------------------ | --------------------- |
-| **Acorn**       | Orchard Shop       | 10 Core               |
+| **Acorn**       | Orchard Shop       | 500 gold 20 shards               |
 | **Clover Seed** | Gifted by The Sage | First 50 Clover Seeds |
 
 The Acorn is the first purchasable seed. The Sage gives the first 50 Clover Seeds to introduce herbaceous plants, nitrogen fixing, and the future Acorn + Clover splice path.
@@ -121,7 +121,7 @@ Successfully splicing a seed makes it available in the Orchard Shop Menu
 ## Orchard Shop Menu
 
 clover_seeds => cost: 5 gold (unlocked by default)
-acorn => cost: 500 gold and 5 shards (unlocked by default)
+acorn => cost: 500 gold 20 shards (unlocked by default)
 coin_tree_seed => cost: 3000 gold, 10 shards
 
 ---
