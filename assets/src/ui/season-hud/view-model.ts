@@ -152,8 +152,6 @@ function resolveRainBandId(rainMmPerHour: number): RainBandId {
 
 function resolveWeatherLabel(rainBand: RainBandId, isDay: boolean): string {
   switch (rainBand) {
-    case "none":
-      return isDay ? "sunny" : "clear";
     case "very_light":
       return "very light rain";
     case "light":
