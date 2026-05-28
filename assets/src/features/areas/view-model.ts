@@ -1,4 +1,4 @@
-import { AreaDefinition, SoilState } from "../../net/protocol";
+import { AreaDefinition, ClimateState, SoilState } from "../../net/protocol";
 import { getAreaPresentation, getFurnaceLevelPresentation } from "../requirements";
 import { syncCloverfieldFromSnapshot } from "./cloverfield/view-model";
 
@@ -14,6 +14,7 @@ export type AreaViewModel = {
   };
   orchard: {
     soil: SoilState | null;
+    climate: ClimateState | null;
   };
 };
 
@@ -27,7 +28,8 @@ let areaViewModel: AreaViewModel = {
     tipText: ""
   },
   orchard: {
-    soil: null
+    soil: null,
+    climate: null
   }
 };
 
@@ -42,6 +44,7 @@ export function updateAreaViewModel(snapshotState: any) {
     .map((area: AreaDefinition) => resolveAreaPresentation(area, areaViewModel.furnaceLevel))
     .sort((a: AreaDefinition, b: AreaDefinition) => b.unlock_level - a.unlock_level);
   areaViewModel.orchard.soil = snapshotState.soil || null;
+  areaViewModel.orchard.climate = snapshotState.climate || null;
   syncCloverfieldFromSnapshot(snapshotState.clover_hunt);
 }
 

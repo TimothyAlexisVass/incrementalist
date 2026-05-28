@@ -16,6 +16,7 @@ export interface TooltipOptions {
   margin?: number;
   widthMode?: 'measured' | 'estimated';
   estimatedWidthFactor?: number;
+  widthScale?: number;
   textUpdateKey?: string;
   lineColors?: string[];
   lineFonts?: string[];
@@ -98,6 +99,7 @@ function drawTooltipInternal(
     margin = 8,
     widthMode = 'measured',
     estimatedWidthFactor = 0.62,
+    widthScale = 1,
     textUpdateKey,
     placement = 'top-left'
   } = options;
@@ -130,7 +132,7 @@ function drawTooltipInternal(
       : renderer.measureTextWidth({ text: line, font: lineFont });
     return Math.max(widest, textWidth);
   }, 0);
-  const width = Math.ceil(contentWidth + paddingX * 2);
+  const width = Math.ceil((contentWidth + paddingX * 2) * Math.max(0.1, widthScale));
   const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
 
   const placementGapX = Math.max(0, offsetX);
