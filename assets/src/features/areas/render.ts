@@ -8,7 +8,7 @@ import { renderOrchard } from "./orchard/render";
 import { handleOrchardInteractions } from "./orchard/interaction";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
-import { doButton, drawButton } from "../../ui/components/button";
+import { doButton, drawButton, drawNoticeDot } from "../../ui/components/button";
 import { queueTooltip } from "../../ui/components/tooltip";
 import { drawLockedElement } from "../../ui/components/locked-element";
 import { FURNACE_MAX_LEVEL, FURNACE_MIN_LEVEL, formatUnlockRequirement } from "../requirements";
@@ -291,8 +291,7 @@ function renderDropdownItems(
         inactiveSurface: COLORS.panel.bg,
         activeBorder: COLORS.panel.border,
         inactiveBorder: COLORS.panel.border,
-        textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary,
-        showNotice: !area.is_locked && hasNotice // Button draws its own notice if not locked
+        textColor: area.is_locked ? COLORS.panel.textDisabled : COLORS.panel.textPrimary
       });
 
       if (hasNotice) {
@@ -305,8 +304,7 @@ function renderDropdownItems(
       // overlay lock labeling/tooltip behavior without shrinking/dimming the shell.
       drawLockedElement(canvas, input, itemRect, renderItem, {
         opacity: 0,
-        criteria: area.lock_reason || formatUnlockRequirement(area.unlock_level, level),
-        showNotice: hasNotice
+        criteria: area.lock_reason || formatUnlockRequirement(area.unlock_level, level)
       });
     } else {
       renderItem();
@@ -322,5 +320,21 @@ function renderDropdownItems(
       isDropdownOpen = false;
       input.consumed = true;
     }
+  });
+
+  // Render dropdown notices in a dedicated pass so they always sit above all buttons in the list.
+  layout.availableAreas.forEach((area, i) => {
+    const leafId = `leaf.area.${area.key}.go_button`;
+    const hasNotice = notices.hasLeafNotice(leafId);
+    if (!hasNotice) return;
+
+    const itemRect = {
+      x: layout.menuRect.x,
+      y: layout.menuRect.y + i * layout.paddedItemHeight,
+      width: layout.menuRect.width,
+      height: layout.paddedItemHeight
+    };
+
+    drawNoticeDot(itemRect.x + itemRect.width - 1, itemRect.y + 1, 4);
   });
 }
