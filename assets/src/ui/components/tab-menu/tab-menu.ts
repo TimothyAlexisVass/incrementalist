@@ -1,5 +1,5 @@
 import { COLORS } from '../../../colors';
-import { drawButton, drawNoticeDot } from '../button';
+import { drawButton, drawNoticeDot, isButtonClicked } from '../button';
 import { InteractionState, pointInRect } from '../../managers/interactions';
 import { ServerState } from '../../../net/snapshots';
 import { notices } from '../../managers/notices';
@@ -214,15 +214,12 @@ export class TabMenu {
     for (let i = 0; i < this.tabs.length; i++) {
       const tab = this.tabs[i];
       const rect = tabRects[i];
-      const isHovered = pointInRect(input.pointer, rect);
-      const startedInside = pointInRect(input.pressStartPointer, rect);
-      const clicked = isHovered && startedInside && input.clicked && !input.consumed;
+      const clicked = isButtonClicked(input, rect);
 
       if (!clicked) {
         continue;
       }
 
-      input.consumed = true;
       const prevTab = this.tabs.find(t => t.id === this.activeTabId);
       if (prevTab && prevTab.id !== tab.id && prevTab.onLeave) {
         prevTab.onLeave();

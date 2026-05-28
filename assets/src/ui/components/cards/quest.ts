@@ -5,7 +5,7 @@ import { GameChannel } from '../../../net/game-channel';
 import { formatNumber } from '../../../utils';
 import { hexToRgba } from '../../../utils/color';
 import { notices } from '../../managers/notices';
-import { drawNoticeDot } from '../button';
+import { drawButton, drawNoticeDot } from '../button';
 import { drawHorizontalBar } from '../bar';
 
 export interface QuestCardOptions {
@@ -101,27 +101,11 @@ export function drawQuestCard(options: QuestCardOptions) {
   // Claim Button or Status
   if (canClaim) {
     const claimRect = getQuestClaimButtonRect(rect);
-    const btnX = claimRect.x;
-    const btnY = claimRect.y;
-    const btnWidth = claimRect.width;
-    const btnHeight = claimRect.height;
-
-    renderer.drawRect({
-      x: btnX,
-      y: btnY,
-      width: btnWidth,
-      height: btnHeight,
-      color: [0.2, 0.6, 0.3, 1.0] as const
-    });
-
-    renderer.drawText({
-      text: 'CLAIM',
-      x: btnX + btnWidth / 2,
-      y: btnY + btnHeight / 2,
+    drawButton(claimRect, 'CLAIM', {
+      active: true,
+      activeSurface: COLORS.bar.quest.readyStart,
       font: 'bold 14px Arial',
-      color: '#ffffff',
-      align: 'center',
-      baseline: 'middle'
+      showNotice: false
     });
 
     // Notification Dot
@@ -156,20 +140,6 @@ export function drawQuestCard(options: QuestCardOptions) {
       baseline: 'bottom'
     });
   }
-}
-
-export function isQuestClaimClicked(
-  pointer: { x: number; y: number },
-  rect: { x: number; y: number; width: number; height: number }
-): boolean {
-  const claimRect = getQuestClaimButtonRect(rect);
-
-  return (
-    pointer.x >= claimRect.x &&
-    pointer.x <= claimRect.x + claimRect.width &&
-    pointer.y >= claimRect.y &&
-    pointer.y <= claimRect.y + claimRect.height
-  );
 }
 
 export function getQuestClaimButtonRect(rect: { x: number; y: number; width: number; height: number }) {

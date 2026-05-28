@@ -8,7 +8,7 @@ import {
 import { formatBigNum, formatLevel } from '../../../utils';
 import { Rect } from '../tab-menu/tab-menu';
 import { InteractionState, pointInRect } from '../../managers/interactions';
-import { drawButton, drawNoticeDot } from '../button';
+import { drawButton, drawNoticeDot, isButtonClicked } from '../button';
 import { drawCurrencyAmount } from '../../../render/currency-icons';
 import { ShopItemDefinition } from '../../../net/protocol';
 import { notices } from '../../managers/notices';
@@ -159,10 +159,7 @@ export function handleShopItemCardInteractions(
 
   const btnRect = getShopItemPurchaseButtonRect(rect);
 
-  if (pointInRect(input.pointer, btnRect) &&
-    pointInRect(input.pressStartPointer, btnRect) &&
-    input.clicked && !input.consumed) {
-    
+  if (isButtonClicked(input, btnRect)) {
     // Clear notice on interaction
     const leafId = `leaf.shop_item.${item.id}.purchase_button`;
     if (notices.hasLeafNotice(leafId) && actions.onNoticeClick) {
@@ -172,8 +169,6 @@ export function handleShopItemCardInteractions(
     if (canAfford) {
       actions.onPurchase(item.id);
     }
-    
-    input.consumed = true;
   }
 }
 

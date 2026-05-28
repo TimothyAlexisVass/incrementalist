@@ -1,6 +1,7 @@
 import { InteractionState, pointInRect } from '../managers/interactions';
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { queueTooltip } from "./tooltip";
+import { isButtonClicked } from './button';
 
 import { BONUSTIME_HUGE_BUTTON_FONT } from "../../config";
 import { COLORS } from "../../colors";
@@ -22,13 +23,7 @@ export function doBonusTimeButton(
   textUpdateKey?: string
 ): boolean {
   const isHovered = pointInRect(input.pointer, rect);
-  const startedInside = pointInRect(input.pressStartPointer, rect);
-  let clicked = false;
-
-  if (isHovered && startedInside && input.clicked && !input.consumed) {
-    clicked = true;
-    input.consumed = true;
-  }
+  const clicked = isButtonClicked(input, rect);
 
   if (isHovered && tooltip) {
     queueTooltip(input.pointer!, tooltip, {

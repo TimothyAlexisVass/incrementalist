@@ -127,26 +127,37 @@ export function drawNoticeDot(
 
 import { InteractionState, pointInRect } from '../managers/interactions';
 
+export function isButtonClicked(
+  input: InteractionState,
+  rect: { x: number; y: number; width: number; height: number },
+  consume = true
+): boolean {
+  if (input.consumed || !input.clicked) return false;
+
+  const isHovered = pointInRect(input.pointer, rect);
+  const startedInside = pointInRect(input.pressStartPointer, rect);
+  const hit = isHovered && startedInside;
+
+  if (hit && consume) {
+    input.consumed = true;
+  }
+
+  return hit;
+}
+
 export function doButton(
   input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   label: string,
   options: ButtonOptions = {}
 ): boolean {
-  const hitRect = rect;
-
-  const isHovered = pointInRect(input.pointer, hitRect);
-  const startedInside = pointInRect(input.pressStartPointer, hitRect);
-  let clicked = false;
-
-  if (isHovered && startedInside && input.clicked && !input.consumed) {
-    clicked = true;
-    input.consumed = true; // Block clicks falling through to game world
-  }
+  const clicked = isButtonClicked(input, rect);
 
   // Visual "active" state:
   // 1. If currently pressing, only show active if started inside and still hovering
   // 2. If not pressing, show active if hovering
+  const isHovered = pointInRect(input.pointer, rect);
+  const startedInside = pointInRect(input.pressStartPointer, rect);
   const isDown = input.isPressed;
   options.active = isDown ? (startedInside && isHovered) : isHovered;
 
