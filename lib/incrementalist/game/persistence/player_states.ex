@@ -53,7 +53,11 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
   def load_or_create(%Player{} = player, now \\ Time.now()) do
     ensure_state(player.id, now)
     ps = get!(player.id)
-    initialize_if_empty(ps, now) |> PlayerState.inject_state_tokens()
+
+    ps
+    |> initialize_if_empty(now)
+    |> maybe_project_and_save(now)
+    |> PlayerState.inject_state_tokens()
   end
 
   def initialize_if_empty(player_state, now \\ Time.now())
@@ -109,6 +113,29 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
   end
 
   def initialize_if_empty(%PlayerState{} = ps, _now), do: ps
+
+  defp maybe_project_and_save(%PlayerState{state: %State{} = state} = ps, now) do
+    projected_state =
+      state
+      |> State.check_daily_reset(now)
+      |> Sisu.project_state(now)
+      |> OrchardSoil.project_state(now)
+
+    if projected_state != state do
+      ps
+      |> PlayerState.changeset(%{
+        state: projected_state,
+        has_bonustime_token: PlayerState.extract_state_tokens(projected_state),
+        bonustime_flips: PlayerState.extract_bonustime_flips(projected_state),
+        last_saved_at: now
+      })
+      |> Repo.update!()
+    else
+      ps
+    end
+  end
+
+  defp maybe_project_and_save(ps, _now), do: ps
 
   def autosave(%PlayerState{} = ps, now \\ Time.now()) do
     projected_state =
