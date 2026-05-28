@@ -8,7 +8,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   """
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerState, PlayerStates}
-  alias Incrementalist.Game.{Climate, Notices, Snapshots, State, Time}
+  alias Incrementalist.Game.{Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
@@ -40,30 +40,6 @@ defmodule Incrementalist.Game.CommandExecutor do
     # The tuple captures the execution boundary: queue status, replayable client
     # payload, and the player state affected by the command.
     case command.command_type do
-      "game.noop" ->
-        ps = player_state(player, now)
-
-        {"succeeded",
-         %{
-           "type" => "game.noop.result",
-           "status" => "ok",
-           "command_id" => command.command_id,
-           "server_time" => Time.iso8601(now),
-           "events" => []
-         }, ps.id}
-
-      "time.sync" ->
-        ps = player_state(player, now)
-
-        {"succeeded",
-         %{
-           "type" => "time.sync.result",
-           "status" => "ok",
-           "command_id" => command.command_id,
-           "server_time" => Time.iso8601(now),
-           "climate" => Climate.visible_state(now)
-         }, ps.id}
-
       "progress.claim_in" ->
         ps = player_state(player, now)
         {next_state, can_claim_in} = Bar.ensure_can_claim_at(ps.state, now)

@@ -10,8 +10,8 @@ defmodule Incrementalist.Application do
       {Phoenix.PubSub, name: Incrementalist.PubSub},
       Incrementalist.Game.Persistence.CommandLog.Cleanup,
       {Registry, keys: :unique, name: Incrementalist.Game.Session.PlayerRegistry},
+      Incrementalist.Game.Push.ClimateCache,
       Incrementalist.Game.Session.PlayerSupervisor,
-      Incrementalist.Game.Push.GlobalTicker,
       IncrementalistWeb.Endpoint
     ]
 

@@ -41,58 +41,14 @@ defmodule Incrementalist.Game.CommandsTest do
     assert cached_boot["snapshot"] == nil
   end
 
-  test "time.sync returns global climate for all players at the same server time" do
-    player_a = create_player()
-    player_b = create_player()
-
-    result_a = Commands.enqueue(player_a.id, "time.sync", intent(0), @now)
-    result_b = Commands.enqueue(player_b.id, "time.sync", intent(0), @now)
-
-    assert result_a["type"] == "time.sync.result"
-    assert result_b["type"] == "time.sync.result"
-    assert result_a["climate"] == result_b["climate"]
-    assert is_integer(result_a["climate"]["year"])
-    assert is_integer(result_a["climate"]["day_in_year"])
-    assert is_number(result_a["climate"]["rain_mm"])
-    assert is_number(result_a["climate"]["temperature_c"])
-  end
-
-  test "time.sync climate payload excludes client-derived presentation fields" do
-    player = create_player()
-
-    result = Commands.enqueue(player.id, "time.sync", intent(0), @now)
-
-    assert result["type"] == "time.sync.result"
-    refute Map.has_key?(result["climate"], "hour_ms")
-    refute Map.has_key?(result["climate"], "hours_per_day")
-    refute Map.has_key?(result["climate"], "season")
-    refute Map.has_key?(result["climate"], "season_label")
-    refute Map.has_key?(result["climate"], "day_phase")
-  end
-
-  test "time.sync starts climate years at 1008 on climate epoch" do
-    Application.put_env(:incrementalist, :climate_epoch_override, DateTime.to_iso8601(@now))
-
-    on_exit(fn ->
-      Application.delete_env(:incrementalist, :climate_epoch_override)
-    end)
-
-    player = create_player()
-    result = Commands.enqueue(player.id, "time.sync", intent(0), @now)
-
-    assert result["type"] == "time.sync.result"
-    assert result["climate"]["year"] == 1008
-    assert result["climate"]["day_in_year"] == 1
-  end
-
   test "commands are FIFO and ACK-gated" do
     player = create_player()
 
-    first = Commands.enqueue(player.id, "game.noop", intent(0), @now)
-    second = Commands.enqueue(player.id, "game.noop", intent(1), @now)
-    third = Commands.enqueue(player.id, "game.noop", intent(2), @now)
+    first = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
+    second = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
+    third = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(2), @now)
 
-    assert first["type"] == "game.noop.result"
+    assert first["type"] == "stats.update.result"
     assert first["command_id"] == 0
     refute Map.has_key?(first, "requires_ack")
     assert second["type"] == "command.queued"
@@ -108,12 +64,12 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(ack, "acked")
     refute Map.has_key?(ack, "next_result")
     refute Map.has_key?(ack, "requires_ack")
-    assert ack["released_result"]["type"] == "game.noop.result"
+    assert ack["released_result"]["type"] == "stats.update.result"
     assert ack["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
 
     ack = Commands.ack(player.id, 1, @now)
-    assert ack["released_result"]["type"] == "game.noop.result"
+    assert ack["released_result"]["type"] == "stats.update.result"
     assert ack["released_result"]["command_id"] == 2
     assert command_statuses(player.id) == ["acked", "acked", "succeeded"]
   end
@@ -121,8 +77,8 @@ defmodule Incrementalist.Game.CommandsTest do
   test "ack ignores command ids that are not the current blocking result" do
     player = create_player()
 
-    Commands.enqueue(player.id, "game.noop", intent(0), @now)
-    Commands.enqueue(player.id, "game.noop", intent(1), @now)
+    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
+    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
 
     ignored = Commands.ack(player.id, 1, @now)
 
@@ -132,7 +88,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     released = Commands.ack(player.id, 0, @now)
 
-    assert released["released_result"]["type"] == "game.noop.result"
+    assert released["released_result"]["type"] == "stats.update.result"
     assert released["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
   end
@@ -500,7 +456,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "the session replay buffer can replay the last completed command by sequence" do
     player = create_player()
 
-    result = Commands.enqueue(player.id, "game.noop", intent(0), @now)
+    result = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
 
     Commands.ack(player.id, 0, @now)
 
@@ -510,14 +466,17 @@ defmodule Incrementalist.Game.CommandsTest do
   test "command ids are limited to the ten client queue slots" do
     player = create_player()
 
-    assert Commands.enqueue(player.id, "game.noop", intent(0), @now)["type"] == "game.noop.result"
+    assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)["type"] ==
+             "stats.update.result"
 
     for command_id <- 1..9 do
-      assert Commands.enqueue(player.id, "game.noop", intent(command_id), @now)["type"] ==
+      assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(command_id), @now)[
+               "type"
+             ] ==
                "command.queued"
     end
 
-    rejected = Commands.enqueue(player.id, "game.noop", intent(10), @now)
+    rejected = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(10), @now)
 
     assert rejected == :invalid_command_id
     assert Repo.aggregate(GameCommand, :count) == 1
@@ -534,11 +493,11 @@ defmodule Incrementalist.Game.CommandsTest do
   test "game.reset blocks follow-up commands until acknowledged" do
     player = create_player()
 
-    Commands.enqueue(player.id, "game.noop", intent(0), @now)
+    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
 
     reset = Commands.enqueue(player.id, "game.reset", intent(1), @now)
     assert reset["type"] == "command.queued"
-    assert Commands.enqueue(player.id, "game.noop", intent(2), @now) == :queue_full
+    assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(2), @now) == :queue_full
 
     ack = Commands.ack(player.id, 0, @now)
 
@@ -582,7 +541,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "reconnect boot includes the unacked stored result" do
     player = Sessions.authenticate_player(nil, @now)
 
-    result = Commands.enqueue(player.id, "game.noop", intent(0), @now)
+    result = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
 
     boot =
       player.id
@@ -811,7 +770,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)
 
-    Commands.enqueue(player.id, "game.noop", intent(0), @now)
+    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
     Commands.ack(player.id, 0, @now)
 
     acked_command = Repo.one!(GameCommand)
@@ -820,7 +779,7 @@ defmodule Incrementalist.Game.CommandsTest do
       set: [acked_at: old]
     )
 
-    Commands.enqueue(player.id, "game.noop", intent(1), @now)
+    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
     unacked_command = Repo.one!(from command in GameCommand, where: is_nil(command.acked_at))
 
     Repo.update_all(
@@ -841,6 +800,10 @@ defmodule Incrementalist.Game.CommandsTest do
 
   defp intent(command_id, attrs \\ %{}) do
     Map.put(attrs, "command_id", command_id)
+  end
+
+  defp stats_intent(command_id) do
+    intent(command_id, %{"screen_id" => "stats"})
   end
 
   defp command_statuses(player_id) do

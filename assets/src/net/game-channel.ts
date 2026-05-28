@@ -1,6 +1,5 @@
 import {
-  isGlobalTickEvent,
-  isPlayerProjectionTickEvent,
+  isPlayerTickEvent,
   type BootResult,
   type CommandAckResult,
   type ServerPushEvent,
@@ -194,13 +193,8 @@ export class GameChannel {
     const message = JSON.parse(event.data) as PhoenixMessage;
     const [_joinRef, ref, _topic, eventName, payload] = message;
 
-    if (eventName === "global.tick") {
-      if (isGlobalTickEvent(payload)) this.onPushEvent?.(payload);
-      return;
-    }
-
-    if (eventName === "player.projection.tick") {
-      if (isPlayerProjectionTickEvent(payload)) this.onPushEvent?.(payload);
+    if (eventName === "player.tick") {
+      if (isPlayerTickEvent(payload)) this.onPushEvent?.(payload);
       return;
     }
 

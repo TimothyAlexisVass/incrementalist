@@ -84,10 +84,6 @@ export function applyResult(state: ServerState, result: ServerResult): void {
     applyProjectionData(state, result);
   }
 
-  if ("climate" in result && result.climate) {
-    applyAuthoritativeData(state, result as any);
-  }
-
   if (result.type === "progress.claim_in.result" || result.type === "progress.set_idle_mode.result") {
     applyProjectionData(state, result);
   }
@@ -122,23 +118,14 @@ export function applyResult(state: ServerState, result: ServerResult): void {
 }
 
 export function applyPushEvent(state: ServerState, event: ServerPushEvent): void {
-  if (event.type === "global.tick") {
-    synchronize(event.server_time);
-    if (!state.snapshot) return;
-    if (isStrictlyOlderServerTime(event.server_time, state.snapshot.server_time)) return;
-
-    state.snapshot.server_time = event.server_time;
-    applyAuthoritativeData(state, { climate: event.climate });
-    return;
-  }
-
-  if (event.type === "player.projection.tick") {
+  if (event.type === "player.tick") {
     synchronize(event.server_time);
     if (!state.snapshot) return;
     if (isStrictlyOlderServerTime(event.server_time, state.snapshot.server_time)) return;
 
     state.snapshot.server_time = event.server_time;
     applyAuthoritativeData(state, {
+      climate: event.climate,
       soil: event.soil,
       has_bonustime_token: event.has_bonustime_token
     });
@@ -310,8 +297,6 @@ function snapshotFromResult(result: ServerResult): GameSnapshot | null {
 function statusForResult(result: ServerResult): string {
   if (result.status === "error") return result.reason || "Command rejected";
   if (result.type === "command.queued") return "Queued";
-  if (result.type === "game.noop.result") return "Synced";
-  if (result.type === "time.sync.result") return "Clock synced";
   if (result.type === "game.reset.result") return "Game reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";
   if (result.type === "furnace.upgrade.result") return "Furnace upgraded";

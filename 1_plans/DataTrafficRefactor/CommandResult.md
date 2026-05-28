@@ -21,7 +21,7 @@ Keep command/result as the only durable gameplay transition lane, with existing 
 - `game.reset`
 - `command.ack`
 
-## Candidate Removals/Moves (After Push Soak)
+## Candidate Removals/Moves
 Move out of command/result into push lanes:
 - `time.sync` -> `global.tick`
 - `progress.claim_in` -> `player.projection.tick`

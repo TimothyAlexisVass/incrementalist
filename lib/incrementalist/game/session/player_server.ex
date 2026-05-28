@@ -15,6 +15,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   alias Incrementalist.Game.{CommandExecutor, Constants, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerStates}
+  alias Incrementalist.Game.Push.ClimateCache
   alias Incrementalist.Game.Session.PlayerSupervisor
   alias Incrementalist.Repo
 
@@ -294,7 +295,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       Phoenix.PubSub.broadcast(
         @pubsub,
         player_push_topic(state.player_id),
-        {:player_projection_tick, payload}
+        {:player_tick, payload}
       )
 
       {:noreply, schedule_next_player_tick(next_state, Time.to_unix_ms(Time.now()))}
@@ -397,8 +398,9 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
     payload =
       %{
-        "type" => "player.projection.tick",
+        "type" => "player.tick",
         "server_time" => Time.iso8601(now),
+        "climate" => ClimateCache.visible_state(now),
         "soil" => OrchardSoil.visible_state(projected_state.soil)
       }
       |> maybe_put_bonustime_token(has_bonustime_token, include_token?)

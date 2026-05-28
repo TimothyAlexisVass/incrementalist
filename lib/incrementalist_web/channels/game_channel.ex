@@ -13,14 +13,11 @@ defmodule IncrementalistWeb.GameChannel do
 
   use Phoenix.Channel
 
-  alias Incrementalist.Game.Push.GlobalTicker
   alias Incrementalist.Game.Sessions
   alias Incrementalist.Game.Session.PlayerServer
 
   @impl true
   def join("game", _params, socket) do
-    :ok = Phoenix.PubSub.subscribe(Incrementalist.PubSub, GlobalTicker.topic())
-
     :ok =
       Phoenix.PubSub.subscribe(
         Incrementalist.PubSub,
@@ -52,14 +49,8 @@ defmodule IncrementalistWeb.GameChannel do
   end
 
   @impl true
-  def handle_info({:global_tick, payload}, socket) when is_map(payload) do
-    push(socket, "global.tick", payload)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:player_projection_tick, payload}, socket) when is_map(payload) do
-    push(socket, "player.projection.tick", payload)
+  def handle_info({:player_tick, payload}, socket) when is_map(payload) do
+    push(socket, "player.tick", payload)
     {:noreply, socket}
   end
 

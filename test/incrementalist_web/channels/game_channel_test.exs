@@ -2,31 +2,13 @@ defmodule IncrementalistWeb.GameChannelTest do
   use Incrementalist.DataCase, async: false
   import Phoenix.ChannelTest
 
-  alias Incrementalist.Game.Push.GlobalTicker
   alias Incrementalist.Game.Sessions
   alias IncrementalistWeb.{GameChannel, UserSocket}
 
   @endpoint IncrementalistWeb.Endpoint
   @now ~U[2026-05-27 10:31:00.000000Z]
 
-  test "forwards global.tick payloads to joined clients" do
-    player = Sessions.authenticate_player(nil, @now)
-
-    token = Phoenix.Token.sign(IncrementalistWeb.Endpoint, "player_auth", player.id)
-
-    {:ok, socket} =
-      connect(UserSocket, %{"token" => token, "cache_username" => player.username})
-
-    {:ok, _boot, _channel_socket} = subscribe_and_join(socket, GameChannel, "game", %{})
-
-    payload = GlobalTicker.global_tick_payload(@now)
-
-    Phoenix.PubSub.broadcast(Incrementalist.PubSub, GlobalTicker.topic(), {:global_tick, payload})
-
-    assert_push "global.tick", ^payload
-  end
-
-  test "forwards player.projection.tick payloads to joined clients" do
+  test "forwards player.tick payloads to joined clients" do
     player = Sessions.authenticate_player(nil, @now)
 
     token = Phoenix.Token.sign(IncrementalistWeb.Endpoint, "player_auth", player.id)
@@ -37,8 +19,15 @@ defmodule IncrementalistWeb.GameChannelTest do
     {:ok, _boot, _channel_socket} = subscribe_and_join(socket, GameChannel, "game", %{})
 
     payload = %{
-      "type" => "player.projection.tick",
+      "type" => "player.tick",
       "server_time" => DateTime.to_iso8601(@now),
+      "climate" => %{
+        "epoch_at" => DateTime.to_iso8601(@now),
+        "year" => 1008,
+        "day_in_year" => 1,
+        "temperature_c" => 18,
+        "rain_mm" => 0.0
+      },
       "soil" => %{
         "water" => 0,
         "water_cap" => 100,
@@ -54,9 +43,9 @@ defmodule IncrementalistWeb.GameChannelTest do
     Phoenix.PubSub.broadcast(
       Incrementalist.PubSub,
       "game:player:#{player.id}",
-      {:player_projection_tick, payload}
+      {:player_tick, payload}
     )
 
-    assert_push "player.projection.tick", ^payload
+    assert_push "player.tick", ^payload
   end
 end

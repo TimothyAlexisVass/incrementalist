@@ -369,7 +369,6 @@ export class GameClient {
       result.type === "stats.update.result" ||
       result.type === "cloverfield.search.result" ||
       result.type === "cloverfield.confirm_discovery.result" ||
-      result.type === "time.sync.result" ||
       result.type === "bonustime.play.result" ||
       result.type === "game.reset.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
