@@ -167,7 +167,89 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert split.projected_at == direct.projected_at
   end
 
+  test "plant growth within a minute respects each plot planted_at timestamp" do
+    {start_time, _} = first_hour_window(fn _mm -> true end)
+    now = DateTime.add(start_time, 70_000, :millisecond)
+
+    early_plant = %State.Plant{
+      plant_id: "clover_patch",
+      growth: 0.0,
+      level: 1,
+      planted_at: Time.iso8601(DateTime.add(start_time, 5, :second))
+    }
+
+    late_plant = %State.Plant{
+      plant_id: "clover_patch",
+      growth: 0.0,
+      level: 1,
+      planted_at: Time.iso8601(DateTime.add(start_time, 55, :second))
+    }
+
+    plots = [
+      %State.Plot{id: "plot_1", depth: 1, plant: early_plant, decomposition: nil},
+      %State.Plot{id: "plot_2", depth: 1, plant: late_plant, decomposition: nil}
+    ]
+
+    state =
+      State.new(start_time)
+      |> with_soil(%SoilState{
+        water_level: 100.0,
+        nitrogen: BigNum.from_number(50),
+        phosphorus: BigNum.from_number(50),
+        potassium: BigNum.from_number(50),
+        organic_matter: BigNum.from_number(20),
+        projected_at: Time.iso8601(start_time)
+      })
+      |> Map.put(:plots, plots)
+
+    projected = Soil.project_state(state, now)
+    early_growth = plot_growth(projected.plots, "plot_1")
+    late_growth = plot_growth(projected.plots, "plot_2")
+
+    assert early_growth > late_growth
+  end
+
+  test "visible partial-minute projection applies only elapsed milliseconds, not a full minute" do
+    {start_time, _} = first_hour_window(fn _mm -> true end)
+    now = DateTime.add(start_time, 8, :second)
+
+    plant = %State.Plant{
+      plant_id: "clover_patch",
+      growth: 0.0,
+      level: 1,
+      planted_at: Time.iso8601(DateTime.add(start_time, 5, :second))
+    }
+
+    plots = [
+      %State.Plot{id: "plot_1", depth: 1, plant: plant, decomposition: nil}
+    ]
+
+    state =
+      State.new(start_time)
+      |> with_soil(%SoilState{
+        water_level: 100.0,
+        nitrogen: BigNum.from_number(50),
+        phosphorus: BigNum.from_number(50),
+        potassium: BigNum.from_number(50),
+        organic_matter: BigNum.from_number(20),
+        projected_at: Time.iso8601(start_time)
+      })
+      |> Map.put(:plots, plots)
+
+    [projected_plot] = Soil.project_visible_plots(state, now)
+    growth = projected_plot.plant.growth
+
+    assert growth > 0.0
+    assert growth < 0.5
+  end
+
   defp with_soil(%State{} = state, %SoilState{} = soil), do: %{state | soil: soil}
+
+  defp plot_growth(plots, plot_id) do
+    plots
+    |> Enum.find(&(&1.id == plot_id))
+    |> then(fn plot -> plot.plant.growth end)
+  end
 
   defp first_hour_window(mm_predicate, hour_span \\ 1) do
     epoch = Constants.climate_epoch_at()

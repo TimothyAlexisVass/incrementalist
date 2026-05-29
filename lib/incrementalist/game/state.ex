@@ -215,10 +215,11 @@ defmodule Incrementalist.Game.State do
       field :resource_id, :string
       embeds_one :amount, BigNum, on_replace: :update
       field :progress, :float, default: 0.0
+      field :started_at, :string
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      cast(schema, attrs, [:resource_id, :progress])
+      cast(schema, attrs, [:resource_id, :progress, :started_at])
       |> cast_embed(:amount)
     end
   end

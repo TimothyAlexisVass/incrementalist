@@ -48,6 +48,43 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     base + trunc(Float.round(bonus_at_max * ratio))
   end
 
+  @doc """
+  Projects plot progress within the current UTC minute for payload rendering
+  without mutating durable state.
+  """
+  def project_visible_plots(%State{} = state, now, opts \\ []) do
+    normalized_soil = normalize_soil(state.soil, now)
+    plots = state.plots || []
+    skip_plot_ids = opts |> Keyword.get(:skip_plot_ids, []) |> MapSet.new()
+
+    projected_at = parse_projected_at(normalized_soil.projected_at, now, @minute_ms)
+    projected_at_ms = Time.to_unix_ms(projected_at)
+    now_ms = Time.to_unix_ms(now)
+    elapsed_ms = max(now_ms - projected_at_ms, 0)
+    remainder_ms = rem(elapsed_ms, @minute_ms)
+
+    if remainder_ms <= 0 do
+      plots
+    else
+      minute_start_ms = now_ms - remainder_ms
+      temperature_c = minute_temperature(minute_start_ms)
+
+      Enum.map(plots, fn plot ->
+        if MapSet.member?(skip_plot_ids, plot.id) do
+          plot
+        else
+          project_plot_partial_minute(
+            plot,
+            normalized_soil,
+            temperature_c,
+            minute_start_ms,
+            remainder_ms
+          )
+        end
+      end)
+    end
+  end
+
   defp project_unified(%SoilState{} = soil, plots, now) do
     hour_ms = Constants.climate_hour_ms()
     projected_at = parse_projected_at(soil.projected_at, now, @minute_ms)
@@ -129,26 +166,20 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
     leached_soil = apply_water_loss(%{soil | water_level: next_water}, water_lost)
 
-    epoch = Constants.climate_epoch_at()
-    epoch_ms = Time.to_unix_ms(epoch)
-    elapsed_minutes = div(minute_start_ms - epoch_ms, @minute_ms)
-    elapsed_hours = div(elapsed_minutes, 60)
-    
-    temp_weather_entry = Constants.climate_weather_entry(elapsed_hours)
-    base_temp = Map.fetch!(temp_weather_entry, "c")
-    temp_jitter = :erlang.phash2(elapsed_minutes, 5) - 2
-    temperature_c = base_temp + temp_jitter
+    temperature_c = minute_temperature(minute_start_ms)
 
     {final_soil, final_plots} =
       Enum.reduce(plots, {leached_soil, []}, fn plot, {acc_soil, acc_plots} ->
-        {next_soil, next_plot} = project_plot_single_minute(plot, acc_soil, temperature_c)
+        {next_soil, next_plot} =
+          project_plot_single_minute(plot, acc_soil, temperature_c, minute_start_ms)
+
         {next_soil, [next_plot | acc_plots]}
       end)
 
     {final_soil, Enum.reverse(final_plots)}
   end
 
-  defp project_plot_single_minute(plot, %SoilState{} = soil, temperature_c) do
+  defp project_plot_single_minute(plot, %SoilState{} = soil, temperature_c, minute_start_ms) do
     cond do
       not is_nil(plot.plant) ->
         plant = plot.plant
@@ -160,25 +191,35 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
           min_water = Map.get(spec, "minWater", 0.0)
 
           if temperature_c >= min_temp and soil.water_level >= min_water do
-            n_ratio = get_nutrient_ratio(soil.nitrogen, spec, "nitrogen")
-            k_ratio = get_nutrient_ratio(soil.potassium, spec, "potassium")
+            active_ratio = activity_ratio(plant.planted_at, minute_start_ms, @minute_ms)
 
-            growth_boost = 1.0 + n_ratio * 0.5 + k_ratio * 0.5
-            base_rate = Map.get(spec, "baseGrowthTime", 100.0) / 60.0
-            next_progress = min(100.0, plant.growth + base_rate * growth_boost)
-
-            n_fixing = Map.get(spec, "nitrogenFixing", 0.0) / 60.0
-            next_soil = if n_fixing > 0.0 do
-              %{soil | nitrogen: BigNum.add(soil.nitrogen, BigNum.from_number(n_fixing))}
+            if active_ratio <= 0.0 do
+              {soil, plot}
             else
-              soil
+              n_ratio = get_nutrient_ratio(soil.nitrogen, spec, "nitrogen")
+              k_ratio = get_nutrient_ratio(soil.potassium, spec, "potassium")
+
+              growth_boost = 1.0 + n_ratio * 0.5 + k_ratio * 0.5
+              base_rate = Map.get(spec, "baseGrowthTime", 100.0) / 60.0
+              next_progress = min(100.0, plant.growth + base_rate * growth_boost * active_ratio)
+
+              n_fixing = Map.get(spec, "nitrogenFixing", 0.0) / 60.0
+
+              next_soil =
+                if n_fixing > 0.0 do
+                  %{
+                    soil
+                    | nitrogen:
+                        BigNum.add(soil.nitrogen, BigNum.from_number(n_fixing * active_ratio))
+                  }
+                else
+                  soil
+                end
+
+              next_plant = %{plant | growth: next_progress}
+
+              {next_soil, %{plot | plant: next_plant}}
             end
-
-            next_plant = %{plant |
-              growth: next_progress
-            }
-
-            {next_soil, %{plot | plant: next_plant}}
           else
             {soil, plot}
           end
@@ -188,29 +229,159 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
       not is_nil(plot.decomposition) ->
         decomp = plot.decomposition
-        next_progress = decomp.progress + 10.0
+        active_ratio = activity_ratio(decomp.started_at, minute_start_ms, @minute_ms)
 
-        if next_progress >= 100.0 do
-          size_val = decomp.amount
-          p_coeff = if decomp.resource_id == "fruit", do: 0.2, else: 0.1
-          
-          om_gain = size_val
-          p_gain = BigNum.from_number(BigNum.to_float(size_val) * p_coeff)
-
-          next_soil = %{soil |
-            organic_matter: clamp_big_num_organic_matter_max(BigNum.add(soil.organic_matter, om_gain)),
-            phosphorus: BigNum.add(soil.phosphorus, p_gain)
-          }
-
-          {next_soil, %{plot | decomposition: nil}}
+        if active_ratio <= 0.0 do
+          {soil, plot}
         else
-          next_decomp = %{decomp | progress: next_progress}
-          {soil, %{plot | decomposition: next_decomp}}
+          next_progress = decomp.progress + 10.0 * active_ratio
+
+          if next_progress >= 100.0 do
+            size_val = decomp.amount
+            p_coeff = if decomp.resource_id == "fruit", do: 0.2, else: 0.1
+
+            om_gain = size_val
+            p_gain = BigNum.from_number(BigNum.to_float(size_val) * p_coeff)
+
+            next_soil = %{
+              soil
+              | organic_matter: clamp_big_num_organic_matter_max(BigNum.add(soil.organic_matter, om_gain)),
+                phosphorus: BigNum.add(soil.phosphorus, p_gain)
+            }
+
+            {next_soil, %{plot | decomposition: nil}}
+          else
+            next_decomp = %{decomp | progress: next_progress}
+            {soil, %{plot | decomposition: next_decomp}}
+          end
         end
 
       true ->
         {soil, plot}
     end
+  end
+
+  defp project_plot_partial_minute(
+         plot,
+         %SoilState{} = soil,
+         temperature_c,
+         minute_start_ms,
+         elapsed_ms
+       )
+       when elapsed_ms > 0 do
+    window_ms = min(elapsed_ms, @minute_ms)
+    minute_window_ratio = window_ms / @minute_ms
+
+    cond do
+      not is_nil(plot.plant) ->
+        plant = plot.plant
+        plant_specs = Constants.orchard_plant_defs()
+        spec = Map.get(plant_specs, plant.plant_id)
+
+        if spec && plant.growth < 100.0 do
+          min_temp = Map.get(spec, "minTemp", 0.0)
+          min_water = Map.get(spec, "minWater", 0.0)
+
+          if temperature_c >= min_temp and soil.water_level >= min_water do
+            active_ratio =
+              partial_activity_ratio(
+                plant.planted_at,
+                minute_start_ms,
+                window_ms,
+                minute_window_ratio
+              )
+
+            if active_ratio <= 0.0 do
+              plot
+            else
+              n_ratio = get_nutrient_ratio(soil.nitrogen, spec, "nitrogen")
+              k_ratio = get_nutrient_ratio(soil.potassium, spec, "potassium")
+
+              growth_boost = 1.0 + n_ratio * 0.5 + k_ratio * 0.5
+              base_rate = Map.get(spec, "baseGrowthTime", 100.0) / 60.0
+
+              next_progress =
+                min(100.0, plant.growth + base_rate * growth_boost * active_ratio)
+
+              %{plot | plant: %{plant | growth: next_progress}}
+            end
+          else
+            plot
+          end
+        else
+          plot
+        end
+
+      not is_nil(plot.decomposition) ->
+        decomp = plot.decomposition
+
+        if decomp.progress < 100.0 do
+          active_ratio =
+            partial_activity_ratio(
+              decomp.started_at,
+              minute_start_ms,
+              window_ms,
+              minute_window_ratio
+            )
+
+          if active_ratio <= 0.0 do
+            plot
+          else
+            next_progress = min(100.0, decomp.progress + 10.0 * active_ratio)
+            %{plot | decomposition: %{decomp | progress: next_progress}}
+          end
+        else
+          plot
+        end
+
+      true ->
+        plot
+    end
+  end
+
+  defp project_plot_partial_minute(plot, _soil, _temperature_c, _minute_start_ms, _elapsed_ms),
+    do: plot
+
+  defp activity_ratio(nil, _window_start_ms, _window_ms), do: 1.0
+
+  defp activity_ratio(started_at, window_start_ms, window_ms)
+       when is_binary(started_at) and is_integer(window_start_ms) and is_integer(window_ms) and
+              window_ms > 0 do
+    case Time.from_iso8601(started_at) do
+      {:ok, started_at_dt} ->
+        started_at_ms = Time.to_unix_ms(started_at_dt)
+        window_end_ms = window_start_ms + window_ms
+        active_start_ms = max(window_start_ms, started_at_ms)
+        active_ms = max(window_end_ms - active_start_ms, 0)
+        min(1.0, active_ms / window_ms)
+
+      _ ->
+        1.0
+    end
+  end
+
+  defp activity_ratio(_started_at, _window_start_ms, _window_ms), do: 1.0
+
+  defp partial_activity_ratio(started_at, window_start_ms, window_ms, minute_window_ratio)
+       when is_binary(started_at) and is_integer(window_start_ms) and is_integer(window_ms) and
+              window_ms > 0 do
+    case Time.from_iso8601(started_at) do
+      {:ok, _dt} -> activity_ratio(started_at, window_start_ms, window_ms) * minute_window_ratio
+      _ -> 0.0
+    end
+  end
+
+  defp partial_activity_ratio(_started_at, _window_start_ms, _window_ms, _minute_window_ratio),
+    do: 0.0
+
+  defp minute_temperature(minute_start_ms) do
+    epoch_ms = Constants.climate_epoch_at() |> Time.to_unix_ms()
+    elapsed_minutes = div(minute_start_ms - epoch_ms, @minute_ms)
+    elapsed_hours = div(elapsed_minutes, 60)
+    temp_weather_entry = Constants.climate_weather_entry(elapsed_hours)
+    base_temp = Map.fetch!(temp_weather_entry, "c")
+    temp_jitter = :erlang.phash2(elapsed_minutes, 5) - 2
+    base_temp + temp_jitter
   end
 
   defp get_nutrient_ratio(%BigNum{} = soil_val, spec, key) do

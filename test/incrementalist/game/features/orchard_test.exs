@@ -183,6 +183,246 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert plot.decomposition.progress == 0.0
   end
 
+  test "orchard command results keep decomposition progress for untouched plots within the same minute", %{player: player} do
+    update_player_state(player.id, fn state ->
+      decomposition = %State.Decomposition{
+        resource_id: "plant_matter",
+        amount: BigNum.from_number(2),
+        progress: 0.0,
+        started_at: Time.iso8601(@now)
+      }
+
+      plots =
+        Enum.map(state.plots, fn
+          p when p.id == "plot_1" -> %{p | depth: 2, plant: nil, decomposition: decomposition}
+          p -> p
+        end)
+
+      %{
+        state
+        | shards: BigNum.from_number(500),
+          clover_seeds: BigNum.from_number(200),
+          plots: plots,
+          soil: %{state.soil | water_level: 100.0, projected_at: Time.iso8601(@now)}
+      }
+    end)
+
+    first_now = DateTime.add(@now, 30, :second)
+
+    unlock_result =
+      Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+
+    assert unlock_result["type"] == "orchard.unlock_plot.result"
+
+    first_progress = result_plot_decomposition_progress(unlock_result, "plot_1")
+    assert first_progress > 0.0
+
+    Commands.ack(player.id, 0, first_now)
+
+    second_now = DateTime.add(@now, 40, :second)
+
+    plant_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.plant_seed",
+        intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
+        second_now
+      )
+
+    assert plant_result["type"] == "orchard.plant_seed.result"
+
+    second_progress = result_plot_decomposition_progress(plant_result, "plot_1")
+    assert second_progress >= first_progress
+    assert result_plot_plant_growth(plant_result, "plot_2") == 0.0
+  end
+
+  test "orchard command results keep plant growth for untouched plots within the same minute", %{player: player} do
+    update_player_state(player.id, fn state ->
+      plant = %State.Plant{
+        plant_id: "clover_patch",
+        growth: 0.0,
+        level: 1,
+        planted_at: Time.iso8601(@now)
+      }
+
+      plots =
+        Enum.map(state.plots, fn
+          p when p.id == "plot_1" -> %{p | depth: 2, plant: plant, decomposition: nil}
+          p -> p
+        end)
+
+      %{
+        state
+        | shards: BigNum.from_number(500),
+          clover_seeds: BigNum.from_number(200),
+          plots: plots,
+          soil: %{state.soil | water_level: 100.0, projected_at: Time.iso8601(@now)}
+      }
+    end)
+
+    first_now = DateTime.add(@now, 30, :second)
+
+    unlock_result =
+      Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+
+    assert unlock_result["type"] == "orchard.unlock_plot.result"
+
+    first_growth = result_plot_plant_growth(unlock_result, "plot_1")
+    assert first_growth > 0.0
+
+    Commands.ack(player.id, 0, first_now)
+
+    second_now = DateTime.add(@now, 40, :second)
+
+    plant_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.plant_seed",
+        intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
+        second_now
+      )
+
+    assert plant_result["type"] == "orchard.plant_seed.result"
+
+    second_growth = result_plot_plant_growth(plant_result, "plot_1")
+    assert second_growth >= first_growth
+    assert result_plot_plant_growth(plant_result, "plot_2") == 0.0
+  end
+
+  test "plots planted at different seconds keep distinct progress in subsequent orchard results", %{player: player} do
+    update_player_state(player.id, fn state ->
+      plots =
+        state.plots
+        |> ensure_plot("plot_2")
+        |> ensure_plot("plot_3")
+        |> ensure_plot("plot_4")
+
+      %{
+        state
+        | shards: BigNum.from_number(2000),
+          clover_seeds: BigNum.from_number(500),
+          unlocked_plots: ["plot_1", "plot_2", "plot_3"],
+          plots: plots,
+          soil: %{
+            state.soil
+            | water_level: 100.0,
+              nitrogen: BigNum.from_number(50),
+              phosphorus: BigNum.from_number(50),
+              potassium: BigNum.from_number(50),
+              organic_matter: BigNum.from_number(20),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    first_plant_at = DateTime.add(@now, 5, :second)
+
+    first_plant_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.plant_seed",
+        intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}),
+        first_plant_at
+      )
+
+    assert first_plant_result["type"] == "orchard.plant_seed.result"
+    Commands.ack(player.id, 0, first_plant_at)
+
+    second_plant_at = DateTime.add(@now, 50, :second)
+
+    second_plant_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.plant_seed",
+        intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
+        second_plant_at
+      )
+
+    assert second_plant_result["type"] == "orchard.plant_seed.result"
+    Commands.ack(player.id, 1, second_plant_at)
+
+    trigger_at = DateTime.add(@now, 70, :second)
+
+    trigger_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.unlock_plot",
+        intent(2, %{"plot_id" => "plot_4"}),
+        trigger_at
+      )
+
+    assert trigger_result["type"] == "orchard.unlock_plot.result"
+
+    first_growth = result_plot_plant_growth(trigger_result, "plot_1")
+    second_growth = result_plot_plant_growth(trigger_result, "plot_2")
+
+    assert first_growth > second_growth
+  end
+
+  test "decomposing a second plot does not over-advance an earlier decomposition within the minute", %{player: player} do
+    update_player_state(player.id, fn state ->
+      ready_plant_1 = %State.Plant{
+        plant_id: "clover_patch",
+        growth: 100.0,
+        level: 1,
+        planted_at: Time.iso8601(DateTime.add(@now, -5, :minute))
+      }
+
+      ready_plant_2 = %State.Plant{
+        plant_id: "clover_patch",
+        growth: 100.0,
+        level: 1,
+        planted_at: Time.iso8601(DateTime.add(@now, -5, :minute))
+      }
+
+      plots =
+        state.plots
+        |> ensure_plot("plot_2")
+        |> Enum.map(fn
+          p when p.id == "plot_1" -> %{p | depth: 2, plant: ready_plant_1, decomposition: nil}
+          p when p.id == "plot_2" -> %{p | depth: 2, plant: ready_plant_2, decomposition: nil}
+          p -> p
+        end)
+
+      %{
+        state
+        | shards: BigNum.from_number(1000),
+          unlocked_plots: ["plot_1", "plot_2"],
+          plots: plots,
+          soil: %{state.soil | water_level: 100.0, projected_at: Time.iso8601(@now)}
+      }
+    end)
+
+    first_decompose_at = DateTime.add(@now, 40, :second)
+
+    first_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.harvest_plot",
+        intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}),
+        first_decompose_at
+      )
+
+    assert first_result["type"] == "orchard.harvest_plot.result"
+    Commands.ack(player.id, 0, first_decompose_at)
+
+    second_decompose_at = DateTime.add(@now, 46, :second)
+
+    second_result =
+      Commands.enqueue(
+        player.id,
+        "orchard.harvest_plot",
+        intent(1, %{"plot_id" => "plot_2", "action" => "decompose"}),
+        second_decompose_at
+      )
+
+    assert second_result["type"] == "orchard.harvest_plot.result"
+
+    first_plot_progress = result_plot_decomposition_progress(second_result, "plot_1")
+    assert first_plot_progress > 0.8
+    assert first_plot_progress < 1.2
+  end
+
   test "orchard.splice_seeds combines seeds into a coin tree seed", %{player: player} do
     # Give gold and ingredients
     update_player_state(player.id, fn state ->
@@ -226,7 +466,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     Repo.get!(Player, player.id)
   end
 
-  defp intent(command_id, attrs \\ %{}) do
+  defp intent(command_id, attrs) do
     Map.put(attrs, "command_id", command_id)
   end
 
@@ -241,5 +481,34 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       last_saved_at: @now
     })
     |> Repo.update!()
+  end
+
+  defp ensure_plot(plots, plot_id) do
+    if Enum.any?(plots, &(&1.id == plot_id)) do
+      plots
+    else
+      [%State.Plot{id: plot_id, depth: 1} | plots]
+    end
+  end
+
+  defp result_plot_decomposition_progress(result, plot_id) do
+    result
+    |> result_plot(plot_id)
+    |> Map.fetch!("decomposition")
+    |> Map.fetch!("progress")
+  end
+
+  defp result_plot_plant_growth(result, plot_id) do
+    result
+    |> result_plot(plot_id)
+    |> Map.fetch!("plant")
+    |> Map.fetch!("growth")
+  end
+
+  defp result_plot(result, plot_id) do
+    case Enum.find(result["plots"] || [], &(&1["id"] == plot_id)) do
+      nil -> raise "missing plot #{plot_id} in result"
+      plot -> plot
+    end
   end
 end

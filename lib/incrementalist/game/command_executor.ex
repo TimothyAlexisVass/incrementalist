@@ -1344,6 +1344,9 @@ defmodule Incrementalist.Game.CommandExecutor do
                 last_saved_at: now
               })
 
+              visible_plots =
+                OrchardSoil.project_visible_plots(next_state, now, skip_plot_ids: [plot_id])
+
               {"succeeded",
                %{
                  "type" => "orchard.unlock_plot.result",
@@ -1352,7 +1355,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                  "plot_id" => plot_id,
                  "shards" => next_state.shards,
                  "unlocked_plots" => next_state.unlocked_plots,
-                 "plots" => State.visible_plots(next_state.plots),
+                 "plots" => State.visible_plots(visible_plots),
                  "notices" => Notices.payload(next_notices)
                }, ps.id}
             else
@@ -1497,6 +1500,9 @@ defmodule Incrementalist.Game.CommandExecutor do
                     last_saved_at: now
                   })
 
+                  visible_plots =
+                    OrchardSoil.project_visible_plots(next_state, now, skip_plot_ids: [plot_id])
+
                   {"succeeded",
                    %{
                      "type" => "orchard.plant_seed.result",
@@ -1508,7 +1514,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                      "acorns" => next_state.acorns,
                      "coin_tree_seeds" => next_state.coin_tree_seeds,
                      "soil" => OrchardSoil.visible_state(next_state.soil),
-                     "plots" => State.visible_plots(next_state.plots),
+                     "plots" => State.visible_plots(visible_plots),
                      "notices" => Notices.payload(next_notices)
                    }, ps.id}
               end
@@ -1616,7 +1622,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                     new_decomp = %State.Decomposition{
                       resource_id: decomp_resource,
                       amount: pm_yield,
-                      progress: 0.0
+                      progress: 0.0,
+                      started_at: Time.iso8601(now)
                     }
 
                     next_plots = Enum.map(ps.state.plots, fn
@@ -1645,6 +1652,9 @@ defmodule Incrementalist.Game.CommandExecutor do
                   last_saved_at: now
                 })
 
+                visible_plots =
+                  OrchardSoil.project_visible_plots(next_state, now, skip_plot_ids: [plot_id])
+
                 {"succeeded",
                  %{
                    "type" => "orchard.harvest_plot.result",
@@ -1660,7 +1670,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                    "acorns" => next_state.acorns,
                    "coin_tree_seeds" => next_state.coin_tree_seeds,
                    "coins" => next_state.coins,
-                   "plots" => State.visible_plots(next_state.plots),
+                   "plots" => State.visible_plots(visible_plots),
                    "notices" => Notices.payload(next_notices)
                  }, ps.id}
               end
