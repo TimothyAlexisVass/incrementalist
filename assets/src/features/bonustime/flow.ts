@@ -1,7 +1,7 @@
 import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { drawButton } from "../../ui/components/button";
-import { hexToRgba, to255 } from "../../utils";
+import { hexToRgba } from "../../utils";
 import { resolveUpdatingText } from "../../utils/text";
 import {
   BONUSTIME_BODY_FONT,
@@ -152,7 +152,7 @@ export function renderBonusTimeWelcomeCard(
   const streakColor = options.streakColor ?? "#52df87";
   const accentColor = options.accentColor ?? "#ffbe4d";
   const backgroundColor = options.backgroundColor ?? "#120d24";
-  const glowColor = options.glowColor ?? [255, 190, 77, 255];
+  const glowColor = options.glowColor ?? [1, 0.745, 0.302, 1];
 
   renderer.drawGlowRect({
     x: cardRect.x,
@@ -264,7 +264,7 @@ export function renderBonusTimeRewardCountdownBanner(
     y: rect.y,
     width: rect.width,
     height: rect.height,
-    color: to255(hexToRgba(accentColor)),
+    color: hexToRgba(accentColor),
     radius: 12,
     intensity: 0.45,
     outerAlpha: 0.25

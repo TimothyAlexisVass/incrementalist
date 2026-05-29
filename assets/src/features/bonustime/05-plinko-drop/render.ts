@@ -73,7 +73,7 @@ export function renderPlinkoDrop(
       titleColor: "#ffbe4d",
       bodyColor: "#edf2f7",
       accentColor: "#ffbe4d",
-      glowColor: [255, 190, 77, 255],
+      glowColor: [1, 0.745, 0.302, 1],
       backgroundColor: "#120d24",
       buttonActive: false
     });
@@ -117,7 +117,7 @@ function drawPegBoard(
     y: boardRect.y,
     width: boardRect.width,
     height: binsRect.y - boardRect.y,
-    color: [9 / 255, 16 / 255, 29 / 255, 0.62]
+    color: [0.035, 0.063, 0.114, 0.62]
   });
 
   const pegRows = buildPegRowsFromBottom(data.rows, data.lanes);

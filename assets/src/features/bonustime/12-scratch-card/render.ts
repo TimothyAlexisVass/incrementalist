@@ -96,7 +96,7 @@ export function renderScratchCard(
       bodyColor: "#edf2f7",
       streakColor: "#52df87",
       accentColor: "#ffbe4d",
-      glowColor: [255, 190, 77, 255],
+      glowColor: [1, 0.745, 0.302, 1],
       backgroundColor: "#1f1a12",
       buttonActive: isPointInBonusTimeWelcomeButton(pointer, welcomeLayout)
     });
@@ -133,7 +133,7 @@ export function renderScratchCard(
     y: boardRect.y,
     width: boardRect.width,
     height: boardRect.height,
-    color: [255, 198, 122, 255],
+    color: [1, 0.776, 0.478, 1],
     radius: 10,
     intensity: 0.2,
     outerAlpha: 0.2

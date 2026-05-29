@@ -63,7 +63,7 @@ function drawChecklistEntry(
   const borderAlpha = isActive ? 1 : 0.55;
   const fillAlpha = isActive ? 0.85 + (Math.sin(now / 170) * 0.15) : (isCompleted ? 1 : 0.26);
   const textColor = getRewardTierLabelColor(entry.tier);
-  const bgColor: RGBA = [27 / 255, 36 / 255, 53 / 255, 1];
+  const bgColor: RGBA = [0.106, 0.141, 0.208, 1];
   const borderColor: RGBA = [1, 1, 1, borderAlpha];
   const inset = Math.min(borderThickness, Math.floor(boxSize / 2));
   const innerSize = Math.max(1, boxSize - (2 * inset));

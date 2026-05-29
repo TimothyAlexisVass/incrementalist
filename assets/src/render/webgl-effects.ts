@@ -1425,15 +1425,12 @@ function normalizeColor(color: any): Rgb {
     const g = Number(color[1]) || 0;
     const b = Number(color[2]) || 0;
 
-    // If any component is > 1.0, assume it's 0-255 range and normalize it.
-    // Otherwise, assume it's already in the 0.0-1.0 range.
-    const isHighRange = r > 1.0 || g > 1.0 || b > 1.0;
-    const factor = isHighRange ? 255 : 1;
+    // Colors are assumed to be [0..1] range.
 
     return [
-      clampColorChannel(r / factor),
-      clampColorChannel(g / factor),
-      clampColorChannel(b / factor)
+      clampColorChannel(r),
+      clampColorChannel(g),
+      clampColorChannel(b)
     ];
   }
 

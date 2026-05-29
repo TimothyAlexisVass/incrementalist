@@ -12,14 +12,14 @@ export const COLORS = Object.freeze({
     border: '#000',
     progress: {
       border: '#412407',
-      fillStart: [255, 107, 107], // #FF6B6B
-      fillMid: [255, 230, 109],   // #FFE66D
-      fillEnd: [78, 205, 196],    // #4ECDC4
+      fillStart: [1, 0.420, 0.420], // #FF6B6B
+      fillMid: [1, 0.902, 0.427],   // #FFE66D
+      fillEnd: [0.306, 0.804, 0.769],    // #4ECDC4
       idle: {
         border: '#2b1c48ff',
-        fillStart: [38, 58, 103], // #263A67
-        fillMid: [82, 97, 163],   // #5261A3
-        fillEnd: [108, 188, 144]  // #6CBC90
+        fillStart: [0.149, 0.227, 0.404], // #263A67
+        fillMid: [0.322, 0.380, 0.639],   // #5261A3
+        fillEnd: [0.424, 0.737, 0.565]  // #6CBC90
       }
     },
     exp: {
@@ -103,7 +103,7 @@ export const COLORS = Object.freeze({
     countdownText: '#ffffff'
   },
   overlay: {
-    backdrop: 'rgba(0, 0, 0, 0.1)',
+    backdrop: [0, 0, 0, 0.1] as const,
     panelBorder: '#3a5273',
     titleText: '#dbe8ff',
     multiplierText: '#ffd966',

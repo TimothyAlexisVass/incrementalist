@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, to255 } from "../../../utils";
+import { hexToRgba } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { CardPickData } from "./view-model";
 import {
@@ -163,7 +163,7 @@ export function renderCardPick(
         // Outer glow of reward color
         renderer.drawGlowRect({
           x: tx, y: ty, width: tileSize, height: tileSize,
-          color: to255(hexToRgba(tierColor)), radius: 8, intensity: 0.55, outerAlpha: 0.35, alpha
+          color: hexToRgba(tierColor), radius: 8, intensity: 0.55, outerAlpha: 0.35, alpha
         });
 
         // Draw solid background block

@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, to255 } from "../../../utils";
+import { hexToRgba } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { RewardLabyrinthData } from "./view-model";
 import {
@@ -51,7 +51,7 @@ function drawTierRewardTile(
       y,
       width: size,
       height: size,
-      color: to255(hexToRgba(tierColor)),
+      color: hexToRgba(tierColor),
       radius: Math.max(4, Math.round(size * 0.14)),
       intensity: 0.45,
       outerAlpha: 0.25,
@@ -159,7 +159,7 @@ export function renderRewardLabyrinth(
       y: rect.y + 20,
       width: rect.width - 40,
       height: rect.height - 40,
-      color: to255(hexToRgba("#4A5568")),
+      color: hexToRgba("#4A5568"),
       intensity: 0.15,
       radius: 10,
       innerAlpha: 0.05,
@@ -259,7 +259,7 @@ export function renderRewardLabyrinth(
             y: cellY - 20,
             width: 40,
             height: 40,
-            color: to255(hexToRgba("#4FD1C5")),
+            color: hexToRgba("#4FD1C5"),
             intensity: 0.35,
             radius: 6
           });
@@ -322,7 +322,7 @@ export function renderRewardLabyrinth(
             y: cellY - 20,
             width: 40,
             height: 40,
-            color: to255(hexToRgba(isHovered ? "#4FD1C5" : "#D69E2E")),
+            color: hexToRgba(isHovered ? "#4FD1C5" : "#D69E2E"),
             intensity: isHovered ? 0.3 : 0.18,
             radius: 6
           });
@@ -420,7 +420,7 @@ export function renderRewardLabyrinth(
       y: cardRect.y,
       width: cardRect.width,
       height: cardRect.height,
-      color: to255(hexToRgba("#D69E2E")), // Glowing Gold border
+      color: hexToRgba("#D69E2E"), // Glowing Gold border
       intensity: 0.3,
       radius: 18,
       innerAlpha: 0.1,

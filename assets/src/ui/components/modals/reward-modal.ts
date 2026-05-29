@@ -4,6 +4,7 @@ import {
   MODAL_TITLE_FONT, MODAL_BODY_FONT 
 } from '../../../config';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
+import { hexToRgba } from '../../../utils/color';
 import { drawButton } from '../button';
 import { BigNum } from '../../../core/bignum';
 import { formatBigNum } from '../../../utils/format';
@@ -76,7 +77,7 @@ export function renderRewardModal(
     y: DISPLAY_AREA_Y,
     width: DISPLAY_AREA_WIDTH,
     height: DISPLAY_AREA_HEIGHT,
-    color: cssToRgba(COLORS.overlay.backdrop, 6.0)
+    color: [0, 0, 0, 0.6]
   });
 
   // Modal Panel
@@ -85,11 +86,11 @@ export function renderRewardModal(
     y: modalRect.y,
     width: modalRect.width,
     height: modalRect.height,
-    color: cssToRgba(COLORS.panel.bg)
+    color: hexToRgba(COLORS.panel.bg)
   });
 
   // Color-coded Border
-  drawRectOutline(renderer, modalRect.x, modalRect.y, modalRect.width, modalRect.height, 3, cssToRgba(rarityColor));
+  drawRectOutline(renderer, modalRect.x, modalRect.y, modalRect.width, modalRect.height, 3, hexToRgba(rarityColor));
 
   // Title - Simplified to just the tier reward
   renderer.drawText({
@@ -136,29 +137,4 @@ function drawRectOutline(
   renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
 }
 
-function cssToRgba(color: string, alphaMultiplier = 1): [number, number, number, number] {
-  const normalized = String(color || '').trim();
-  
-  // Handle rgba(r, g, b, a)
-  const rgbaMatch = normalized.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/i);
-  if (rgbaMatch) {
-    const r = parseInt(rgbaMatch[1], 10) / 255;
-    const g = parseInt(rgbaMatch[2], 10) / 255;
-    const b = parseInt(rgbaMatch[3], 10) / 255;
-    const a = rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : 1.0;
-    return [r, g, b, clamp01(a * alphaMultiplier)];
-  }
 
-  const match = normalized.match(/^#([0-9a-f]{6})$/i);
-  if (!match) return [0, 0, 0, clamp01(alphaMultiplier)]; // Default to black if unknown
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  return [r, g, b, clamp01(alphaMultiplier)];
-}
-
-function clamp01(value: number) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}

@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, cssToRgba } from "../../../utils";
+import { hexToRgba, hslToRgb } from "../../../utils";
 import { JackpotMeterData } from "./view-model";
 import { JackpotState, getJackpotState } from "./interactions";
 import { fitRectWithinBonusTimeArea } from "../layout";
@@ -56,7 +56,7 @@ export function renderJackpotMeter(
       bodyColor: "#edf2f7",
       streakColor: "#52df87",
       accentColor: "#ffbe4d",
-      glowColor: [255, 190, 77, 255],
+      glowColor: [1, 0.745, 0.302, 1],
       backgroundColor: "#120d24",
       buttonActive: false
     });
@@ -141,7 +141,7 @@ export function renderJackpotMeter(
     if (isStarred) {
       if (displayedProgress >= 14 || (state === JackpotState.REVEALED && data.lastTier === 7)) {
         const hue = (now % 1000) / 1000 * 360;
-        dotColor = cssToRgba(`hsl(${hue}, 90%, 55%)`);
+        dotColor = hslToRgb(hue, 0.9, 0.55);
       } else {
         dotColor = hexToRgba("#ffbe4d");
       }
@@ -163,7 +163,7 @@ export function renderJackpotMeter(
     let arcColor = hexToRgba("#3182ce");
     if (isGuaranteed) {
       const hue = (now % 1000) / 1000 * 360;
-      arcColor = cssToRgba(`hsl(${hue}, 80%, 50%)`);
+      arcColor = hslToRgb(hue, 0.8, 0.5);
     }
 
     renderer.drawArc(centerX, centerY, radius, thickness, arcStart, arcEnd, arcColor);
@@ -239,7 +239,7 @@ export function renderJackpotMeter(
     y: btnY,
     width: btnWidth,
     height: btnHeight,
-    color: cssToRgba(btnColor)
+    color: hexToRgba(btnColor)
   });
 
   renderer.drawText({

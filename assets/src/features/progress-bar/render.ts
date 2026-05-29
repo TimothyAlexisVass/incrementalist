@@ -52,22 +52,22 @@ const COLLECTION_GLOW_FADE_MS = (Math.PI * 165) / (
   BAR_FULL_PULSE_SPEED * BAR_COLLECTION_GLOW_FADE_MULTIPLIER
 );
 
-const YELLOW_GLOW: Rgb = [255, 255, 0];
-const IDLE_GLOW: Rgb = [160, 100, 255];
+const YELLOW_GLOW: Rgb = [1, 1, 0];
+const IDLE_GLOW: Rgb = [0.627, 0.392, 1];
 
 const COMPLETION_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillStart,
   COLORS.bar.progress.fillMid,
   COLORS.bar.progress.fillEnd,
-  [255, 255, 255] as const,
-  [142, 246, 255] as const
+  [1, 1, 1] as const,
+  [0.557, 0.965, 1] as const,
 ]);
 
 const COLLECTION_LASER_BURST_COLORS: readonly ColorInput[] = Object.freeze([
   COLORS.bar.progress.fillEnd,
-  [255, 255, 255] as const,
+  [1, 1, 1] as const,
   COLORS.bar.progress.fillMid,
-  [142, 246, 255] as const,
+  [0.557, 0.965, 1] as const,
   COLORS.bar.progress.fillStart
 ]);
 const PROGRESS_TOOLTIP_TEXT_KEY = "progress.bar.hover";
@@ -292,7 +292,7 @@ function renderProgressBarDirect(
         y: energyY,
         width: barWidth - 12,
         height: 2,
-        color: [255, 255, 255, 0.9],
+        color: [1, 1, 1, 0.9],
         radius: 0.5,
         intensity: alpha,
         innerAlpha: 0.3,
@@ -328,7 +328,7 @@ function renderProgressBarDirect(
       y: barY,
       width: barWidth,
       height: barHeight,
-      color: [255, 255, 255, 1],
+      color: [1, 1, 1, 1],
       radius: 32 + 28 * pulse,
       intensity: (0.12 + 0.24 * pulse) * 0.4,
       innerAlpha: 0.0,

@@ -56,7 +56,7 @@ export function renderCoinRain(
       bodyColor: "#edf2f7",
       streakColor: "#52df87",
       accentColor: COIN_COLOR,
-      glowColor: [255, 215, 0, 255],
+      glowColor: [1, 0.843, 0, 1],
       backgroundColor: "#0d1117",
       buttonActive: false
     });

@@ -254,7 +254,7 @@ function renderWelcomeCard(
     streakColor: "#52df87",
     accentColor: "#ff5b8f",
     backgroundColor: "#120d24",
-    glowColor: [255, 91, 143, 255],
+    glowColor: [1, 0.357, 0.561, 1],
     buttonActive: isPointInBonusTimeWelcomeButton(pointer, welcomeLayout)
   });
 }

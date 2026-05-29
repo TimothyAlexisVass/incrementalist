@@ -98,8 +98,7 @@ function normalizeColor(color: BarColor): RGBA {
 
   if (Array.isArray(color)) {
     const [r, g, b, a = 1] = color;
-    const scale = Math.max(r, g, b, a) > 1 ? 255 : 1;
-    return [r / scale, g / scale, b / scale, a / scale];
+    return [r, g, b, a];
   }
 
   return [1, 1, 1, 1];

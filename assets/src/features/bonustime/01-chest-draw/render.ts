@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, cssToRgba } from "../../../utils";
+import { hexToRgba, hslToRgb, type RGBA } from "../../../utils";
 import { ChestDrawData } from "./view-model";
 import { ChestState, getChestState } from "./interactions";
 import bonusTimeConfig from "../../../../../shared/requirements/bonustime.json";
@@ -10,7 +10,7 @@ function getTierConfig(tier: number) {
   return (bonusTimeConfig.reward_tiers as any)[`tier_${tier}`];
 }
 
-const DEFAULT_COLOR = "#4a5568";
+const DEFAULT_RGBA = hexToRgba("#4a5568");
 
 export function renderChestDraw(
   data: ChestDrawData,
@@ -34,25 +34,26 @@ export function renderChestDraw(
       bodyColor: "#edf2f7",
       streakColor: "#52df87",
       accentColor: "#ffbe4d",
-      glowColor: [255, 190, 77, 255],
+      glowColor: [1, 0.745, 0.302, 1],
       backgroundColor: "#120d24",
       buttonActive: false
     });
     return;
   }
 
-  let color = DEFAULT_COLOR;
+  let rgba: RGBA = DEFAULT_RGBA;
 
   if (state === ChestState.REVEALING) {
     const hue = (now % 1000) / 1000 * 360;
-    color = `hsl(${hue}, 70%, 50%)`;
+    rgba = hslToRgb(hue, 0.7, 0.5);
   } else if (state === ChestState.REVEALED && data.lastTier) {
     const tierConfig = getTierConfig(data.lastTier);
-    color = tierConfig?.color || "#ffffff";
+    rgba = hexToRgba(tierConfig?.color || "#ffffff");
   }
 
   renderer.drawRect({
     x: layout.x, y: layout.y, width: layout.width, height: layout.height,
-    color: color.startsWith("#") ? hexToRgba(color) : cssToRgba(color)
+    color: rgba
   });
 }
+

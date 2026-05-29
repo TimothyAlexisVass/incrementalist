@@ -35,12 +35,7 @@ export function hexToRgba(hex: string, alpha = 1): RGBA {
   ];
 }
 
-/**
- * Converts a normalized RGBA tuple to a 0..255 tuple.
- */
-export function to255(rgba: RGBA | number[]): [number, number, number, number] {
-  return [rgba[0] * 255, rgba[1] * 255, rgba[2] * 255, (rgba[3] ?? 1) * 255];
-}
+
 
 export function rgbArrayToCss(rgb: number[] | readonly number[]): string {
   return `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
@@ -73,7 +68,7 @@ export function cssToRgba(css: string): RGBA {
   return [1, 1, 1, 1];
 }
 
-function hslToRgb(h: number, s: number, l: number): RGBA {
+export function hslToRgb(h: number, s: number, l: number, a = 1.0): RGBA {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs((h / 60) % 2 - 1));
   const m = l - c / 2;
@@ -86,5 +81,5 @@ function hslToRgb(h: number, s: number, l: number): RGBA {
   else if (h < 300) { r = x; g = 0; b = c; }
   else { r = c; g = 0; b = x; }
 
-  return [r + m, g + m, b + m, 1];
+  return [r + m, g + m, b + m, a];
 }

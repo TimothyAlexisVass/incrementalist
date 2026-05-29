@@ -4,6 +4,7 @@ import { InteractionState, pointInRect } from '../../managers/interactions';
 import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../../../config';
 import { drawButton, doButton } from '../button';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
+import { hexToRgba } from '../../../utils/color';
 
 export class ResetConfirmationModal implements Modal {
   public readonly isBlocking = true;
@@ -34,9 +35,9 @@ export class ResetConfirmationModal implements Modal {
       y: modalY,
       width: modalWidth,
       height: modalHeight,
-      color: cssToRgba(COLORS.panel.bg)
+      color: hexToRgba(COLORS.panel.bg)
     });
-    drawRectOutline(renderer, modalX, modalY, modalWidth, modalHeight, 2, cssToRgba(COLORS.overlay.panelBorder));
+    drawRectOutline(renderer, modalX, modalY, modalWidth, modalHeight, 2, hexToRgba(COLORS.overlay.panelBorder));
     renderer.drawText({
       text: this.title,
       x: modalX + modalWidth / 2,
@@ -149,15 +150,15 @@ export class LoadingModal implements Modal {
           y: spinnerY,
           width: spinnerWidth,
           height: spinnerHeight,
-          color: cssToRgba(COLORS.bar.track)
+          color: hexToRgba(COLORS.bar.track)
         });
-        drawRectOutline(renderer, spinnerX, spinnerY, spinnerWidth, spinnerHeight, 1, cssToRgba(COLORS.bar.border));
+        drawRectOutline(renderer, spinnerX, spinnerY, spinnerWidth, spinnerHeight, 1, hexToRgba(COLORS.bar.border));
         renderer.drawRect({
           x: chunkX,
           y: spinnerY + 1,
           width: chunkWidth,
           height: spinnerHeight - 2,
-          color: cssToRgba(COLORS.panel.textPrimary)
+          color: hexToRgba(COLORS.panel.textPrimary)
         });
         renderer.drawText({
           text: this.message,
@@ -211,7 +212,7 @@ export class InfoAcknowledgementModal implements Modal {
       y: modalY,
       width: modalWidth,
       height: modalHeight,
-      color: cssToRgba(COLORS.panel.bg)
+      color: hexToRgba(COLORS.panel.bg)
     });
     drawRectOutline(
       renderer,
@@ -220,7 +221,7 @@ export class InfoAcknowledgementModal implements Modal {
       modalWidth,
       modalHeight,
       2,
-      cssToRgba(COLORS.overlay.panelBorder)
+      hexToRgba(COLORS.overlay.panelBorder)
     );
 
     renderer.drawText({
@@ -269,7 +270,7 @@ function drawRectOutline(
   width: number,
   height: number,
   borderWidth: number,
-  color: [number, number, number, number]
+  color: readonly [number, number, number, number]
 ) {
   const stroke = Math.max(1, Number.isFinite(borderWidth) ? borderWidth : 1);
   renderer.drawRect({ x, y, width, height: stroke, color });
@@ -278,13 +279,4 @@ function drawRectOutline(
   renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
 }
 
-function cssToRgba(color: string): [number, number, number, number] {
-  const normalized = String(color || '').trim();
-  const match = normalized.match(/^#([0-9a-f]{6})$/i);
-  if (!match) return [1, 1, 1, 1];
-  const value = match[1];
-  const r = parseInt(value.slice(0, 2), 16) / 255;
-  const g = parseInt(value.slice(2, 4), 16) / 255;
-  const b = parseInt(value.slice(4, 6), 16) / 255;
-  return [r, g, b, 1];
-}
+

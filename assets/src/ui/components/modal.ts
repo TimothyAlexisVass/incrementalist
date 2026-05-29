@@ -1,6 +1,7 @@
 import { COLORS } from '../../colors';
 import { MODAL_TITLE_FONT, MODAL_BODY_FONT } from '../../config';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
+import { hexToRgba } from '../../utils/color';
 import { drawButton } from './button';
 
 export interface ModalState {
@@ -42,16 +43,16 @@ export function renderConfirmationModal(
     y: 0,
     width: canvas.width,
     height: canvas.height,
-    color: cssToRgba(COLORS.overlay.backdrop)
+    color: COLORS.overlay.backdrop
   });
   renderer.drawRect({
     x: modalX,
     y: modalY,
     width: modalWidth,
     height: modalHeight,
-    color: cssToRgba(COLORS.panel.bg)
+    color: hexToRgba(COLORS.panel.bg)
   });
-  drawRectOutline(renderer, modalX, modalY, modalWidth, modalHeight, 2, cssToRgba(COLORS.overlay.panelBorder));
+  drawRectOutline(renderer, modalX, modalY, modalWidth, modalHeight, 2, hexToRgba(COLORS.overlay.panelBorder));
 
   const title = modalState.title || 'Confirm';
   renderer.drawText({
@@ -159,7 +160,7 @@ function drawRectOutline(
   width: number,
   height: number,
   borderWidth: number,
-  color: [number, number, number, number]
+  color: readonly [number, number, number, number]
 ) {
   const stroke = Math.max(1, Number.isFinite(borderWidth) ? borderWidth : 1);
   renderer.drawRect({ x, y, width, height: stroke, color });
@@ -168,38 +169,4 @@ function drawRectOutline(
   renderer.drawRect({ x: x + width - stroke, y, width: stroke, height, color });
 }
 
-function cssToRgba(color: string): [number, number, number, number] {
-  const normalized = String(color || '').trim().toLowerCase();
-  const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (hexMatch) {
-    const raw = hexMatch[1];
-    const hex = raw.length === 3
-      ? `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
-      : raw;
-    const value = Number.parseInt(hex, 16);
-    return [
-      ((value >> 16) & 255) / 255,
-      ((value >> 8) & 255) / 255,
-      (value & 255) / 255,
-      1
-    ];
-  }
-  const rgbaMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
-  if (rgbaMatch) {
-    const parts = rgbaMatch[1].split(',').map((part) => Number(part.trim()));
-    if (parts.length >= 3) {
-      return [
-        clamp01(parts[0] / 255),
-        clamp01(parts[1] / 255),
-        clamp01(parts[2] / 255),
-        clamp01(parts.length >= 4 ? parts[3] : 1)
-      ];
-    }
-  }
-  return [1, 1, 1, 1];
-}
 
-function clamp01(value: number) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}

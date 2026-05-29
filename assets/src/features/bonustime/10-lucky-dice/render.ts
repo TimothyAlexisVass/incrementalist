@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, to255 } from "../../../utils";
+import { hexToRgba } from "../../../utils";
 import { drawButton } from "../../../ui/components/button";
 import {
   BONUSTIME_BODY_FONT,
@@ -172,7 +172,7 @@ export function renderLuckyDice(
         y: die.y - 1,
         width: die.width + 2,
         height: die.height + 2,
-        color: to255(hexToRgba(borderColor)),
+        color: hexToRgba(borderColor),
         radius: 10,
         intensity: isHeld ? 0.45 : 0.3,
         outerAlpha: isHeld ? 0.3 : 0.2

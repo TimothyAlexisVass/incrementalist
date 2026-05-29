@@ -981,9 +981,9 @@ export class WebGLRenderer {
     gl.uniform2f(this.liquidResolutionLocation, this.canvas.width, this.canvas.height);
     gl.uniform1f(this.liquidTimeLocation, time);
     gl.uniform1f(this.liquidProgressLocation, progress);
-    gl.uniform3f(this.liquidColorStartLocation, colorStart[0] / 255, colorStart[1] / 255, colorStart[2] / 255);
-    gl.uniform3f(this.liquidColorMidLocation, colorMid[0] / 255, colorMid[1] / 255, colorMid[2] / 255);
-    gl.uniform3f(this.liquidColorEndLocation, colorEnd[0] / 255, colorEnd[1] / 255, colorEnd[2] / 255);
+    gl.uniform3f(this.liquidColorStartLocation, colorStart[0], colorStart[1], colorStart[2]);
+    gl.uniform3f(this.liquidColorMidLocation, colorMid[0], colorMid[1], colorMid[2]);
+    gl.uniform3f(this.liquidColorEndLocation, colorEnd[0], colorEnd[1], colorEnd[2]);
     gl.uniform1f(this.liquidBarHeightLocation, height);
     const alpha = (options.alpha ?? 1.0) * this._globalAlpha;
     gl.uniform1f(this.liquidAlphaLocation, alpha);
@@ -1034,7 +1034,7 @@ export class WebGLRenderer {
 
     gl.uniform2f(this.glowResolutionLocation, this.canvas.width, this.canvas.height);
     gl.uniform4f(this.glowRectLocation, x, y, width, height);
-    gl.uniform3f(this.glowColorLocation, color[0] / 255, color[1] / 255, color[2] / 255);
+    gl.uniform3f(this.glowColorLocation, color[0], color[1], color[2]);
     gl.uniform1f(this.glowIntensityLocation, intensity * (options.alpha ?? 1.0) * this._globalAlpha);
     gl.uniform1f(this.glowRadiusLocation, radius);
     gl.uniform1f(this.glowInnerAlphaLocation, options.innerAlpha ?? 0.0);

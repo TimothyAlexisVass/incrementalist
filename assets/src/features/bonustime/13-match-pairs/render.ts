@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
-import { hexToRgba, to255 } from "../../../utils";
+import { hexToRgba } from "../../../utils";
 import { getRewardTierLabelColor } from "../../../colors";
 import { MatchPairsData } from "./view-model";
 import {
@@ -122,7 +122,7 @@ export function renderMatchPairs(
 
         renderer.drawGlowRect({
           x: tx, y: ty, width: tileSize, height: tileSize,
-          color: to255(hexToRgba(tierColor)), radius: 8, intensity: activeHighlight ? 0.6 : 0.3, outerAlpha: activeHighlight ? 0.4 : 0.2, alpha
+          color: hexToRgba(tierColor), radius: 8, intensity: activeHighlight ? 0.6 : 0.3, outerAlpha: activeHighlight ? 0.4 : 0.2, alpha
         });
 
         renderer.drawRect({
