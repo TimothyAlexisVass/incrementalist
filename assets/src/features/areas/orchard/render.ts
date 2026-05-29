@@ -34,6 +34,9 @@ type OrchardPlantRenderState = {
   currentStage: number;
   previousStage: number | null;
   transitionStartedAt: number;
+  hoverOpacityFrom: number;
+  hoverOpacityTarget: number;
+  hoverTransitionStartedAt: number;
 };
 
 type OrchardPlantRenderRequest = {
@@ -41,6 +44,7 @@ type OrchardPlantRenderRequest = {
   plotId: string;
   plantId: string;
   growth: number;
+  isPlotHovered: boolean;
 };
 
 type OrchardPlantRenderOptions = {
@@ -56,7 +60,9 @@ type OrchardPlantSpec = {
 const ORCHARD_LOCKED_FILL_COLOR = 0x000000;
 const ORCHARD_LOCKED_FILL_OPACITY = 0.52;
 const ORCHARD_PLANT_STAGE_COUNT = 8;
-const ORCHARD_PLANT_STAGE_FADE_MS = 260;
+const ORCHARD_PLANT_STAGE_FADE_MS = 1000;
+const ORCHARD_PLANT_HOVER_OPACITY = 0.4;
+const ORCHARD_PLANT_HOVER_FADE_MS = 200;
 const ORCHARD_SOIL_TEXT_COLOR = "#f9e7af";
 const ORCHARD_SOIL_TEXT_FONT = "bold 13px Inter";
 const ORCHARD_SOIL_TEXT_LINE_HEIGHT = 29;
@@ -196,7 +202,10 @@ function updatePlantRenderState(plotId: string, currentStage: number, now: numbe
     state = {
       currentStage,
       previousStage: null,
-      transitionStartedAt: 0
+      transitionStartedAt: 0,
+      hoverOpacityFrom: 1,
+      hoverOpacityTarget: 1,
+      hoverTransitionStartedAt: 0
     };
     orchardPlantRenderStates.set(plotId, state);
     return state;
@@ -209,6 +218,12 @@ function updatePlantRenderState(plotId: string, currentStage: number, now: numbe
   }
 
   return state;
+}
+
+function getPlantHoverOpacity(state: OrchardPlantRenderState, now: number) {
+  const elapsed = Math.max(0, now - state.hoverTransitionStartedAt);
+  const progress = Math.min(1, elapsed / ORCHARD_PLANT_HOVER_FADE_MS);
+  return state.hoverOpacityFrom + ((state.hoverOpacityTarget - state.hoverOpacityFrom) * progress);
 }
 
 function getPlantImageFrame(
@@ -242,12 +257,34 @@ function getPlantImageFrame(
   };
 }
 
+function resolvePlantSpriteOpacity(
+  state: OrchardPlantRenderState,
+  input: InteractionState | undefined,
+  isPlotHovered: boolean,
+  frame: { x: number; y: number; width: number; height: number },
+  now: number
+) {
+  const shouldDim = !!input?.pointer && !isPlotHovered && pointInRect(input.pointer, frame);
+  const targetOpacity = shouldDim ? ORCHARD_PLANT_HOVER_OPACITY : 1;
+  const currentOpacity = getPlantHoverOpacity(state, now);
+
+  if (state.hoverOpacityTarget !== targetOpacity) {
+    state.hoverOpacityFrom = currentOpacity;
+    state.hoverOpacityTarget = targetOpacity;
+    state.hoverTransitionStartedAt = now;
+  }
+
+  return getPlantHoverOpacity(state, now);
+}
+
 function renderPlantImage(
   renderer: ReturnType<typeof getActiveWebGLRenderer>,
+  input: InteractionState | undefined,
   uvPoints: readonly (readonly [number, number])[],
   plotId: string,
   plantId: string,
-  growth: number
+  growth: number,
+  isPlotHovered: boolean
 ) {
   const now = performance.now();
   const currentStage = resolvePlantStage(growth);
@@ -273,6 +310,7 @@ function renderPlantImage(
 
     if (isRenderablePlantImage(currentImage) && isRenderablePlantImage(previousImage)) {
       const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: previousImage,
         mixImage: currentImage,
@@ -280,31 +318,36 @@ function renderPlantImage(
         x: frame.x,
         y: frame.y,
         width: frame.width,
-        height: frame.height
+        height: frame.height,
+        alpha
       });
       return;
     }
 
     if (isRenderablePlantImage(currentImage)) {
       const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: currentImage,
         x: frame.x,
         y: frame.y,
         width: frame.width,
-        height: frame.height
+        height: frame.height,
+        alpha
       });
       return;
     }
 
     if (isRenderablePlantImage(previousImage)) {
       const frame = getPlantImageFrame(uvPoints, previousImage, plantOptions);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: previousImage,
         x: frame.x,
         y: frame.y,
         width: frame.width,
-        height: frame.height
+        height: frame.height,
+        alpha
       });
       return;
     }
@@ -321,12 +364,14 @@ function renderPlantImage(
   }
 
   const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+  const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
   renderer.drawImage({
     image: currentImage,
     x: frame.x,
     y: frame.y,
     width: frame.width,
-    height: frame.height
+    height: frame.height,
+    alpha
   });
 }
 
@@ -465,7 +510,8 @@ export function renderOrchard(input?: InteractionState) {
           uvPoints,
           plotId: hex.id,
           plantId: plant.plant_id,
-          growth: plant.growth
+          growth: plant.growth,
+          isPlotHovered: isHovered
         });
 
         // Spawn slowly rising particles from the plot when ready for harvest
@@ -592,7 +638,15 @@ export function renderOrchard(input?: InteractionState) {
   }
 
   for (const request of plantRenderRequests) {
-    renderPlantImage(renderer, request.uvPoints, request.plotId, request.plantId, request.growth);
+    renderPlantImage(
+      renderer,
+      input,
+      request.uvPoints,
+      request.plotId,
+      request.plantId,
+      request.growth,
+      request.isPlotHovered
+    );
   }
 
   renderSoilStats(input);
