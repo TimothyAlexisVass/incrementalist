@@ -1461,8 +1461,8 @@ export function spawnGpuHarvestParticle(x: number, y: number, color: ColorInput 
   if (!WEBGL_EFFECTS.ready) return false;
 
   const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.45;
-  const speed = 15 + Math.random() * 25;
-  const size = 12 + Math.random() * 12;
+  const speed = 5 + Math.random() * 8;
+  const size = 4 + Math.random() * 4;
   pushGpuParticle({
     x,
     y: y + (Math.random() - 0.5) * 6,
@@ -1473,7 +1473,7 @@ export function spawnGpuHarvestParticle(x: number, y: number, color: ColorInput 
     color,
     alpha: 0.75,
     fadePower: 1.1,
-    lifeMs: 1400 + Math.random() * 800,
+    lifeMs: 2400 + Math.random() * 800,
     kind: 'harvest'
   });
 
