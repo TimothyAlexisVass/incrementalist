@@ -144,8 +144,7 @@ export function renderBonusTimeWelcomeCard(
   const {
     cardRect,
     buttonRect,
-    centerX,
-    centerY
+    centerX
   } = layout;
 
   const titleColor = options.titleColor ?? "#ffbe4d";
@@ -204,7 +203,7 @@ export function renderBonusTimeWelcomeCard(
     renderer.drawText({
       text: options.streakText,
       x: centerX,
-      y: cardRect.y + 355,
+      y: cardRect.y + 337,
       font: options.streakFont ?? BONUSTIME_BODY_FONT,
       color: streakColor,
       align: "center",
