@@ -109,8 +109,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
     {next_water, water_lost} =
       if rain_mm_per_minute > 0.0 do
-        rain_ratio = Constants.orchard_soil_rain_mm_to_water_ratio()
-        gained_water = rain_mm_per_minute * number(rain_ratio)
+        gained_water = rain_mm_per_minute
         water_after_rain = current_water + gained_water
         overflow_loss = max(0.0, water_after_rain - water_cap)
 
@@ -153,8 +152,8 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     cond do
       not is_nil(plot.plant) ->
         plant = plot.plant
-        plant_specs = Map.get(Incrementalist.Game.Constants.orchard_defs(), "plants", %{})
-        spec = Map.get(plant_specs, plant.seed_id)
+        plant_specs = Incrementalist.Game.Constants.orchard_plant_defs()
+        spec = Map.get(plant_specs, plant.plant_id)
 
         if spec && plant.growth < 100.0 do
           min_temp = Map.get(spec, "minTemp", 0.0)

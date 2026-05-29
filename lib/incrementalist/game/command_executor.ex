@@ -1369,9 +1369,9 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, plot_id} <- fetch_plot_id(command.intent),
              {:ok, seed_id} <- fetch_seed_id(command.intent) do
-          
+          matched_plant = orchard_plant_def_by_seed_id(seed_id)
+
           plot = Enum.find(ps.state.plots, &(&1.id == plot_id))
-          spec = Map.get(Constants.orchard_defs()["plants"] || %{}, seed_id)
 
           cond do
             not (plot_id in ps.state.unlocked_plots) ->
@@ -1383,10 +1383,11 @@ defmodule Incrementalist.Game.CommandExecutor do
             not is_nil(plot.plant) or not is_nil(plot.decomposition) ->
               {"failed", error_result("plot_occupied", command), ps.id}
 
-            is_nil(spec) ->
+            is_nil(matched_plant) ->
               {"failed", error_result("unknown_seed", command), ps.id}
 
             true ->
+              {plant_id, spec} = matched_plant
               current_seeds = get_seed_inventory(ps.state, seed_id)
 
               seeds_to_plant = normalize_big_num(spec["seedsToPlant"])
@@ -1466,9 +1467,9 @@ defmodule Incrementalist.Game.CommandExecutor do
                   next_state = update_seed_inventory(next_state, seed_id, next_seed_inv)
 
                   next_soil = %{soil | nitrogen: next_n, phosphorus: next_p, potassium: next_k}
-                  
+
                   new_plant = %State.Plant{
-                    seed_id: seed_id,
+                    plant_id: plant_id,
                     growth: 0.0,
                     level: 1,
                     planted_at: Time.iso8601(now)
@@ -1502,7 +1503,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                      "status" => "ok",
                      "command_id" => command.command_id,
                      "plot_id" => plot_id,
-                     "seed_id" => seed_id,
+                     "plant_id" => plant_id,
                      "clover_seeds" => next_state.clover_seeds,
                      "acorns" => next_state.acorns,
                      "coin_tree_seeds" => next_state.coin_tree_seeds,
@@ -1539,7 +1540,7 @@ defmodule Incrementalist.Game.CommandExecutor do
               {"failed", error_result("plant_not_ready", command), ps.id}
 
             true ->
-              spec = Map.get(Constants.orchard_defs()["plants"] || %{}, plot.plant.seed_id)
+              spec = Map.get(Constants.orchard_plant_defs(), plot.plant.plant_id)
 
               if is_nil(spec) do
                 {"failed", error_result("unknown_seed", command), ps.id}
@@ -1675,7 +1676,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         with {:ok, seed_a} <- fetch_seed_a(command.intent),
              {:ok, seed_b} <- fetch_seed_b(command.intent) do
           
-          splicing_defs = Constants.orchard_defs()["splicing"] || %{}
+          splicing_defs = Constants.orchard_seed_splicing_defs()
           matched_recipe =
             Enum.find(splicing_defs, fn {_result_seed, rule} ->
               (rule["seed_a"] == seed_a and rule["seed_b"] == seed_b) or
@@ -1761,36 +1762,30 @@ defmodule Incrementalist.Game.CommandExecutor do
         with {:ok, seed_id} <- fetch_seed_id(command.intent),
              {:ok, amount} <- fetch_amount(command.intent) do
           
-          shop_defs = Constants.orchard_defs()["shop"] || %{}
+          shop_defs = Constants.orchard_seed_shop_defs()
           rule = Map.get(shop_defs, seed_id)
 
           cond do
             is_nil(rule) ->
               {"failed", error_result("unknown_seed", command), ps.id}
 
-            not (rule["unlocked_by_default"] == true or seed_id in ps.state.spliced_seeds) ->
+            not (rule["unlocked"] == true or seed_id in ps.state.spliced_seeds) ->
               {"failed", error_result("seed_locked", command), ps.id}
 
             true ->
-              cost_coins = BigNum.mul(normalize_big_num(rule["cost"]), BigNum.from_number(amount))
-              
-              cost_shards =
-                if rule["cost_shards"] do
-                  BigNum.mul(normalize_big_num(rule["cost_shards"]), BigNum.from_number(amount))
-                else
-                  nil
-                end
+              cost_coins = BigNum.mul(normalize_big_num(rule["coins"]), BigNum.from_number(amount))
+              cost_shards = BigNum.mul(normalize_big_num(rule["shards"]), BigNum.from_number(amount))
 
               cond do
                 BigNum.compare(ps.state.coins, cost_coins) < 0 ->
                   {"failed", error_result("insufficient_gold", command), ps.id}
 
-                not is_nil(cost_shards) and BigNum.compare(ps.state.shards, cost_shards) < 0 ->
+                BigNum.compare(ps.state.shards, cost_shards) < 0 ->
                   {"failed", error_result("insufficient_shards", command), ps.id}
 
                 true ->
                   next_coins = BigNum.sub(ps.state.coins, cost_coins)
-                  next_shards = if is_nil(cost_shards), do: ps.state.shards, else: BigNum.sub(ps.state.shards, cost_shards)
+                  next_shards = BigNum.sub(ps.state.shards, cost_shards)
 
                   seeds_inv = get_seed_inventory(ps.state, seed_id)
                   next_seeds = BigNum.add(seeds_inv, BigNum.from_number(amount))
@@ -2441,6 +2436,16 @@ defmodule Incrementalist.Game.CommandExecutor do
     end
   end
 
+  defp orchard_plant_def_by_seed_id(seed_id) do
+    case Constants.orchard_plant_defs() do
+      %{} = plant_defs ->
+        Enum.find(plant_defs, fn {_plant_id, spec} -> spec["seed"] == seed_id end)
+
+      _ ->
+        nil
+    end
+  end
+
   defp roll_weighted(weight_map) do
     if map_size(weight_map) == 0 do
       0
@@ -2452,7 +2457,7 @@ defmodule Incrementalist.Game.CommandExecutor do
         if roll <= next_acc do
           {:halt, String.to_integer(amount_str)}
         else
-          {:ok, next_acc}
+          {:cont, next_acc}
         end
       end)
       |> case do

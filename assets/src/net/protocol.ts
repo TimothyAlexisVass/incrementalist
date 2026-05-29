@@ -113,7 +113,7 @@ export type SoilState = {
 };
 
 export type PlantState = {
-  seed_id: string;
+  plant_id: string;
   growth: number;
   level: number;
   planted_at: string;

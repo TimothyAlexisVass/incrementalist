@@ -11,7 +11,10 @@ defmodule Incrementalist.Game.Constants do
   @bonustime_path Path.join(@requirements_dir, "bonustime.json")
   @climate_path Path.join(@requirements_dir, "climate.json")
   @weather_path Path.join(@requirements_dir, "weather.json")
-  @orchard_path Path.join(@requirements_dir, "orchard.json")
+  @orchard_soil_path Path.join(@requirements_dir, "orchard.json")
+  @orchard_plants_path Path.join(@requirements_dir, "plants.json")
+  @orchard_seed_splicing_path Path.join(@requirements_dir, "splicing.json")
+  @orchard_seed_shop_path Path.join(@requirements_dir, "seeds.json")
   @external_resource @unlocking_path
   @external_resource @furnace_path
   @external_resource @quests_path
@@ -19,7 +22,10 @@ defmodule Incrementalist.Game.Constants do
   @external_resource @bonustime_path
   @external_resource @climate_path
   @external_resource @weather_path
-  @external_resource @orchard_path
+  @external_resource @orchard_soil_path
+  @external_resource @orchard_plants_path
+  @external_resource @orchard_seed_splicing_path
+  @external_resource @orchard_seed_shop_path
   @unlocking @unlocking_path |> File.read!() |> Jason.decode!()
   @furnace @furnace_path |> File.read!() |> Jason.decode!()
   @quests @quests_path |> File.read!() |> Jason.decode!()
@@ -27,7 +33,10 @@ defmodule Incrementalist.Game.Constants do
   @bonustime @bonustime_path |> File.read!() |> Jason.decode!()
   @climate @climate_path |> File.read!() |> Jason.decode!()
   @weather @weather_path |> File.read!() |> Jason.decode!()
-  @orchard @orchard_path |> File.read!() |> Jason.decode!()
+  @orchard_soil @orchard_soil_path |> File.read!() |> Jason.decode!()
+  @orchard_plants @orchard_plants_path |> File.read!() |> Jason.decode!()
+  @orchard_seed_splicing @orchard_seed_splicing_path |> File.read!() |> Jason.decode!()
+  @orchard_seed_shop @orchard_seed_shop_path |> File.read!() |> Jason.decode!()
   @climate_weather_entries_tuple :erlang.list_to_tuple(@weather)
   @climate_weather_entry_count tuple_size(@climate_weather_entries_tuple)
   @area_unlocking_entries @unlocking |> Enum.filter(&(&1["type"] == "area"))
@@ -110,18 +119,20 @@ defmodule Incrementalist.Game.Constants do
     |> Map.fetch!("label")
   end
 
-  def orchard_defs, do: @orchard
+  def orchard_plant_defs, do: @orchard_plants
+  def orchard_seed_splicing_defs, do: @orchard_seed_splicing
+  def orchard_seed_shop_defs, do: @orchard_seed_shop
 
   # Orchard / Soil Constants
   def orchard_soil_default_water_level do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("defaults")
     |> Map.fetch!("water_level")
   end
 
   def orchard_soil_default_nitrogen do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("defaults")
     |> Map.fetch!("nitrogen")
@@ -129,7 +140,7 @@ defmodule Incrementalist.Game.Constants do
   end
 
   def orchard_soil_default_phosphorus do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("defaults")
     |> Map.fetch!("phosphorus")
@@ -137,7 +148,7 @@ defmodule Incrementalist.Game.Constants do
   end
 
   def orchard_soil_default_potassium do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("defaults")
     |> Map.fetch!("potassium")
@@ -145,7 +156,7 @@ defmodule Incrementalist.Game.Constants do
   end
 
   def orchard_soil_default_organic_matter do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("defaults")
     |> Map.fetch!("organic_matter")
@@ -153,68 +164,62 @@ defmodule Incrementalist.Game.Constants do
   end
 
   def orchard_soil_organic_matter_min do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("organic_matter")
     |> Map.fetch!("min")
   end
 
   def orchard_soil_organic_matter_max do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("organic_matter")
     |> Map.fetch!("max")
   end
 
   def orchard_soil_runoff_retention_factor_at_max do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("organic_matter")
     |> Map.fetch!("runoff_retention_factor_at_max")
   end
 
   def orchard_soil_water_cap_base do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("organic_matter")
     |> Map.fetch!("water_cap_base")
   end
 
   def orchard_soil_water_cap_bonus_at_max do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("organic_matter")
     |> Map.fetch!("water_cap_bonus_at_max")
   end
 
   def orchard_soil_base_dry_down_per_hour do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("base_dry_down_per_hour")
   end
 
-  def orchard_soil_rain_mm_to_water_ratio do
-    @orchard
-    |> Map.fetch!("soil")
-    |> Map.fetch!("rain_mm_to_water_ratio")
-  end
-
   def orchard_soil_nk_leach_per_water_loss do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("leach")
     |> Map.fetch!("nitrogen_and_potassium_per_water_loss")
   end
 
   def orchard_soil_phosphorus_leach_multiplier do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("leach")
     |> Map.fetch!("phosphorus_multiplier")
   end
 
   def orchard_soil_organic_matter_leach_per_water_loss do
-    @orchard
+    @orchard_soil
     |> Map.fetch!("soil")
     |> Map.fetch!("leach")
     |> Map.fetch!("organic_matter_per_water_loss")

@@ -1,0 +1,57 @@
+{
+  "clover_patch": {
+    "seed": "clover_seeds",
+    "size": { "m": 2.0, "e": 0 },
+    "plantType": "herbaceous",
+    "baseGrowthTime": 100.0,
+    "seedsToPlant": { "m": 5.0, "e": 1 },
+    "harvestType": "seed",
+    "seedAmount": {
+      "20": 40, "30": 20, "40": 20, "50": 10, "75": 5, "100": 5
+    },
+    "nitrogenFixing": 2.0,
+    "minOrganic": 5.0,
+    "minDepth": 0,
+    "minTemp": 0.0,
+    "minWater": 1.0
+  },
+  "oak": {
+    "seed": "acorn",
+    "size": { "m": 4.0, "e": 1 },
+    "plantType": "tree",
+    "baseGrowthTime": 25.0,
+    "seedsToPlant": { "m": 1.0, "e": 0 },
+    "harvestType": "seed",
+    "seedAmount": {
+      "0": 50, "1": 45, "2": 5
+    },
+    "nitrogen": { "min": 2.0, "max": 10.0 },
+    "potassium": { "min": 1.0, "max": 5.0 },
+    "minOrganic": 10.0,
+    "minDepth": 1,
+    "minTemp": 15.0,
+    "minWater": 2.0
+  },
+  "coin_tree": {
+    "seed": "coin_tree_seed",
+    "size": { "m": 2.0, "e": 1 },
+    "plantType": "tree",
+    "baseGrowthTime": 20.0,
+    "seedsToPlant": { "m": 1.0, "e": 0 },
+    "harvestType": "resource",
+    "seedAmount": {
+      "0": 60, "1": 20, "2": 15, "3": 5
+    },
+    "harvestAmount": {
+      "min": { "m": 1.0, "e": 3 },
+      "max": { "m": 2.0, "e": 4 }
+    },
+    "nitrogen": { "min": 2.0, "max": 10.0 },
+    "phosphorus": { "min": 2.0, "max": 10.0 },
+    "potassium": { "min": 2.0, "max": 10.0 },
+    "minOrganic": 0.0,
+    "minDepth": 2,
+    "minTemp": 18.0,
+    "minWater": 2.0
+  }
+}

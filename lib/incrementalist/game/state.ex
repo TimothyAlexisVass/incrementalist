@@ -194,14 +194,14 @@ defmodule Incrementalist.Game.State do
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      field :seed_id, :string
+      field :plant_id, :string
       field :growth, :float, default: 0.0
       field :level, :integer, default: 1
       field :planted_at, :string
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
-      cast(schema, attrs, [:seed_id, :growth, :level, :planted_at])
+      cast(schema, attrs, [:plant_id, :growth, :level, :planted_at])
     end
   end
 
@@ -412,7 +412,7 @@ defmodule Incrementalist.Game.State do
     embeds_one :clover_hunt, CloverHunt, on_replace: :update
     embeds_one :soil, Soil, on_replace: :update
 
-    field :unlocked_plots, {:array, :string}, default: ["plot_16"]
+    field :unlocked_plots, {:array, :string}, default: ["plot_1"]
     field :spliced_seeds, {:array, :string}, default: []
 
     embeds_one :wood, BigNum, on_replace: :update
@@ -601,7 +601,7 @@ defmodule Incrementalist.Game.State do
         organic_matter: Constants.orchard_soil_default_organic_matter(),
         projected_at: utc_minute_boundary_iso(now)
       },
-      unlocked_plots: ["plot_16"],
+      unlocked_plots: ["plot_1"],
       spliced_seeds: [],
       wood: BigNum.zero(),
       plant_matter: BigNum.zero(),
@@ -611,7 +611,7 @@ defmodule Incrementalist.Game.State do
       acorns: BigNum.zero(),
       coin_tree_seeds: BigNum.zero(),
       plots: [
-        %Plot{id: "plot_16", depth: 1}
+        %Plot{id: "plot_1", depth: 1}
       ],
       quests: [],
       achievements: %{},
@@ -697,7 +697,7 @@ defmodule Incrementalist.Game.State do
         "id" => p.id,
         "depth" => p.depth,
         "plant" => if(p.plant, do: %{
-          "seed_id" => p.plant.seed_id,
+          "plant_id" => p.plant.plant_id,
           "growth" => p.plant.growth,
           "level" => p.plant.level,
           "planted_at" => p.plant.planted_at
@@ -785,7 +785,7 @@ defmodule Incrementalist.Game.State do
       "climate" => Climate.visible_state(now),
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "soil" => OrchardSoil.visible_state(projected_state.soil),
-      "unlocked_plots" => projected_state.unlocked_plots || ["plot_16"],
+      "unlocked_plots" => projected_state.unlocked_plots || ["plot_1"],
       "spliced_seeds" => projected_state.spliced_seeds || [],
       "wood" => projected_state.wood || BigNum.zero(),
       "plant_matter" => projected_state.plant_matter || BigNum.zero(),

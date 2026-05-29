@@ -1,5 +1,5 @@
 import type { PlotState } from "../../../net/protocol";
-import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
+import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
 import { getAreaViewModel } from "../view-model";
 import { toNumber } from "../../../core/bignum";
 
@@ -22,7 +22,7 @@ const orchardViewModel: OrchardViewModel = {
   // UV coordinates in local display-area space (0..1, 0..1).
   hexagons: [
     {
-      id: "plot_1",
+      id: "plot_30",
       points: [
         [0.3770, 0.5748], // top-right
         [0.3872, 0.5899], // right
@@ -34,7 +34,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_2",
+      id: "plot_19",
       points: [
         [0.5100, 0.5739], // top-right
         [0.5254, 0.5958], // right
@@ -46,7 +46,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_3",
+      id: "plot_31",
       points: [
         [0.6400, 0.5783], // top-right
         [0.6635, 0.5945], // right
@@ -58,7 +58,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_4",
+      id: "plot_28",
       points: [
         [0.2968, 0.5927], // top-right
         [0.3085, 0.6126], // right
@@ -70,7 +70,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_5",
+      id: "plot_17",
       points: [
         [0.4396, 0.5939], // top-right
         [0.4554, 0.6150], // right
@@ -82,7 +82,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_6",
+      id: "plot_18",
       points: [
         [0.5781, 0.5950], // top-right
         [0.5996, 0.6162], // right
@@ -94,7 +94,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_7",
+      id: "plot_29",
       points: [
         [0.7166, 0.5962], // top-right
         [0.7445, 0.6174], // right
@@ -106,7 +106,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_8",
+      id: "plot_15",
       points: [
         [0.3650, 0.6165], // top-right
         [0.3774, 0.6400], // right
@@ -118,7 +118,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_9",
+      id: "plot_2",
       points: [
         [0.5100, 0.6181], // top-right
         [0.5288, 0.6424], // right
@@ -130,7 +130,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_10",
+      id: "plot_16",
       points: [
         [0.6541, 0.6177], // top-right
         [0.6812, 0.6424], // right
@@ -142,7 +142,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_11",
+      id: "plot_26",
       points: [
         [0.2779, 0.6428], // top-right
         [0.2905, 0.6680], // right
@@ -154,7 +154,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_12",
+      id: "plot_7",
       points: [
         [0.4340, 0.6428], // top-right
         [0.4505, 0.6699], // right
@@ -166,7 +166,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_13",
+      id: "plot_3",
       points: [
         [0.5865, 0.6440], // top-right
         [0.6108, 0.6711], // right
@@ -178,7 +178,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_14",
+      id: "plot_27",
       points: [
         [0.7356, 0.6440], // top-right
         [0.7691, 0.6723], // right
@@ -190,7 +190,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_15",
+      id: "plot_13",
       points: [
         [0.3496, 0.6714], // top-right
         [0.3640, 0.7021], // right
@@ -202,7 +202,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_16",
+      id: "plot_1",
       points: [
         [0.5109, 0.6738], // top-right
         [0.5352, 0.7021], // right
@@ -214,7 +214,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "unlocked"
     },
     {
-      id: "plot_17",
+      id: "plot_14",
       points: [
         [0.6709, 0.6726], // top-right
         [0.7023, 0.7045], // right
@@ -226,7 +226,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_18",
+      id: "plot_24",
       points: [
         [0.2553, 0.7036], // top-right
         [0.2656, 0.7379], // right
@@ -238,7 +238,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_19",
+      id: "plot_6",
       points: [
         [0.4255, 0.7048], // top-right
         [0.4449, 0.7427], // right
@@ -250,7 +250,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_20",
+      id: "plot_4",
       points: [
         [0.5957, 0.7060], // top-right
         [0.6242, 0.7415], // right
@@ -262,7 +262,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_21",
+      id: "plot_25",
       points: [
         [0.7638, 0.7060], // top-right
         [0.8014, 0.7439], // right
@@ -274,7 +274,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_22",
+      id: "plot_11",
       points: [
         [0.3306, 0.7442], // top-right
         [0.3465, 0.7844], // right
@@ -286,7 +286,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_23",
+      id: "plot_5",
       points: [
         [0.5120, 0.7454], // top-right
         [0.5356, 0.7832], // right
@@ -298,7 +298,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_24",
+      id: "plot_12",
       points: [
         [0.6920, 0.7442], // top-right
         [0.7276, 0.7844], // right
@@ -310,7 +310,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_25",
+      id: "plot_22",
       points: [
         [0.2244, 0.7860], // top-right
         [0.2353, 0.8322], // right
@@ -322,7 +322,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_26",
+      id: "plot_9",
       points: [
         [0.4157, 0.7860], // top-right
         [0.4372, 0.8322], // right
@@ -334,7 +334,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_27",
+      id: "plot_10",
       points: [
         [0.6069, 0.7860], // top-right
         [0.6383, 0.8357], // right
@@ -346,7 +346,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_28",
+      id: "plot_23",
       points: [
         [0.7968, 0.7884], // top-right
         [0.8436, 0.8393], // right
@@ -358,7 +358,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_29",
+      id: "plot_20",
       points: [
         [0.3081, 0.8397], // top-right
         [0.3232, 0.8918], // right
@@ -370,7 +370,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_30",
+      id: "plot_8",
       points: [
         [0.5104, 0.8406], // top-right
         [0.5395, 0.8961], // right
@@ -382,7 +382,7 @@ const orchardViewModel: OrchardViewModel = {
       state: "locked"
     },
     {
-      id: "plot_31",
+      id: "plot_21",
       points: [
         [0.7152, 0.8397], // top-right
         [0.7578, 0.8978], // right
@@ -395,8 +395,6 @@ const orchardViewModel: OrchardViewModel = {
     }
   ]
 };
-
-const LOCKED_HEX_ID = "plot_30";
 
 export function getOrchardViewModel() {
   return orchardViewModel;
@@ -429,7 +427,7 @@ export function tickOrchardProjections(deltaTimeMs: number) {
     if (hex.plotData && hex.plotData.plant) {
       const plant = hex.plotData.plant;
       if (plant.growth < 100.0) {
-        const spec = (orchardSharedConfig.plants as any)[plant.seed_id];
+        const spec = (orchardPlantsConfig as any)[plant.plant_id];
         if (spec) {
           const minTemp = spec.minTemp ?? 0.0;
           const minWater = spec.minWater ?? 0.0;
@@ -469,4 +467,3 @@ function getNutrientRatio(soilVal: any, limit: { min: number; max: number } | nu
   }
   return 0;
 }
-

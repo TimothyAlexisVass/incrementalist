@@ -1,8 +1,10 @@
 defmodule Incrementalist.Game.Features.OrchardTest do
   use Incrementalist.DataCase, async: false
 
-  alias Incrementalist.Game.{Commands, State, Time, Constants, BigNum}
+  alias BigNum
+  alias Incrementalist.Game.{Commands, State, Time, Notices, Sessions}
   alias Incrementalist.Game.Persistence.{Player, PlayerState, PlayerStates}
+  alias Incrementalist.Repo
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
 
   @now ~U[2026-05-04 12:00:00.000000Z]
@@ -13,9 +15,9 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   end
 
   test "orchard.unlock_plot unlocks a locked plot when having enough shards", %{player: player} do
-    # plot_1 needs 1 * 100 = 100 shards
+    # plot_2 needs 2 * 100 = 200 shards
     # Initially player has 0 shards
-    result = Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_1"}), @now)
+    result = Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), @now)
     assert result["type"] == "command.error"
     assert result["reason"] == "insufficient_shards"
 
@@ -23,24 +25,24 @@ defmodule Incrementalist.Game.Features.OrchardTest do
 
     # Give shards
     update_player_state(player.id, fn state ->
-      %{state | shards: BigNum.from_number(150)}
+      %{state | shards: BigNum.from_number(250)}
     end)
 
-    # Unlock plot_1
-    success = Commands.enqueue(player.id, "orchard.unlock_plot", intent(1, %{"plot_id" => "plot_1"}), @now)
+    # Unlock plot_2
+    success = Commands.enqueue(player.id, "orchard.unlock_plot", intent(1, %{"plot_id" => "plot_2"}), @now)
     assert success["type"] == "orchard.unlock_plot.result"
     assert success["status"] == "ok"
-    assert "plot_1" in success["unlocked_plots"]
+    assert "plot_2" in success["unlocked_plots"]
     assert BigNum.to_float(success["shards"]) == 50.0
 
     # Verify state in database
     ps = PlayerStates.get!(player.id)
-    assert "plot_1" in ps.state.unlocked_plots
-    assert Enum.any?(ps.state.plots, &(&1.id == "plot_1"))
+    assert "plot_2" in ps.state.unlocked_plots
+    assert Enum.any?(ps.state.plots, &(&1.id == "plot_2"))
   end
 
-  test "orchard.plant_seed plants clover on plot_16, consuming seeds and soil nutrients", %{player: player} do
-    # Clover planting requires 50 clover seeds
+  test "orchard.plant_seed plants clover patch on plot_1, consuming seeds and soil nutrients", %{player: player} do
+    # Clover Patch planting requires 50 clover seeds
     # Soil nitrogen is clamped/default. Let's make sure player has enough seeds and soil nutrients
     update_player_state(player.id, fn state ->
       %{state | 
@@ -54,35 +56,35 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       }
     end)
 
-    # Plant clovers on plot_16
-    result = Commands.enqueue(player.id, "orchard.plant_seed", intent(0, %{"plot_id" => "plot_16", "seed_id" => "clover_seeds"}), @now)
+    # Plant a clover patch on plot_1
+    result = Commands.enqueue(player.id, "orchard.plant_seed", intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}), @now)
     assert result["type"] == "orchard.plant_seed.result"
     assert result["status"] == "ok"
-    assert result["seed_id"] == "clover_seeds"
+    assert result["plant_id"] == "clover_patch"
 
     # Verify inventory is deducted by 50
     ps = PlayerStates.get!(player.id)
     assert BigNum.to_float(ps.state.clover_seeds) == 50.0
 
     # Verify plot contains the growing plant
-    plot = Enum.find(ps.state.plots, &(&1.id == "plot_16"))
+    plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
     assert plot.plant
-    assert plot.plant.seed_id == "clover_seeds"
-    assert plot.plant.growth_progress == 0.0
+    assert plot.plant.plant_id == "clover_patch"
+    assert plot.plant.growth == 0.0
   end
 
   test "unified minute-by-minute projection simulates plant growth and soil nitrogen fixing", %{player: player} do
     # Plant a seed first
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
-        seed_id: "clover_seeds",
+        plant_id: "clover_patch",
         growth: 0.0,
         level: 1,
         planted_at: Time.iso8601(@now)
       }
       
       plots = Enum.map(state.plots, fn
-        p when p.id == "plot_16" -> %{p | plant: plant}
+        p when p.id == "plot_1" -> %{p | plant: plant}
         p -> p
       end)
 
@@ -90,6 +92,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
         plots: plots,
         soil: %{state.soil |
           water_level: 100.0,
+          projected_at: Time.iso8601(@now),
           nitrogen: BigNum.from_number(50),
           phosphorus: BigNum.from_number(50),
           potassium: BigNum.from_number(50),
@@ -105,25 +108,25 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     projected = OrchardSoil.project_state(ps.state, future_time)
 
     # Check plant growth progress has increased
-    plot = Enum.find(projected.plots, &(&1.id == "plot_16"))
+    plot = Enum.find(projected.plots, &(&1.id == "plot_1"))
     assert plot.plant.growth > 0.0
 
-    # Clovers fix nitrogen, check nitrogen has increased relative to leaching alone
+    # Clover patches fix nitrogen, check nitrogen has increased relative to leaching alone
     assert BigNum.compare(projected.soil.nitrogen, BigNum.zero()) > 0
   end
 
   test "orchard.harvest_plot keep adds to inventory and clears plant", %{player: player} do
-    # Plant a fully grown plant on plot_16
+    # Plant a fully grown plant on plot_1
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
-        seed_id: "clover_seeds",
+        plant_id: "clover_patch",
         growth: 100.0,
         level: 1,
         planted_at: Time.iso8601(@now)
       }
       
       plots = Enum.map(state.plots, fn
-        p when p.id == "plot_16" -> %{p | plant: plant}
+        p when p.id == "plot_1" -> %{p | plant: plant}
         p -> p
       end)
 
@@ -131,7 +134,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Harvest with "keep"
-    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_16", "action" => "keep"}), @now)
+    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "keep"}), @now)
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
     assert result["action"] == "keep"
@@ -141,23 +144,23 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert BigNum.compare(ps.state.clover_seeds, BigNum.zero()) > 0
 
     # Verify plot is cleared and depth is incremented
-    plot = Enum.find(ps.state.plots, &(&1.id == "plot_16"))
+    plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
     assert is_nil(plot.plant)
     assert plot.depth == 2
   end
 
   test "orchard.harvest_plot decompose spawns decomposition on the plot", %{player: player} do
-    # Plant a fully grown plant on plot_16
+    # Plant a fully grown plant on plot_1
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
-        seed_id: "clover_seeds",
+        plant_id: "clover_patch",
         growth: 100.0,
         level: 1,
         planted_at: Time.iso8601(@now)
       }
       
       plots = Enum.map(state.plots, fn
-        p when p.id == "plot_16" -> %{p | plant: plant}
+        p when p.id == "plot_1" -> %{p | plant: plant}
         p -> p
       end)
 
@@ -165,14 +168,14 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Harvest with "decompose"
-    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_16", "action" => "decompose"}), @now)
+    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}), @now)
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
     assert result["action"] == "decompose"
 
     # Verify plot has decomposition
     ps = PlayerStates.get!(player.id)
-    plot = Enum.find(ps.state.plots, &(&1.id == "plot_16"))
+    plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
     assert is_nil(plot.plant)
     assert plot.decomposition
     assert plot.decomposition.resource_id == "plant_matter"

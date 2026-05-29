@@ -1,0 +1,8 @@
+{
+  "coin_tree_seed": {
+    "cost_gold": { "m": 2.0, "e": 3 },
+    "chance": 1.0,
+    "seed_a": "clover_seeds",
+    "seed_b": "acorn"
+  }
+}

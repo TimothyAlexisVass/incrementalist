@@ -1,6 +1,7 @@
 defmodule Incrementalist.Game.Features.OrchardSoilTest do
   use ExUnit.Case, async: true
 
+  alias BigNum
   alias Incrementalist.Game.{Constants, State, Time}
   alias Incrementalist.Game.Features.Orchard.Soil
   alias Incrementalist.Game.State.Soil, as: SoilState
@@ -34,7 +35,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
 
     projected = Soil.project_state(state, now).soil
 
-    assert projected.water_level == 94
+    assert_in_delta projected.water_level, 94.0, 1.0e-9
     assert_in_delta BigNum.to_float(projected.nitrogen), 9.4, 1.0e-9
     assert_in_delta BigNum.to_float(projected.phosphorus), 9.7, 1.0e-9
     assert_in_delta BigNum.to_float(projected.potassium), 9.4, 1.0e-9

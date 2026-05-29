@@ -21,6 +21,7 @@ import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
 import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
+import { humanizeSystemKey } from "./names";
 
 type OrchardRuntime = {
   scene: THREE.Scene;
@@ -56,7 +57,6 @@ const ORCHARD_SOIL_RUNOFF_RETENTION_AT_MAX = orchardSharedConfig.soil.organic_ma
 const ORCHARD_SOIL_WATER_CAP_BASE = orchardSharedConfig.soil.organic_matter.water_cap_base;
 const ORCHARD_SOIL_WATER_CAP_BONUS_AT_MAX = orchardSharedConfig.soil.organic_matter.water_cap_bonus_at_max;
 const ORCHARD_SOIL_BASE_DRY_DOWN_PER_HOUR = orchardSharedConfig.soil.base_dry_down_per_hour;
-const ORCHARD_SOIL_RAIN_MM_TO_WATER_RATIO = orchardSharedConfig.soil.rain_mm_to_water_ratio;
 const ORCHARD_SOIL_NK_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.nitrogen_and_potassium_per_water_loss;
 const ORCHARD_SOIL_P_LEACH_MULTIPLIER = orchardSharedConfig.soil.leach.phosphorus_multiplier;
 const ORCHARD_SOIL_OM_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.organic_matter_per_water_loss;
@@ -283,10 +283,10 @@ export function renderOrchard(input?: InteractionState) {
             }
           }
 
-          let color = '#00e676'; // Clover: vibrant neon green
-          if (plant.seed_id === 'acorn') {
+          let color = '#00e676'; // Clover Patch: vibrant neon green
+          if (plant.plant_id === 'oak') {
             color = '#ff9100'; // Oak: warm vibrant gold
-          } else if (plant.seed_id === 'coin_tree_seed') {
+          } else if (plant.plant_id === 'coin_tree') {
             color = '#ffd700'; // Coin Tree: shiny rich gold
           }
           spawnGpuHarvestParticle(spawnX, spawnY, color);
@@ -294,12 +294,7 @@ export function renderOrchard(input?: InteractionState) {
 
         // Show tooltip on hover
         if (isHovered && input?.pointer) {
-          let label = "Clover";
-          if (plant.seed_id === "acorn") {
-            label = "Oak";
-          } else if (plant.seed_id === "coin_tree_seed") {
-            label = "Coin Tree";
-          }
+          const label = humanizeSystemKey(plant.plant_id);
 
           const progressText = isReady ? "Harvest" : `${plant.growth.toFixed(1)}%`;
 
@@ -537,7 +532,7 @@ function computeSoilDeltaPerMinute(soil: SoilState, climate: ClimateState | null
   let waterLost = 0;
 
   if (rainMmPerMinute > 0) {
-    const gainedWater = rainMmPerMinute * ORCHARD_SOIL_RAIN_MM_TO_WATER_RATIO;
+    const gainedWater = rainMmPerMinute;
     const waterAfterRain = currentWater + gainedWater;
     const overflowLoss = Math.max(0, waterAfterRain - waterCap);
     nextWater = clampNumber(waterAfterRain - overflowLoss, 0, waterCap);

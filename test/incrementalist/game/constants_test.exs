@@ -87,10 +87,53 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert Constants.orchard_soil_water_cap_base() == 150
     assert Constants.orchard_soil_water_cap_bonus_at_max() == 100
     assert Constants.orchard_soil_base_dry_down_per_hour() == 6
-    assert Constants.orchard_soil_rain_mm_to_water_ratio() == 1
     assert Constants.orchard_soil_nk_leach_per_water_loss() == 0.1
     assert Constants.orchard_soil_phosphorus_leach_multiplier() == 0.5
     assert Constants.orchard_soil_organic_matter_leach_per_water_loss() == 0.05
+  end
+
+  test "orchard plant, splicing, and seed shop manifests load from shared requirements" do
+    assert Map.has_key?(Constants.orchard_plant_defs(), "clover_patch")
+    assert Map.has_key?(Constants.orchard_plant_defs(), "oak")
+    assert Map.has_key?(Constants.orchard_plant_defs(), "coin_tree")
+
+    assert %{
+             "coin_tree_seed" => %{
+               "cost_gold" => %{"m" => 2.0, "e" => 3},
+               "chance" => 1.0,
+               "seed_a" => "clover_seeds",
+               "seed_b" => "acorn"
+             }
+           } = Constants.orchard_seed_splicing_defs()
+
+    assert %{
+             "clover_seeds" => %{
+               "id" => "clover_seeds",
+               "name" => "Clover Seeds",
+               "description" => "Plant clover patches to fix nitrogen in your soil.",
+               "coins" => %{"m" => 5.0, "e" => 0},
+               "shards" => %{"m" => shards_m, "e" => 0},
+               "unlocked" => true
+             },
+             "acorn" => %{
+               "id" => "acorn",
+               "name" => "Acorn",
+               "description" => "An oak acorn to grow a sturdy tree.",
+               "coins" => %{"m" => 5.0, "e" => 2},
+               "shards" => %{"m" => 2.0, "e" => 1},
+               "unlocked" => true
+             },
+             "coin_tree_seed" => %{
+               "id" => "coin_tree_seed",
+               "name" => "Coin Tree Seed",
+               "description" => "Spliced from clover patch and oak; yields coins when harvested.",
+               "coins" => %{"m" => 3.0, "e" => 3},
+               "shards" => %{"m" => 1.0, "e" => 1},
+               "unlocked" => false
+             }
+           } = Constants.orchard_seed_shop_defs()
+
+    assert shards_m == 0.0
   end
 
   test "sisu levels load the shared upgrade table" do

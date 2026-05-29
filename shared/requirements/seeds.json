@@ -1,0 +1,26 @@
+{
+  "clover_seeds": {
+    "id": "clover_seeds",
+    "name": "Clover Seeds",
+    "description": "Plant clover patches to fix nitrogen in your soil.",
+    "coins": { "m": 5.0, "e": 0 },
+    "shards": { "m": 0.0, "e": 0 },
+    "unlocked": true
+  },
+  "acorn": {
+    "id": "acorn",
+    "name": "Acorn",
+    "description": "An oak acorn to grow a sturdy tree.",
+    "coins": { "m": 5.0, "e": 2 },
+    "shards": { "m": 2.0, "e": 1 },
+    "unlocked": true
+  },
+  "coin_tree_seed": {
+    "id": "coin_tree_seed",
+    "name": "Coin Tree Seed",
+    "description": "Spliced from clover patch and oak; yields coins when harvested.",
+    "coins": { "m": 3.0, "e": 3 },
+    "shards": { "m": 1.0, "e": 1 },
+    "unlocked": false
+  }
+}

@@ -20,11 +20,13 @@ import { drawButton, doButton } from "../../../ui/components/button";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { toNumber } from "../../../core/bignum";
 import { formatBigNum } from "../../../utils/format";
+import { resolveUpdatingText } from "../../../utils/text";
 import {
   getOrchardViewModel,
   orchardHexPoints,
   orchardHexState
 } from "./view-model";
+import { humanizeSystemKey } from "./names";
 
 export function handleOrchardInteractions(
   input: InteractionState,
@@ -228,8 +230,8 @@ export class PlotActionModal implements Modal {
       this.acornBtnRect = { x: btnX, y: modalY + 140, width: 320, height: 38 };
       this.coinTreeBtnRect = { x: btnX, y: modalY + 190, width: 320, height: 38 };
 
-      // Clovers Button
-      const cloverLabel = `Clovers (Cost: 50, Have: ${cloverSeeds})`;
+      // Clover Seeds Button
+      const cloverLabel = `${humanizeSystemKey("clover_patch")} (Cost: 50, Have: ${cloverSeeds})`;
       const cloverClicked = doButton(input, this.cloverBtnRect, cloverLabel, {
         activeSurface: cloverSeeds >= 50 ? COLORS.button.surface.active : COLORS.button.surface.inactive,
         inactiveSurface: cloverSeeds >= 50 ? COLORS.button.surface.inactive : COLORS.button.secondary.surface,
@@ -240,7 +242,7 @@ export class PlotActionModal implements Modal {
       }
 
       // Acorn Button
-      const acornLabel = `Oak Acorn (Cost: 1, Have: ${acorns})`;
+      const acornLabel = `${humanizeSystemKey("acorn")} (Cost: 1, Have: ${acorns})`;
       const acornClicked = doButton(input, this.acornBtnRect, acornLabel, {
         activeSurface: acorns >= 1 ? COLORS.button.surface.active : COLORS.button.surface.inactive,
         inactiveSurface: acorns >= 1 ? COLORS.button.surface.inactive : COLORS.button.secondary.surface,
@@ -251,7 +253,7 @@ export class PlotActionModal implements Modal {
       }
 
       // Coin Tree Button
-      const coinTreeLabel = `Coin Tree Seed (Cost: 1, Have: ${coinTreeSeeds})`;
+      const coinTreeLabel = `${humanizeSystemKey("coin_tree_seed")} (Cost: 1, Have: ${coinTreeSeeds})`;
       const coinTreeClicked = doButton(input, this.coinTreeBtnRect, coinTreeLabel, {
         activeSurface: coinTreeSeeds >= 1 ? COLORS.button.surface.active : COLORS.button.surface.inactive,
         inactiveSurface: coinTreeSeeds >= 1 ? COLORS.button.surface.inactive : COLORS.button.secondary.surface,
@@ -280,8 +282,20 @@ export class PlotActionModal implements Modal {
 
       if (isReady) {
         // --- Harvestable ---
+        const readyText = resolveUpdatingText(
+          `orchard.plot.${this.plotData.id}.plant.ready`,
+          "The plant is fully grown and ready to harvest!",
+          (candidate) => renderer.isTextReady({
+            text: candidate,
+            font: MODAL_BODY_FONT,
+            color: COLORS.overlay.bodyText,
+            align: "center",
+            baseline: "top"
+          })
+        );
+
         renderer.drawText({
-          text: "The plant is fully grown and ready to harvest!",
+          text: readyText,
           x: modalX + modalWidth / 2,
           y: modalY + 60,
           font: MODAL_BODY_FONT,
@@ -324,15 +338,27 @@ export class PlotActionModal implements Modal {
         }
       } else {
         // --- Growing ---
-        let plantName = "Clover";
-        if (plant.seed_id === "acorn") plantName = "Oak";
-        else if (plant.seed_id === "coin_tree_seed") plantName = "Coin Tree";
+        const plantName = humanizeSystemKey(plant.plant_id);
 
-        const lines = [
-          `Plant: ${plantName}`,
-          `Growth: ${plant.growth.toFixed(1)}%`,
-          `Level: ${plant.level}`
-        ];
+        const stableLines = resolveUpdatingText(
+          `orchard.plot.${this.plotData.id}.plant.details`,
+          [
+            `Plant: ${plantName}`,
+            `Growth: ${plant.growth.toFixed(1)}%`,
+            `Level: ${plant.level}`
+          ].join("\n"),
+          (candidate) => candidate.split("\n").every((line) =>
+            renderer.isTextReady({
+              text: line,
+              font: MODAL_BODY_FONT,
+              color: COLORS.overlay.bodyText,
+              align: "center",
+              baseline: "top"
+            })
+          )
+        );
+
+        const lines = stableLines.split("\n");
 
         lines.forEach((line, index) => {
           renderer.drawText({
