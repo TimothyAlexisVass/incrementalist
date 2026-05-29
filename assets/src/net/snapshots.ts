@@ -13,7 +13,8 @@ import type {
   AreaDefinition,
   ClimateState,
   SoilState,
-  ServerPushEvent
+  ServerPushEvent,
+  PlotState
 } from "./protocol";
 import type { BigNum } from "../core/bignum";
 import { updateAreaViewModel } from "../features/areas/view-model";
@@ -33,7 +34,12 @@ const AUTHORITATIVE_AND_PROJECTION_RESULT_TYPES = new Set<ServerResult["type"]>(
   "stats.update.result",
   "cloverfield.search.result",
   "cloverfield.confirm_discovery.result",
-  "bonustime.play.result"
+  "bonustime.play.result",
+  "orchard.unlock_plot.result",
+  "orchard.plant_seed.result",
+  "orchard.harvest_plot.result",
+  "orchard.splice_seeds.result",
+  "orchard.buy_seed.result"
 ]);
 
 export type ServerState = {
@@ -127,6 +133,7 @@ export function applyPushEvent(state: ServerState, event: ServerPushEvent): void
     applyAuthoritativeData(state, {
       climate: event.climate,
       soil: event.soil,
+      plots: event.plots,
       has_bonustime_token: event.has_bonustime_token
     });
   }
@@ -155,6 +162,16 @@ export function applyAuthoritativeData(
     clover_hunt?: CloverHuntState;
     climate?: ClimateState;
     soil?: SoilState;
+    unlocked_plots?: string[];
+    spliced_seeds?: string[];
+    wood?: BigNum;
+    plant_matter?: BigNum;
+    ash?: BigNum;
+    charcoal?: BigNum;
+    clover_seeds?: BigNum;
+    acorns?: BigNum;
+    coin_tree_seeds?: BigNum;
+    plots?: PlotState[];
     [key: string]: any;
   }
 ) {
@@ -198,6 +215,16 @@ export function applyAuthoritativeData(
   if (data.areas !== undefined) state.snapshot.state.areas = data.areas;
   if (data.climate !== undefined) state.snapshot.state.climate = data.climate;
   if (data.soil !== undefined) state.snapshot.state.soil = data.soil;
+  if (data.unlocked_plots !== undefined) state.snapshot.state.unlocked_plots = data.unlocked_plots;
+  if (data.spliced_seeds !== undefined) state.snapshot.state.spliced_seeds = data.spliced_seeds;
+  if (data.wood !== undefined) state.snapshot.state.wood = data.wood;
+  if (data.plant_matter !== undefined) state.snapshot.state.plant_matter = data.plant_matter;
+  if (data.ash !== undefined) state.snapshot.state.ash = data.ash;
+  if (data.charcoal !== undefined) state.snapshot.state.charcoal = data.charcoal;
+  if (data.clover_seeds !== undefined) state.snapshot.state.clover_seeds = data.clover_seeds;
+  if (data.acorns !== undefined) state.snapshot.state.acorns = data.acorns;
+  if (data.coin_tree_seeds !== undefined) state.snapshot.state.coin_tree_seeds = data.coin_tree_seeds;
+  if (data.plots !== undefined) state.snapshot.state.plots = data.plots;
 
   if (data.item_id !== undefined) {
     const item = state.snapshot.state.shop.find(i => i.id === data.item_id);
@@ -220,7 +247,14 @@ export function applyAuthoritativeData(
     }
   }
 
-  if (data.area !== undefined || data.areas !== undefined || data.clover_hunt !== undefined || data.soil !== undefined) {
+  if (
+    data.area !== undefined ||
+    data.areas !== undefined ||
+    data.clover_hunt !== undefined ||
+    data.soil !== undefined ||
+    data.unlocked_plots !== undefined ||
+    data.plots !== undefined
+  ) {
     updateAreaViewModel(state.snapshot.state);
   }
 }

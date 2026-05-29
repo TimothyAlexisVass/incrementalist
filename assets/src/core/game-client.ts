@@ -86,6 +86,7 @@ import {
   getCloverfieldViewModel,
   startCloverfieldBackgroundTransition
 } from "../features/areas/cloverfield/view-model";
+import { tickOrchardProjections } from "../features/areas/orchard/view-model";
 import {
   NOTICE_LEAF_TAB_MENU_ANY_BUTTON,
   NOTICE_PARENT_MENU_MAIN,
@@ -370,7 +371,12 @@ export class GameClient {
       result.type === "cloverfield.search.result" ||
       result.type === "cloverfield.confirm_discovery.result" ||
       result.type === "bonustime.play.result" ||
-      result.type === "game.reset.result") {
+      result.type === "game.reset.result" ||
+      result.type === "orchard.unlock_plot.result" ||
+      result.type === "orchard.plant_seed.result" ||
+      result.type === "orchard.harvest_plot.result" ||
+      result.type === "orchard.splice_seeds.result" ||
+      result.type === "orchard.buy_seed.result") {
       this.snapshotCache!.save(this.store.state.snapshot);
       return;
     }
@@ -622,6 +628,10 @@ export class GameClient {
 
     // Advance client-side estimation of progress bar fill
     updateProjectedFill(dt);
+
+    if (this.store.state.snapshot && this.store.state.snapshot.state.area === "orchard") {
+      tickOrchardProjections(dt);
+    }
 
     // Check if projection expects bar to be full, and queue command if so
     if (this.channel && handleProgressLoop(this.channel)) {

@@ -1,6 +1,7 @@
 import { AreaDefinition, ClimateState, SoilState } from "../../net/protocol";
 import { getAreaPresentation, getFurnaceLevelPresentation } from "../requirements";
 import { syncCloverfieldFromSnapshot } from "./cloverfield/view-model";
+import { syncOrchardFromSnapshot } from "./orchard/view-model";
 
 export type AreaViewModel = {
   currentArea: string;
@@ -46,6 +47,7 @@ export function updateAreaViewModel(snapshotState: any) {
   areaViewModel.orchard.soil = snapshotState.soil || null;
   areaViewModel.orchard.climate = snapshotState.climate || null;
   syncCloverfieldFromSnapshot(snapshotState.clover_hunt);
+  syncOrchardFromSnapshot(snapshotState);
 }
 
 function resolveAreaPresentation(area: AreaDefinition, furnaceLevel: number): AreaDefinition {

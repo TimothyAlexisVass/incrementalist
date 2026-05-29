@@ -124,7 +124,7 @@ export function renderAreaSpecifics(
 
   if (model.currentArea === "orchard") {
     renderOrchard(input);
-    handleOrchardInteractions(input, blocked);
+    handleOrchardInteractions(input, channel, runCommand, blocked);
     return;
   }
 

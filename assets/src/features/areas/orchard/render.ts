@@ -20,6 +20,7 @@ import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
+import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
 
 type OrchardRuntime = {
   scene: THREE.Scene;
@@ -210,23 +211,23 @@ export function renderOrchard(input?: InteractionState) {
       });
     }
 
+    let sumX = 0;
+    let sumY = 0;
+    for (const pt of uvPoints) {
+      sumX += pt[0];
+      sumY += pt[1];
+    }
+    const centerX = sumX / uvPoints.length;
+    const centerY = sumY / uvPoints.length;
+
+    const pixelX = DISPLAY_AREA_X + centerX * DISPLAY_AREA_WIDTH;
+    const pixelY = DISPLAY_AREA_Y + centerY * DISPLAY_AREA_HEIGHT;
+
     // Locked plots render their shard unlock price at the hex center.
     if (isLocked) {
       const match = hex.id.match(/^plot_(\d+)$/);
       const plotIdNum = match ? parseInt(match[1], 10) : 0;
       const price = 100 * plotIdNum;
-
-      let sumX = 0;
-      let sumY = 0;
-      for (const pt of uvPoints) {
-        sumX += pt[0];
-        sumY += pt[1];
-      }
-      const centerX = sumX / uvPoints.length;
-      const centerY = sumY / uvPoints.length;
-
-      const pixelX = DISPLAY_AREA_X + centerX * DISPLAY_AREA_WIDTH;
-      const pixelY = DISPLAY_AREA_Y + centerY * DISPLAY_AREA_HEIGHT;
 
       drawCurrencyAmount(
         "shards",
@@ -242,6 +243,137 @@ export function renderOrchard(input?: InteractionState) {
           iconGap: 4
         }
       );
+    } else if (hex.plotData) {
+      const plot = hex.plotData;
+      if (plot.plant) {
+        const plant = plot.plant;
+        const isReady = plant.growth >= 100.0;
+
+        // Spawn slowly rising particles from the plot when ready for harvest
+        if (isReady && Math.random() < 0.08) {
+          const vertices = uvPoints.map((point) => [
+            DISPLAY_AREA_X + point[0] * DISPLAY_AREA_WIDTH,
+            DISPLAY_AREA_Y + point[1] * DISPLAY_AREA_HEIGHT
+          ] as const);
+
+          let minX = vertices[0][0];
+          let maxX = vertices[0][0];
+          let minY = vertices[0][1];
+          let maxY = vertices[0][1];
+          for (let i = 1; i < vertices.length; i++) {
+            const vx = vertices[i][0];
+            const vy = vertices[i][1];
+            if (vx < minX) minX = vx;
+            if (vx > maxX) maxX = vx;
+            if (vy < minY) minY = vy;
+            if (vy > maxY) maxY = vy;
+          }
+
+          let spawnX = pixelX;
+          let spawnY = pixelY;
+          let found = false;
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const rx = minX + Math.random() * (maxX - minX);
+            const ry = minY + Math.random() * (maxY - minY);
+            if (isPointInPolygon(rx, ry, vertices)) {
+              spawnX = rx;
+              spawnY = ry;
+              found = true;
+              break;
+            }
+          }
+
+          let color = '#00e676'; // Clover: vibrant neon green
+          if (plant.seed_id === 'acorn') {
+            color = '#ff9100'; // Oak: warm vibrant gold
+          } else if (plant.seed_id === 'coin_tree_seed') {
+            color = '#ffd700'; // Coin Tree: shiny rich gold
+          }
+          spawnGpuHarvestParticle(spawnX, spawnY, color);
+        }
+
+        // Show tooltip on hover
+        if (isHovered && input?.pointer) {
+          let label = "Clover";
+          if (plant.seed_id === "acorn") {
+            label = "Oak";
+          } else if (plant.seed_id === "coin_tree_seed") {
+            label = "Coin Tree";
+          }
+
+          const progressText = isReady ? "Harvest" : `${plant.growth.toFixed(1)}%`;
+
+          queueTooltip(input.pointer, [label, progressText], {
+            font: "13px Arial",
+            lineFonts: ["bold 13px Arial", "13px Arial"],
+            lineColors: ["#ffffff", isReady ? "#4caf50" : "#ffffff"],
+            textUpdateKey: `orchard.plot.${hex.id}.tooltip`,
+            placement: "top-left",
+            align: "center"
+          });
+        }
+      } else if (plot.decomposition) {
+        const decomp = plot.decomposition;
+        const emoji = decomp.resource_id === "fruit" ? "🍎" : "🍂";
+        const label = decomp.resource_id === "fruit" ? "Fruit Pile" : "Plant Matter";
+
+        renderer.drawText({
+          text: emoji,
+          x: pixelX,
+          y: pixelY - 14,
+          font: "20px Arial",
+          color: "#ffffff",
+          align: "center",
+          baseline: "middle"
+        });
+
+        const decompFont = "bold 10px Inter";
+        const decompColor = "#d4a5a5";
+        const decompTextKey = `orchard.plot.${hex.id}.decomp`;
+        const decompCandidate = `${label} (${decomp.progress.toFixed(0)}%)`;
+        const stableDecompLabel = resolveUpdatingText(decompTextKey, decompCandidate, (candidate) =>
+          renderer.isTextReady({
+            text: candidate,
+            font: decompFont,
+            color: decompColor,
+            align: "center",
+            baseline: "middle"
+          })
+        );
+
+        renderer.drawText({
+          text: stableDecompLabel,
+          x: pixelX,
+          y: pixelY + 12,
+          font: decompFont,
+          color: decompColor,
+          align: "center",
+          baseline: "middle"
+        });
+
+        const barW = 46;
+        const barH = 3;
+        const barX = pixelX - barW / 2;
+        const barY = pixelY + 22;
+
+        renderer.drawRect({
+          x: barX,
+          y: barY,
+          width: barW,
+          height: barH,
+          color: [0.2, 0.2, 0.2, 0.6]
+        });
+
+        renderer.drawRect({
+          x: barX,
+          y: barY,
+          width: barW * (decomp.progress / 100.0),
+          height: barH,
+          color: [0.8, 0.5, 0.5, 0.9]
+        });
+      } else {
+        // Empty plot - drawn completely clean without seedling emoji or plant text.
+      }
     }
   }
 
@@ -328,7 +460,9 @@ function isPointInPolygon(px: number, py: number, polygon: readonly (readonly [n
 function formatSoilBigNum(value: BigNum): string {
   const asNumber = toNumber(value);
   if (Number.isFinite(asNumber) && Math.abs(asNumber) < 100) {
-    return asNumber.toFixed(1);
+    const normalized = Math.max(0, asNumber);
+    const floored = Math.floor(normalized * 10) / 10;
+    return floored.toFixed(1);
   }
 
   return formatBigNum(value);
@@ -337,7 +471,8 @@ function formatSoilBigNum(value: BigNum): string {
 function formatSoilNumber(value: number): string {
   const normalized = Math.max(0, value);
   if (normalized < 100) {
-    return normalized.toFixed(1);
+    const floored = Math.floor(normalized * 10) / 10;
+    return floored.toFixed(1);
   }
 
   return Math.floor(normalized).toString();

@@ -110,6 +110,8 @@ defmodule Incrementalist.Game.Constants do
     |> Map.fetch!("label")
   end
 
+  def orchard_defs, do: @orchard
+
   # Orchard / Soil Constants
   def orchard_soil_default_water_level do
     @orchard

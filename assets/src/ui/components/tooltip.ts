@@ -21,6 +21,7 @@ export interface TooltipOptions {
   lineColors?: string[];
   lineFonts?: string[];
   placement?: TooltipPlacement;
+  align?: 'left' | 'center' | 'right';
 }
 
 export type TooltipPlacement =
@@ -113,7 +114,7 @@ function drawTooltipInternal(
           text: line,
           font: lineFont,
           color: textColor,
-          align: 'left',
+          align: options.align || 'left',
           baseline: 'top'
         });
       });
@@ -184,13 +185,19 @@ function drawTooltipInternal(
   for (let i = 0; i < lines.length; i += 1) {
     const lineColor = (options.lineColors && options.lineColors[i]) || textColor;
     const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
+    const lineAlign = options.align || 'left';
+    const textX = lineAlign === 'center'
+      ? x + (width / 2)
+      : lineAlign === 'right'
+        ? x + width - paddingX
+        : x + paddingX;
     renderer.drawText({
       text: lines[i],
-      x: x + paddingX,
+      x: textX,
       y: y + paddingY + (i * lineHeight),
       font: lineFont,
       color: lineColor,
-      align: 'left',
+      align: lineAlign,
       baseline: 'top'
     });
   }

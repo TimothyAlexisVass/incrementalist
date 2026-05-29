@@ -8,7 +8,7 @@ defmodule Incrementalist.Game.CommandExecutor do
   """
 
   alias Incrementalist.Game.Persistence.{GameCommand, Player, PlayerState, PlayerStates}
-  alias Incrementalist.Game.{Notices, Snapshots, State, Time}
+  alias Incrementalist.Game.{Constants, Notices, Snapshots, State, Time}
   alias Incrementalist.Game.Features.Progress.{Bar, Sisu}
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
   alias Incrementalist.Game.Features.Quests.Rules, as: Quests
@@ -1294,6 +1294,549 @@ defmodule Incrementalist.Game.CommandExecutor do
             {"failed", error_result("invalid_request", command), ps.id}
         end
 
+      "orchard.unlock_plot" ->
+        ps = player_state(player, now)
+
+        with {:ok, plot_id} <- fetch_plot_id(command.intent),
+             {:ok, plot_index} <- parse_plot_index(plot_id) do
+          if plot_id in ps.state.unlocked_plots do
+            {"failed", error_result("already_unlocked", command), ps.id}
+          else
+            price_shards = plot_index * 100
+            price_bn = BigNum.from_number(price_shards)
+
+            if BigNum.compare(ps.state.shards, price_bn) >= 0 do
+              next_shards = BigNum.sub(ps.state.shards, price_bn)
+
+              next_plots =
+                if Enum.any?(ps.state.plots, &(&1.id == plot_id)) do
+                  ps.state.plots
+                else
+                  [%State.Plot{id: plot_id, depth: 1} | ps.state.plots]
+                end
+
+              next_unlocked =
+                if plot_id in ps.state.unlocked_plots do
+                  ps.state.unlocked_plots
+                else
+                  [plot_id | ps.state.unlocked_plots]
+                end
+
+              next_state = %{
+                ps.state
+                | shards: next_shards,
+                  plots: next_plots,
+                  unlocked_plots: next_unlocked
+              }
+              |> Quests.evaluate()
+              |> Achievements.evaluate()
+
+              next_notices =
+                Notices.refresh_for_state_transition(
+                  ps.notices || Notices.new(ps.state),
+                  ps.state,
+                  next_state
+                )
+
+              update_player_state(ps, %{
+                state: next_state,
+                notices: next_notices,
+                last_saved_at: now
+              })
+
+              {"succeeded",
+               %{
+                 "type" => "orchard.unlock_plot.result",
+                 "status" => "ok",
+                 "command_id" => command.command_id,
+                 "plot_id" => plot_id,
+                 "shards" => next_state.shards,
+                 "unlocked_plots" => next_state.unlocked_plots,
+                 "plots" => State.visible_plots(next_state.plots),
+                 "notices" => Notices.payload(next_notices)
+               }, ps.id}
+            else
+              {"failed", error_result("insufficient_shards", command), ps.id}
+            end
+          end
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
+      "orchard.plant_seed" ->
+        ps = player_state(player, now)
+
+        with {:ok, plot_id} <- fetch_plot_id(command.intent),
+             {:ok, seed_id} <- fetch_seed_id(command.intent) do
+          
+          plot = Enum.find(ps.state.plots, &(&1.id == plot_id))
+          spec = Map.get(Constants.orchard_defs()["plants"] || %{}, seed_id)
+
+          cond do
+            not (plot_id in ps.state.unlocked_plots) ->
+              {"failed", error_result("plot_locked", command), ps.id}
+
+            is_nil(plot) ->
+              {"failed", error_result("plot_locked", command), ps.id}
+
+            not is_nil(plot.plant) or not is_nil(plot.decomposition) ->
+              {"failed", error_result("plot_occupied", command), ps.id}
+
+            is_nil(spec) ->
+              {"failed", error_result("unknown_seed", command), ps.id}
+
+            true ->
+              current_seeds = get_seed_inventory(ps.state, seed_id)
+
+              seeds_to_plant = normalize_big_num(spec["seedsToPlant"])
+              min_organic = BigNum.from_number(spec["minOrganic"] || 0.0)
+              min_depth = spec["minDepth"] || 0
+
+              soil = ps.state.soil
+
+              # Nutrient checks
+              {next_n, err} =
+                case spec["nitrogen"] do
+                  %{"min" => min_val} ->
+                    min_bn = normalize_big_num(min_val)
+                    if BigNum.compare(soil.nitrogen, min_bn) >= 0 do
+                      loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
+                      {clamp_big_num_non_negative(BigNum.sub(soil.nitrogen, loss)), nil}
+                    else
+                      {soil.nitrogen, "insufficient_nitrogen"}
+                    end
+                  _ ->
+                    {soil.nitrogen, nil}
+                end
+
+              {next_p, err} =
+                if is_nil(err) do
+                  case spec["phosphorus"] do
+                    %{"min" => min_val} ->
+                      min_bn = normalize_big_num(min_val)
+                      if BigNum.compare(soil.phosphorus, min_bn) >= 0 do
+                        loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
+                        {clamp_big_num_non_negative(BigNum.sub(soil.phosphorus, loss)), nil}
+                      else
+                        {soil.phosphorus, "insufficient_phosphorus"}
+                      end
+                    _ ->
+                      {soil.phosphorus, nil}
+                  end
+                else
+                  {soil.phosphorus, err}
+                end
+
+              {next_k, err} =
+                if is_nil(err) do
+                  case spec["potassium"] do
+                    %{"min" => min_val} ->
+                      min_bn = normalize_big_num(min_val)
+                      if BigNum.compare(soil.potassium, min_bn) >= 0 do
+                        loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
+                        {clamp_big_num_non_negative(BigNum.sub(soil.potassium, loss)), nil}
+                      else
+                        {soil.potassium, "insufficient_potassium"}
+                      end
+                    _ ->
+                      {soil.potassium, nil}
+                  end
+                else
+                  {soil.potassium, err}
+                end
+
+              cond do
+                BigNum.compare(current_seeds, seeds_to_plant) < 0 ->
+                  {"failed", error_result("insufficient_seeds", command), ps.id}
+
+                BigNum.compare(soil.organic_matter, min_organic) < 0 ->
+                  {"failed", error_result("insufficient_organic_matter", command), ps.id}
+
+                plot.depth < min_depth ->
+                  {"failed", error_result("insufficient_depth", command), ps.id}
+
+                not is_nil(err) ->
+                  {"failed", error_result(err, command), ps.id}
+
+                true ->
+                  next_seed_inv = BigNum.sub(current_seeds, seeds_to_plant)
+                  
+                  next_state = ps.state
+                  next_state = update_seed_inventory(next_state, seed_id, next_seed_inv)
+
+                  next_soil = %{soil | nitrogen: next_n, phosphorus: next_p, potassium: next_k}
+                  
+                  new_plant = %State.Plant{
+                    seed_id: seed_id,
+                    growth: 0.0,
+                    level: 1,
+                    planted_at: Time.iso8601(now)
+                  }
+
+                  next_plots = Enum.map(next_state.plots, fn
+                    p when p.id == plot_id -> %{p | plant: new_plant}
+                    p -> p
+                  end)
+
+                  next_state = %{next_state | soil: next_soil, plots: next_plots}
+                  |> Quests.evaluate()
+                  |> Achievements.evaluate()
+
+                  next_notices =
+                    Notices.refresh_for_state_transition(
+                      ps.notices || Notices.new(ps.state),
+                      ps.state,
+                      next_state
+                    )
+
+                  update_player_state(ps, %{
+                    state: next_state,
+                    notices: next_notices,
+                    last_saved_at: now
+                  })
+
+                  {"succeeded",
+                   %{
+                     "type" => "orchard.plant_seed.result",
+                     "status" => "ok",
+                     "command_id" => command.command_id,
+                     "plot_id" => plot_id,
+                     "seed_id" => seed_id,
+                     "clover_seeds" => next_state.clover_seeds,
+                     "acorns" => next_state.acorns,
+                     "coin_tree_seeds" => next_state.coin_tree_seeds,
+                     "soil" => OrchardSoil.visible_state(next_state.soil),
+                     "plots" => State.visible_plots(next_state.plots),
+                     "notices" => Notices.payload(next_notices)
+                   }, ps.id}
+              end
+          end
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
+      "orchard.harvest_plot" ->
+        ps = player_state(player, now)
+
+        with {:ok, plot_id} <- fetch_plot_id(command.intent),
+             {:ok, action} <- fetch_action(command.intent) do
+          
+          plot = Enum.find(ps.state.plots, &(&1.id == plot_id))
+
+          cond do
+            not (plot_id in ps.state.unlocked_plots) ->
+              {"failed", error_result("plot_locked", command), ps.id}
+
+            is_nil(plot) ->
+              {"failed", error_result("plot_locked", command), ps.id}
+
+            is_nil(plot.plant) ->
+              {"failed", error_result("no_plant_on_plot", command), ps.id}
+
+            plot.plant.growth < 100.0 ->
+              {"failed", error_result("plant_not_ready", command), ps.id}
+
+            true ->
+              spec = Map.get(Constants.orchard_defs()["plants"] || %{}, plot.plant.seed_id)
+
+              if is_nil(spec) do
+                {"failed", error_result("unknown_seed", command), ps.id}
+              else
+                size_bn = normalize_big_num(spec["size"])
+                size_f = BigNum.to_float(size_bn)
+
+                {wood_f, pm_f} =
+                  case spec["plantType"] do
+                    "tree" -> {size_f * 0.9, size_f * 0.1}
+                    "bush" -> {size_f * 0.4, size_f * 0.6}
+                    _ -> {0.0, size_f * 1.0} # herbaceous
+                  end
+
+                wood_yield = BigNum.from_number(trunc(wood_f))
+                pm_yield = BigNum.from_number(trunc(pm_f))
+
+                next_depth = plot.depth + 1
+
+                next_state =
+                  if action == "keep" do
+                    # Gain materials
+                    next_wood = BigNum.add(ps.state.wood, wood_yield)
+                    next_pm = BigNum.add(ps.state.plant_matter, pm_yield)
+
+                    # Roll seeds
+                    seeds_rolled = roll_weighted(spec["seedAmount"] || %{})
+                    seeds_rolled_bn = BigNum.from_number(seeds_rolled)
+
+                    next_state = %{ps.state | wood: next_wood, plant_matter: next_pm}
+
+                    next_state =
+                      case spec["seed"] do
+                        "clover_seeds" ->
+                          %{next_state | clover_seeds: BigNum.add(next_state.clover_seeds, seeds_rolled_bn)}
+                        "acorn" ->
+                          %{next_state | acorns: BigNum.add(next_state.acorns, seeds_rolled_bn)}
+                        "coin_tree_seed" ->
+                          %{next_state | coin_tree_seeds: BigNum.add(next_state.coin_tree_seeds, seeds_rolled_bn)}
+                        _ ->
+                          next_state
+                      end
+
+                    # Gained coins if harvestType is resource
+                    next_state =
+                      if spec["harvestType"] == "resource" do
+                        min_coins = normalize_big_num(spec["harvestAmount"]["min"])
+                        max_coins = normalize_big_num(spec["harvestAmount"]["max"])
+                        min_f = BigNum.to_float(min_coins)
+                        max_f = BigNum.to_float(max_coins)
+                        coins_rolled = min_f + :rand.uniform() * (max_f - min_f)
+                        coins_yield = BigNum.from_number(trunc(coins_rolled))
+
+                        %{next_state |
+                          coins: BigNum.add(next_state.coins, coins_yield),
+                          stats: %{next_state.stats |
+                            total_coins_earned: BigNum.add(next_state.stats.total_coins_earned, coins_yield)
+                          }
+                        }
+                      else
+                        next_state
+                      end
+
+                    next_plots = Enum.map(next_state.plots, fn
+                      p when p.id == plot_id -> %{p | plant: nil, decomposition: nil, depth: next_depth}
+                      p -> p
+                    end)
+
+                    %{next_state | plots: next_plots}
+                  else
+                    # action == decompose
+                    decomp_resource = if(spec["harvestType"] == "fruit", do: "fruit", else: "plant_matter")
+                    new_decomp = %State.Decomposition{
+                      resource_id: decomp_resource,
+                      amount: pm_yield,
+                      progress: 0.0
+                    }
+
+                    next_plots = Enum.map(ps.state.plots, fn
+                      p when p.id == plot_id -> %{p | plant: nil, decomposition: new_decomp, depth: next_depth}
+                      p -> p
+                    end)
+
+                    %{ps.state | plots: next_plots}
+                  end
+
+                next_state =
+                  next_state
+                  |> Quests.evaluate()
+                  |> Achievements.evaluate()
+
+                next_notices =
+                  Notices.refresh_for_state_transition(
+                    ps.notices || Notices.new(ps.state),
+                    ps.state,
+                    next_state
+                  )
+
+                update_player_state(ps, %{
+                  state: next_state,
+                  notices: next_notices,
+                  last_saved_at: now
+                })
+
+                {"succeeded",
+                 %{
+                   "type" => "orchard.harvest_plot.result",
+                   "status" => "ok",
+                   "command_id" => command.command_id,
+                   "plot_id" => plot_id,
+                   "action" => action,
+                   "wood" => next_state.wood,
+                   "plant_matter" => next_state.plant_matter,
+                   "ash" => next_state.ash,
+                   "charcoal" => next_state.charcoal,
+                   "clover_seeds" => next_state.clover_seeds,
+                   "acorns" => next_state.acorns,
+                   "coin_tree_seeds" => next_state.coin_tree_seeds,
+                   "coins" => next_state.coins,
+                   "plots" => State.visible_plots(next_state.plots),
+                   "notices" => Notices.payload(next_notices)
+                 }, ps.id}
+              end
+          end
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
+      "orchard.splice_seeds" ->
+        ps = player_state(player, now)
+
+        with {:ok, seed_a} <- fetch_seed_a(command.intent),
+             {:ok, seed_b} <- fetch_seed_b(command.intent) do
+          
+          splicing_defs = Constants.orchard_defs()["splicing"] || %{}
+          matched_recipe =
+            Enum.find(splicing_defs, fn {_result_seed, rule} ->
+              (rule["seed_a"] == seed_a and rule["seed_b"] == seed_b) or
+              (rule["seed_a"] == seed_b and rule["seed_b"] == seed_a)
+            end)
+
+          if is_nil(matched_recipe) do
+            {"failed", error_result("invalid_splice_recipe", command), ps.id}
+          else
+            {result_seed_id, rule} = matched_recipe
+            cost_gold = normalize_big_num(rule["cost_gold"])
+
+            seeds_a_inv = get_seed_inventory(ps.state, seed_a)
+            seeds_b_inv = get_seed_inventory(ps.state, seed_b)
+
+            cond do
+              BigNum.compare(ps.state.coins, cost_gold) < 0 ->
+                {"failed", error_result("insufficient_gold", command), ps.id}
+
+              BigNum.compare(seeds_a_inv, BigNum.one()) < 0 or BigNum.compare(seeds_b_inv, BigNum.one()) < 0 ->
+                {"failed", error_result("insufficient_seeds", command), ps.id}
+
+              true ->
+                next_state = ps.state
+                next_state = update_seed_inventory(next_state, seed_a, BigNum.sub(seeds_a_inv, BigNum.one()))
+                
+                # Fetch fresh from next_state in case seed_b was the same
+                seeds_b_inv_fresh = get_seed_inventory(next_state, seed_b)
+                next_state = update_seed_inventory(next_state, seed_b, BigNum.sub(seeds_b_inv_fresh, BigNum.one()))
+
+                next_coins = BigNum.sub(next_state.coins, cost_gold)
+                next_state = %{next_state | coins: next_coins}
+
+                # Chance roll
+                roll = :rand.uniform()
+                next_state =
+                  if roll <= (rule["chance"] || 1.0) do
+                    next_spliced = Enum.uniq([result_seed_id | next_state.spliced_seeds])
+                    %{next_state | spliced_seeds: next_spliced}
+                  else
+                    next_state
+                  end
+
+                next_state =
+                  next_state
+                  |> Quests.evaluate()
+                  |> Achievements.evaluate()
+
+                next_notices =
+                  Notices.refresh_for_state_transition(
+                    ps.notices || Notices.new(ps.state),
+                    ps.state,
+                    next_state
+                  )
+
+                update_player_state(ps, %{
+                  state: next_state,
+                  notices: next_notices,
+                  last_saved_at: now
+                })
+
+                {"succeeded",
+                 %{
+                   "type" => "orchard.splice_seeds.result",
+                   "status" => "ok",
+                   "command_id" => command.command_id,
+                   "spliced_seeds" => next_state.spliced_seeds,
+                   "coins" => next_state.coins,
+                   "clover_seeds" => next_state.clover_seeds,
+                   "acorns" => next_state.acorns,
+                   "notices" => Notices.payload(next_notices)
+                 }, ps.id}
+            end
+          end
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
+      "orchard.buy_seed" ->
+        ps = player_state(player, now)
+
+        with {:ok, seed_id} <- fetch_seed_id(command.intent),
+             {:ok, amount} <- fetch_amount(command.intent) do
+          
+          shop_defs = Constants.orchard_defs()["shop"] || %{}
+          rule = Map.get(shop_defs, seed_id)
+
+          cond do
+            is_nil(rule) ->
+              {"failed", error_result("unknown_seed", command), ps.id}
+
+            not (rule["unlocked_by_default"] == true or seed_id in ps.state.spliced_seeds) ->
+              {"failed", error_result("seed_locked", command), ps.id}
+
+            true ->
+              cost_coins = BigNum.mul(normalize_big_num(rule["cost"]), BigNum.from_number(amount))
+              
+              cost_shards =
+                if rule["cost_shards"] do
+                  BigNum.mul(normalize_big_num(rule["cost_shards"]), BigNum.from_number(amount))
+                else
+                  nil
+                end
+
+              cond do
+                BigNum.compare(ps.state.coins, cost_coins) < 0 ->
+                  {"failed", error_result("insufficient_gold", command), ps.id}
+
+                not is_nil(cost_shards) and BigNum.compare(ps.state.shards, cost_shards) < 0 ->
+                  {"failed", error_result("insufficient_shards", command), ps.id}
+
+                true ->
+                  next_coins = BigNum.sub(ps.state.coins, cost_coins)
+                  next_shards = if is_nil(cost_shards), do: ps.state.shards, else: BigNum.sub(ps.state.shards, cost_shards)
+
+                  seeds_inv = get_seed_inventory(ps.state, seed_id)
+                  next_seeds = BigNum.add(seeds_inv, BigNum.from_number(amount))
+
+                  next_state = %{ps.state | coins: next_coins, shards: next_shards}
+                  next_state = update_seed_inventory(next_state, seed_id, next_seeds)
+
+                  next_state =
+                    next_state
+                    |> Quests.evaluate()
+                    |> Achievements.evaluate()
+
+                  next_notices =
+                    Notices.refresh_for_state_transition(
+                      ps.notices || Notices.new(ps.state),
+                      ps.state,
+                      next_state
+                    )
+
+                  update_player_state(ps, %{
+                    state: next_state,
+                    notices: next_notices,
+                    last_saved_at: now
+                  })
+
+                  {"succeeded",
+                   %{
+                     "type" => "orchard.buy_seed.result",
+                     "status" => "ok",
+                     "command_id" => command.command_id,
+                     "seed_id" => seed_id,
+                     "amount" => amount,
+                     "coins" => next_state.coins,
+                     "shards" => next_state.shards,
+                     "clover_seeds" => next_state.clover_seeds,
+                     "acorns" => next_state.acorns,
+                     "coin_tree_seeds" => next_state.coin_tree_seeds,
+                     "notices" => Notices.payload(next_notices)
+                   }, ps.id}
+              end
+          end
+        else
+          {:error, reason} ->
+            {"failed", error_result(reason, command), ps.id}
+        end
+
       _unknown ->
         ps = player_state(player, now)
 
@@ -1848,4 +2391,92 @@ defmodule Incrementalist.Game.CommandExecutor do
       _ -> list
     end
   end
+  defp fetch_plot_id(%{"plot_id" => plot_id}) when is_binary(plot_id), do: {:ok, plot_id}
+  defp fetch_plot_id(%{plot_id: plot_id}) when is_binary(plot_id), do: {:ok, plot_id}
+  defp fetch_plot_id(_intent), do: {:error, "plot_id_required"}
+
+  defp parse_plot_index("plot_" <> num) do
+    case Integer.parse(num) do
+      {val, ""} -> {:ok, val}
+      _ -> {:error, "invalid_plot_id"}
+    end
+  end
+  defp parse_plot_index(_), do: {:error, "invalid_plot_id"}
+
+  defp fetch_seed_id(%{"seed_id" => seed_id}) when is_binary(seed_id), do: {:ok, seed_id}
+  defp fetch_seed_id(%{seed_id: seed_id}) when is_binary(seed_id), do: {:ok, seed_id}
+  defp fetch_seed_id(_intent), do: {:error, "seed_id_required"}
+
+  defp fetch_action(%{"action" => action}) when is_binary(action), do: {:ok, action}
+  defp fetch_action(%{action: action}) when is_binary(action), do: {:ok, action}
+  defp fetch_action(_intent), do: {:error, "action_required"}
+
+  defp fetch_seed_a(%{"seed_a" => seed_a}) when is_binary(seed_a), do: {:ok, seed_a}
+  defp fetch_seed_a(%{seed_a: seed_a}) when is_binary(seed_a), do: {:ok, seed_a}
+  defp fetch_seed_a(_intent), do: {:error, "seed_a_required"}
+
+  defp fetch_seed_b(%{"seed_b" => seed_b}) when is_binary(seed_b), do: {:ok, seed_b}
+  defp fetch_seed_b(%{seed_b: seed_b}) when is_binary(seed_b), do: {:ok, seed_b}
+  defp fetch_seed_b(_intent), do: {:error, "seed_b_required"}
+
+  defp fetch_amount(%{"amount" => amount}) when is_integer(amount), do: {:ok, amount}
+  defp fetch_amount(%{amount: amount}) when is_integer(amount), do: {:ok, amount}
+  defp fetch_amount(_intent), do: {:error, "amount_required"}
+
+  defp get_seed_inventory(state, seed_id) do
+    case seed_id do
+      "clover_seeds" -> state.clover_seeds || BigNum.zero()
+      "acorn" -> state.acorns || BigNum.zero()
+      "coin_tree_seed" -> state.coin_tree_seeds || BigNum.zero()
+      _ -> BigNum.zero()
+    end
+  end
+
+  defp update_seed_inventory(state, seed_id, val) do
+    case seed_id do
+      "clover_seeds" -> %{state | clover_seeds: val}
+      "acorn" -> %{state | acorns: val}
+      "coin_tree_seed" -> %{state | coin_tree_seeds: val}
+      _ -> state
+    end
+  end
+
+  defp roll_weighted(weight_map) do
+    if map_size(weight_map) == 0 do
+      0
+    else
+      roll = :rand.uniform(100)
+      
+      Enum.reduce_while(weight_map, 0, fn {amount_str, weight}, acc ->
+        next_acc = acc + weight
+        if roll <= next_acc do
+          {:halt, String.to_integer(amount_str)}
+        else
+          {:ok, next_acc}
+        end
+      end)
+      |> case do
+        val when is_integer(val) -> val
+        _ -> 0
+      end
+    end
+  end
+
+  defp clamp_big_num_non_negative(%BigNum{} = value) do
+    if BigNum.compare(value, BigNum.zero()) < 0 do
+      BigNum.zero()
+    else
+      value
+    end
+  end
+
+  defp normalize_big_num(%BigNum{} = value), do: value
+  defp normalize_big_num(%{"m" => m, "e" => e}), do: BigNum.new(number(m), trunc(number(e)))
+  defp normalize_big_num(%{m: m, e: e}), do: BigNum.new(number(m), trunc(number(e)))
+  defp normalize_big_num(value) when is_number(value), do: BigNum.from_number(value)
+  defp normalize_big_num(_), do: BigNum.zero()
+
+  defp number(value) when is_integer(value), do: value * 1.0
+  defp number(value) when is_float(value), do: value
+  defp number(_value), do: 0.0
 end

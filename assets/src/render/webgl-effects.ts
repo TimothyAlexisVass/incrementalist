@@ -140,7 +140,7 @@ const FRAGMENT_SHADER_SOURCE = `
     float alpha = (core * 0.95 + halo * 0.52 + outerGlow * 0.2) * v_color.a;
     vec3 color = v_color.rgb * (1.35 + core * 0.95);
 
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color * alpha, alpha);
   }
 `;
 
@@ -467,7 +467,7 @@ export function updateWebGLEffects(deltaTime: number) {
       const dx = tx - particle.x;
       const dy = ty - particle.y;
       const distSq = dx * dx + dy * dy;
-      
+
       if (distSq < 100) {
         particle.sisuState = 'orbiting';
         particle.orbitRadius = 15 + Math.random() * 25;
@@ -476,20 +476,20 @@ export function updateWebGLEffects(deltaTime: number) {
       } else {
         const targetAngle = Math.atan2(dy, dx);
         const currentAngle = Math.atan2(particle.vy, particle.vx);
-        
+
         let diff = targetAngle - currentAngle;
         while (diff > Math.PI) diff -= TWO_PI;
         while (diff < -Math.PI) diff += TWO_PI;
-        
+
         // Rotate the direction vector towards the target
-        const rotationSpeed = 5.5; 
+        const rotationSpeed = 5.5;
         const step = rotationSpeed * deltaSeconds;
         const newAngle = currentAngle + Math.max(-step, Math.min(step, diff));
-        
+
         const currentSpeed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
         const targetSpeed = 700;
         const nextSpeed = currentSpeed + (targetSpeed - currentSpeed) * 3.0 * deltaSeconds;
-        
+
         particle.vx = Math.cos(newAngle) * nextSpeed;
         particle.vy = Math.sin(newAngle) * nextSpeed;
         particle.x += particle.vx * deltaSeconds;
@@ -575,7 +575,7 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
   }
 
   gl.enable(gl.BLEND);
-  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  gl.blendFunc(gl.ONE, gl.ONE);
 
   gl.useProgram(pProgram);
   gl.bindBuffer(gl.ARRAY_BUFFER, pBuffer);
@@ -1407,3 +1407,27 @@ function normalizeColor(color: any): Rgb {
 function clampColorChannel(value: number) {
   return Math.min(Math.max(Number(value) || 0, 0), 1);
 }
+
+export function spawnGpuHarvestParticle(x: number, y: number, color: ColorInput = '#81c784') {
+  if (!WEBGL_EFFECTS.ready) return false;
+
+  const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.45;
+  const speed = 15 + Math.random() * 25;
+  const size = 12 + Math.random() * 12;
+  pushGpuParticle({
+    x,
+    y: y + (Math.random() - 0.5) * 6,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    drag: 0.995,
+    size,
+    color,
+    alpha: 0.75,
+    fadePower: 1.1,
+    lifeMs: 1400 + Math.random() * 800
+  });
+
+  trimGpuParticles();
+  return true;
+}
+

@@ -187,6 +187,62 @@ defmodule Incrementalist.Game.State do
     end
   end
 
+  defmodule Plant do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :seed_id, :string
+      field :growth, :float, default: 0.0
+      field :level, :integer, default: 1
+      field :planted_at, :string
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:seed_id, :growth, :level, :planted_at])
+    end
+  end
+
+  defmodule Decomposition do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :resource_id, :string
+      embeds_one :amount, BigNum, on_replace: :update
+      field :progress, :float, default: 0.0
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:resource_id, :progress])
+      |> cast_embed(:amount)
+    end
+  end
+
+  defmodule Plot do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      field :id, :string
+      field :depth, :integer, default: 1
+      embeds_one :plant, Incrementalist.Game.State.Plant, on_replace: :update
+      embeds_one :decomposition, Incrementalist.Game.State.Decomposition, on_replace: :update
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:id, :depth])
+      |> cast_embed(:plant)
+      |> cast_embed(:decomposition)
+    end
+  end
+
   defmodule QuestState do
     use Ecto.Schema
     import Ecto.Changeset
@@ -356,6 +412,18 @@ defmodule Incrementalist.Game.State do
     embeds_one :clover_hunt, CloverHunt, on_replace: :update
     embeds_one :soil, Soil, on_replace: :update
 
+    field :unlocked_plots, {:array, :string}, default: ["plot_16"]
+    field :spliced_seeds, {:array, :string}, default: []
+
+    embeds_one :wood, BigNum, on_replace: :update
+    embeds_one :plant_matter, BigNum, on_replace: :update
+    embeds_one :ash, BigNum, on_replace: :update
+    embeds_one :charcoal, BigNum, on_replace: :update
+    embeds_one :clover_seeds, BigNum, on_replace: :update
+    embeds_one :acorns, BigNum, on_replace: :update
+    embeds_one :coin_tree_seeds, BigNum, on_replace: :update
+
+    embeds_many :plots, Incrementalist.Game.State.Plot, on_replace: :delete
     embeds_many :quests, __MODULE__.QuestState, on_replace: :delete
     embeds_one :stats, __MODULE__.Stats, on_replace: :update
     embeds_one :bonustime, __MODULE__.BonusTime, on_replace: :update
@@ -380,7 +448,9 @@ defmodule Incrementalist.Game.State do
       :cycle_started_at,
       :can_claim_at,
       :saved_at,
-      :achievements
+      :achievements,
+      :unlocked_plots,
+      :spliced_seeds
     ])
     |> cast_embed(:exp)
     |> cast_embed(:required_exp)
@@ -395,6 +465,14 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:sisu)
     |> cast_embed(:clover_hunt)
     |> cast_embed(:soil)
+    |> cast_embed(:wood)
+    |> cast_embed(:plant_matter)
+    |> cast_embed(:ash)
+    |> cast_embed(:charcoal)
+    |> cast_embed(:clover_seeds)
+    |> cast_embed(:acorns)
+    |> cast_embed(:coin_tree_seeds)
+    |> cast_embed(:plots)
     |> cast_embed(:quests)
     |> cast_embed(:stats)
     |> cast_embed(:bonustime)
@@ -437,6 +515,14 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
     |> maybe_put_embed(:bonustime)
+    |> maybe_put_embed(:wood)
+    |> maybe_put_embed(:plant_matter)
+    |> maybe_put_embed(:ash)
+    |> maybe_put_embed(:charcoal)
+    |> maybe_put_embed(:clover_seeds)
+    |> maybe_put_embed(:acorns)
+    |> maybe_put_embed(:coin_tree_seeds)
+    |> maybe_put_embed(:plots)
   end
 
   defp maybe_put_embed(attrs, key) do
@@ -515,6 +601,18 @@ defmodule Incrementalist.Game.State do
         organic_matter: Constants.orchard_soil_default_organic_matter(),
         projected_at: utc_minute_boundary_iso(now)
       },
+      unlocked_plots: ["plot_16"],
+      spliced_seeds: [],
+      wood: BigNum.zero(),
+      plant_matter: BigNum.zero(),
+      ash: BigNum.zero(),
+      charcoal: BigNum.zero(),
+      clover_seeds: BigNum.from_number(50),
+      acorns: BigNum.zero(),
+      coin_tree_seeds: BigNum.zero(),
+      plots: [
+        %Plot{id: "plot_16", depth: 1}
+      ],
       quests: [],
       achievements: %{},
       stats: %Stats{
@@ -593,6 +691,26 @@ defmodule Incrementalist.Game.State do
     %{state | saved_at: Time.iso8601(now)}
   end
 
+  def visible_plots(plots) do
+    Enum.map(plots || [], fn p ->
+      %{
+        "id" => p.id,
+        "depth" => p.depth,
+        "plant" => if(p.plant, do: %{
+          "seed_id" => p.plant.seed_id,
+          "growth" => p.plant.growth,
+          "level" => p.plant.level,
+          "planted_at" => p.plant.planted_at
+        }, else: nil),
+        "decomposition" => if(p.decomposition, do: %{
+          "resource_id" => p.decomposition.resource_id,
+          "amount" => p.decomposition.amount,
+          "progress" => p.decomposition.progress
+        }, else: nil)
+      }
+    end)
+  end
+
   def visible_state(nil, now), do: visible_state(new(now), now)
 
   def visible_state(%__MODULE__{} = state, now) do
@@ -667,6 +785,16 @@ defmodule Incrementalist.Game.State do
       "climate" => Climate.visible_state(now),
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "soil" => OrchardSoil.visible_state(projected_state.soil),
+      "unlocked_plots" => projected_state.unlocked_plots || ["plot_16"],
+      "spliced_seeds" => projected_state.spliced_seeds || [],
+      "wood" => projected_state.wood || BigNum.zero(),
+      "plant_matter" => projected_state.plant_matter || BigNum.zero(),
+      "ash" => projected_state.ash || BigNum.zero(),
+      "charcoal" => projected_state.charcoal || BigNum.zero(),
+      "clover_seeds" => projected_state.clover_seeds || BigNum.zero(),
+      "acorns" => projected_state.acorns || BigNum.zero(),
+      "coin_tree_seeds" => projected_state.coin_tree_seeds || BigNum.zero(),
+      "plots" => visible_plots(projected_state.plots),
       "shop" =>
         Enum.map(Incrementalist.Game.Constants.shop_item_defs(), fn def ->
           is_purchased =

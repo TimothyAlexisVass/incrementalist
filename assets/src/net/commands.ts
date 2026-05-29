@@ -129,6 +129,26 @@ export function claimMatchPairs(channel: GameChannel, discardedTiers: string[]) 
   });
 }
 
+export function unlockPlot(channel: GameChannel, plotId: string) {
+  return channel.pushCommand("orchard.unlock_plot", { plot_id: plotId });
+}
+
+export function plantSeed(channel: GameChannel, plotId: string, seedId: string) {
+  return channel.pushCommand("orchard.plant_seed", { plot_id: plotId, seed_id: seedId });
+}
+
+export function harvestPlot(channel: GameChannel, plotId: string, action: "keep" | "decompose") {
+  return channel.pushCommand("orchard.harvest_plot", { plot_id: plotId, action });
+}
+
+export function spliceSeeds(channel: GameChannel, seedA: string, seedB: string) {
+  return channel.pushCommand("orchard.splice_seeds", { seed_a: seedA, seed_b: seedB });
+}
+
+export function buySeed(channel: GameChannel, seedId: string, amount: number) {
+  return channel.pushCommand("orchard.buy_seed", { seed_id: seedId, amount });
+}
+
 export async function ackAppliedResult(
   channel: GameChannel,
   commandId: number

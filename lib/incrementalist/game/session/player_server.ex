@@ -401,7 +401,8 @@ defmodule Incrementalist.Game.Session.PlayerServer do
         "type" => "player.tick",
         "server_time" => Time.iso8601(now),
         "climate" => ClimateCache.visible_state(now),
-        "soil" => OrchardSoil.visible_state(projected_state.soil)
+        "soil" => OrchardSoil.visible_state(projected_state.soil),
+        "plots" => Incrementalist.Game.State.visible_plots(projected_state.plots)
       }
       |> maybe_put_bonustime_token(has_bonustime_token, include_token?)
 

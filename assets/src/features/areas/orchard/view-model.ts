@@ -1,3 +1,9 @@
+import type { PlotState } from "../../../net/protocol";
+import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
+import { getAreaViewModel } from "../view-model";
+import { toNumber } from "../../../core/bignum";
+
+
 export type OrchardUvPoint = readonly [number, number];
 export type OrchardHexState = "unlocked" | "locked";
 
@@ -5,6 +11,7 @@ export type OrchardHexagon = {
   id: string;
   points: readonly OrchardUvPoint[];
   state?: OrchardHexState;
+  plotData?: PlotState | null;
 };
 
 export type OrchardViewModel = {
@@ -400,6 +407,66 @@ export function orchardHexPoints(hex: OrchardHexagon): readonly OrchardUvPoint[]
 }
 
 export function orchardHexState(hex: OrchardHexagon): OrchardHexState {
-  if (hex.id === LOCKED_HEX_ID) return "locked";
-  return hex.state ?? "unlocked";
+  return hex.state ?? "locked";
 }
+
+export function syncOrchardFromSnapshot(snapshotState: any) {
+  const unlocked = new Set(snapshotState.unlocked_plots || ["plot_16"]);
+  const plotsList = snapshotState.plots || [];
+  const plotsMap = new Map(plotsList.map((p: any) => [p.id, p]));
+
+  for (const hex of orchardViewModel.hexagons as any) {
+    hex.state = unlocked.has(hex.id) ? "unlocked" : "locked";
+    hex.plotData = plotsMap.get(hex.id) || null;
+  }
+}
+
+export function tickOrchardProjections(deltaTimeMs: number) {
+  const { soil, climate } = getAreaViewModel().orchard;
+  if (!soil || !climate) return;
+
+  for (const hex of orchardViewModel.hexagons as any) {
+    if (hex.plotData && hex.plotData.plant) {
+      const plant = hex.plotData.plant;
+      if (plant.growth < 100.0) {
+        const spec = (orchardSharedConfig.plants as any)[plant.seed_id];
+        if (spec) {
+          const minTemp = spec.minTemp ?? 0.0;
+          const minWater = spec.minWater ?? 0.0;
+
+          if (climate.temperature_c >= minTemp && soil.water >= minWater) {
+            const nRatio = getNutrientRatio(soil.nitrogen, spec.nitrogen);
+            const kRatio = getNutrientRatio(soil.potassium, spec.potassium);
+
+            const growthBoost = 1.0 + nRatio * 0.5 + kRatio * 0.5;
+            const baseRate = (spec.baseGrowthTime ?? 100.0) / 60.0;
+            const ratePerMs = baseRate / (60.0 * 1000.0);
+
+            const addedProgress = ratePerMs * growthBoost * deltaTimeMs;
+            plant.growth = Math.min(100.0, plant.growth + addedProgress);
+          }
+        }
+      }
+    }
+
+    if (hex.plotData && hex.plotData.decomposition) {
+      const decomp = hex.plotData.decomposition;
+      if (decomp.progress < 100.0) {
+        const ratePerMs = 10.0 / (60.0 * 1000.0);
+        decomp.progress = Math.min(100.0, decomp.progress + ratePerMs * deltaTimeMs);
+      }
+    }
+  }
+}
+
+function getNutrientRatio(soilVal: any, limit: { min: number; max: number } | null | undefined): number {
+  if (!limit) return 0;
+  const maxVal = limit.max;
+  if (!maxVal) return 0;
+  const soilFloat = toNumber(soilVal);
+  if (maxVal > 0) {
+    return Math.min(1.0, soilFloat / maxVal);
+  }
+  return 0;
+}
+

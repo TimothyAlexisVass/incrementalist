@@ -112,6 +112,26 @@ export type SoilState = {
   organic_matter_cap: number;
 };
 
+export type PlantState = {
+  seed_id: string;
+  growth: number;
+  level: number;
+  planted_at: string;
+};
+
+export type DecompositionState = {
+  resource_id: string;
+  amount: BigNum;
+  progress: number;
+};
+
+export type PlotState = {
+  id: string;
+  depth: number;
+  plant: PlantState | null;
+  decomposition: DecompositionState | null;
+};
+
 // Mirrors the server wire contract for visible snapshots. Persisted save JSON may
 // contain more fields, but hidden or durable gameplay facts do not belong here
 // unless the player is allowed to know and render them.
@@ -171,6 +191,16 @@ export type GameSnapshot = {
     };
     climate: ClimateState;
     soil: SoilState;
+    unlocked_plots: string[];
+    spliced_seeds: string[];
+    wood: BigNum;
+    plant_matter: BigNum;
+    ash: BigNum;
+    charcoal: BigNum;
+    clover_seeds: BigNum;
+    acorns: BigNum;
+    coin_tree_seeds: BigNum;
+    plots: PlotState[];
     shop: ShopItemDefinition[];
     quests: Record<string, QuestState>;
     achievements: Record<string, AchievementState>;
@@ -187,6 +217,7 @@ export type PlayerTickEvent = {
   server_time: string;
   climate: ClimateState;
   soil: SoilState;
+  plots?: PlotState[];
   has_bonustime_token?: boolean;
 };
 
@@ -399,6 +430,74 @@ export type CommandErrorResult = {
   can_claim_at?: string | null;
 };
 
+export type OrchardUnlockPlotResult = {
+  type: "orchard.unlock_plot.result";
+  status: "ok";
+  command_id: number;
+  plot_id: string;
+  shards: BigNum;
+  unlocked_plots: string[];
+  plots: PlotState[];
+  notices: NoticeState;
+};
+
+export type OrchardPlantSeedResult = {
+  type: "orchard.plant_seed.result";
+  status: "ok";
+  command_id: number;
+  plot_id: string;
+  seed_id: string;
+  clover_seeds: BigNum;
+  acorns: BigNum;
+  coin_tree_seeds: BigNum;
+  soil: SoilState;
+  plots: PlotState[];
+  notices: NoticeState;
+};
+
+export type OrchardHarvestPlotResult = {
+  type: "orchard.harvest_plot.result";
+  status: "ok";
+  command_id: number;
+  plot_id: string;
+  action: string;
+  wood: BigNum;
+  plant_matter: BigNum;
+  ash: BigNum;
+  charcoal: BigNum;
+  clover_seeds: BigNum;
+  acorns: BigNum;
+  coin_tree_seeds: BigNum;
+  coins: BigNum;
+  plots: PlotState[];
+  notices: NoticeState;
+};
+
+export type OrchardSpliceSeedsResult = {
+  type: "orchard.splice_seeds.result";
+  status: "ok";
+  command_id: number;
+  spliced_seeds: string[];
+  coins: BigNum;
+  clover_seeds: BigNum;
+  acorns: BigNum;
+  notices: NoticeState;
+};
+
+export type OrchardBuySeedResult = {
+  type: "orchard.buy_seed.result";
+  status: "ok";
+  command_id: number;
+  seed_id: string;
+  amount: number;
+  coins: BigNum;
+  shards: BigNum;
+  clover_seeds: BigNum;
+  acorns: BigNum;
+  coin_tree_seeds: BigNum;
+  notices: NoticeState;
+};
+
 export type AckableCommandResult =
   | GameResetResult
   | ProgressClaimInResult
@@ -415,7 +514,12 @@ export type AckableCommandResult =
   | StatsUpdateResult
   | NoticeEventResult
   | BonusTimePlayResult
-  | CommandErrorResult;
+  | CommandErrorResult
+  | OrchardUnlockPlotResult
+  | OrchardPlantSeedResult
+  | OrchardHarvestPlotResult
+  | OrchardSpliceSeedsResult
+  | OrchardBuySeedResult;
 
 export type CommandQueuedResult = {
   type: "command.queued";
@@ -471,7 +575,12 @@ export function isAckableCommandResult(result: ServerResult): result is AckableC
     result.type === "stats.update.result" ||
     result.type === "notice.event.result" ||
     result.type === "bonustime.play.result" ||
-    result.type === "command.error"
+    result.type === "command.error" ||
+    result.type === "orchard.unlock_plot.result" ||
+    result.type === "orchard.plant_seed.result" ||
+    result.type === "orchard.harvest_plot.result" ||
+    result.type === "orchard.splice_seeds.result" ||
+    result.type === "orchard.buy_seed.result"
   );
 }
 
@@ -482,6 +591,10 @@ export function isPlayerTickEvent(event: unknown): event is PlayerTickEvent {
   const hasValidOptionalToken =
     candidate.has_bonustime_token === undefined || typeof candidate.has_bonustime_token === "boolean";
 
+  const hasValidPlots =
+    candidate.plots === undefined ||
+    (Array.isArray(candidate.plots) && candidate.plots.every((p) => typeof p === "object"));
+
   return (
     candidate.type === "player.tick" &&
     typeof candidate.server_time === "string" &&
@@ -489,6 +602,7 @@ export function isPlayerTickEvent(event: unknown): event is PlayerTickEvent {
     typeof candidate.climate === "object" &&
     Boolean(candidate.soil) &&
     typeof candidate.soil === "object" &&
-    hasValidOptionalToken
+    hasValidOptionalToken &&
+    hasValidPlots
   );
 }
