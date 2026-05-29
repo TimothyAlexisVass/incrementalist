@@ -4,7 +4,7 @@ import { upgradeFurnace } from "../../net/commands";
 import { renderSageArea } from "./sage/render";
 import { getCloverfieldBackgroundBlendState } from "./cloverfield/render";
 import { handleCloverfieldInteractions } from "./cloverfield/interactions";
-import { renderOrchard } from "./orchard/render";
+import { renderOrchard, setOrchardPlantVisibility } from "./orchard/render";
 import { handleOrchardInteractions } from "./orchard/interaction";
 import { getAreaViewModel } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
@@ -112,6 +112,8 @@ export function renderAreaSpecifics(
   blocked: boolean = false
 ) {
   const model = getAreaViewModel();
+  setOrchardPlantVisibility(model.currentArea === "orchard");
+
   if (model.currentArea === 'sage') {
     renderSageArea(canvas, input, level, channel, runCommand, blocked);
     return;

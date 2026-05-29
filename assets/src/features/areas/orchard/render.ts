@@ -29,8 +29,23 @@ type OrchardRuntime = {
   fillMesh: THREE.Mesh;
 };
 
+type OrchardPlantRenderState = {
+  currentStage: number;
+  previousStage: number | null;
+  transitionStartedAt: number;
+};
+
+type OrchardPlantRenderRequest = {
+  uvPoints: readonly (readonly [number, number])[];
+  plotId: string;
+  plantId: string;
+  growth: number;
+};
+
 const ORCHARD_LOCKED_FILL_COLOR = 0x000000;
 const ORCHARD_LOCKED_FILL_OPACITY = 0.52;
+const ORCHARD_PLANT_STAGE_COUNT = 8;
+const ORCHARD_PLANT_STAGE_FADE_MS = 260;
 const ORCHARD_SOIL_TEXT_COLOR = "#f9e7af";
 const ORCHARD_SOIL_TEXT_FONT = "bold 13px Inter";
 const ORCHARD_SOIL_TEXT_LINE_HEIGHT = 29;
@@ -61,7 +76,24 @@ const ORCHARD_SOIL_NK_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.nitr
 const ORCHARD_SOIL_P_LEACH_MULTIPLIER = orchardSharedConfig.soil.leach.phosphorus_multiplier;
 const ORCHARD_SOIL_OM_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.organic_matter_per_water_loss;
 
+const orchardPlantImages = new Map<string, HTMLImageElement>();
+const orchardPlantRenderStates = new Map<string, OrchardPlantRenderState>();
+
 let orchardRuntime: OrchardRuntime | null = null;
+let orchardPlantVisibility = false;
+
+export function setOrchardPlantVisibility(isVisible: boolean) {
+  if (!isVisible) {
+    if (orchardPlantVisibility) {
+      orchardPlantRenderStates.clear();
+    }
+
+    orchardPlantVisibility = false;
+    return;
+  }
+
+  orchardPlantVisibility = true;
+}
 
 function ensureOrchardRuntime(): OrchardRuntime {
   if (orchardRuntime) return orchardRuntime;
@@ -116,9 +148,178 @@ function setHexagonGeometry(runtime: OrchardRuntime, points: readonly { x: numbe
   runtime.fillMesh.geometry = fillGeometry;
 }
 
+function resolvePlantStage(growth: number) {
+  const normalizedGrowth = Number.isFinite(growth) ? growth : 0;
+  const stage = Math.ceil(normalizedGrowth / (100 / ORCHARD_PLANT_STAGE_COUNT));
+  return Math.min(ORCHARD_PLANT_STAGE_COUNT, Math.max(1, stage));
+}
+
+function getOrchardPlantImage(plantId: string, stage: number) {
+  if (typeof Image === "undefined") return null;
+
+  const normalizedStage = Math.min(ORCHARD_PLANT_STAGE_COUNT, Math.max(1, Math.floor(stage)));
+  const imageKey = `${plantId}-${normalizedStage}`;
+
+  if (!orchardPlantImages.has(imageKey)) {
+    const image = new Image();
+    image.src = `images/plants/${imageKey}.png`;
+    orchardPlantImages.set(imageKey, image);
+  }
+
+  return orchardPlantImages.get(imageKey) ?? null;
+}
+
+function isRenderablePlantImage(image: HTMLImageElement | null): image is HTMLImageElement {
+  return !!image && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+function isBrokenPlantImage(image: HTMLImageElement | null) {
+  return !!image && image.complete && (image.naturalWidth <= 0 || image.naturalHeight <= 0);
+}
+
+function updatePlantRenderState(plotId: string, currentStage: number, now: number) {
+  let state = orchardPlantRenderStates.get(plotId);
+
+  if (!state) {
+    state = {
+      currentStage,
+      previousStage: null,
+      transitionStartedAt: 0
+    };
+    orchardPlantRenderStates.set(plotId, state);
+    return state;
+  }
+
+  if (state.currentStage !== currentStage) {
+    state.previousStage = state.currentStage;
+    state.currentStage = currentStage;
+    state.transitionStartedAt = now;
+  }
+
+  return state;
+}
+
+function getPlantImageFrame(
+  uvPoints: readonly (readonly [number, number])[],
+  image: HTMLImageElement
+) {
+  let minX = uvPoints[0][0];
+  let maxX = uvPoints[0][0];
+  let minY = uvPoints[0][1];
+  let maxY = uvPoints[0][1];
+
+  for (let i = 1; i < uvPoints.length; i += 1) {
+    const [u, v] = uvPoints[i];
+    if (u < minX) minX = u;
+    if (u > maxX) maxX = u;
+    if (v < minY) minY = v;
+    if (v > maxY) maxY = v;
+  }
+
+  const centerX = ((minX + maxX) / 2) * DISPLAY_AREA_WIDTH;
+  const width = image.naturalWidth * 0.4;
+  const height = image.naturalHeight * 0.4;
+  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT;
+
+  return {
+    x: DISPLAY_AREA_X + centerX - width / 2,
+    y: bottomY - height,
+    width,
+    height
+  };
+}
+
+function renderPlantImage(
+  renderer: ReturnType<typeof getActiveWebGLRenderer>,
+  uvPoints: readonly (readonly [number, number])[],
+  plotId: string,
+  plantId: string,
+  growth: number
+) {
+  const now = performance.now();
+  const currentStage = resolvePlantStage(growth);
+  const currentImage = getOrchardPlantImage(plantId, currentStage);
+  if (isBrokenPlantImage(currentImage)) {
+    orchardPlantRenderStates.delete(plotId);
+    return;
+  }
+
+  const state = updatePlantRenderState(plotId, currentStage, now);
+  const previousStage = state.previousStage;
+  const previousImage = previousStage !== null ? getOrchardPlantImage(plantId, previousStage) : null;
+  const currentImageIsLoading = !!currentImage && currentImage.complete === false;
+
+  if (previousStage !== null) {
+    const elapsed = Math.max(0, now - state.transitionStartedAt);
+    const mixAmount = Math.min(1, elapsed / ORCHARD_PLANT_STAGE_FADE_MS);
+
+    if (mixAmount >= 1 && !currentImageIsLoading) {
+      state.previousStage = null;
+    }
+
+    if (isRenderablePlantImage(currentImage) && isRenderablePlantImage(previousImage)) {
+      const frame = getPlantImageFrame(uvPoints, currentImage);
+      renderer.drawImage({
+        image: previousImage,
+        mixImage: currentImage,
+        mixAmount,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height
+      });
+      return;
+    }
+
+    if (isRenderablePlantImage(currentImage)) {
+      const frame = getPlantImageFrame(uvPoints, currentImage);
+      renderer.drawImage({
+        image: currentImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height
+      });
+      return;
+    }
+
+    if (isRenderablePlantImage(previousImage)) {
+      const frame = getPlantImageFrame(uvPoints, previousImage);
+      renderer.drawImage({
+        image: previousImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height
+      });
+      return;
+    }
+
+    if (mixAmount >= 1 && !currentImageIsLoading) {
+      state.previousStage = null;
+    }
+
+    return;
+  }
+
+  if (!isRenderablePlantImage(currentImage)) {
+    return;
+  }
+
+  const frame = getPlantImageFrame(uvPoints, currentImage);
+  renderer.drawImage({
+    image: currentImage,
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height
+  });
+}
+
 export function renderOrchard(input?: InteractionState) {
   const renderer = getActiveWebGLRenderer();
   const orchard = getOrchardViewModel();
+  const plantRenderRequests: OrchardPlantRenderRequest[] = [];
 
   if (orchard.hexagons.length === 0) return;
 
@@ -133,6 +334,16 @@ export function renderOrchard(input?: InteractionState) {
     }));
 
     const isLocked = orchardHexState(hex) === "locked";
+    let sumX = 0;
+    let sumY = 0;
+    for (const pt of uvPoints) {
+      sumX += pt[0];
+      sumY += pt[1];
+    }
+    const centerX = sumX / uvPoints.length;
+    const centerY = sumY / uvPoints.length;
+    const pixelX = DISPLAY_AREA_X + centerX * DISPLAY_AREA_WIDTH;
+    const pixelY = DISPLAY_AREA_Y + centerY * DISPLAY_AREA_HEIGHT;
 
     let isHovered = false;
     if (!isLocked && input && input.pointer) {
@@ -211,18 +422,6 @@ export function renderOrchard(input?: InteractionState) {
       });
     }
 
-    let sumX = 0;
-    let sumY = 0;
-    for (const pt of uvPoints) {
-      sumX += pt[0];
-      sumY += pt[1];
-    }
-    const centerX = sumX / uvPoints.length;
-    const centerY = sumY / uvPoints.length;
-
-    const pixelX = DISPLAY_AREA_X + centerX * DISPLAY_AREA_WIDTH;
-    const pixelY = DISPLAY_AREA_Y + centerY * DISPLAY_AREA_HEIGHT;
-
     // Locked plots render their shard unlock price at the hex center.
     if (isLocked) {
       const match = hex.id.match(/^plot_(\d+)$/);
@@ -248,6 +447,12 @@ export function renderOrchard(input?: InteractionState) {
       if (plot.plant) {
         const plant = plot.plant;
         const isReady = plant.growth >= 100.0;
+        plantRenderRequests.push({
+          uvPoints,
+          plotId: hex.id,
+          plantId: plant.plant_id,
+          growth: plant.growth
+        });
 
         // Spawn slowly rising particles from the plot when ready for harvest
         if (isReady && Math.random() < 0.08) {
@@ -370,6 +575,10 @@ export function renderOrchard(input?: InteractionState) {
         // Empty plot - drawn completely clean without seedling emoji or plant text.
       }
     }
+  }
+
+  for (const request of plantRenderRequests) {
+    renderPlantImage(renderer, request.uvPoints, request.plotId, request.plantId, request.growth);
   }
 
   renderSoilStats(input);
