@@ -20,6 +20,7 @@ import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
+import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
 import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
 import { humanizeSystemKey } from "./names";
 
@@ -40,6 +41,16 @@ type OrchardPlantRenderRequest = {
   plotId: string;
   plantId: string;
   growth: number;
+};
+
+type OrchardPlantRenderOptions = {
+  w: number;
+  h: number;
+  y: number;
+};
+
+type OrchardPlantSpec = {
+  renderOptions: OrchardPlantRenderOptions;
 };
 
 const ORCHARD_LOCKED_FILL_COLOR = 0x000000;
@@ -75,6 +86,7 @@ const ORCHARD_SOIL_BASE_DRY_DOWN_PER_HOUR = orchardSharedConfig.soil.base_dry_do
 const ORCHARD_SOIL_NK_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.nitrogen_and_potassium_per_water_loss;
 const ORCHARD_SOIL_P_LEACH_MULTIPLIER = orchardSharedConfig.soil.leach.phosphorus_multiplier;
 const ORCHARD_SOIL_OM_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.organic_matter_per_water_loss;
+const orchardPlantSpecs = orchardPlantsConfig as Record<string, OrchardPlantSpec>;
 
 const orchardPlantImages = new Map<string, HTMLImageElement>();
 const orchardPlantRenderStates = new Map<string, OrchardPlantRenderState>();
@@ -201,7 +213,8 @@ function updatePlantRenderState(plotId: string, currentStage: number, now: numbe
 
 function getPlantImageFrame(
   uvPoints: readonly (readonly [number, number])[],
-  image: HTMLImageElement
+  image: HTMLImageElement,
+  renderOptions: OrchardPlantRenderOptions
 ) {
   let minX = uvPoints[0][0];
   let maxX = uvPoints[0][0];
@@ -217,9 +230,9 @@ function getPlantImageFrame(
   }
 
   const centerX = ((minX + maxX) / 2) * DISPLAY_AREA_WIDTH;
-  const width = image.naturalWidth * 0.4;
-  const height = image.naturalHeight * 0.4;
-  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT;
+  const width = image.naturalWidth * renderOptions.w;
+  const height = image.naturalHeight * renderOptions.h;
+  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT + renderOptions.y;
 
   return {
     x: DISPLAY_AREA_X + centerX - width / 2,
@@ -239,6 +252,7 @@ function renderPlantImage(
   const now = performance.now();
   const currentStage = resolvePlantStage(growth);
   const currentImage = getOrchardPlantImage(plantId, currentStage);
+  const plantOptions = orchardPlantSpecs[plantId].renderOptions;
   if (isBrokenPlantImage(currentImage)) {
     orchardPlantRenderStates.delete(plotId);
     return;
@@ -258,7 +272,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(currentImage) && isRenderablePlantImage(previousImage)) {
-      const frame = getPlantImageFrame(uvPoints, currentImage);
+      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
       renderer.drawImage({
         image: previousImage,
         mixImage: currentImage,
@@ -272,7 +286,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(currentImage)) {
-      const frame = getPlantImageFrame(uvPoints, currentImage);
+      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
       renderer.drawImage({
         image: currentImage,
         x: frame.x,
@@ -284,7 +298,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(previousImage)) {
-      const frame = getPlantImageFrame(uvPoints, previousImage);
+      const frame = getPlantImageFrame(uvPoints, previousImage, plantOptions);
       renderer.drawImage({
         image: previousImage,
         x: frame.x,
@@ -306,7 +320,7 @@ function renderPlantImage(
     return;
   }
 
-  const frame = getPlantImageFrame(uvPoints, currentImage);
+  const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
   renderer.drawImage({
     image: currentImage,
     x: frame.x,

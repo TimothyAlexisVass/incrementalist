@@ -12,7 +12,7 @@
     "name": "Acorn",
     "description": "An oak acorn to grow a sturdy tree.",
     "coins": { "m": 5.0, "e": 2 },
-    "shards": { "m": 2.0, "e": 1 },
+    "shards": { "m": 5.0, "e": 0 },
     "unlocked": true
   },
   "coin_tree_seed": {

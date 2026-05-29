@@ -9,6 +9,11 @@
     "seedAmount": {
       "20": 40, "30": 20, "40": 20, "50": 10, "75": 5, "100": 5
     },
+    "renderOptions": {
+      "w": 0.42,
+      "h": 0.38,
+      "y": 5
+    },
     "nitrogenFixing": 2.0,
     "minOrganic": 5.0,
     "minDepth": 0,
@@ -24,6 +29,11 @@
     "harvestType": "seed",
     "seedAmount": {
       "0": 50, "1": 45, "2": 5
+    },
+    "renderOptions": {
+      "w": 0.4,
+      "h": 0.4,
+      "y": 20
     },
     "nitrogen": { "min": 2.0, "max": 10.0 },
     "potassium": { "min": 1.0, "max": 5.0 },
@@ -41,6 +51,11 @@
     "harvestType": "resource",
     "seedAmount": {
       "0": 60, "1": 20, "2": 15, "3": 5
+    },
+    "renderOptions": {
+      "w": 0.4,
+      "h": 0.4,
+      "y": 20
     },
     "harvestAmount": {
       "min": { "m": 1.0, "e": 3 },
