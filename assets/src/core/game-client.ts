@@ -741,6 +741,14 @@ export class GameClient {
       renderAreaSpecifics(this.canvas, sceneInput, this.store.state.snapshot.state.level, this.channel || undefined, (cmd) => this.runCommand(cmd), uiBlocked);
     }
 
+    updateWebGLEffects(dt);
+    // Keep orchard harvest particles in the world layer so they remain visible
+    // through semi-transparent overlays but never on top of opaque modal panels.
+    renderWebGLEffects({
+      includeNonParticleEffects: false,
+      particleRenderMode: 'harvest_only'
+    });
+
     const amounts = this.snapshotAmounts();
     if (amounts) {
       updateHudViewModel(dt, amounts);
@@ -812,10 +820,8 @@ export class GameClient {
     this.ui.tick(dt, input);
     this.ui.render(this.canvas, input, this.store.state);
 
-    // Update and render reward collection effects (including Sisu particles and click bursts)
-    // These are rendered AFTER the UI to appear on top of modals.
-    updateWebGLEffects(dt);
-    renderWebGLEffects();
+    // Render non-harvest effects after UI so these bursts remain visible over overlays.
+    renderWebGLEffects({ particleRenderMode: 'exclude_harvest' });
 
     renderFloatingTexts(this.floatingTexts);
 

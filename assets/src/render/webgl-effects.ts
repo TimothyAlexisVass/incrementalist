@@ -522,6 +522,8 @@ export function updateWebGLEffects(deltaTime: number) {
 export interface RenderWebGLOptions {
   visible?: boolean;
   targetCanvas?: HTMLCanvasElement | null;
+  includeNonParticleEffects?: boolean;
+  particleRenderMode?: 'all' | 'harvest_only' | 'exclude_harvest';
 }
 
 export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
@@ -530,6 +532,8 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
 
   const particles = WEBGL_EFFECTS.particles;
   const visible = options.visible !== false;
+  const includeNonParticleEffects = options.includeNonParticleEffects !== false;
+  const particleRenderMode = options.particleRenderMode ?? 'all';
 
   if (!visible) {
     return;
@@ -540,9 +544,11 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
   gl.disable(gl.SCISSOR_TEST);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  renderProgressBarGlow(gl, gl.canvas.width, gl.canvas.height);
-  renderLiquidBubbles(gl, gl.canvas.width, gl.canvas.height);
-  renderLaserBursts(gl, gl.canvas.width, gl.canvas.height);
+  if (includeNonParticleEffects) {
+    renderProgressBarGlow(gl, gl.canvas.width, gl.canvas.height);
+    renderLiquidBubbles(gl, gl.canvas.width, gl.canvas.height);
+    renderLaserBursts(gl, gl.canvas.width, gl.canvas.height);
+  }
 
   if (particles.length === 0) {
     return;
@@ -557,12 +563,16 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
     return;
   }
 
-  const drawCount = Math.min(particles.length, MAX_GPU_PARTICLES);
   const data = WEBGL_EFFECTS.data;
   let offset = 0;
+  let drawCount = 0;
 
-  for (let i = 0; i < drawCount; i += 1) {
+  for (let i = 0; i < particles.length; i += 1) {
     const particle = particles[i];
+    if (!shouldRenderParticleKind(particle.kind, particleRenderMode)) {
+      continue;
+    }
+
     const lifeProgress = particle.elapsedMs / particle.lifeMs;
     const alpha = particle.alpha * Math.pow(Math.max(0, 1 - lifeProgress), particle.fadePower);
     const size = particle.size * (0.86 + alpha * 0.34);
@@ -575,6 +585,15 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
     data[offset + 5] = particle.b;
     data[offset + 6] = alpha;
     offset += PARTICLE_FLOATS;
+
+    drawCount += 1;
+    if (drawCount >= MAX_GPU_PARTICLES) {
+      break;
+    }
+  }
+
+  if (drawCount === 0) {
+    return;
   }
 
   gl.enable(gl.BLEND);
@@ -594,6 +613,21 @@ export function renderWebGLEffects(options: RenderWebGLOptions = {}) {
 
   // Restore default blend mode for main renderer
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+}
+
+function shouldRenderParticleKind(
+  kind: ParticleKind,
+  particleRenderMode: NonNullable<RenderWebGLOptions['particleRenderMode']>
+) {
+  if (particleRenderMode === 'harvest_only') {
+    return kind === 'harvest';
+  }
+
+  if (particleRenderMode === 'exclude_harvest') {
+    return kind !== 'harvest';
+  }
+
+  return true;
 }
 
 export interface LiquidBubbleOptions {

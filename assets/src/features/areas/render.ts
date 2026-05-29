@@ -126,7 +126,9 @@ export function renderAreaSpecifics(
 
   if (model.currentArea === "orchard") {
     const orchardInput = blocked ? undefined : input;
-    renderOrchard(orchardInput, !blocked);
+    // Keep ambient harvest particles active even while modal input is blocked,
+    // so particles remain visible behind semi-transparent overlays.
+    renderOrchard(orchardInput, true);
     handleOrchardInteractions(input, channel, runCommand, blocked);
     return;
   }

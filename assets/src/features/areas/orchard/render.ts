@@ -22,7 +22,7 @@ import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
 import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
-import { clearGpuHarvestParticles, spawnGpuHarvestParticle } from "../../../render/webgl-effects";
+import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
 import { humanizeSystemKey } from "./names";
 
 type OrchardRuntime = {
@@ -404,10 +404,6 @@ function renderPlantImage(
 }
 
 export function renderOrchard(input?: InteractionState, allowAmbientHarvestParticles = true) {
-  if (!allowAmbientHarvestParticles) {
-    clearGpuHarvestParticles();
-  }
-
   const renderer = getActiveWebGLRenderer();
   const orchard = getOrchardViewModel();
   const plantRenderRequests: OrchardPlantRenderRequest[] = [];
