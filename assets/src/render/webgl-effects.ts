@@ -3,6 +3,7 @@ import { COLORS } from '../colors';
 type AnyRecord = Record<string, any>;
 export type Rgb = [number, number, number];
 export type ColorInput = Rgb | readonly [number, number, number] | string;
+type ParticleKind = 'default' | 'harvest';
 type ParticleOptions = {
   x: number;
   y: number;
@@ -18,6 +19,7 @@ type ParticleOptions = {
   targetX?: number;
   targetY?: number;
   sisuState?: 'bursting' | 'homing' | 'orbiting';
+  kind?: ParticleKind;
 };
 type LaserRectOptions = {
   originX: number;
@@ -58,6 +60,7 @@ type GpuParticle = {
   orbitAngle?: number;
   orbitSpeed?: number;
   sisuState?: 'bursting' | 'homing' | 'orbiting';
+  kind: ParticleKind;
 };
 type GpuLaserRect = {
   originX: number;
@@ -601,6 +604,20 @@ export interface LiquidBubbleOptions {
   fillHeight?: number;
   fillRatio?: number;
   fillY?: number;
+}
+
+export function clearGpuHarvestParticles() {
+  const particles = WEBGL_EFFECTS.particles;
+  if (particles.length === 0) return;
+
+  let writeIndex = 0;
+  for (let i = 0; i < particles.length; i += 1) {
+    const particle = particles[i];
+    if (particle.kind === 'harvest') continue;
+    particles[writeIndex] = particle;
+    writeIndex += 1;
+  }
+  particles.length = writeIndex;
 }
 
 export function updateGpuProgressLiquidBubbles(deltaTime: number, options: LiquidBubbleOptions = {}) {
@@ -1321,7 +1338,8 @@ function pushGpuParticle(options: ParticleOptions) {
     lifeMs: options.lifeMs,
     targetX: options.targetX,
     targetY: options.targetY,
-    sisuState: options.sisuState
+    sisuState: options.sisuState,
+    kind: options.kind ?? 'default'
   });
 }
 
@@ -1424,10 +1442,10 @@ export function spawnGpuHarvestParticle(x: number, y: number, color: ColorInput 
     color,
     alpha: 0.75,
     fadePower: 1.1,
-    lifeMs: 1400 + Math.random() * 800
+    lifeMs: 1400 + Math.random() * 800,
+    kind: 'harvest'
   });
 
   trimGpuParticles();
   return true;
 }
-

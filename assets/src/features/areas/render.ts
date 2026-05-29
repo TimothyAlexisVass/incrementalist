@@ -125,7 +125,8 @@ export function renderAreaSpecifics(
   }
 
   if (model.currentArea === "orchard") {
-    renderOrchard(input);
+    const orchardInput = blocked ? undefined : input;
+    renderOrchard(orchardInput, !blocked);
     handleOrchardInteractions(input, channel, runCommand, blocked);
     return;
   }
