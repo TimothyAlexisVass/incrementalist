@@ -606,6 +606,7 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
           });
         }
       } else if (plot.decomposition) {
+        orchardPlantRenderStates.delete(hex.id);
         const decomp = plot.decomposition;
         const emoji = decomp.resource_id === "fruit" ? "🍎" : "🍂";
         const label = decomp.resource_id === "fruit" ? "Fruit Pile" : "Plant Matter";
@@ -665,7 +666,7 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
           color: [0.8, 0.5, 0.5, 0.9]
         });
       } else {
-        // Empty plot - drawn completely clean without seedling emoji or plant text.
+        orchardPlantRenderStates.delete(hex.id);
       }
     }
   }
