@@ -10,6 +10,7 @@ import { pointInRect, type InteractionState } from "../../../ui/managers/interac
 import { queueTooltip } from "../../../ui/components/tooltip";
 import {
   orchardHexPoints,
+  orchardHexPlotRatio,
   orchardHexState,
   getOrchardViewModel
 } from "./view-model";
@@ -45,6 +46,7 @@ type OrchardPlantRenderRequest = {
   plantId: string;
   growth: number;
   isPlotHovered: boolean;
+  plotRatio: number;
 };
 
 type OrchardPlantRenderOptions = {
@@ -229,7 +231,8 @@ function getPlantHoverOpacity(state: OrchardPlantRenderState, now: number) {
 function getPlantImageFrame(
   uvPoints: readonly (readonly [number, number])[],
   image: HTMLImageElement,
-  renderOptions: OrchardPlantRenderOptions
+  renderOptions: OrchardPlantRenderOptions,
+  rawPlotRatio: number
 ) {
   let minX = uvPoints[0][0];
   let maxX = uvPoints[0][0];
@@ -244,10 +247,14 @@ function getPlantImageFrame(
     if (v > maxY) maxY = v;
   }
 
+  const plotRatio = Number.isFinite(rawPlotRatio) && rawPlotRatio > 0
+    ? rawPlotRatio
+    : 1;
+  const widthRatio = 1 + ((plotRatio - 1) * 0.5);
   const centerX = ((minX + maxX) / 2) * DISPLAY_AREA_WIDTH;
-  const width = image.naturalWidth * renderOptions.w;
-  const height = image.naturalHeight * renderOptions.h;
-  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT + renderOptions.y;
+  const width = image.naturalWidth * renderOptions.w * widthRatio;
+  const height = image.naturalHeight * renderOptions.h * plotRatio;
+  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT + renderOptions.y * plotRatio;
 
   return {
     x: DISPLAY_AREA_X + centerX - width / 2,
@@ -284,7 +291,8 @@ function renderPlantImage(
   plotId: string,
   plantId: string,
   growth: number,
-  isPlotHovered: boolean
+  isPlotHovered: boolean,
+  plotRatio: number
 ) {
   const now = performance.now();
   const currentStage = resolvePlantStage(growth);
@@ -309,7 +317,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(currentImage) && isRenderablePlantImage(previousImage)) {
-      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: previousImage,
@@ -325,7 +333,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(currentImage)) {
-      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+      const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: currentImage,
@@ -339,7 +347,7 @@ function renderPlantImage(
     }
 
     if (isRenderablePlantImage(previousImage)) {
-      const frame = getPlantImageFrame(uvPoints, previousImage, plantOptions);
+      const frame = getPlantImageFrame(uvPoints, previousImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: previousImage,
@@ -363,7 +371,7 @@ function renderPlantImage(
     return;
   }
 
-  const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions);
+  const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions, plotRatio);
   const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
   renderer.drawImage({
     image: currentImage,
@@ -511,7 +519,8 @@ export function renderOrchard(input?: InteractionState) {
           plotId: hex.id,
           plantId: plant.plant_id,
           growth: plant.growth,
-          isPlotHovered: isHovered
+          isPlotHovered: isHovered,
+          plotRatio: orchardHexPlotRatio(hex)
         });
 
         // Spawn slowly rising particles from the plot when ready for harvest
@@ -645,7 +654,8 @@ export function renderOrchard(input?: InteractionState) {
       request.plotId,
       request.plantId,
       request.growth,
-      request.isPlotHovered
+      request.isPlotHovered,
+      request.plotRatio
     );
   }
 

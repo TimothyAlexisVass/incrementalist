@@ -387,7 +387,7 @@ defmodule Incrementalist.Game.State do
     field :area, :string, default: "sage"
     field :level, :integer, default: 1
     field :furnace_level, :integer, default: 1
-    field :has_bonustime_token, :boolean, virtual: true, default: true
+    field :has_bonustime_token, :boolean, default: true
 
     embeds_one :exp, BigNum, on_replace: :update
     embeds_one :required_exp, BigNum, on_replace: :update
@@ -441,6 +441,7 @@ defmodule Incrementalist.Game.State do
       :area,
       :level,
       :furnace_level,
+      :has_bonustime_token,
       :trust,
       :idle_mode,
       :first_played_at,

@@ -579,6 +579,39 @@ defmodule Incrementalist.Game.CommandsTest do
     refute Map.has_key?(result["bonustime"], "rotation_anchor")
   end
 
+  test "bonustime.play keeps a consumed token false after projection reload" do
+    Application.put_env(
+      :incrementalist,
+      :bonustime_rotation_anchor_override,
+      DateTime.to_iso8601(@now)
+    )
+
+    on_exit(fn ->
+      Application.delete_env(:incrementalist, :bonustime_rotation_anchor_override)
+    end)
+
+    player = create_player()
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "bonustime.play",
+        intent(0, %{"game" => "chest_draw"}),
+        @now
+      )
+
+    assert result["type"] == "bonustime.play.result"
+    assert result["status"] == "ok"
+    refute result["has_bonustime_token"]
+
+    stored = PlayerStates.get!(player.id)
+    refute stored.state.has_bonustime_token
+
+    reloaded = PlayerStates.load_or_create(player, DateTime.add(@now, 61, :second))
+    refute reloaded.state.has_bonustime_token
+    refute PlayerStates.get!(player.id).has_bonustime_token
+  end
+
   test "bonustime.play plinko_drop includes authoritative roll payload in last_result" do
     plinko_anchor = DateTime.add(@now, -(4 * 43_200_000), :millisecond)
 

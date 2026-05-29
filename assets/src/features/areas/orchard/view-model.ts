@@ -12,6 +12,7 @@ export type OrchardHexagon = {
   points: readonly OrchardUvPoint[];
   state?: OrchardHexState;
   plotData?: PlotState | null;
+  plotRatio?: number;
 };
 
 export type OrchardViewModel = {
@@ -396,6 +397,11 @@ const orchardViewModel: OrchardViewModel = {
   ]
 };
 
+const ORCHARD_BASELINE_RENDER_PLOT_ID = "plot_8";
+const ORCHARD_FRONT_ROW_RENDER_PLOT_IDS = new Set(["plot_20", "plot_8", "plot_21"]);
+
+initializePlotRatios();
+
 export function getOrchardViewModel() {
   return orchardViewModel;
 }
@@ -406,6 +412,10 @@ export function orchardHexPoints(hex: OrchardHexagon): readonly OrchardUvPoint[]
 
 export function orchardHexState(hex: OrchardHexagon): OrchardHexState {
   return hex.state ?? "locked";
+}
+
+export function orchardHexPlotRatio(hex: OrchardHexagon): number {
+  return hex.plotRatio ?? 1;
 }
 
 export function syncOrchardFromSnapshot(snapshotState: any) {
@@ -466,4 +476,32 @@ function getNutrientRatio(soilVal: any, limit: { min: number; max: number } | nu
     return Math.min(1.0, soilFloat / maxVal);
   }
   return 0;
+}
+
+function initializePlotRatios() {
+  const baselineHex = orchardViewModel.hexagons.find((hex) => hex.id === ORCHARD_BASELINE_RENDER_PLOT_ID);
+  const baselineHeight = baselineHex ? getPlotUvHeight(baselineHex.points) : 0;
+
+  for (const hex of orchardViewModel.hexagons as OrchardHexagon[]) {
+    if (baselineHeight <= 0 || ORCHARD_FRONT_ROW_RENDER_PLOT_IDS.has(hex.id)) {
+      hex.plotRatio = 1;
+      continue;
+    }
+
+    const plotRatio = getPlotUvHeight(hex.points) / baselineHeight;
+    hex.plotRatio = Number.isFinite(plotRatio) && plotRatio > 0 ? plotRatio : 1;
+  }
+}
+
+function getPlotUvHeight(points: readonly OrchardUvPoint[]) {
+  let minY = points[0][1];
+  let maxY = points[0][1];
+
+  for (let i = 1; i < points.length; i += 1) {
+    const y = points[i][1];
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+
+  return maxY - minY;
 }

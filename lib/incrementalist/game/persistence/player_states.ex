@@ -114,7 +114,10 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
 
   def initialize_if_empty(%PlayerState{} = ps, _now), do: ps
 
-  defp maybe_project_and_save(%PlayerState{state: %State{} = state} = ps, now) do
+  defp maybe_project_and_save(%PlayerState{} = ps, now) do
+    ps = PlayerState.inject_state_tokens(ps)
+    state = ps.state
+
     projected_state =
       state
       |> State.check_daily_reset(now)
@@ -138,6 +141,8 @@ defmodule Incrementalist.Game.Persistence.PlayerStates do
   defp maybe_project_and_save(ps, _now), do: ps
 
   def autosave(%PlayerState{} = ps, now \\ Time.now()) do
+    ps = PlayerState.inject_state_tokens(ps)
+
     projected_state =
       if ps.state do
         ps.state
