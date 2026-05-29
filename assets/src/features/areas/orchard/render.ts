@@ -20,6 +20,7 @@ import { fromNumber, toNumber, type BigNum } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum } from "../../../utils/format";
 import { resolveUpdatingText } from "../../../utils/text";
+import { getOrchardHarvestParticleColor } from "../../../colors";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
 import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
 import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
@@ -577,13 +578,7 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
             }
           }
 
-          let color = '#00e676'; // Clover Patch: vibrant neon green
-          if (plant.plant_id === 'oak') {
-            color = '#ff9100'; // Oak: warm vibrant gold
-          } else if (plant.plant_id === 'coin_tree') {
-            color = '#ffd700'; // Coin Tree: shiny rich gold
-          }
-          spawnGpuHarvestParticle(spawnX, spawnY, color);
+          spawnGpuHarvestParticle(spawnX, spawnY, getOrchardHarvestParticleColor(plant.plant_id));
         }
 
         // Show tooltip on hover

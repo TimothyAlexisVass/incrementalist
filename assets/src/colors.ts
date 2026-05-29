@@ -132,6 +132,17 @@ export const COLORS = Object.freeze({
   }
 } as const);
 
+export const ORCHARD_HARVEST_PARTICLE_COLORS = Object.freeze({
+  default: '#00e676',
+  oak: '#ff9100',
+  coin_tree: '#ffd700'
+} as const);
+
+export function getOrchardHarvestParticleColor(plantId: string): string {
+  return ORCHARD_HARVEST_PARTICLE_COLORS[plantId as keyof typeof ORCHARD_HARVEST_PARTICLE_COLORS] ??
+    ORCHARD_HARVEST_PARTICLE_COLORS.default;
+}
+
 const BONUS_TIER_1_LABEL_COLOR = "#2d3748";
 
 const CSS_COLOR_VARIABLES = Object.freeze({
