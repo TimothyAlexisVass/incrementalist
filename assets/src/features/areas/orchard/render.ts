@@ -34,7 +34,8 @@ type OrchardRuntime = {
 type OrchardPlantRenderState = {
   currentStage: number;
   previousStage: number | null;
-  transitionStartedAt: number;
+  stageBlend: number;
+  stageBlendUpdatedAt: number;
   hoverOpacityFrom: number;
   hoverOpacityTarget: number;
   hoverTransitionStartedAt: number;
@@ -204,7 +205,8 @@ function updatePlantRenderState(plotId: string, currentStage: number, now: numbe
     state = {
       currentStage,
       previousStage: null,
-      transitionStartedAt: 0,
+      stageBlend: 1,
+      stageBlendUpdatedAt: now,
       hoverOpacityFrom: 1,
       hoverOpacityTarget: 1,
       hoverTransitionStartedAt: 0
@@ -216,10 +218,24 @@ function updatePlantRenderState(plotId: string, currentStage: number, now: numbe
   if (state.currentStage !== currentStage) {
     state.previousStage = state.currentStage;
     state.currentStage = currentStage;
-    state.transitionStartedAt = now;
+    state.stageBlend = 0;
+    state.stageBlendUpdatedAt = now;
   }
 
   return state;
+}
+
+function advancePlantStageBlend(state: OrchardPlantRenderState, canAdvance: boolean, now: number) {
+  if (!canAdvance || state.previousStage === null) {
+    state.stageBlendUpdatedAt = now;
+    return state.stageBlend;
+  }
+
+  const elapsed = Math.max(0, now - state.stageBlendUpdatedAt);
+  state.stageBlendUpdatedAt = now;
+  const transitionStep = ORCHARD_PLANT_STAGE_FADE_MS > 0 ? elapsed / ORCHARD_PLANT_STAGE_FADE_MS : 1;
+  state.stageBlend = Math.min(1, state.stageBlend + transitionStep);
+  return state.stageBlend;
 }
 
 function getPlantHoverOpacity(state: OrchardPlantRenderState, now: number) {
@@ -306,33 +322,38 @@ function renderPlantImage(
   const state = updatePlantRenderState(plotId, currentStage, now);
   const previousStage = state.previousStage;
   const previousImage = previousStage !== null ? getOrchardPlantImage(plantId, previousStage) : null;
-  const currentImageIsLoading = !!currentImage && currentImage.complete === false;
+  const currentImageReady = isRenderablePlantImage(currentImage);
+  const previousImageReady = isRenderablePlantImage(previousImage);
 
   if (previousStage !== null) {
-    const elapsed = Math.max(0, now - state.transitionStartedAt);
-    const mixAmount = Math.min(1, elapsed / ORCHARD_PLANT_STAGE_FADE_MS);
+    const stageBlend = advancePlantStageBlend(state, currentImageReady, now);
 
-    if (mixAmount >= 1 && !currentImageIsLoading) {
-      state.previousStage = null;
-    }
-
-    if (isRenderablePlantImage(currentImage) && isRenderablePlantImage(previousImage)) {
+    if (currentImageReady && previousImageReady) {
       const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
         image: previousImage,
-        mixImage: currentImage,
-        mixAmount,
         x: frame.x,
         y: frame.y,
         width: frame.width,
         height: frame.height,
-        alpha
+        alpha: alpha * (1 - stageBlend)
       });
+      renderer.drawImage({
+        image: currentImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        alpha: alpha * stageBlend
+      });
+      if (stageBlend >= 1) {
+        state.previousStage = null;
+      }
       return;
     }
 
-    if (isRenderablePlantImage(currentImage)) {
+    if (currentImageReady) {
       const frame = getPlantImageFrame(uvPoints, currentImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
@@ -343,10 +364,13 @@ function renderPlantImage(
         height: frame.height,
         alpha
       });
+      if (stageBlend >= 1) {
+        state.previousStage = null;
+      }
       return;
     }
 
-    if (isRenderablePlantImage(previousImage)) {
+    if (previousImageReady) {
       const frame = getPlantImageFrame(uvPoints, previousImage, plantOptions, plotRatio);
       const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
       renderer.drawImage({
@@ -360,14 +384,10 @@ function renderPlantImage(
       return;
     }
 
-    if (mixAmount >= 1 && !currentImageIsLoading) {
-      state.previousStage = null;
-    }
-
     return;
   }
 
-  if (!isRenderablePlantImage(currentImage)) {
+  if (!currentImageReady) {
     return;
   }
 
