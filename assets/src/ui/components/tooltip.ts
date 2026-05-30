@@ -1,7 +1,7 @@
 import { SMALL_TEXT_FONT } from '../../config';
 import { getActiveWebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
-import { resolveUpdatingText } from '../../utils/text';
+import { resolveStableMultilineText } from '../../renderer/stable-text';
 
 export interface TooltipOptions {
   font?: string;
@@ -105,23 +105,19 @@ function drawTooltipInternal(
     placement = 'top-left'
   } = options;
 
-  const resolvedContent = textUpdateKey
-    ? resolveUpdatingText(textUpdateKey, Array.isArray(content) ? content.join('\n') : content, (candidate) => {
-      const candidateLines = normalizeTooltipLines(candidate);
-      return candidateLines.every((line, i) => {
-        const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
-        return renderer.isTextReady({
-          text: line,
-          font: lineFont,
-          color: textColor,
-          align: options.align || 'left',
-          baseline: 'top'
-        });
-      });
-    })
-    : content;
+  const lines = resolveStableMultilineText(
+    textUpdateKey,
+    normalizeTooltipLines(content),
+    {
+      font,
+      color: textColor,
+      align: options.align || 'left',
+      baseline: 'top',
+      lineFonts: options.lineFonts,
+      lineColors: options.lineColors,
+    }
+  );
 
-  const lines = normalizeTooltipLines(resolvedContent);
   if (lines.length === 0) {
     return null;
   }

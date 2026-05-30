@@ -20,7 +20,7 @@ import { drawButton, doButton } from "../../../ui/components/button";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { toNumber } from "../../../core/bignum";
 import { formatBigNum } from "../../../utils/format";
-import { resolveUpdatingText } from "../../../utils/text";
+import { resolveStableText, resolveStableMultilineText } from "../../../renderer/stable-text";
 import {
   getOrchardViewModel,
   orchardHexPoints,
@@ -282,16 +282,15 @@ export class PlotActionModal implements Modal {
 
       if (isReady) {
         // --- Harvestable ---
-        const readyText = resolveUpdatingText(
+        const readyText = resolveStableText(
           `orchard.plot.${this.plotData.id}.plant.ready`,
           "The plant is fully grown and ready to harvest!",
-          (candidate) => renderer.isTextReady({
-            text: candidate,
+          {
             font: MODAL_BODY_FONT,
             color: COLORS.overlay.bodyText,
             align: "center",
             baseline: "top"
-          })
+          }
         );
 
         renderer.drawText({
@@ -340,25 +339,20 @@ export class PlotActionModal implements Modal {
         // --- Growing ---
         const plantName = humanizeSystemKey(plant.plant_id);
 
-        const stableLines = resolveUpdatingText(
+        const lines = resolveStableMultilineText(
           `orchard.plot.${this.plotData.id}.plant.details`,
           [
             `Plant: ${plantName}`,
             `Growth: ${plant.growth.toFixed(1)}%`,
             `Level: ${plant.level}`
-          ].join("\n"),
-          (candidate) => candidate.split("\n").every((line) =>
-            renderer.isTextReady({
-              text: line,
-              font: MODAL_BODY_FONT,
-              color: COLORS.overlay.bodyText,
-              align: "center",
-              baseline: "top"
-            })
-          )
+          ],
+          {
+            font: MODAL_BODY_FONT,
+            color: COLORS.overlay.bodyText,
+            align: "center",
+            baseline: "top"
+          }
         );
-
-        const lines = stableLines.split("\n");
 
         lines.forEach((line, index) => {
           renderer.drawText({

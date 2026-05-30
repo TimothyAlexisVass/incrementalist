@@ -1,5 +1,6 @@
-import { Camera, OrthographicCamera, Scene, Vector4, WebGLRenderer as ThreeWebGLRenderer } from "three";
+import { Camera, Mesh, MeshBasicMaterial, OrthographicCamera, Scene, Texture, Vector4, WebGLRenderer as ThreeWebGLRenderer } from "three";
 import { Text } from "troika-three-text";
+import { resolveUpdatingText } from "../utils/text";
 
 export type RGBA = readonly [number, number, number, number];
 
@@ -43,6 +44,7 @@ export interface DrawTextOptions {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   scale?: number;
+  textUpdateKey?: string;
 }
 
 export type TextReadinessOptions = Omit<DrawTextOptions, "x" | "y">;
@@ -1284,8 +1286,14 @@ export class WebGLRenderer {
   }
 
   drawText(options: DrawTextOptions) {
-    const text = options.text;
+    let text = options.text;
     if (!text) return;
+
+    if (options.textUpdateKey) {
+      text = resolveUpdatingText(options.textUpdateKey, text, (candidate: string) => {
+        return this.isTextReady({ ...options, text: candidate });
+      });
+    }
 
     const alpha = clamp01(options.alpha ?? 1) * this._globalAlpha;
     if (alpha <= 0) return;

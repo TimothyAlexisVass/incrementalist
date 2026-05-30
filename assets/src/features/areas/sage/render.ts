@@ -14,7 +14,8 @@ import { COLORS } from '../../../colors';
 import { doButton } from '../../../ui/components/button';
 import { getActiveWebGLRenderer } from '../../../renderer/webgl';
 import { hexToRgba } from '../../../utils/color';
-import { clearUpdatingTextKeysByPrefix, resolveUpdatingText } from '../../../utils/text';
+import { clearUpdatingTextKeysByPrefix } from '../../../utils/text';
+import { resolveStableText } from '../../../renderer/stable-text';
 
 const LETTERS_PER_SECOND = 40;
 const PANEL_PADDING = 16;
@@ -209,16 +210,15 @@ function renderTipPanel(
     const x = boxX + PANEL_PADDING;
     const y = bodyStartY + (i * LINE_HEIGHT);
     const nextVisibleLine = fullLine.slice(0, visibleChars);
-    const renderedLine = resolveUpdatingText(
+    const renderedLine = resolveStableText(
       getSageTipLineTextKey(leafId, i),
       nextVisibleLine,
-      (candidate) => renderer.isTextReady({
-        text: candidate,
+      {
         font: SMALL_TEXT_FONT,
         color: COLORS.panel.textPrimary,
         align: 'left',
         baseline: 'top'
-      })
+      }
     );
 
     renderer.drawText({

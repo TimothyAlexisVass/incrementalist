@@ -2,7 +2,7 @@ import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { drawButton } from "../../ui/components/button";
 import { hexToRgba } from "../../utils";
-import { resolveUpdatingText } from "../../utils/text";
+import { resolveStableText } from "../../renderer/stable-text";
 import {
   BONUSTIME_BODY_FONT,
   BONUSTIME_BUTTON_FONT,
@@ -242,16 +242,15 @@ export function renderBonusTimeRewardCountdownBanner(
   const remainingMs = getBonusTimeRewardCountdownRemainingMs(options.startedAt);
   const remainingSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const bodyText = `${options.bodyPrefix}${remainingSeconds}s...`;
-  const stableBodyText = resolveUpdatingText(
+  const stableBodyText = resolveStableText(
     options.key,
     bodyText,
-    (text) => renderer.isTextReady({
-      text,
+    {
       font: options.bodyFont ?? BONUSTIME_TIMER_FONT,
       color: options.bodyColor ?? "#a0aec0",
       align: "center",
       baseline: "middle"
-    })
+    }
   );
 
   const accentColor = options.accentColor ?? "#52df87";

@@ -160,11 +160,7 @@ export function renderCardPick(
         // Dim unclicked ones flipped in FINAL_REVEAL
         const alpha = isRestFlipped ? 0.35 : 1.0;
 
-        // Outer glow of reward color
-        renderer.drawGlowRect({
-          x: tx, y: ty, width: tileSize, height: tileSize,
-          color: hexToRgba(tierColor), radius: 8, intensity: 0.55, outerAlpha: 0.35, alpha
-        });
+
 
         // Draw solid background block
         renderer.drawRect({
@@ -200,12 +196,7 @@ export function renderCardPick(
         const drawSize = tileSize * scale;
         const offset = (drawSize - tileSize) / 2;
 
-        if (isHovered) {
-          renderer.drawGlowRect({
-            x: tx - offset, y: ty - offset, width: drawSize, height: drawSize,
-            color: [255, 190, 77, 255], radius: 10, intensity: 0.45, outerAlpha: 0.25
-          });
-        }
+
 
         // Closed card background
         renderer.drawGradientRect({

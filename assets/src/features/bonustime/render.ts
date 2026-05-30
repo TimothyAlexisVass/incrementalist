@@ -17,7 +17,7 @@ import { getWheelState, WheelState, getRewardWaitStartedAt as getWheelRewardWait
 import { renderResourceChecklist } from "./03-resource-checklist/render";
 import { getResourceChecklistData } from "./03-resource-checklist/view-model";
 import { getResourceChecklistState, ResourceChecklistState, getRewardWaitStartedAt as getResourceChecklistRewardWaitStartedAt } from "./03-resource-checklist/interactions";
-import { resolveUpdatingText } from "../../utils/text";
+import { resolveStableText } from "../../renderer/stable-text";
 import { drawButton } from "../../ui/components/button";
 import { InteractionState } from "../../ui/managers/interactions";
 import { renderItemChecklist } from "./11-item-checklist/render";
@@ -106,13 +106,12 @@ export function renderBonusTimeOverview(
     // Render the unified global cooldown screen instead of the active game!
     const remainingMs = getTimeUntilNextTokenMs(state);
     const countdownStr = formatCountdown(remainingMs);
-    const stableCountdown = resolveUpdatingText("bonustime_countdown", countdownStr, (text) => renderer.isTextReady({
-      text,
+    const stableCountdown = resolveStableText("bonustime_countdown", countdownStr, {
       font: BONUSTIME_TIMER_FONT,
       color: "#edf2f7",
       align: 'center',
       baseline: 'middle'
-    }));
+    });
 
     renderer.drawText({
       text: "TIME UNTIL NEXT ENTRY",

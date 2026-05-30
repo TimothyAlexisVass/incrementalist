@@ -19,7 +19,7 @@ import type { ClimateState, SoilState } from "../../../net/protocol";
 import { fromNumber, toNumber, type BigNum } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum } from "../../../utils/format";
-import { resolveUpdatingText } from "../../../utils/text";
+import { resolveStableText } from "../../../renderer/stable-text";
 import { getOrchardHarvestParticleColor } from "../../../colors";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
 import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
@@ -834,15 +834,12 @@ function renderSoilStats(input?: InteractionState) {
 
   lines.forEach((line, index) => {
     let x = ORCHARD_SOIL_STATS_X;
-    const stableLine = resolveUpdatingText(`orchard.soil.line.${index}`, line[1], (candidate) =>
-      renderer.isTextReady({
-        text: candidate,
-        font: ORCHARD_SOIL_TEXT_FONT,
-        color: ORCHARD_SOIL_TEXT_COLOR,
-        align: "left",
-        baseline: "top"
-      })
-    );
+    const stableLine = resolveStableText(`orchard.soil.line.${index}`, line[1], {
+      font: ORCHARD_SOIL_TEXT_FONT,
+      color: ORCHARD_SOIL_TEXT_COLOR,
+      align: "left",
+      baseline: "top"
+    });
 
     renderer.drawText({
       text: line[0],

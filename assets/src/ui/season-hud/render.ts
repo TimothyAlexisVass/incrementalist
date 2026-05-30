@@ -2,7 +2,7 @@ import { COLORS } from "../../colors";
 import { BOTTOM_HUD_HEIGHT, SEASON_HUD_FONT } from "../../config";
 import type { ClimateState } from "../../net/protocol";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
-import { resolveUpdatingText } from "../../utils/text";
+import { resolveStableText } from "../../renderer/stable-text";
 import { buildSeasonHudModel, buildSeasonHudTooltip } from "./view-model";
 import { InteractionState, pointInRect } from "../../ui/managers/interactions";
 import { queueTooltip } from "../../ui/components/tooltip";
@@ -26,25 +26,19 @@ export function renderSeasonHud(
   const model = buildSeasonHudModel(climate);
   if (!model) return;
 
-  const stableLeftText = resolveUpdatingText(SEASON_HUD_LEFT_TEXT_KEY, model.leftText, (candidate) =>
-    renderer.isTextReady({
-      text: candidate,
-      font: SEASON_HUD_FONT,
-      color: COLORS.panel.textPrimary,
-      align: "left",
-      baseline: "middle"
-    })
-  );
+  const stableLeftText = resolveStableText(SEASON_HUD_LEFT_TEXT_KEY, model.leftText, {
+    font: SEASON_HUD_FONT,
+    color: COLORS.panel.textPrimary,
+    align: "left",
+    baseline: "middle"
+  });
 
-  const stableRightText = resolveUpdatingText(SEASON_HUD_RIGHT_TEXT_KEY, model.rightText, (candidate) =>
-    renderer.isTextReady({
-      text: candidate,
-      font: SEASON_HUD_FONT,
-      color: COLORS.panel.textPrimary,
-      align: "left",
-      baseline: "middle"
-    })
-  );
+  const stableRightText = resolveStableText(SEASON_HUD_RIGHT_TEXT_KEY, model.rightText, {
+    font: SEASON_HUD_FONT,
+    color: COLORS.panel.textPrimary,
+    align: "left",
+    baseline: "middle"
+  });
 
   const hudTopY = canvas.height - BOTTOM_HUD_HEIGHT;
   const textY = hudTopY + 23;

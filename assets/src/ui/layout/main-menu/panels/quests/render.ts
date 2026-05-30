@@ -14,7 +14,7 @@ import { markViewed } from '../../../../../net/commands';
 import { notices } from '../../../../managers/notices';
 import { formatNumberRatio } from '../../../../../utils';
 import { toNumber } from '../../../../../core/bignum';
-import { resolveUpdatingText } from '../../../../../utils/text';
+import { resolveStableText } from '../../../../../renderer/stable-text';
 import { ZERO } from '../../../../../core/bignum';
 import { drawHorizontalBar, getHorizontalBarCenterY } from '../../../../components/bar';
 import { getQuestFameBarRect, setQuestFameBarContainerRect } from '../../../../../features/quests/fame-bar';
@@ -238,16 +238,15 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
     }
   );
 
-  const trustText = resolveUpdatingText(
+  const trustText = resolveStableText(
     FAME_BAR_TRUST_TEXT_KEY,
     String(trust),
-    (candidate) => renderer.isTextReady({
-      text: candidate,
+    {
       font: TOP_HUD_LEVEL_FONT,
       color: COLORS.panel.textPrimary,
       align: 'right',
       baseline: 'middle'
-    })
+    }
   );
   renderer.drawText({
     text: trustText,
@@ -259,16 +258,15 @@ function drawFameBar(snapshot: GameSnapshot, rect: Rect) {
     baseline: 'middle'
   });
 
-  const fameText = resolveUpdatingText(
+  const fameText = resolveStableText(
     FAME_BAR_TEXT_KEY,
     `${formatNumberRatio(fame, requiredFame)} FAME`,
-    (candidate) => renderer.isTextReady({
-      text: candidate,
+    {
       font: TOP_HUD_EXP_FONT,
       color: COLORS.panel.textPrimary,
       align: 'center',
       baseline: 'middle'
-    })
+    }
   );
   renderer.drawText({
     text: fameText,

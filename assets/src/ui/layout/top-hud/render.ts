@@ -14,7 +14,7 @@ import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { spawnGpuProgressCompletionBurst } from "../../../render/webgl-effects";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { drawHorizontalBar, getHorizontalBarCenterY } from "../../components/bar";
-import { resolveUpdatingText } from "../../../utils/text";
+import { resolveStableText } from "../../../renderer/stable-text";
 
 const EXP_BAR_LEVEL_UP_PARTICLE_GRAVITY = 520;
 const EXP_BAR_LEVEL_UP_PARTICLE_LIFE_MULTIPLIER = 2;
@@ -74,16 +74,15 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
     }
   );
 
-  const expText = resolveUpdatingText(
+  const expText = resolveStableText(
     TOP_HUD_EXP_TEXT_KEY,
     `${formatNumberRatio(model.displayedExp, requiredExp)} EXP`,
-    (candidate) => renderer.isTextReady({
-      text: candidate,
+    {
       font: TOP_HUD_EXP_FONT,
       color: COLORS.panel.textPrimary,
       align: 'center',
       baseline: 'middle'
-    })
+    }
   );
   renderer.drawText({
     text: expText,
@@ -94,16 +93,15 @@ export function renderTopHUD(canvas: HTMLCanvasElement, dtMs: number) {
     align: 'center',
     baseline: 'middle'
   });
-  const levelText = resolveUpdatingText(
+  const levelText = resolveStableText(
     TOP_HUD_LEVEL_TEXT_KEY,
     String(model.displayedLevel),
-    (candidate) => renderer.isTextReady({
-      text: candidate,
+    {
       font: TOP_HUD_LEVEL_FONT,
       color: COLORS.panel.textPrimary,
       align: 'left',
       baseline: 'alphabetic'
-    })
+    }
   );
   renderer.drawText({
     text: levelText,
@@ -135,18 +133,17 @@ function cssToRgba(color: string): [number, number, number, number] {
 function drawCurrency(canvas: HTMLCanvasElement, label: string, amount: BigNum, color: string, counterRight: number) {
   const renderer = getActiveWebGLRenderer();
   if (!renderer) return;
-  const stableAmountText = resolveUpdatingText(
+  const stableAmountText = resolveStableText(
     `top_hud.currency.${label.toLowerCase()}`,
     formatNumber(amount),
-    (candidate) => renderer.isTextReady({
-      text: candidate,
+    {
       font: TOP_HUD_COINS_FONT,
       color,
       align: 'left',
       baseline: 'alphabetic',
       strokeColor: color,
       strokeWidth: 0.6
-    })
+    }
   );
   drawCurrencyAmount(
     label.toLowerCase(),
