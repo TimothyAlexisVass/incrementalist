@@ -114,20 +114,41 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   @impl true
   def handle_call({:boot_player, has_cached_snapshot, now}, _from, state) do
-    player_state = state.player_state || PlayerStates.load_or_create(state.player, now)
+    state = refresh_player_and_state(state, now)
+    player_state = state.player_state
+    projected_state = player_state.state
+
     snapshot = if has_cached_snapshot, do: nil, else: Snapshots.full(player_state, now)
+    has_bonustime_token = State.has_bonustime_token_available?(projected_state, now)
+
+    bonustime_payload =
+      if projected_state.bonustime do
+        Map.merge(Map.from_struct(projected_state.bonustime), %{
+          "active_game_id" =>
+            Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id(now)
+        })
+      else
+        nil
+      end
 
     boot = %{
       "type" => "game.boot",
       "username" => state.player.username,
       "server_time" => Time.iso8601(now),
-      "idle_mode" => player_state.state.idle_mode || false,
-      "projection_params" => Incrementalist.Game.State.projection_params(player_state.state, now),
+      "idle_mode" => projected_state.idle_mode || false,
+      "projection_params" => Incrementalist.Game.State.projection_params(projected_state, now),
       "snapshot" => snapshot,
-      "pending_result" => pending_result(state, nil)
+      "pending_result" => pending_result(state, nil),
+      "has_bonustime_token" => has_bonustime_token,
+      "bonustime" => bonustime_payload
     }
 
-    {:reply, boot, state}
+    next_state =
+      state
+      |> Map.put(:include_token_on_next_tick, true)
+      |> Map.put(:last_pushed_has_bonustime_token, has_bonustime_token)
+
+    {:reply, boot, next_state}
   end
 
   @impl true

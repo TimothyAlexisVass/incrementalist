@@ -557,6 +557,8 @@ export type BootResult = {
   projection_params: ProjectionParams;
   snapshot?: GameSnapshot | null;
   pending_result?: AckableCommandResult | null;
+  has_bonustime_token?: boolean;
+  bonustime?: BonusTimeState | null;
 };
 
 export function isAckableCommandResult(result: ServerResult): result is AckableCommandResult {

@@ -185,6 +185,14 @@ export class GameClient {
         // Ensure the bar projection is up to date even if the snapshot was cached
         this.store.state.snapshot.state.projection_params = result.projection_params;
         this.store.state.snapshot.state.idle_mode = result.idle_mode;
+        
+        if (result.has_bonustime_token !== undefined) {
+          this.store.state.snapshot.state.has_bonustime_token = result.has_bonustime_token;
+        }
+        if (result.bonustime !== undefined) {
+          this.store.state.snapshot.state.bonustime = result.bonustime;
+        }
+
         this.snapshotCache.save(this.store.state.snapshot);
 
         notices.setSnapshot(this.store.state.snapshot);
