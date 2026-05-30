@@ -23,6 +23,7 @@ import { resolveUpdatingText } from "../../../utils/text";
 import { getOrchardHarvestParticleColor } from "../../../colors";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
 import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
+import orchardDecomposeConfig from "../../../../../shared/requirements/decompose.json";
 import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
 import { humanizeSystemKey } from "./names";
 
@@ -47,6 +48,15 @@ type OrchardPlantRenderRequest = {
   plotId: string;
   plantId: string;
   growth: number;
+  isPlotHovered: boolean;
+  plotRatio: number;
+};
+
+type OrchardDecompRenderRequest = {
+  uvPoints: readonly (readonly [number, number])[];
+  plotId: string;
+  plantType: string;
+  progress: number;
   isPlotHovered: boolean;
   plotRatio: number;
 };
@@ -404,10 +414,132 @@ function renderPlantImage(
   });
 }
 
+const orchardDecomposeSpecs = orchardDecomposeConfig as Record<string, OrchardPlantSpec>;
+
+function resolveDecompStage(progress: number) {
+  const normalized = Math.max(0, Math.min(100, progress));
+  return Math.min(3, Math.max(1, Math.ceil(normalized / (100 / 3))));
+}
+
+function getNutrientRatio(soilVal: any, limit: { min: number; max: number } | null | undefined): number {
+  if (!limit) return 0;
+  const maxVal = limit.max;
+  if (!maxVal) return 0;
+  const soilFloat = toNumber(soilVal);
+  if (maxVal > 0) {
+    return Math.min(1.0, soilFloat / maxVal);
+  }
+  return 0;
+}
+
+function renderDecompositionImage(
+  renderer: ReturnType<typeof getActiveWebGLRenderer>,
+  input: InteractionState | undefined,
+  uvPoints: readonly (readonly [number, number])[],
+  plotId: string,
+  plantType: string,
+  progress: number,
+  isPlotHovered: boolean,
+  plotRatio: number
+) {
+  const now = performance.now();
+  const currentStage = resolveDecompStage(progress);
+  const currentImage = getOrchardPlantImage(plantType, currentStage);
+  const decompOptions = orchardDecomposeSpecs[plantType]?.renderOptions || { w: 0.4, h: 0.4, y: 0 };
+  if (isBrokenPlantImage(currentImage)) {
+    orchardPlantRenderStates.delete(plotId);
+    return;
+  }
+
+  const state = updatePlantRenderState(plotId, currentStage, now);
+  const previousStage = state.previousStage;
+  const previousImage = previousStage !== null ? getOrchardPlantImage(plantType, previousStage) : null;
+  const currentImageReady = isRenderablePlantImage(currentImage);
+  const previousImageReady = isRenderablePlantImage(previousImage);
+
+  if (previousStage !== null) {
+    const stageBlend = advancePlantStageBlend(state, currentImageReady, now);
+
+    if (currentImageReady && previousImageReady) {
+      const frame = getPlantImageFrame(uvPoints, currentImage, decompOptions, plotRatio);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
+      renderer.drawImage({
+        image: previousImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        alpha: alpha * (1 - stageBlend)
+      });
+      renderer.drawImage({
+        image: currentImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        alpha: alpha * stageBlend
+      });
+      if (stageBlend >= 1) {
+        state.previousStage = null;
+      }
+      return;
+    }
+
+    if (currentImageReady) {
+      const frame = getPlantImageFrame(uvPoints, currentImage, decompOptions, plotRatio);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
+      renderer.drawImage({
+        image: currentImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        alpha
+      });
+      if (stageBlend >= 1) {
+        state.previousStage = null;
+      }
+      return;
+    }
+
+    if (previousImageReady) {
+      const frame = getPlantImageFrame(uvPoints, previousImage, decompOptions, plotRatio);
+      const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
+      renderer.drawImage({
+        image: previousImage,
+        x: frame.x,
+        y: frame.y,
+        width: frame.width,
+        height: frame.height,
+        alpha
+      });
+      return;
+    }
+
+    return;
+  }
+
+  if (!currentImageReady) {
+    return;
+  }
+
+  const frame = getPlantImageFrame(uvPoints, currentImage, decompOptions, plotRatio);
+  const alpha = resolvePlantSpriteOpacity(state, input, isPlotHovered, frame, now);
+  renderer.drawImage({
+    image: currentImage,
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+    alpha
+  });
+}
+
 export function renderOrchard(input?: InteractionState, allowAmbientHarvestParticles = true) {
   const renderer = getActiveWebGLRenderer();
   const orchard = getOrchardViewModel();
   const plantRenderRequests: OrchardPlantRenderRequest[] = [];
+  const decompRenderRequests: OrchardDecompRenderRequest[] = [];
 
   if (orchard.hexagons.length === 0) return;
 
@@ -584,8 +716,34 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
         // Show tooltip on hover
         if (isHovered && input?.pointer) {
           const label = humanizeSystemKey(plant.plant_id);
+          let progressText = isReady ? "Harvest" : `${plant.growth.toFixed(1)}%`;
 
-          const progressText = isReady ? "Harvest" : `${plant.growth.toFixed(1)}%`;
+          if (!isReady) {
+            const { soil, climate } = getAreaViewModel().orchard;
+            if (soil && climate) {
+              const spec = orchardPlantSpecs[plant.plant_id];
+              if (spec) {
+                const minTemp = (spec as any).minTemp ?? 0.0;
+                const minWater = (spec as any).minWater ?? 0.0;
+
+                if (climate.temperature_c >= minTemp && soil.water >= minWater) {
+                  const nRatio = getNutrientRatio(soil.nitrogen, (spec as any).nitrogen);
+                  const kRatio = getNutrientRatio(soil.potassium, (spec as any).potassium);
+
+                  const growthBoost = 1.0 + nRatio * 0.5 + kRatio * 0.5;
+                  const baseRate = ((spec as any).baseGrowthTime ?? 100.0) / 60.0;
+                  const ratePerSecond = (baseRate / 60.0) * growthBoost;
+
+                  if (ratePerSecond > 0) {
+                    const secondsLeft = (100.0 - plant.growth) / ratePerSecond;
+                    progressText += `\nTime left: ${secondsLeft.toFixed(1)}`;
+                  }
+                } else {
+                  progressText += `\nTime left: Stalled`;
+                }
+              }
+            }
+          }
 
           queueTooltip(input.pointer, [label, progressText], {
             font: "13px Arial",
@@ -597,65 +755,32 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
           });
         }
       } else if (plot.decomposition) {
-        orchardPlantRenderStates.delete(hex.id);
         const decomp = plot.decomposition;
-        const emoji = decomp.resource_id === "fruit" ? "🍎" : "🍂";
-        const label = decomp.resource_id === "fruit" ? "Fruit Pile" : "Plant Matter";
-
-        renderer.drawText({
-          text: emoji,
-          x: pixelX,
-          y: pixelY - 14,
-          font: "20px Arial",
-          color: "#ffffff",
-          align: "center",
-          baseline: "middle"
+        const plantType = decomp.plant_type || "herbaceous";
+        decompRenderRequests.push({
+          uvPoints,
+          plotId: hex.id,
+          plantType,
+          progress: decomp.progress,
+          isPlotHovered: isHovered,
+          plotRatio: orchardHexPlotRatio(hex)
         });
 
-        const decompFont = "bold 10px Inter";
-        const decompColor = "#d4a5a5";
-        const decompTextKey = `orchard.plot.${hex.id}.decomp`;
-        const decompCandidate = `${label} (${decomp.progress.toFixed(0)}%)`;
-        const stableDecompLabel = resolveUpdatingText(decompTextKey, decompCandidate, (candidate) =>
-          renderer.isTextReady({
-            text: candidate,
-            font: decompFont,
-            color: decompColor,
-            align: "center",
-            baseline: "middle"
-          })
-        );
+        // Show tooltip on hover
+        if (isHovered && input?.pointer) {
+          const label = decomp.resource_id === "fruit" ? "Fruit Pile" : "Plant Matter";
+          const secondsLeft = (100.0 - decomp.progress) * 6.0;
+          const progressText = `${decomp.progress.toFixed(0)}%\nTime left: ${secondsLeft.toFixed(1)}`;
 
-        renderer.drawText({
-          text: stableDecompLabel,
-          x: pixelX,
-          y: pixelY + 12,
-          font: decompFont,
-          color: decompColor,
-          align: "center",
-          baseline: "middle"
-        });
-
-        const barW = 46;
-        const barH = 3;
-        const barX = pixelX - barW / 2;
-        const barY = pixelY + 22;
-
-        renderer.drawRect({
-          x: barX,
-          y: barY,
-          width: barW,
-          height: barH,
-          color: [0.2, 0.2, 0.2, 0.6]
-        });
-
-        renderer.drawRect({
-          x: barX,
-          y: barY,
-          width: barW * (decomp.progress / 100.0),
-          height: barH,
-          color: [0.8, 0.5, 0.5, 0.9]
-        });
+          queueTooltip(input.pointer, [label, progressText], {
+            font: "13px Arial",
+            lineFonts: ["bold 13px Arial", "13px Arial"],
+            lineColors: ["#ffffff", "#ffffff"],
+            textUpdateKey: `orchard.plot.${hex.id}.tooltip`,
+            placement: "top-left",
+            align: "center"
+          });
+        }
       } else {
         orchardPlantRenderStates.delete(hex.id);
       }
@@ -670,6 +795,19 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
       request.plotId,
       request.plantId,
       request.growth,
+      request.isPlotHovered,
+      request.plotRatio
+    );
+  }
+
+  for (const request of decompRenderRequests) {
+    renderDecompositionImage(
+      renderer,
+      input,
+      request.uvPoints,
+      request.plotId,
+      request.plantType,
+      request.progress,
       request.isPlotHovered,
       request.plotRatio
     );

@@ -1623,6 +1623,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                       resource_id: decomp_resource,
                       amount: pm_yield,
                       progress: 0.0,
+                      plant_type: spec["plantType"] || "herbaceous",
                       started_at: Time.iso8601(now)
                     }
 

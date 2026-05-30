@@ -1,0 +1,23 @@
+{
+  "tree": {
+    "renderOptions": {
+      "w": 0.46,
+      "h": 0.46,
+      "y": -23
+    }
+  },
+  "bush": {
+    "renderOptions": {
+      "w": 0.4,
+      "h": 0.4,
+      "y": 10
+    }
+  },
+  "herbaceous": {
+    "renderOptions": {
+      "w": 0.42,
+      "h": 0.38,
+      "y": 5
+    }
+  }
+}

@@ -123,6 +123,7 @@ export type DecompositionState = {
   resource_id: string;
   amount: BigNum;
   progress: number;
+  plant_type?: string;
 };
 
 export type PlotState = {
