@@ -10,7 +10,7 @@ import {
 } from '../../config';
 import { COLORS } from '../../colors';
 import { drawButton } from '../../ui/components/button';
-import { clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss } from '../../utils';
+import { clampNumber, lerpColor, rgbArrayToCss, rgbaArrayToCss, formatDuration } from '../../utils';
 import { hexToRgba } from '../../utils/color';
 import { drawLockedElement } from '../../ui/components/locked-element';
 import { notices } from '../../ui/managers/notices';
@@ -352,11 +352,14 @@ function renderProgressBarDirect(
     height: barHeight
   };
   if (!blocked && input.pointer && pointInRect(input.pointer, tooltipHoverRect)) {
-    queueTooltip(input.pointer, `Progress: ${fillValue.toFixed(0)}%\nTime left: ${getProgressTimeLeftSeconds(state).toFixed(1)}`, {
-      font: TINY_TEXT_FONT,
-      textColor: '#f4f7ff',
+    const tooltipRows = [
+      { label: "Progress:", value: `${fillValue.toFixed(0)}%` },
+      { label: "Time left:", value: formatDuration(getProgressTimeLeftSeconds(state)) }
+    ];
+    queueTooltip(input.pointer, tooltipRows, {
       widthMode: 'estimated',
-      estimatedWidthFactor: 0.46,
+      width: 200,
+      estimatedWidthFactor: 0.52,
       textUpdateKey: PROGRESS_TOOLTIP_TEXT_KEY
     });
   }

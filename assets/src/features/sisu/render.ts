@@ -235,10 +235,13 @@ function drawSisuControlNative(
 
   // Multiplier Tooltip
   if (!blocked && showSisuHoverInfo && input.pointer && pointInRect(input.pointer, controlRect)) {
-    const tooltipText = `Sisu Multiplier: x${displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2)}`;
-    queueTooltip(input.pointer, tooltipText, {
+    const tooltipRows = [
+      { label: "Sisu Multiplier:", value: `x${displayCurrent.toFixed(displayCurrent >= 10 ? 1 : 2)}` }
+    ];
+    queueTooltip(input.pointer, tooltipRows, {
       widthMode: 'estimated',
-      estimatedWidthFactor: displayCurrent >= 10 ? 0.46 : 0.45,
+      width: 200,
+      estimatedWidthFactor: 0.52,
       textUpdateKey: SISU_MULTIPLIER_TEXT_KEY
     });
   }

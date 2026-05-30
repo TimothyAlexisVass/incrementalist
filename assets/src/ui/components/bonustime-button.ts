@@ -1,6 +1,6 @@
 import { InteractionState, pointInRect } from '../managers/interactions';
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
-import { queueTooltip } from "./tooltip";
+import { queueTooltip, TooltipContent } from "./tooltip";
 import { isButtonClicked } from './button';
 
 import { BONUSTIME_HUGE_BUTTON_FONT } from "../../config";
@@ -19,7 +19,7 @@ export function doBonusTimeButton(
   input: InteractionState,
   rect: { x: number; y: number; width: number; height: number },
   hasToken: boolean,
-  tooltip?: string | string[],
+  tooltip?: TooltipContent,
   textUpdateKey?: string
 ): boolean {
   const isHovered = pointInRect(input.pointer, rect);
@@ -28,6 +28,7 @@ export function doBonusTimeButton(
   if (isHovered && tooltip) {
     queueTooltip(input.pointer!, tooltip, {
       widthMode: 'estimated',
+      width: Array.isArray(tooltip) && typeof tooltip[0] === 'object' ? 240 : undefined,
       estimatedWidthFactor: 0.52,
       textUpdateKey
     });

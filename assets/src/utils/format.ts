@@ -190,3 +190,18 @@ export function formatTimestamp(timestamp: any, emptyText = 'Never', invalidText
 export function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return Math.floor(count) === 1 ? singular : plural;
 }
+
+export function formatDuration(seconds: number): string {
+  const val = Math.max(0, seconds);
+  if (val < 20) {
+    return `${val.toFixed(1)}s`;
+  }
+  const hrs = Math.floor(val / 3600);
+  const mins = Math.floor((val % 3600) / 60);
+  const secs = Math.floor(val % 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  if (hrs > 0) {
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+  }
+  return `${pad(mins)}:${pad(secs)}`;
+}

@@ -24,7 +24,7 @@ export function renderBottomHUD(
   onAreaSelect?: (areaKey: string) => void,
   channel?: GameChannel,
   hasBonusTimeToken?: boolean,
-  bonusTooltip?: string[],
+  bonusTooltip?: import('../../components/tooltip').TooltipContent,
   isUnlocked?: boolean,
   runCommand?: (cmd: () => Promise<any>) => void,
   snapshot?: GameSnapshot | null

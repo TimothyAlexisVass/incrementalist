@@ -3,7 +3,18 @@ import { getActiveWebGLRenderer } from '../../renderer/webgl';
 import { parseFontSizePx } from '../../utils';
 import { resolveStableMultilineText } from '../../renderer/stable-text';
 
+export interface TooltipRow {
+  label: string;
+  value?: string;
+  color?: string;
+  font?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+export type TooltipContent = string | string[] | TooltipRow[];
+
 export interface TooltipOptions {
+  width?: number;
   font?: string;
   textColor?: string;
   backgroundColor?: string;
@@ -34,7 +45,7 @@ export type TooltipPlacement =
 
 interface TooltipRequest {
   anchorPoint: { x: number; y: number };
-  content: string | string[];
+  content: TooltipContent;
   options: TooltipOptions;
 }
 
@@ -46,7 +57,7 @@ export function beginTooltipFrame() {
 
 export function queueTooltip(
   anchorPoint: { x: number; y: number },
-  content: string | string[],
+  content: TooltipContent,
   options: TooltipOptions = {}
 ) {
   queuedTooltips.push({ anchorPoint, content, options });
@@ -68,7 +79,7 @@ export function renderQueuedTooltips() {
 
 export function drawTooltip(
   anchorPoint: { x: number; y: number },
-  content: string | string[],
+  content: TooltipContent,
   options: TooltipOptions = {}
 ) {
   const renderer = getActiveWebGLRenderer();
@@ -79,7 +90,7 @@ export function drawTooltip(
 function drawTooltipInternal(
   renderer: import('../../renderer/webgl').WebGLRenderer,
   anchorPoint: { x: number; y: number },
-  content: string | string[],
+  content: TooltipContent,
   options: TooltipOptions = {}
 ) {
   const canvas = renderer.canvasElement;
@@ -105,32 +116,82 @@ function drawTooltipInternal(
     placement = 'top-left'
   } = options;
 
-  const lines = resolveStableMultilineText(
-    textUpdateKey,
-    normalizeTooltipLines(content),
-    {
-      font,
-      color: textColor,
-      align: options.align || 'left',
-      baseline: 'top',
-      lineFonts: options.lineFonts,
-      lineColors: options.lineColors,
-    }
-  );
+  const isTable = Array.isArray(content) && content.length > 0 && typeof content[0] === 'object';
+  const tableRows = isTable ? (content as TooltipRow[]) : null;
 
-  if (lines.length === 0) {
+  let labels: string[] = [];
+  let values: string[] = [];
+  let stringLines: string[] = [];
+
+  if (isTable && tableRows) {
+    const rawLabels = tableRows.map((r) => r.label);
+    const rawValues = tableRows.map((r) => r.value || '');
+    const lineFonts = tableRows.map((r) => r.font || (r.value === undefined || r.value === '' ? font : '12px "Courier New", monospace'));
+    const lineColors = tableRows.map((r) => r.color || textColor);
+    
+    labels = resolveStableMultilineText(
+      textUpdateKey ? `${textUpdateKey}.labels` : undefined,
+      rawLabels,
+      { font, color: textColor, align: 'left', baseline: 'top', lineFonts, lineColors }
+    );
+    values = resolveStableMultilineText(
+      textUpdateKey ? `${textUpdateKey}.values` : undefined,
+      rawValues,
+      { font, color: textColor, align: 'right', baseline: 'top', lineFonts, lineColors }
+    );
+  } else {
+    stringLines = resolveStableMultilineText(
+      textUpdateKey,
+      normalizeTooltipLines(content as string | string[]),
+      {
+        font,
+        color: textColor,
+        align: options.align || 'left',
+        baseline: 'top',
+        lineFonts: options.lineFonts,
+        lineColors: options.lineColors,
+      }
+    );
+  }
+
+  const rowCount = isTable && tableRows ? tableRows.length : stringLines.length;
+  if (rowCount === 0) {
     return null;
   }
 
-  const contentWidth = lines.reduce((widest, line, i) => {
-    const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
-    const textWidth = widthMode === 'estimated'
-      ? (line.length * parseFontSizePx(lineFont, 12) * estimatedWidthFactor)
-      : renderer.measureTextWidth({ text: line, font: lineFont });
-    return Math.max(widest, textWidth);
-  }, 0);
-  const width = Math.ceil((contentWidth + paddingX * 2) * Math.max(0.1, widthScale));
-  const height = Math.ceil((lines.length * lineHeight) + paddingY * 2);
+  let contentWidth = 0;
+  if (isTable && tableRows) {
+    for (let i = 0; i < rowCount; i++) {
+      const isSingleLine = tableRows[i].value === undefined || tableRows[i].value === '';
+      const rowFont = tableRows[i].font || (isSingleLine ? font : '12px "Courier New", monospace');
+      const labelWidth = widthMode === 'estimated' 
+         ? labels[i].length * parseFontSizePx(rowFont, 12) * estimatedWidthFactor
+         : renderer.measureTextWidth({ text: labels[i], font: rowFont });
+         
+      if (isSingleLine) {
+        contentWidth = Math.max(contentWidth, labelWidth);
+      } else {
+        const valueWidth = widthMode === 'estimated' 
+           ? values[i].length * parseFontSizePx(rowFont, 12) * estimatedWidthFactor
+           : renderer.measureTextWidth({ text: values[i], font: rowFont });
+        const gap = 16;
+        contentWidth = Math.max(contentWidth, labelWidth + gap + valueWidth);
+      }
+    }
+  } else {
+    contentWidth = stringLines.reduce((widest, line, i) => {
+      const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
+      const textWidth = widthMode === 'estimated'
+        ? (line.length * parseFontSizePx(lineFont, 12) * estimatedWidthFactor)
+        : renderer.measureTextWidth({ text: line, font: lineFont });
+      return Math.max(widest, textWidth);
+    }, 0);
+  }
+
+  const width = options.width !== undefined 
+    ? options.width 
+    : Math.ceil((contentWidth + paddingX * 2) * Math.max(0.1, widthScale));
+  const height = Math.ceil((rowCount * lineHeight) + paddingY * 2);
 
   const placementGapX = Math.max(0, offsetX);
   const placementGapY = Math.max(0, offsetY);
@@ -178,24 +239,72 @@ function drawTooltipInternal(
   });
   drawRectOutline(renderer, x, y, width, height, 1, cssToRgba(borderColor));
 
-  for (let i = 0; i < lines.length; i += 1) {
-    const lineColor = (options.lineColors && options.lineColors[i]) || textColor;
-    const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
-    const lineAlign = options.align || 'left';
-    const textX = lineAlign === 'center'
-      ? x + (width / 2)
-      : lineAlign === 'right'
-        ? x + width - paddingX
-        : x + paddingX;
-    renderer.drawText({
-      text: lines[i],
-      x: textX,
-      y: y + paddingY + (i * lineHeight),
-      font: lineFont,
-      color: lineColor,
-      align: lineAlign,
-      baseline: 'top'
-    });
+  if (isTable && tableRows) {
+    for (let i = 0; i < rowCount; i += 1) {
+      const row = tableRows[i];
+      const lineColor = row.color || textColor;
+      const isSingleLine = row.value === undefined || row.value === '';
+      const rowFont = row.font || (isSingleLine ? font : '12px "Courier New", monospace');
+      const yPos = y + paddingY + (i * lineHeight);
+      
+      if (isSingleLine) {
+        const rowAlign = row.align || 'center';
+        const textX = rowAlign === 'center'
+          ? x + (width / 2)
+          : rowAlign === 'right'
+            ? x + width - paddingX
+            : x + paddingX;
+        renderer.drawText({
+          text: labels[i],
+          x: textX,
+          y: yPos,
+          font: rowFont,
+          color: lineColor,
+          align: rowAlign,
+          baseline: 'top'
+        });
+      } else {
+        renderer.drawText({
+          text: labels[i],
+          x: x + paddingX,
+          y: yPos,
+          font: rowFont,
+          color: lineColor,
+          align: 'left',
+          baseline: 'top'
+        });
+
+        renderer.drawText({
+          text: values[i],
+          x: x + width - paddingX,
+          y: yPos,
+          font: rowFont,
+          color: lineColor,
+          align: 'right',
+          baseline: 'top'
+        });
+      }
+    }
+  } else {
+    for (let i = 0; i < rowCount; i += 1) {
+      const lineColor = (options.lineColors && options.lineColors[i]) || textColor;
+      const lineFont = (options.lineFonts && options.lineFonts[i]) || font;
+      const lineAlign = options.align || 'left';
+      const textX = lineAlign === 'center'
+        ? x + (width / 2)
+        : lineAlign === 'right'
+          ? x + width - paddingX
+          : x + paddingX;
+      renderer.drawText({
+        text: stringLines[i],
+        x: textX,
+        y: y + paddingY + (i * lineHeight),
+        font: lineFont,
+        color: lineColor,
+        align: lineAlign,
+        baseline: 'top'
+      });
+    }
   }
 
   return { x, y, width, height };

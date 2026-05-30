@@ -1,5 +1,5 @@
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
-import { hexToRgba } from "../../utils";
+import { hexToRgba, formatDuration } from "../../utils";
 import { ServerState } from "../../net/snapshots";
 import { COLORS } from "../../colors";
 import { 
@@ -379,9 +379,5 @@ function renderActiveRewardCountdownOverlay(
 }
 
 function formatCountdown(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return formatDuration(ms / 1000);
 }

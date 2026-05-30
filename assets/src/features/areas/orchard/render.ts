@@ -7,7 +7,7 @@ import {
 } from "../../../config";
 import { getActiveWebGLRenderer } from "../../../renderer/webgl";
 import { pointInRect, type InteractionState } from "../../../ui/managers/interactions";
-import { queueTooltip } from "../../../ui/components/tooltip";
+import { queueTooltip, TooltipRow } from "../../../ui/components/tooltip";
 import {
   orchardHexPoints,
   orchardHexPlotRatio,
@@ -18,7 +18,7 @@ import { getAreaViewModel } from "../view-model";
 import type { ClimateState, SoilState } from "../../../net/protocol";
 import { fromNumber, toNumber, type BigNum } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
-import { formatBigNum } from "../../../utils/format";
+import { formatBigNum, formatDuration } from "../../../utils/format";
 import { resolveStableText } from "../../../renderer/stable-text";
 import { getOrchardHarvestParticleColor } from "../../../colors";
 import orchardSharedConfig from "../../../../../shared/requirements/orchard.json";
@@ -80,7 +80,6 @@ const ORCHARD_PLANT_HOVER_FADE_MS = 200;
 const ORCHARD_SOIL_TEXT_COLOR = "#f9e7af";
 const ORCHARD_SOIL_TEXT_FONT = "bold 13px Inter";
 const ORCHARD_SOIL_TEXT_LINE_HEIGHT = 29;
-const ORCHARD_SOIL_TOOLTIP_FONT = '12px "Courier New", monospace';
 const ORCHARD_SOIL_STATS_X = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH - 236;
 const ORCHARD_SOIL_STATS_Y = DISPLAY_AREA_Y + 55;
 const ORCHARD_SOIL_STATS_VALUE_X_OFFSET = 203;
@@ -716,9 +715,18 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
         // Show tooltip on hover
         if (isHovered && input?.pointer) {
           const label = humanizeSystemKey(plant.plant_id);
-          let progressText = isReady ? "Harvest" : `${plant.growth.toFixed(1)}%`;
+          const tooltipRows: TooltipRow[] = [
+            { label: label, font: "bold 13px Arial", align: "center" }
+          ];
 
-          if (!isReady) {
+          if (isReady) {
+            tooltipRows.push({ label: "Growth:", value: "Harvest", color: "#4caf50" });
+          } else {
+            tooltipRows.push({ label: "Growth:", value: `${plant.growth.toFixed(1)}%` });
+
+            let timeLeftText = "Stalled";
+            let timeLeftColor = "#ffb74d";
+
             const { soil, climate } = getAreaViewModel().orchard;
             if (soil && climate) {
               const spec = orchardPlantSpecs[plant.plant_id];
@@ -736,22 +744,24 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
 
                   if (ratePerSecond > 0) {
                     const secondsLeft = (100.0 - plant.growth) / ratePerSecond;
-                    progressText += `\nTime left: ${secondsLeft.toFixed(1)}`;
+                    timeLeftText = formatDuration(secondsLeft);
+                    timeLeftColor = "";
                   }
-                } else {
-                  progressText += `\nTime left: Stalled`;
                 }
               }
             }
+            tooltipRows.push({
+              label: "Time left:",
+              value: timeLeftText,
+              color: timeLeftColor || undefined
+            });
           }
 
-          queueTooltip(input.pointer, [label, progressText], {
-            font: "13px Arial",
-            lineFonts: ["bold 13px Arial", "13px Arial"],
-            lineColors: ["#ffffff", isReady ? "#4caf50" : "#ffffff"],
+          queueTooltip(input.pointer, tooltipRows, {
+            font: "12px Inter",
+            width: 180,
             textUpdateKey: `orchard.plot.${hex.id}.tooltip`,
-            placement: "top-left",
-            align: "center"
+            placement: "top-left"
           });
         }
       } else if (plot.decomposition) {
@@ -770,15 +780,17 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
         if (isHovered && input?.pointer) {
           const label = decomp.resource_id === "fruit" ? "Fruit Pile" : "Plant Matter";
           const secondsLeft = (100.0 - decomp.progress) * 6.0;
-          const progressText = `${decomp.progress.toFixed(0)}%\nTime left: ${secondsLeft.toFixed(1)}`;
+          const tooltipRows: TooltipRow[] = [
+            { label: label, font: "bold 13px Arial", align: "center" },
+            { label: "Decompose:", value: `${decomp.progress.toFixed(0)}%` },
+            { label: "Time left:", value: formatDuration(secondsLeft) }
+          ];
 
-          queueTooltip(input.pointer, [label, progressText], {
-            font: "13px Arial",
-            lineFonts: ["bold 13px Arial", "13px Arial"],
-            lineColors: ["#ffffff", "#ffffff"],
+          queueTooltip(input.pointer, tooltipRows, {
+            font: "12px Inter",
+            width: 160,
             textUpdateKey: `orchard.plot.${hex.id}.tooltip`,
-            placement: "top-left",
-            align: "center"
+            placement: "top-left"
           });
         }
       } else {
@@ -865,10 +877,11 @@ function renderSoilStats(input?: InteractionState) {
   });
 
   if (input?.pointer && pointInRect(input.pointer, ORCHARD_SOIL_STATS_HOVER_RECT)) {
-    const tooltipLines = buildSoilTooltipLines(soil, deltaPerMinute);
-    queueTooltip(input.pointer, tooltipLines, {
-      font: ORCHARD_SOIL_TOOLTIP_FONT,
-      lineHeight: 16,
+    const tooltipRows = buildSoilTooltipLines(soil, deltaPerMinute);
+    queueTooltip(input.pointer, tooltipRows, {
+      font: "12px Inter",
+      width: 360,
+      lineHeight: 18,
       textUpdateKey: "orchard.soil.tooltip",
       placement: "top-left"
     });
@@ -911,8 +924,8 @@ function formatSoilNumber(value: number): string {
   return Math.floor(normalized).toString();
 }
 
-function buildSoilTooltipLines(soil: SoilState, delta: SoilDelta): string[] {
-  const rows = [
+function buildSoilTooltipLines(soil: SoilState, delta: SoilDelta) {
+  return [
     {
       label: "Nitrogen",
       value: buildTooltipValue(formatTooltipFixed(toNumber(soil.nitrogen)), delta.nitrogen)
@@ -934,16 +947,6 @@ function buildSoilTooltipLines(soil: SoilState, delta: SoilDelta): string[] {
       value: `${formatTooltipFixed(toNumber(soil.organic_matter))}/${formatTooltipFixed(soil.organic_matter_cap)} ${formatTooltipDelta(delta.organicMatter)}`
     }
   ];
-
-  const labelWidth = rows.reduce((max, row) => Math.max(max, row.label.length), 0);
-  const valueWidth = rows.reduce((max, row) => Math.max(max, row.value.length), 0);
-  const baseWidth = labelWidth + 1 + valueWidth;
-  const widenedWidth = Math.ceil(baseWidth * 1.2);
-
-  return rows.map((row) => {
-    const gapWidth = Math.max(1, widenedWidth - row.label.length - row.value.length);
-    return `${row.label}${" ".repeat(gapWidth)}${row.value}`;
-  });
 }
 
 function buildTooltipValue(formattedValue: string, delta: number): string {

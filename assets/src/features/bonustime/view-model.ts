@@ -2,6 +2,7 @@ import { ServerState } from "../../net/snapshots";
 import { getServerNow } from "../../core/time";
 import bonustimeConfig from "../../../../shared/requirements/bonustime.json";
 import climateConfig from "../../../../shared/requirements/climate.json";
+import { formatDuration } from "../../utils/format";
 
 const SLOT_MS = 43_200_000; // 12 hours
 
@@ -59,7 +60,7 @@ export function getTimeUntilNextTokenMs(state?: ServerState): number {
   return Math.max(0, nextBoundaryMs - now);
 }
 
-export function getBonusTimeTooltipData(state: ServerState): string[] | null {
+export function getBonusTimeTooltipData(state: ServerState) {
   const snapshot = state.snapshot;
   if (!snapshot || !snapshot.state.bonustime) return null;
 
@@ -67,18 +68,15 @@ export function getBonusTimeTooltipData(state: ServerState): string[] | null {
   const gameName = getActiveGameName(state);
   
   const tooltip = [
-    `Current game: ${gameName}`,
-    `Special tokens: ${db.special_tokens}`,
-    `Streak: ${db.streak}`
+    { label: "Current game:", value: gameName },
+    { label: "Special tokens:", value: String(db.special_tokens) },
+    { label: "Streak:", value: String(db.streak) }
   ];
 
   if (!snapshot.state.has_bonustime_token) {
     const nextMs = getTimeUntilNextTokenMs(state);
-    const hours = Math.floor(nextMs / 3_600_000);
-    const mins = Math.floor((nextMs % 3_600_000) / 60_000);
-    const secs = Math.floor((nextMs % 60_000) / 1000);
-    const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    tooltip.push(`Next entry in ${timeStr}`);
+    const timeStr = formatDuration(nextMs / 1000);
+    tooltip.push({ label: "Next entry in:", value: timeStr });
   }
 
   return tooltip;
