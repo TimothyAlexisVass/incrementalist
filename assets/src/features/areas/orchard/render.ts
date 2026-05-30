@@ -537,8 +537,10 @@ function renderDecompositionImage(
 export function renderOrchard(input?: InteractionState, allowAmbientHarvestParticles = true) {
   const renderer = getActiveWebGLRenderer();
   const orchard = getOrchardViewModel();
-  const plantRenderRequests: OrchardPlantRenderRequest[] = [];
-  const decompRenderRequests: OrchardDecompRenderRequest[] = [];
+  type RenderRequest = 
+    | { type: "plant"; req: OrchardPlantRenderRequest }
+    | { type: "decomp"; req: OrchardDecompRenderRequest };
+  const renderRequests: RenderRequest[] = [];
 
   if (orchard.hexagons.length === 0) return;
 
@@ -666,13 +668,16 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
       if (plot.plant) {
         const plant = plot.plant;
         const isReady = plant.growth >= 100.0;
-        plantRenderRequests.push({
-          uvPoints,
-          plotId: hex.id,
-          plantId: plant.plant_id,
-          growth: plant.growth,
-          isPlotHovered: isHovered,
-          plotRatio: orchardHexPlotRatio(hex)
+        renderRequests.push({
+          type: "plant",
+          req: {
+            uvPoints,
+            plotId: hex.id,
+            plantId: plant.plant_id,
+            growth: plant.growth,
+            isPlotHovered: isHovered,
+            plotRatio: orchardHexPlotRatio(hex)
+          }
         });
 
         // Spawn slowly rising particles from the plot when ready for harvest
@@ -767,13 +772,16 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
       } else if (plot.decomposition) {
         const decomp = plot.decomposition;
         const plantType = decomp.plant_type || "herbaceous";
-        decompRenderRequests.push({
-          uvPoints,
-          plotId: hex.id,
-          plantType,
-          progress: decomp.progress,
-          isPlotHovered: isHovered,
-          plotRatio: orchardHexPlotRatio(hex)
+        renderRequests.push({
+          type: "decomp",
+          req: {
+            uvPoints,
+            plotId: hex.id,
+            plantType,
+            progress: decomp.progress,
+            isPlotHovered: isHovered,
+            plotRatio: orchardHexPlotRatio(hex)
+          }
         });
 
         // Show tooltip on hover
@@ -799,30 +807,30 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
     }
   }
 
-  for (const request of plantRenderRequests) {
-    renderPlantImage(
-      renderer,
-      input,
-      request.uvPoints,
-      request.plotId,
-      request.plantId,
-      request.growth,
-      request.isPlotHovered,
-      request.plotRatio
-    );
-  }
-
-  for (const request of decompRenderRequests) {
-    renderDecompositionImage(
-      renderer,
-      input,
-      request.uvPoints,
-      request.plotId,
-      request.plantType,
-      request.progress,
-      request.isPlotHovered,
-      request.plotRatio
-    );
+  for (const item of renderRequests) {
+    if (item.type === "plant") {
+      renderPlantImage(
+        renderer,
+        input,
+        item.req.uvPoints,
+        item.req.plotId,
+        item.req.plantId,
+        item.req.growth,
+        item.req.isPlotHovered,
+        item.req.plotRatio
+      );
+    } else {
+      renderDecompositionImage(
+        renderer,
+        input,
+        item.req.uvPoints,
+        item.req.plotId,
+        item.req.plantType,
+        item.req.progress,
+        item.req.isPlotHovered,
+        item.req.plotRatio
+      );
+    }
   }
 
   renderSoilStats(input);
