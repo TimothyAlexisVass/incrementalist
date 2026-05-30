@@ -276,7 +276,7 @@ function getPlantImageFrame(
   const plotRatio = Number.isFinite(rawPlotRatio) && rawPlotRatio > 0
     ? rawPlotRatio
     : 1;
-  const widthRatio = 1 + ((plotRatio - 1) * 0.5);
+  const widthRatio = 1 + ((plotRatio - 1) * 0.8);
   const centerX = ((minX + maxX) / 2) * DISPLAY_AREA_WIDTH;
   const width = image.naturalWidth * renderOptions.w * widthRatio;
   const height = image.naturalHeight * renderOptions.h * plotRatio;
