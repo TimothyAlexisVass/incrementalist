@@ -103,6 +103,7 @@ async function resolveClaimAsync(
     let reward = await runCommand(() => progressClaimReward(channel));
 
     while (
+      channel.status === "connected" &&
       reward &&
       reward.type === "command.error" &&
       reward.reason === "claim_not_ready"

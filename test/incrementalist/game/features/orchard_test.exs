@@ -17,11 +17,11 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   test "orchard.unlock_plot unlocks a locked plot when having enough shards", %{player: player} do
     # plot_2 needs 2 * 100 = 200 shards
     # Initially player has 0 shards
-    result = Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), @now)
     assert result["type"] == "command.error"
     assert result["reason"] == "insufficient_shards"
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     # Give shards
     update_player_state(player.id, fn state ->
@@ -29,7 +29,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Unlock plot_2
-    success = Commands.enqueue(player.id, "orchard.unlock_plot", intent(1, %{"plot_id" => "plot_2"}), @now)
+    success = Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(1, %{"plot_id" => "plot_2"}), @now)
     assert success["type"] == "orchard.unlock_plot.result"
     assert success["status"] == "ok"
     assert "plot_2" in success["unlocked_plots"]
@@ -57,7 +57,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Plant a clover patch on plot_1
-    result = Commands.enqueue(player.id, "orchard.plant_seed", intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.plant_seed", intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}), @now)
     assert result["type"] == "orchard.plant_seed.result"
     assert result["status"] == "ok"
     assert result["plant_id"] == "clover_patch"
@@ -134,7 +134,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Harvest with "keep"
-    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "keep"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "keep"}), @now)
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
     assert result["action"] == "keep"
@@ -168,7 +168,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Harvest with "decompose"
-    result = Commands.enqueue(player.id, "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}), @now)
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
     assert result["action"] == "decompose"
@@ -210,14 +210,14 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_now = DateTime.add(@now, 30, :second)
 
     unlock_result =
-      Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+      Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
 
     assert unlock_result["type"] == "orchard.unlock_plot.result"
 
     first_progress = result_plot_decomposition_progress(unlock_result, "plot_1")
     assert first_progress > 0.0
 
-    Commands.ack(player.id, 0, first_now)
+    Commands.ack(player.id, "test_session", 0, first_now)
 
     second_now = DateTime.add(@now, 40, :second)
 
@@ -263,14 +263,14 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_now = DateTime.add(@now, 30, :second)
 
     unlock_result =
-      Commands.enqueue(player.id, "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+      Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
 
     assert unlock_result["type"] == "orchard.unlock_plot.result"
 
     first_growth = result_plot_plant_growth(unlock_result, "plot_1")
     assert first_growth > 0.0
 
-    Commands.ack(player.id, 0, first_now)
+    Commands.ack(player.id, "test_session", 0, first_now)
 
     second_now = DateTime.add(@now, 40, :second)
 
@@ -326,7 +326,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       )
 
     assert first_plant_result["type"] == "orchard.plant_seed.result"
-    Commands.ack(player.id, 0, first_plant_at)
+    Commands.ack(player.id, "test_session", 0, first_plant_at)
 
     second_plant_at = DateTime.add(@now, 50, :second)
 
@@ -339,7 +339,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       )
 
     assert second_plant_result["type"] == "orchard.plant_seed.result"
-    Commands.ack(player.id, 1, second_plant_at)
+    Commands.ack(player.id, "test_session", 1, second_plant_at)
 
     trigger_at = DateTime.add(@now, 70, :second)
 
@@ -404,7 +404,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       )
 
     assert first_result["type"] == "orchard.harvest_plot.result"
-    Commands.ack(player.id, 0, first_decompose_at)
+    Commands.ack(player.id, "test_session", 0, first_decompose_at)
 
     second_decompose_at = DateTime.add(@now, 46, :second)
 
@@ -433,7 +433,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       }
     end)
 
-    result = Commands.enqueue(player.id, "orchard.splice_seeds", intent(0, %{"seed_a" => "clover_seeds", "seed_b" => "acorn"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.splice_seeds", intent(0, %{"seed_a" => "clover_seeds", "seed_b" => "acorn"}), @now)
     assert result["type"] == "orchard.splice_seeds.result"
     assert result["status"] == "ok"
     assert "coin_tree_seed" in result["spliced_seeds"]
@@ -449,7 +449,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       %{state | coins: BigNum.from_number(100), clover_seeds: BigNum.zero()}
     end)
 
-    result = Commands.enqueue(player.id, "orchard.buy_seed", intent(0, %{"seed_id" => "clover_seeds", "amount" => 10}), @now)
+    result = Commands.enqueue(player.id, "test_session", "orchard.buy_seed", intent(0, %{"seed_id" => "clover_seeds", "amount" => 10}), @now)
     assert result["type"] == "orchard.buy_seed.result"
     assert result["status"] == "ok"
 

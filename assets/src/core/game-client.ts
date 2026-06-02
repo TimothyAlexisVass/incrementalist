@@ -96,6 +96,7 @@ import { setNetwork as setMainMenuNetwork } from "../ui/layout/main-menu/view-mo
 import { getActiveWebGLRenderer } from "../renderer/webgl";
 import { DISPLAY_AREA_X, DISPLAY_AREA_WIDTH, TOP_HUD_EXP_BAR_Y } from '../config';
 import { COLORS } from '../colors';
+import { resolveStableText } from "../renderer/stable-text";
 
 
 // Cached snapshots are projection data. They make boot feel
@@ -242,6 +243,8 @@ export class GameClient {
   private async runCommand(
     command: () => Promise<ServerResult>
   ): Promise<ServerResult | null> {
+    if (this.channel?.status === "superseded") return null;
+
     try {
       const result = await command();
       await this.applyAndAck(result);
@@ -580,7 +583,52 @@ export class GameClient {
   // ---------------------------------------------------------------------------
 
   private tick(dt: number) {
-    getActiveWebGLRenderer()?.beginFrame([0, 0, 0, 0]);
+    const renderer = getActiveWebGLRenderer();
+    renderer?.beginFrame([0, 0, 0, 0]);
+
+    if (this.channel?.status === "superseded") {
+      if (renderer) {
+        renderer.drawRect({
+          x: 0,
+          y: 0,
+          width: this.canvas.width,
+          height: this.canvas.height,
+          color: [0, 0, 0, 1.0]
+        });
+
+        renderer.drawText({
+          text: resolveStableText("session.superseded.title", "Session Ended", {
+            font: "bold 48px 'Outfit'",
+            color: "#ff4444",
+            align: "center",
+            baseline: "middle"
+          }),
+          x: this.canvas.width / 2,
+          y: this.canvas.height / 2 - 30,
+          font: "bold 48px 'Outfit'",
+          color: "#ff4444",
+          align: "center",
+          baseline: "middle"
+        });
+
+        renderer.drawText({
+          text: resolveStableText("session.superseded.desc", "Session Taken Over in Another Tab or Device", {
+            font: "24px 'Outfit'",
+            color: "#ffffff",
+            align: "center",
+            baseline: "middle"
+          }),
+          x: this.canvas.width / 2,
+          y: this.canvas.height / 2 + 30,
+          font: "24px 'Outfit'",
+          color: "#ffffff",
+          align: "center",
+          baseline: "middle"
+        });
+      }
+      return;
+    }
+
     beginTooltipFrame();
 
     if (this.pendingCloseTransientUi) {
@@ -840,6 +888,7 @@ export class GameClient {
         }
       }, amounts?.level ?? 1, this.channel || undefined, (cmd) => this.runCommand(cmd));
     }
+
     renderQueuedTooltips();
   }
 

@@ -11,7 +11,7 @@ import {
 // inferred from websocket timing; the server persists its own command sequence.
 type PhoenixMessage = [string | null, string | null, string, string, unknown];
 
-export type ConnectionStatus = "connected" | "connecting" | "disconnected" | "reconnecting";
+export type ConnectionStatus = "connected" | "connecting" | "disconnected" | "reconnecting" | "superseded";
 
 const heartbeatIntervalMs = 25_000;
 const commandQueueLimit = 10;
@@ -195,6 +195,18 @@ export class GameChannel {
 
     if (eventName === "player.tick") {
       if (isPlayerTickEvent(payload)) this.onPushEvent?.(payload);
+      return;
+    }
+
+    if (eventName === "session.superseded") {
+      this.setStatus("superseded");
+      this.clearReconnectionTimeout();
+      this.stopHeartbeat();
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+      this.onPushEvent?.({ type: "session.superseded", reason: "takeover" });
       return;
     }
 

@@ -44,9 +44,9 @@ defmodule Incrementalist.Game.CommandsTest do
   test "commands are FIFO and ACK-gated" do
     player = create_player()
 
-    first = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
-    second = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
-    third = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(2), @now)
+    first = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
+    second = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(1), @now)
+    third = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(2), @now)
 
     assert first["type"] == "stats.update.result"
     assert first["command_id"] == 0
@@ -59,7 +59,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert third["type"] == "command.queued"
     assert command_statuses(player.id) == ["succeeded"]
 
-    ack = Commands.ack(player.id, 0, @now)
+    ack = Commands.ack(player.id, "test_session", 0, @now)
     assert ack["command_id"] == 0
     refute Map.has_key?(ack, "acked")
     refute Map.has_key?(ack, "next_result")
@@ -68,7 +68,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert ack["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
 
-    ack = Commands.ack(player.id, 1, @now)
+    ack = Commands.ack(player.id, "test_session", 1, @now)
     assert ack["released_result"]["type"] == "stats.update.result"
     assert ack["released_result"]["command_id"] == 2
     assert command_statuses(player.id) == ["acked", "acked", "succeeded"]
@@ -77,16 +77,16 @@ defmodule Incrementalist.Game.CommandsTest do
   test "ack ignores command ids that are not the current blocking result" do
     player = create_player()
 
-    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
-    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
+    Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
+    Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(1), @now)
 
-    ignored = Commands.ack(player.id, 1, @now)
+    ignored = Commands.ack(player.id, "test_session", 1, @now)
 
     assert ignored["command_id"] == 1
     assert ignored["released_result"] == nil
     assert command_statuses(player.id) == ["succeeded"]
 
-    released = Commands.ack(player.id, 0, @now)
+    released = Commands.ack(player.id, "test_session", 0, @now)
 
     assert released["released_result"]["type"] == "stats.update.result"
     assert released["released_result"]["command_id"] == 1
@@ -97,15 +97,15 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
 
     # Sage is unlocked by default
-    result = Commands.enqueue(player.id, "area.select", intent(0, %{"area" => "sage"}), @now)
+    result = Commands.enqueue(player.id, "test_session", "area.select", intent(0, %{"area" => "sage"}), @now)
     assert result["type"] == "area.select.result"
     assert result["area"] == "sage"
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     # Cloverfield is locked at level 1
     locked =
-      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(1, %{"area" => "cloverfield"}), @now)
 
     assert locked["type"] == "command.error"
     assert locked["reason"] == "area_locked"
@@ -115,7 +115,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     set_player_area(player.id, "furnace", 1)
 
-    result = Commands.enqueue(player.id, "furnace.upgrade", intent(0), @now)
+    result = Commands.enqueue(player.id, "test_session", "furnace.upgrade", intent(0), @now)
 
     assert result["type"] == "furnace.upgrade.result"
     assert result["furnace_level"] == 2
@@ -133,7 +133,7 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     set_player_area(player.id, "cloverfield", 10)
 
-    search = Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)
+    search = Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(0), @now)
     assert search["type"] == "cloverfield.search.result"
     assert search["clover_hunt"]["click_count"] == 100
     assert search["discoveries"] == ["four_leaf_1"]
@@ -141,7 +141,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert search["quests"]["clover_hunt"]["rank"] == 1
     assert search["quests"]["clover_hunt"]["claimed_rank"] == 0
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     confirm =
       Commands.enqueue(
@@ -165,26 +165,26 @@ defmodule Incrementalist.Game.CommandsTest do
     assert (cloverfield_area[:lock_reason] || cloverfield_area["lock_reason"]) ==
              "Claim the Quest first!"
 
-    Commands.ack(player.id, 1, @now)
+    Commands.ack(player.id, "test_session", 1, @now)
 
     locked =
-      Commands.enqueue(player.id, "area.select", intent(2, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(2, %{"area" => "cloverfield"}), @now)
 
     assert locked["type"] == "command.error"
     assert locked["reason"] == "area_locked"
 
-    Commands.ack(player.id, 2, @now)
+    Commands.ack(player.id, "test_session", 2, @now)
 
     claim =
-      Commands.enqueue(player.id, "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
+      Commands.enqueue(player.id, "test_session", "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
 
     assert claim["type"] == "quest.claim.result"
     assert claim["quests"]["clover_hunt"]["claimed_rank"] >= 1
 
-    Commands.ack(player.id, 3, @now)
+    Commands.ack(player.id, "test_session", 3, @now)
 
     unlocked =
-      Commands.enqueue(player.id, "area.select", intent(4, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(4, %{"area" => "cloverfield"}), @now)
 
     assert unlocked["type"] == "area.select.result"
     assert unlocked["area"] == "cloverfield"
@@ -195,10 +195,10 @@ defmodule Incrementalist.Game.CommandsTest do
     set_player_area(player.id, "cloverfield", 10)
 
     # 100 -> first 4-leaf
-    assert Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(0), @now)["type"] ==
              "cloverfield.search.result"
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     assert Commands.enqueue(
              player.id,
@@ -207,7 +207,7 @@ defmodule Incrementalist.Game.CommandsTest do
              @now
            )["type"] == "cloverfield.confirm_discovery.result"
 
-    Commands.ack(player.id, 1, @now)
+    Commands.ack(player.id, "test_session", 1, @now)
 
     assert Commands.enqueue(
              player.id,
@@ -218,25 +218,25 @@ defmodule Incrementalist.Game.CommandsTest do
              "type"
            ] == "quest.claim.result"
 
-    Commands.ack(player.id, 2, @now)
+    Commands.ack(player.id, "test_session", 2, @now)
 
-    assert Commands.enqueue(player.id, "area.select", intent(3, %{"area" => "cloverfield"}), @now)[
+    assert Commands.enqueue(player.id, "test_session", "area.select", intent(3, %{"area" => "cloverfield"}), @now)[
              "type"
            ] == "area.select.result"
 
-    Commands.ack(player.id, 3, @now)
+    Commands.ack(player.id, "test_session", 3, @now)
 
     # 200 -> second 4-leaf
-    assert Commands.enqueue(player.id, "cloverfield.search", intent(4), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(4), @now)["type"] ==
              "cloverfield.search.result"
 
-    Commands.ack(player.id, 4, @now)
+    Commands.ack(player.id, "test_session", 4, @now)
 
     # 300 -> first 5-leaf
-    assert Commands.enqueue(player.id, "cloverfield.search", intent(5), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(5), @now)["type"] ==
              "cloverfield.search.result"
 
-    Commands.ack(player.id, 5, @now)
+    Commands.ack(player.id, "test_session", 5, @now)
 
     five_confirm =
       Commands.enqueue(
@@ -249,49 +249,49 @@ defmodule Incrementalist.Game.CommandsTest do
     assert five_confirm["type"] == "cloverfield.confirm_discovery.result"
     assert five_confirm["area"] == "sage"
 
-    Commands.ack(player.id, 6, @now)
+    Commands.ack(player.id, "test_session", 6, @now)
 
     locked_attempt =
-      Commands.enqueue(player.id, "area.select", intent(7, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(7, %{"area" => "cloverfield"}), @now)
 
     assert locked_attempt["type"] == "command.error"
     assert locked_attempt["reason"] == "area_locked"
 
-    Commands.ack(player.id, 7, @now)
+    Commands.ack(player.id, "test_session", 7, @now)
 
     claim_rank_2 =
-      Commands.enqueue(player.id, "quest.claim", intent(8, %{"quest_id" => "clover_hunt"}), @now)
+      Commands.enqueue(player.id, "test_session", "quest.claim", intent(8, %{"quest_id" => "clover_hunt"}), @now)
 
     assert claim_rank_2["type"] == "quest.claim.result"
     assert claim_rank_2["quests"]["clover_hunt"]["claimed_rank"] >= 2
 
-    Commands.ack(player.id, 8, @now)
+    Commands.ack(player.id, "test_session", 8, @now)
 
-    assert Commands.enqueue(player.id, "area.select", intent(9, %{"area" => "cloverfield"}), @now)[
+    assert Commands.enqueue(player.id, "test_session", "area.select", intent(9, %{"area" => "cloverfield"}), @now)[
              "type"
            ] == "area.select.result"
 
-    Commands.ack(player.id, 9, @now)
+    Commands.ack(player.id, "test_session", 9, @now)
 
     # 400, 500, 600
-    assert Commands.enqueue(player.id, "cloverfield.search", intent(0), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(0), @now)["type"] ==
              "cloverfield.search.result"
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
-    assert Commands.enqueue(player.id, "cloverfield.search", intent(1), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(1), @now)["type"] ==
              "cloverfield.search.result"
 
-    Commands.ack(player.id, 1, @now)
+    Commands.ack(player.id, "test_session", 1, @now)
 
-    six_discovery = Commands.enqueue(player.id, "cloverfield.search", intent(2), @now)
+    six_discovery = Commands.enqueue(player.id, "test_session", "cloverfield.search", intent(2), @now)
     assert six_discovery["type"] == "cloverfield.search.result"
     assert "six_leaf_1" in six_discovery["discoveries"]
 
-    Commands.ack(player.id, 2, @now)
+    Commands.ack(player.id, "test_session", 2, @now)
 
     claim_rank_3 =
-      Commands.enqueue(player.id, "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
+      Commands.enqueue(player.id, "test_session", "quest.claim", intent(3, %{"quest_id" => "clover_hunt"}), @now)
 
     assert claim_rank_3["type"] == "quest.claim.result"
     assert claim_rank_3["quests"]["clover_hunt"]["claimed_rank"] >= 3
@@ -299,7 +299,7 @@ defmodule Incrementalist.Game.CommandsTest do
     area_keys_before_confirmation = Enum.map(claim_rank_3["areas"], &(&1[:key] || &1["key"]))
     assert "cloverfield" in area_keys_before_confirmation
 
-    Commands.ack(player.id, 3, @now)
+    Commands.ack(player.id, "test_session", 3, @now)
 
     six_confirm =
       Commands.enqueue(
@@ -315,10 +315,10 @@ defmodule Incrementalist.Game.CommandsTest do
     area_keys_after_confirmation = Enum.map(six_confirm["areas"], &(&1[:key] || &1["key"]))
     refute "cloverfield" in area_keys_after_confirmation
 
-    Commands.ack(player.id, 4, @now)
+    Commands.ack(player.id, "test_session", 4, @now)
 
     unavailable =
-      Commands.enqueue(player.id, "area.select", intent(5, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(5, %{"area" => "cloverfield"}), @now)
 
     assert unavailable["type"] == "command.error"
     assert unavailable["reason"] == "unknown_area"
@@ -381,10 +381,10 @@ defmodule Incrementalist.Game.CommandsTest do
       )
 
     assert shown_notice["type"] == "notice.event.result"
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     go_cloverfield =
-      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(1, %{"area" => "cloverfield"}), @now)
 
     assert go_cloverfield["type"] == "area.select.result"
     refute "leaf.area.sage.go_button" in go_cloverfield["notices"]["active_leaf_ids"]
@@ -417,15 +417,15 @@ defmodule Incrementalist.Game.CommandsTest do
       )
 
     assert click_notice["type"] == "notice.event.result"
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     go_cloverfield =
-      Commands.enqueue(player.id, "area.select", intent(1, %{"area" => "cloverfield"}), @now)
+      Commands.enqueue(player.id, "test_session", "area.select", intent(1, %{"area" => "cloverfield"}), @now)
 
     assert go_cloverfield["type"] == "area.select.result"
-    Commands.ack(player.id, 1, @now)
+    Commands.ack(player.id, "test_session", 1, @now)
 
-    go_sage = Commands.enqueue(player.id, "area.select", intent(2, %{"area" => "sage"}), @now)
+    go_sage = Commands.enqueue(player.id, "test_session", "area.select", intent(2, %{"area" => "sage"}), @now)
 
     assert go_sage["type"] == "area.select.result"
 
@@ -437,7 +437,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "stored results replay without re-executing command rules" do
     player = create_player()
 
-    result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
+    result = Commands.enqueue(player.id, "test_session", "game.reset", intent(0), @now)
     replayed_once = Commands.replay_pending(player.id)
     replayed_twice = Commands.replay_pending(player.id)
 
@@ -449,16 +449,16 @@ defmodule Incrementalist.Game.CommandsTest do
     command = Repo.one!(GameCommand)
     assert command.replay_count == 2
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
     assert Commands.replay_pending(player.id) == nil
   end
 
   test "the session replay buffer can replay the last completed command by sequence" do
     player = create_player()
 
-    result = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
+    result = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     assert PlayerServer.replay_pending(player.id, 0) == result
   end
@@ -466,17 +466,17 @@ defmodule Incrementalist.Game.CommandsTest do
   test "command ids are limited to the ten client queue slots" do
     player = create_player()
 
-    assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)["type"] ==
+    assert Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)["type"] ==
              "stats.update.result"
 
     for command_id <- 1..9 do
-      assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(command_id), @now)[
+      assert Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(command_id), @now)[
                "type"
              ] ==
                "command.queued"
     end
 
-    rejected = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(10), @now)
+    rejected = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(10), @now)
 
     assert rejected == :invalid_command_id
     assert Repo.aggregate(GameCommand, :count) == 1
@@ -485,7 +485,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "game.reset resets the player state and returns a fresh snapshot" do
     player = create_player()
 
-    reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
+    reset_result = Commands.enqueue(player.id, "test_session", "game.reset", intent(0), @now)
     assert reset_result["type"] == "game.reset.result"
     assert reset_result["snapshot"]["state"]
   end
@@ -493,19 +493,19 @@ defmodule Incrementalist.Game.CommandsTest do
   test "game.reset blocks follow-up commands until acknowledged" do
     player = create_player()
 
-    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
+    Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
 
-    reset = Commands.enqueue(player.id, "game.reset", intent(1), @now)
+    reset = Commands.enqueue(player.id, "test_session", "game.reset", intent(1), @now)
     assert reset["type"] == "command.queued"
-    assert Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(2), @now) == :queue_full
+    assert Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(2), @now) == :queue_full
 
-    ack = Commands.ack(player.id, 0, @now)
+    ack = Commands.ack(player.id, "test_session", 0, @now)
 
     assert ack["released_result"]["type"] == "game.reset.result"
     assert ack["released_result"]["command_id"] == 1
     assert command_statuses(player.id) == ["acked", "succeeded"]
 
-    ack = Commands.ack(player.id, 1, @now)
+    ack = Commands.ack(player.id, "test_session", 1, @now)
 
     assert ack["released_result"] == nil
     assert command_statuses(player.id) == ["acked", "acked"]
@@ -514,7 +514,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "game.reset persists claim boundary from snapshot projection" do
     player = create_player()
 
-    reset_result = Commands.enqueue(player.id, "game.reset", intent(0), @now)
+    reset_result = Commands.enqueue(player.id, "test_session", "game.reset", intent(0), @now)
     assert reset_result["type"] == "game.reset.result"
 
     can_claim_at =
@@ -524,7 +524,7 @@ defmodule Incrementalist.Game.CommandsTest do
 
     {:ok, claim_at, 0} = DateTime.from_iso8601(can_claim_at)
 
-    Commands.ack(player.id, 0, @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     claim_result =
       Commands.enqueue(
@@ -541,7 +541,7 @@ defmodule Incrementalist.Game.CommandsTest do
   test "reconnect boot includes the unacked stored result" do
     player = Sessions.authenticate_player(nil, @now)
 
-    result = Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
+    result = Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
 
     boot =
       player.id
@@ -795,7 +795,7 @@ defmodule Incrementalist.Game.CommandsTest do
     assert is_list(last_result["dice"])
     assert length(last_result["dice"]) == 7
 
-    start_ack = Commands.ack(player.id, 0, @now)
+    start_ack = Commands.ack(player.id, "test_session", 0, @now)
     assert start_ack["released_result"] == nil
   end
 
@@ -803,8 +803,8 @@ defmodule Incrementalist.Game.CommandsTest do
     player = create_player()
     old = DateTime.add(@now, -49 * 60 * 60, :second)
 
-    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(0), @now)
-    Commands.ack(player.id, 0, @now)
+    Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(0), @now)
+    Commands.ack(player.id, "test_session", 0, @now)
 
     acked_command = Repo.one!(GameCommand)
 
@@ -812,7 +812,7 @@ defmodule Incrementalist.Game.CommandsTest do
       set: [acked_at: old]
     )
 
-    Commands.enqueue(player.id, "stats.mark_viewed", stats_intent(1), @now)
+    Commands.enqueue(player.id, "test_session", "stats.mark_viewed", stats_intent(1), @now)
     unacked_command = Repo.one!(from command in GameCommand, where: is_nil(command.acked_at))
 
     Repo.update_all(

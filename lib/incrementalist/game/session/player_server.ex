@@ -44,14 +44,14 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     GenServer.call(via_tuple(player_id), {:boot_player, has_cached_snapshot, now})
   end
 
-  def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now()) do
+  def enqueue(player_id, session_id, command_type, intent \\ %{}, now \\ Time.now()) do
     ensure_started(player_id)
-    GenServer.call(via_tuple(player_id), {:enqueue, command_type, intent, now})
+    GenServer.call(via_tuple(player_id), {:enqueue, session_id, command_type, intent, now})
   end
 
-  def ack(player_id, command_id, now \\ Time.now()) do
+  def ack(player_id, session_id, command_id, now \\ Time.now()) do
     ensure_started(player_id)
-    GenServer.call(via_tuple(player_id), {:ack, command_id, now})
+    GenServer.call(via_tuple(player_id), {:ack, session_id, command_id, now})
   end
 
   def replay_pending(player_id, last_known_sequence \\ nil) do
@@ -71,9 +71,9 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     end
   end
 
-  def connect_channel(player_id, channel_pid \\ self()) do
+  def connect_channel(player_id, session_id, channel_pid \\ self()) do
     ensure_started(player_id)
-    GenServer.call(via_tuple(player_id), {:connect_channel, channel_pid})
+    GenServer.call(via_tuple(player_id), {:connect_channel, session_id, channel_pid})
   end
 
   def disconnect_channel(player_id, channel_pid \\ self()) do
@@ -99,7 +99,8 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       recent_commands: [],
       unacked_command: nil,
       sequence: 0,
-      connected_channels: MapSet.new(),
+      active_channel_pid: nil,
+      active_session_id: nil,
       include_token_on_next_tick: true,
       last_pushed_has_bonustime_token: nil
     }
@@ -158,18 +159,21 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
-  def handle_call({:connect_channel, channel_pid}, _from, state) do
-    connected_channels = MapSet.put(state.connected_channels, channel_pid)
+  def handle_call({:connect_channel, session_id, channel_pid}, _from, state) do
+    if state.active_channel_pid && state.active_channel_pid != channel_pid do
+      send(state.active_channel_pid, {:superseded, session_id})
+    end
 
     next_state =
-      if MapSet.size(state.connected_channels) == 0 and MapSet.size(connected_channels) > 0 do
+      if is_nil(state.active_channel_pid) do
         state
-        |> Map.put(:connected_channels, connected_channels)
+        |> Map.put(:active_channel_pid, channel_pid)
+        |> Map.put(:active_session_id, session_id)
         |> Map.put(:include_token_on_next_tick, true)
         |> Map.put(:last_pushed_has_bonustime_token, nil)
         |> schedule_next_player_tick(Time.to_unix_ms(Time.now()))
       else
-        %{state | connected_channels: connected_channels}
+        %{state | active_channel_pid: channel_pid, active_session_id: session_id}
       end
 
     {:reply, :ok, next_state}
@@ -177,22 +181,21 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   @impl true
   def handle_call({:disconnect_channel, channel_pid}, _from, state) do
-    connected_channels = MapSet.delete(state.connected_channels, channel_pid)
-
-    if MapSet.size(connected_channels) == 0 do
+    if state.active_channel_pid == channel_pid do
       save_player_state(state)
 
       next_state =
         state
         |> cancel_player_tick_timer()
         |> Map.put(:player_state, nil)
-        |> Map.put(:connected_channels, connected_channels)
+        |> Map.put(:active_channel_pid, nil)
+        |> Map.put(:active_session_id, nil)
         |> Map.put(:include_token_on_next_tick, true)
         |> Map.put(:last_pushed_has_bonustime_token, nil)
 
       {:stop, :normal, :ok, next_state}
     else
-      {:reply, :ok, %{state | connected_channels: connected_channels}}
+      {:reply, :ok, state}
     end
   end
 
@@ -214,7 +217,10 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   end
 
   @impl true
-  def handle_call({:enqueue, command_type, intent, now}, _from, state) do
+  def handle_call({:enqueue, session_id, command_type, intent, now}, _from, state) do
+    if session_id != state.active_session_id do
+      {:reply, %{"type" => "command.error", "status" => "error", "reason" => "session_superseded", "command_id" => get_command_id_or_zero(intent)}, state}
+    else
     case extract_command_id(intent) do
       {:ok, command_id, command_intent} ->
         case existing_pending_by_command_id(state, command_id) do
@@ -245,10 +251,14 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       _error ->
         {:reply, :invalid_command_id, state}
     end
+    end
   end
 
   @impl true
-  def handle_call({:ack, command_id, now}, _from, state) do
+  def handle_call({:ack, session_id, command_id, now}, _from, state) do
+    if session_id != state.active_session_id do
+      {:reply, %{"type" => "command.error", "status" => "error", "reason" => "session_superseded", "command_id" => command_id}, state}
+    else
     case normalize_command_id(command_id) do
       {:ok, valid_id} ->
         case state.unacked_command do
@@ -269,11 +279,12 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       _error ->
         {:reply, :invalid_command_id, state}
     end
+    end
   end
 
   @impl true
   def handle_info(:idle_timeout, state) do
-    if MapSet.size(state.connected_channels) > 0 do
+    if not is_nil(state.active_channel_pid) do
       {:noreply, %{state | idle_timer: Process.send_after(self(), :idle_timeout, @idle_timeout)}}
     else
       Logger.info("PlayerServer #{state.player_id} shutting down due to idle timeout")
@@ -308,7 +319,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     boundary_time = DateTime.from_unix!(boundary_ms, :millisecond)
     state = %{state | player_tick_timer: nil}
 
-    if MapSet.size(state.connected_channels) == 0 do
+    if is_nil(state.active_channel_pid) do
       {:noreply, state}
     else
       {payload, next_state} = player_tick_payload_with_state(state, boundary_time)
@@ -773,5 +784,12 @@ defmodule Incrementalist.Game.Session.PlayerServer do
 
   defp queued_result(command_id) do
     %{"type" => "command.queued", "status" => "ok", "command_id" => command_id}
+  end
+
+  defp get_command_id_or_zero(intent) do
+    case extract_command_id(intent) do
+      {:ok, id, _} -> id
+      _ -> 0
+    end
   end
 end

@@ -9,12 +9,12 @@ defmodule Incrementalist.Game.Commands do
   alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Game.Time
 
-  def enqueue(player_id, command_type, intent \\ %{}, now \\ Time.now()) do
-    PlayerServer.enqueue(player_id, command_type, intent, now)
+  def enqueue(player_id, session_id, command_type, intent \\ %{}, now \\ Time.now()) do
+    PlayerServer.enqueue(player_id, session_id, command_type, intent, now)
   end
 
-  def ack(player_id, command_id, now \\ Time.now()) do
-    PlayerServer.ack(player_id, command_id, now)
+  def ack(player_id, session_id, command_id, now \\ Time.now()) do
+    PlayerServer.ack(player_id, session_id, command_id, now)
   end
 
   def replay_pending(player_id, last_known_sequence \\ nil) do

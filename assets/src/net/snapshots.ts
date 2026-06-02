@@ -136,6 +136,9 @@ export function applyPushEvent(state: ServerState, event: ServerPushEvent): void
       plots: event.plots,
       has_bonustime_token: event.has_bonustime_token
     });
+  } else if (event.type === "session.superseded") {
+    state.statusTone = "error";
+    state.status = "Session Taken Over in Another Tab or Device";
   }
 }
 
@@ -184,7 +187,7 @@ export function applyAuthoritativeData(
   if (data.exp !== undefined) state.snapshot.state.exp = data.exp;
   if (data.level !== undefined) {
     state.snapshot.state.level = data.level;
-    
+
     // Update shop item purchase eligibility
     for (const item of state.snapshot.state.shop) {
       item.can_purchase = !item.is_purchased && state.snapshot.state.level >= item.required_level;
@@ -329,7 +332,10 @@ function snapshotFromResult(result: ServerResult): GameSnapshot | null {
 }
 
 function statusForResult(result: ServerResult): string {
-  if (result.status === "error") return result.reason || "Command rejected";
+  if (result.status === "error") {
+    if (result.reason === "session_superseded") return "Session Taken Over in Another Tab or Device";
+    return result.reason || "Command rejected";
+  }
   if (result.type === "command.queued") return "Queued";
   if (result.type === "game.reset.result") return "Game reset";
   if (result.type === "shop.purchase.result") return "Purchase successful";

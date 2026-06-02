@@ -419,7 +419,8 @@ export type CommandErrorReason =
   | "game_id_required"
   | "furnace_only"
   | "furnace_max_level_reached"
-  | "invalid_request";
+  | "invalid_request"
+  | "session_superseded";
 
 export type CommandErrorResult = {
   type: "command.error";
@@ -546,7 +547,12 @@ export type ServerResult =
   | CommandQueuedResult
   | CommandAckResult;
 
-export type ServerPushEvent = PlayerTickEvent;
+export type SessionSupersededEvent = {
+  type: "session.superseded";
+  reason: "takeover";
+};
+
+export type ServerPushEvent = PlayerTickEvent | SessionSupersededEvent;
 
 export type BootResult = {
   type: "game.boot";

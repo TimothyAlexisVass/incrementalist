@@ -18,13 +18,16 @@ defmodule IncrementalistWeb.GameChannel do
 
   @impl true
   def join("game", _params, socket) do
+    session_id = Ecto.UUID.generate()
+    socket = assign(socket, :session_id, session_id)
+
     :ok =
       Phoenix.PubSub.subscribe(
         Incrementalist.PubSub,
         PlayerServer.player_push_topic(socket.assigns.player_id)
       )
 
-    :ok = PlayerServer.connect_channel(socket.assigns.player_id, self())
+    :ok = PlayerServer.connect_channel(socket.assigns.player_id, session_id, self())
     boot = Sessions.boot_player(socket.assigns.player_id, socket.assigns.has_cached_snapshot)
 
     token = Phoenix.Token.sign(socket.endpoint, "player_auth", socket.assigns.player_id)
@@ -41,16 +44,21 @@ defmodule IncrementalistWeb.GameChannel do
 
   @impl true
   def handle_in("command.ack", command_id, socket) do
-    reply_command(PlayerServer.ack(socket.assigns.player_id, command_id), socket)
+    reply_command(PlayerServer.ack(socket.assigns.player_id, socket.assigns.session_id, command_id), socket)
   end
 
   def handle_in(command_type, payload, socket) when is_binary(command_type) do
-    reply_command(PlayerServer.enqueue(socket.assigns.player_id, command_type, payload), socket)
+    reply_command(PlayerServer.enqueue(socket.assigns.player_id, socket.assigns.session_id, command_type, payload), socket)
   end
 
   @impl true
   def handle_info({:player_tick, payload}, socket) when is_map(payload) do
     push(socket, "player.tick", payload)
+    {:noreply, socket}
+  end
+
+  def handle_info({:superseded, _new_session_id}, socket) do
+    push(socket, "session.superseded", %{type: "session.superseded", reason: "takeover"})
     {:noreply, socket}
   end
 

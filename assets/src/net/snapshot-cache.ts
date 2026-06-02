@@ -40,6 +40,14 @@ export class SnapshotCache {
       return null;
     }
   }
+
+  clear(): void {
+    try {
+      window.localStorage.removeItem(this.key());
+    } catch {
+      // Ignored
+    }
+  }
 }
 
 function isUsableSnapshot(data: any): data is GameSnapshot {
