@@ -26,6 +26,7 @@ import orchardPlantsConfig from "../../../../../shared/requirements/plants.json"
 import orchardDecomposeConfig from "../../../../../shared/requirements/decompose.json";
 import { spawnGpuHarvestParticle } from "../../../render/webgl-effects";
 import { humanizeSystemKey } from "./names";
+import { drawHorizontalBar } from "../../../ui/components/bar";
 
 type OrchardRuntime = {
   scene: THREE.Scene;
@@ -537,7 +538,7 @@ function renderDecompositionImage(
 export function renderOrchard(input?: InteractionState, allowAmbientHarvestParticles = true) {
   const renderer = getActiveWebGLRenderer();
   const orchard = getOrchardViewModel();
-  type RenderRequest = 
+  type RenderRequest =
     | { type: "plant"; req: OrchardPlantRenderRequest }
     | { type: "decomp"; req: OrchardDecompRenderRequest };
   const renderRequests: RenderRequest[] = [];
@@ -819,6 +820,9 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
         item.req.isPlotHovered,
         item.req.plotRatio
       );
+      if (item.req.growth < 100.0) {
+        drawOrchardProgressBar(item.req.uvPoints, item.req.growth / 100.0, "plant");
+      }
     } else {
       renderDecompositionImage(
         renderer,
@@ -830,10 +834,60 @@ export function renderOrchard(input?: InteractionState, allowAmbientHarvestParti
         item.req.isPlotHovered,
         item.req.plotRatio
       );
+      if (item.req.progress < 100.0) {
+        drawOrchardProgressBar(item.req.uvPoints, item.req.progress / 100.0, "decomp");
+      }
     }
   }
 
   renderSoilStats(input);
+}
+
+function drawOrchardProgressBar(
+  uvPoints: readonly (readonly [number, number])[],
+  fillRatio: number,
+  type: "plant" | "decomp"
+) {
+  let minX = uvPoints[0][0];
+  let maxX = uvPoints[0][0];
+  let maxY = uvPoints[0][1];
+
+  for (let i = 1; i < uvPoints.length; i += 1) {
+    const [u, v] = uvPoints[i];
+    if (u < minX) minX = u;
+    if (u > maxX) maxX = u;
+    if (v > maxY) maxY = v;
+  }
+
+  const centerX = DISPLAY_AREA_X + ((minX + maxX) / 2) * DISPLAY_AREA_WIDTH;
+  const bottomY = DISPLAY_AREA_Y + maxY * DISPLAY_AREA_HEIGHT;
+
+  const barWidth = 60;
+  const barHeight = 10;
+
+  const rect = {
+    x: centerX - barWidth / 2,
+    y: bottomY - barHeight + 4,
+    width: barWidth,
+    height: barHeight
+  };
+
+  const fillStartColor = type === "plant"
+    ? ([0.06, 0.73, 0.51, 1] as const)
+    : ([0.70, 0.33, 0.04, 1] as const);
+
+  const fillEndColor = type === "plant"
+    ? ([0.02, 0.71, 0.83, 1] as const)
+    : ([0.85, 0.47, 0.02, 1] as const);
+
+  drawHorizontalBar(rect, {
+    fillRatio,
+    fillStartColor,
+    fillEndColor,
+    trackColor: [0.06, 0.11, 0.19, 0.8],
+    borderColor: [0, 0, 0, 0.95],
+    borderWidth: 1
+  });
 }
 
 function renderSoilStats(input?: InteractionState) {
