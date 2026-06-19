@@ -20,6 +20,7 @@ import {
 import { GameChannel } from "../../net/game-channel";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
 import { hexToRgba } from "../../utils/color";
+import { drawLazyLoader } from "../../ui/components/utils/lazy-loader";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
 const GO_TO_AREA_BUTTON_PADDING = 3;
@@ -125,11 +126,34 @@ export function renderAreaSpecifics(
   }
 
   if (model.currentArea === "orchard") {
-    const orchardInput = blocked ? undefined : input;
+    const isConnecting = channel ? channel.status !== "connected" : false;
+    const orchardInput = (blocked || isConnecting) ? undefined : input;
     // Keep ambient harvest particles active even while modal input is blocked,
     // so particles remain visible behind semi-transparent overlays.
     renderOrchard(orchardInput, true);
-    handleOrchardInteractions(input, channel, runCommand, blocked);
+    handleOrchardInteractions(input, channel, runCommand, blocked || isConnecting);
+
+    if (isConnecting) {
+      const renderer = getActiveWebGLRenderer();
+      if (renderer) {
+        // Dim the background slightly
+        renderer.drawRect({
+          x: DISPLAY_AREA_X,
+          y: DISPLAY_AREA_Y,
+          width: DISPLAY_AREA_WIDTH,
+          height: DISPLAY_AREA_HEIGHT,
+          color: [0, 0, 0, 0.6]
+        });
+
+        // Draw loading spinner/text
+        drawLazyLoader({
+          x: DISPLAY_AREA_X,
+          y: DISPLAY_AREA_Y,
+          width: DISPLAY_AREA_WIDTH,
+          height: DISPLAY_AREA_HEIGHT
+        }, "Connecting to Server...");
+      }
+    }
     return;
   }
 

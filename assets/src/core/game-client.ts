@@ -193,6 +193,15 @@ export class GameClient {
         if (result.bonustime !== undefined) {
           this.store.state.snapshot.state.bonustime = result.bonustime;
         }
+        if (result.plots !== undefined) {
+          this.store.state.snapshot.state.plots = result.plots;
+        }
+        if (result.soil !== undefined) {
+          this.store.state.snapshot.state.soil = result.soil;
+        }
+        if (result.climate !== undefined) {
+          this.store.state.snapshot.state.climate = result.climate;
+        }
 
         this.snapshotCache.save(this.store.state.snapshot);
 

@@ -20,7 +20,7 @@
       }
     },
     "organic_matter": {
-      "min": 0,
+      "min": 5.0,
       "max": 2000,
       "runoff_retention_factor_at_max": 0.5,
       "water_cap_base": 150,

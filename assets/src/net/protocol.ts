@@ -565,6 +565,9 @@ export type BootResult = {
   pending_result?: AckableCommandResult | null;
   has_bonustime_token?: boolean;
   bonustime?: BonusTimeState | null;
+  plots?: PlotState[];
+  soil?: SoilState;
+  climate?: ClimateState;
 };
 
 export function isAckableCommandResult(result: ServerResult): result is AckableCommandResult {

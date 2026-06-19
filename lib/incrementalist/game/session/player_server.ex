@@ -144,6 +144,16 @@ defmodule Incrementalist.Game.Session.PlayerServer do
       "bonustime" => bonustime_payload
     }
 
+    boot =
+      if has_cached_snapshot do
+        boot
+        |> Map.put("plots", Incrementalist.Game.State.visible_plots(projected_state.plots))
+        |> Map.put("soil", OrchardSoil.visible_state(projected_state.soil))
+        |> Map.put("climate", ClimateCache.visible_state(now))
+      else
+        boot
+      end
+
     next_state =
       state
       |> Map.put(:include_token_on_next_tick, true)

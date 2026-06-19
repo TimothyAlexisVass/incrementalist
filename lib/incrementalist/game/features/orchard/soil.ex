@@ -422,7 +422,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
         organic_matter:
           soil.organic_matter
           |> BigNum.sub(om_loss)
-          |> clamp_big_num_non_negative()
+          |> clamp_big_num_organic_matter_min()
           |> clamp_big_num_organic_matter_max()
     }
   end
@@ -438,7 +438,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     normalized_organic_matter =
       soil.organic_matter
       |> normalize_big_num(Constants.orchard_soil_default_organic_matter())
-      |> clamp_big_num_non_negative()
+      |> clamp_big_num_organic_matter_min()
       |> clamp_big_num_organic_matter_max()
 
     water_cap = water_cap_from_organic_matter(normalized_organic_matter)
@@ -490,6 +490,16 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
   defp clamp_big_num_non_negative(%BigNum{} = value) do
     if BigNum.compare(value, BigNum.zero()) < 0 do
       BigNum.zero()
+    else
+      value
+    end
+  end
+
+  defp clamp_big_num_organic_matter_min(%BigNum{} = value) do
+    min_value = BigNum.from_number(Constants.orchard_soil_organic_matter_min())
+
+    if BigNum.compare(value, min_value) < 0 do
+      min_value
     else
       value
     end
