@@ -38,14 +38,14 @@ defmodule BigNum do
     e = e + shift
 
     {m, e} =
-      cond do
-        abs(m) >= 10 ->
+      case abs(m) do
+        abs_m when abs_m >= 10 ->
           {m / 10, e + 1}
 
-        abs(m) < 1 ->
+        abs_m when abs_m < 1 ->
           {m * 10, e - 1}
 
-        true ->
+        _ ->
           {m, e}
       end
 
