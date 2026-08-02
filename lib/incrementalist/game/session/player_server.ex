@@ -125,8 +125,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
     bonustime_payload =
       if projected_state.bonustime do
         Map.merge(Map.from_struct(projected_state.bonustime), %{
-          "active_game_id" =>
-            Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id(now)
+          "active_game_id" => Incrementalist.Game.Features.BonusTime.Rules.get_active_game_id(now)
         })
       else
         nil
@@ -150,6 +149,10 @@ defmodule Incrementalist.Game.Session.PlayerServer do
         |> Map.put("plots", Incrementalist.Game.State.visible_plots(projected_state.plots))
         |> Map.put("soil", OrchardSoil.visible_state(projected_state.soil))
         |> Map.put("climate", ClimateCache.visible_state(now))
+        |> Map.put("furnace", %{
+          "burn_queue" => projected_state.furnace.burn_queue,
+          "projected_at" => projected_state.furnace.projected_at
+        })
       else
         boot
       end
@@ -229,66 +232,78 @@ defmodule Incrementalist.Game.Session.PlayerServer do
   @impl true
   def handle_call({:enqueue, session_id, command_type, intent, now}, _from, state) do
     if session_id != state.active_session_id do
-      {:reply, %{"type" => "command.error", "status" => "error", "reason" => "session_superseded", "command_id" => get_command_id_or_zero(intent)}, state}
+      {:reply,
+       %{
+         "type" => "command.error",
+         "status" => "error",
+         "reason" => "session_superseded",
+         "command_id" => get_command_id_or_zero(intent)
+       }, state}
     else
-    case extract_command_id(intent) do
-      {:ok, command_id, command_intent} ->
-        case existing_pending_by_command_id(state, command_id) do
-          {:unacked, command} ->
-            {result, next_state} = replay_unacked(state, command)
-            {:reply, result, next_state}
+      case extract_command_id(intent) do
+        {:ok, command_id, command_intent} ->
+          case existing_pending_by_command_id(state, command_id) do
+            {:unacked, command} ->
+              {result, next_state} = replay_unacked(state, command)
+              {:reply, result, next_state}
 
-          {:queued, _command} ->
-            {:reply, queued_result(command_id), state}
+            {:queued, _command} ->
+              {:reply, queued_result(command_id), state}
 
-          :none ->
-            if queue_full?(state) or reset_pending?(state) do
-              {:reply, :queue_full, state}
-            else
-              {command, next_state} =
-                build_command(state, command_type, command_id, command_intent, now)
-
-              if can_execute_immediately?(state) do
-                {result, released_state} = execute_next(next_state, command, now)
-                {:reply, result, released_state}
+            :none ->
+              if queue_full?(state) or reset_pending?(state) do
+                {:reply, :queue_full, state}
               else
-                queued_state = enqueue_in_memory(next_state, command)
-                {:reply, queued_result(command_id), queued_state}
-              end
-            end
-        end
+                {command, next_state} =
+                  build_command(state, command_type, command_id, command_intent, now)
 
-      _error ->
-        {:reply, :invalid_command_id, state}
-    end
+                if can_execute_immediately?(state) do
+                  {result, released_state} = execute_next(next_state, command, now)
+                  {:reply, result, released_state}
+                else
+                  queued_state = enqueue_in_memory(next_state, command)
+                  {:reply, queued_result(command_id), queued_state}
+                end
+              end
+          end
+
+        _error ->
+          {:reply, :invalid_command_id, state}
+      end
     end
   end
 
   @impl true
   def handle_call({:ack, session_id, command_id, now}, _from, state) do
     if session_id != state.active_session_id do
-      {:reply, %{"type" => "command.error", "status" => "error", "reason" => "session_superseded", "command_id" => command_id}, state}
+      {:reply,
+       %{
+         "type" => "command.error",
+         "status" => "error",
+         "reason" => "session_superseded",
+         "command_id" => command_id
+       }, state}
     else
-    case normalize_command_id(command_id) do
-      {:ok, valid_id} ->
-        case state.unacked_command do
-          %GameCommand{command_id: ^valid_id} = command ->
-            async_mark_command_acked(command, now)
+      case normalize_command_id(command_id) do
+        {:ok, valid_id} ->
+          case state.unacked_command do
+            %GameCommand{command_id: ^valid_id} = command ->
+              async_mark_command_acked(command, now)
 
-            recent = push_recent(state.recent_commands, command)
-            next_after_ack = %{state | unacked_command: nil, recent_commands: recent}
+              recent = push_recent(state.recent_commands, command)
+              next_after_ack = %{state | unacked_command: nil, recent_commands: recent}
 
-            {released_result, next_state} = process_next_queued(next_after_ack, now)
+              {released_result, next_state} = process_next_queued(next_after_ack, now)
 
-            {:reply, ack_result(valid_id, released_result), next_state}
+              {:reply, ack_result(valid_id, released_result), next_state}
 
-          _not_current ->
-            {:reply, ack_result(valid_id, nil), state}
-        end
+            _not_current ->
+              {:reply, ack_result(valid_id, nil), state}
+          end
 
-      _error ->
-        {:reply, :invalid_command_id, state}
-    end
+        _error ->
+          {:reply, :invalid_command_id, state}
+      end
     end
   end
 
@@ -444,7 +459,11 @@ defmodule Incrementalist.Game.Session.PlayerServer do
         "server_time" => Time.iso8601(now),
         "climate" => ClimateCache.visible_state(now),
         "soil" => OrchardSoil.visible_state(projected_state.soil),
-        "plots" => Incrementalist.Game.State.visible_plots(projected_state.plots)
+        "plots" => Incrementalist.Game.State.visible_plots(projected_state.plots),
+        "furnace" => %{
+          "burn_queue" => projected_state.furnace.burn_queue,
+          "projected_at" => projected_state.furnace.projected_at
+        }
       }
       |> maybe_put_bonustime_token(has_bonustime_token, include_token?)
 

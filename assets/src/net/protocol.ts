@@ -102,6 +102,11 @@ export type ClimateState = {
   rain_mm: number;
 };
 
+export type FurnaceState = {
+  burn_queue: BigNum;
+  projected_at: string;
+};
+
 export type SoilState = {
   water: number;
   water_cap: number;
@@ -192,6 +197,7 @@ export type GameSnapshot = {
     };
     climate: ClimateState;
     soil: SoilState;
+    furnace: FurnaceState;
     unlocked_plots: string[];
     spliced_seeds: string[];
     wood: BigNum;
@@ -218,6 +224,7 @@ export type PlayerTickEvent = {
   server_time: string;
   climate: ClimateState;
   soil: SoilState;
+  furnace: FurnaceState;
   plots?: PlotState[];
   has_bonustime_token?: boolean;
 };
@@ -472,6 +479,7 @@ export type OrchardHarvestPlotResult = {
   coin_tree_seeds: BigNum;
   coins: BigNum;
   plots: PlotState[];
+  furnace: FurnaceState;
   notices: NoticeState;
 };
 
@@ -568,6 +576,7 @@ export type BootResult = {
   plots?: PlotState[];
   soil?: SoilState;
   climate?: ClimateState;
+  furnace?: FurnaceState;
 };
 
 export function isAckableCommandResult(result: ServerResult): result is AckableCommandResult {
@@ -607,6 +616,8 @@ export function isPlayerTickEvent(event: unknown): event is PlayerTickEvent {
     candidate.plots === undefined ||
     (Array.isArray(candidate.plots) && candidate.plots.every((p) => typeof p === "object"));
 
+  const hasValidFurnace = candidate.furnace !== null && typeof candidate.furnace === "object";
+
   return (
     candidate.type === "player.tick" &&
     typeof candidate.server_time === "string" &&
@@ -615,6 +626,7 @@ export function isPlayerTickEvent(event: unknown): event is PlayerTickEvent {
     Boolean(candidate.soil) &&
     typeof candidate.soil === "object" &&
     hasValidOptionalToken &&
-    hasValidPlots
+    hasValidPlots &&
+    hasValidFurnace
   );
 }

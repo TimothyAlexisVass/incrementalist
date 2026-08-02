@@ -1322,14 +1322,15 @@ defmodule Incrementalist.Game.CommandExecutor do
                   [plot_id | ps.state.unlocked_plots]
                 end
 
-              next_state = %{
-                ps.state
-                | shards: next_shards,
-                  plots: next_plots,
-                  unlocked_plots: next_unlocked
-              }
-              |> Quests.evaluate()
-              |> Achievements.evaluate()
+              next_state =
+                %{
+                  ps.state
+                  | shards: next_shards,
+                    plots: next_plots,
+                    unlocked_plots: next_unlocked
+                }
+                |> Quests.evaluate()
+                |> Achievements.evaluate()
 
               next_notices =
                 Notices.refresh_for_state_transition(
@@ -1377,7 +1378,7 @@ defmodule Incrementalist.Game.CommandExecutor do
           plot = Enum.find(ps.state.plots, &(&1.id == plot_id))
 
           cond do
-            not (plot_id in ps.state.unlocked_plots) ->
+            plot_id not in ps.state.unlocked_plots ->
               {"failed", error_result("plot_locked", command), ps.id}
 
             is_nil(plot) ->
@@ -1404,12 +1405,14 @@ defmodule Incrementalist.Game.CommandExecutor do
                 case spec["nitrogen"] do
                   %{"min" => min_val} ->
                     min_bn = normalize_big_num(min_val)
+
                     if BigNum.compare(soil.nitrogen, min_bn) >= 0 do
                       loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
                       {clamp_big_num_non_negative(BigNum.sub(soil.nitrogen, loss)), nil}
                     else
                       {soil.nitrogen, "insufficient_nitrogen"}
                     end
+
                   _ ->
                     {soil.nitrogen, nil}
                 end
@@ -1419,12 +1422,14 @@ defmodule Incrementalist.Game.CommandExecutor do
                   case spec["phosphorus"] do
                     %{"min" => min_val} ->
                       min_bn = normalize_big_num(min_val)
+
                       if BigNum.compare(soil.phosphorus, min_bn) >= 0 do
                         loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
                         {clamp_big_num_non_negative(BigNum.sub(soil.phosphorus, loss)), nil}
                       else
                         {soil.phosphorus, "insufficient_phosphorus"}
                       end
+
                     _ ->
                       {soil.phosphorus, nil}
                   end
@@ -1437,12 +1442,14 @@ defmodule Incrementalist.Game.CommandExecutor do
                   case spec["potassium"] do
                     %{"min" => min_val} ->
                       min_bn = normalize_big_num(min_val)
+
                       if BigNum.compare(soil.potassium, min_bn) >= 0 do
                         loss = BigNum.from_number(BigNum.to_float(min_bn) * 0.5)
                         {clamp_big_num_non_negative(BigNum.sub(soil.potassium, loss)), nil}
                       else
                         {soil.potassium, "insufficient_potassium"}
                       end
+
                     _ ->
                       {soil.potassium, nil}
                   end
@@ -1465,7 +1472,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
                 true ->
                   next_seed_inv = BigNum.sub(current_seeds, seeds_to_plant)
-                  
+
                   next_state = ps.state
                   next_state = update_seed_inventory(next_state, seed_id, next_seed_inv)
 
@@ -1478,14 +1485,16 @@ defmodule Incrementalist.Game.CommandExecutor do
                     planted_at: Time.iso8601(now)
                   }
 
-                  next_plots = Enum.map(next_state.plots, fn
-                    p when p.id == plot_id -> %{p | plant: new_plant}
-                    p -> p
-                  end)
+                  next_plots =
+                    Enum.map(next_state.plots, fn
+                      p when p.id == plot_id -> %{p | plant: new_plant}
+                      p -> p
+                    end)
 
-                  next_state = %{next_state | soil: next_soil, plots: next_plots}
-                  |> Quests.evaluate()
-                  |> Achievements.evaluate()
+                  next_state =
+                    %{next_state | soil: next_soil, plots: next_plots}
+                    |> Quests.evaluate()
+                    |> Achievements.evaluate()
 
                   next_notices =
                     Notices.refresh_for_state_transition(
@@ -1529,11 +1538,10 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, plot_id} <- fetch_plot_id(command.intent),
              {:ok, action} <- fetch_action(command.intent) do
-          
           plot = Enum.find(ps.state.plots, &(&1.id == plot_id))
 
           cond do
-            not (plot_id in ps.state.unlocked_plots) ->
+            plot_id not in ps.state.unlocked_plots ->
               {"failed", error_result("plot_locked", command), ps.id}
 
             is_nil(plot) ->
@@ -1558,7 +1566,8 @@ defmodule Incrementalist.Game.CommandExecutor do
                   case spec["plantType"] do
                     "tree" -> {size_f * 0.9, size_f * 0.1}
                     "bush" -> {size_f * 0.4, size_f * 0.6}
-                    _ -> {0.0, size_f * 1.0} # herbaceous
+                    # herbaceous
+                    _ -> {0.0, size_f * 1.0}
                   end
 
                 wood_yield = BigNum.from_number(trunc(wood_f))
@@ -1566,59 +1575,77 @@ defmodule Incrementalist.Game.CommandExecutor do
 
                 next_depth = plot.depth + 1
 
+                next_state = %{ps.state | wood: BigNum.add(ps.state.wood, wood_yield)}
+
+                seeds_rolled = roll_weighted(spec["seedAmount"] || %{})
+                seeds_rolled_bn = BigNum.from_number(seeds_rolled)
+
                 next_state =
-                  if action == "keep" do
-                    # Gain materials
-                    next_wood = BigNum.add(ps.state.wood, wood_yield)
-                    next_pm = BigNum.add(ps.state.plant_matter, pm_yield)
-
-                    # Roll seeds
-                    seeds_rolled = roll_weighted(spec["seedAmount"] || %{})
-                    seeds_rolled_bn = BigNum.from_number(seeds_rolled)
-
-                    next_state = %{ps.state | wood: next_wood, plant_matter: next_pm}
-
-                    next_state =
-                      case spec["seed"] do
-                        "clover_seeds" ->
-                          %{next_state | clover_seeds: BigNum.add(next_state.clover_seeds, seeds_rolled_bn)}
-                        "acorn" ->
-                          %{next_state | acorns: BigNum.add(next_state.acorns, seeds_rolled_bn)}
-                        "coin_tree_seed" ->
-                          %{next_state | coin_tree_seeds: BigNum.add(next_state.coin_tree_seeds, seeds_rolled_bn)}
-                        _ ->
-                          next_state
-                      end
-
-                    # Gained coins if harvestType is resource
-                    next_state =
-                      if spec["harvestType"] == "resource" do
-                        min_coins = normalize_big_num(spec["harvestAmount"]["min"])
-                        max_coins = normalize_big_num(spec["harvestAmount"]["max"])
-                        min_f = BigNum.to_float(min_coins)
-                        max_f = BigNum.to_float(max_coins)
-                        coins_rolled = min_f + :rand.uniform() * (max_f - min_f)
-                        coins_yield = BigNum.from_number(trunc(coins_rolled))
-
-                        %{next_state |
-                          coins: BigNum.add(next_state.coins, coins_yield),
-                          stats: %{next_state.stats |
-                            total_coins_earned: BigNum.add(next_state.stats.total_coins_earned, coins_yield)
-                          }
-                        }
-                      else
+                  case spec["seed"] do
+                    "clover_seeds" ->
+                      %{
                         next_state
-                      end
+                        | clover_seeds: BigNum.add(next_state.clover_seeds, seeds_rolled_bn)
+                      }
 
-                    next_plots = Enum.map(next_state.plots, fn
-                      p when p.id == plot_id -> %{p | plant: nil, decomposition: nil, depth: next_depth}
-                      p -> p
-                    end)
+                    "acorn" ->
+                      %{next_state | acorns: BigNum.add(next_state.acorns, seeds_rolled_bn)}
 
-                    %{next_state | plots: next_plots}
+                    "coin_tree_seed" ->
+                      %{
+                        next_state
+                        | coin_tree_seeds: BigNum.add(next_state.coin_tree_seeds, seeds_rolled_bn)
+                      }
+
+                    _ ->
+                      next_state
+                  end
+
+                next_state =
+                  if spec["harvestType"] == "resource" do
+                    min_coins = normalize_big_num(spec["harvestAmount"]["min"])
+                    max_coins = normalize_big_num(spec["harvestAmount"]["max"])
+                    min_f = BigNum.to_float(min_coins)
+                    max_f = BigNum.to_float(max_coins)
+                    coins_rolled = min_f + :rand.uniform() * (max_f - min_f)
+                    coins_yield = BigNum.from_number(trunc(coins_rolled))
+
+                    %{
+                      next_state
+                      | coins: BigNum.add(next_state.coins, coins_yield),
+                        stats: %{
+                          next_state.stats
+                          | total_coins_earned:
+                              BigNum.add(next_state.stats.total_coins_earned, coins_yield)
+                        }
+                    }
+                  else
+                    next_state
+                  end
+
+                next_state =
+                  if action == "burn" do
+                    # Add harvested plant matter straight to the furnace burn queue
+                    next_furnace = %{
+                      next_state.furnace
+                      | burn_queue: BigNum.add(next_state.furnace.burn_queue, pm_yield)
+                    }
+
+                    next_plots =
+                      Enum.map(next_state.plots, fn
+                        p when p.id == plot_id ->
+                          %{p | plant: nil, decomposition: nil, depth: next_depth}
+
+                        p ->
+                          p
+                      end)
+
+                    %{next_state | plots: next_plots, furnace: next_furnace}
                   else
                     # action == decompose
-                    decomp_resource = if(spec["harvestType"] == "fruit", do: "fruit", else: "plant_matter")
+                    decomp_resource =
+                      if(spec["harvestType"] == "fruit", do: "fruit", else: "plant_matter")
+
                     new_decomp = %State.Decomposition{
                       resource_id: decomp_resource,
                       amount: pm_yield,
@@ -1627,12 +1654,16 @@ defmodule Incrementalist.Game.CommandExecutor do
                       started_at: Time.iso8601(now)
                     }
 
-                    next_plots = Enum.map(ps.state.plots, fn
-                      p when p.id == plot_id -> %{p | plant: nil, decomposition: new_decomp, depth: next_depth}
-                      p -> p
-                    end)
+                    next_plots =
+                      Enum.map(next_state.plots, fn
+                        p when p.id == plot_id ->
+                          %{p | plant: nil, decomposition: new_decomp, depth: next_depth}
 
-                    %{ps.state | plots: next_plots}
+                        p ->
+                          p
+                      end)
+
+                    %{next_state | plots: next_plots}
                   end
 
                 next_state =
@@ -1672,6 +1703,10 @@ defmodule Incrementalist.Game.CommandExecutor do
                    "coin_tree_seeds" => next_state.coin_tree_seeds,
                    "coins" => next_state.coins,
                    "plots" => State.visible_plots(visible_plots),
+                   "furnace" => %{
+                     "burn_queue" => next_state.furnace.burn_queue,
+                     "projected_at" => next_state.furnace.projected_at
+                   },
                    "notices" => Notices.payload(next_notices)
                  }, ps.id}
               end
@@ -1686,12 +1721,12 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, seed_a} <- fetch_seed_a(command.intent),
              {:ok, seed_b} <- fetch_seed_b(command.intent) do
-          
           splicing_defs = Constants.orchard_seed_splicing_defs()
+
           matched_recipe =
             Enum.find(splicing_defs, fn {_result_seed, rule} ->
               (rule["seed_a"] == seed_a and rule["seed_b"] == seed_b) or
-              (rule["seed_a"] == seed_b and rule["seed_b"] == seed_a)
+                (rule["seed_a"] == seed_b and rule["seed_b"] == seed_a)
             end)
 
           if is_nil(matched_recipe) do
@@ -1707,22 +1742,32 @@ defmodule Incrementalist.Game.CommandExecutor do
               BigNum.compare(ps.state.coins, cost_gold) < 0 ->
                 {"failed", error_result("insufficient_gold", command), ps.id}
 
-              BigNum.compare(seeds_a_inv, BigNum.one()) < 0 or BigNum.compare(seeds_b_inv, BigNum.one()) < 0 ->
+              BigNum.compare(seeds_a_inv, BigNum.one()) < 0 or
+                  BigNum.compare(seeds_b_inv, BigNum.one()) < 0 ->
                 {"failed", error_result("insufficient_seeds", command), ps.id}
 
               true ->
                 next_state = ps.state
-                next_state = update_seed_inventory(next_state, seed_a, BigNum.sub(seeds_a_inv, BigNum.one()))
-                
+
+                next_state =
+                  update_seed_inventory(next_state, seed_a, BigNum.sub(seeds_a_inv, BigNum.one()))
+
                 # Fetch fresh from next_state in case seed_b was the same
                 seeds_b_inv_fresh = get_seed_inventory(next_state, seed_b)
-                next_state = update_seed_inventory(next_state, seed_b, BigNum.sub(seeds_b_inv_fresh, BigNum.one()))
+
+                next_state =
+                  update_seed_inventory(
+                    next_state,
+                    seed_b,
+                    BigNum.sub(seeds_b_inv_fresh, BigNum.one())
+                  )
 
                 next_coins = BigNum.sub(next_state.coins, cost_gold)
                 next_state = %{next_state | coins: next_coins}
 
                 # Chance roll
                 roll = :rand.uniform()
+
                 next_state =
                   if roll <= (rule["chance"] || 1.0) do
                     next_spliced = Enum.uniq([result_seed_id | next_state.spliced_seeds])
@@ -1772,7 +1817,6 @@ defmodule Incrementalist.Game.CommandExecutor do
 
         with {:ok, seed_id} <- fetch_seed_id(command.intent),
              {:ok, amount} <- fetch_amount(command.intent) do
-          
           shop_defs = Constants.orchard_seed_shop_defs()
           rule = Map.get(shop_defs, seed_id)
 
@@ -1784,8 +1828,11 @@ defmodule Incrementalist.Game.CommandExecutor do
               {"failed", error_result("seed_locked", command), ps.id}
 
             true ->
-              cost_coins = BigNum.mul(normalize_big_num(rule["coins"]), BigNum.from_number(amount))
-              cost_shards = BigNum.mul(normalize_big_num(rule["shards"]), BigNum.from_number(amount))
+              cost_coins =
+                BigNum.mul(normalize_big_num(rule["coins"]), BigNum.from_number(amount))
+
+              cost_shards =
+                BigNum.mul(normalize_big_num(rule["shards"]), BigNum.from_number(amount))
 
               cond do
                 BigNum.compare(ps.state.coins, cost_coins) < 0 ->
@@ -2397,6 +2444,7 @@ defmodule Incrementalist.Game.CommandExecutor do
       _ -> list
     end
   end
+
   defp fetch_plot_id(%{"plot_id" => plot_id}) when is_binary(plot_id), do: {:ok, plot_id}
   defp fetch_plot_id(%{plot_id: plot_id}) when is_binary(plot_id), do: {:ok, plot_id}
   defp fetch_plot_id(_intent), do: {:error, "plot_id_required"}
@@ -2407,14 +2455,17 @@ defmodule Incrementalist.Game.CommandExecutor do
       _ -> {:error, "invalid_plot_id"}
     end
   end
+
   defp parse_plot_index(_), do: {:error, "invalid_plot_id"}
 
   defp fetch_seed_id(%{"seed_id" => seed_id}) when is_binary(seed_id), do: {:ok, seed_id}
   defp fetch_seed_id(%{seed_id: seed_id}) when is_binary(seed_id), do: {:ok, seed_id}
   defp fetch_seed_id(_intent), do: {:error, "seed_id_required"}
 
-  defp fetch_action(%{"action" => action}) when is_binary(action), do: {:ok, action}
-  defp fetch_action(%{action: action}) when is_binary(action), do: {:ok, action}
+  defp fetch_action(%{"action" => action}) when action in ["burn", "decompose"], do: {:ok, action}
+  defp fetch_action(%{action: action}) when action in ["burn", "decompose"], do: {:ok, action}
+  defp fetch_action(%{"action" => _action}), do: {:error, "invalid_harvest_action"}
+  defp fetch_action(%{action: _action}), do: {:error, "invalid_harvest_action"}
   defp fetch_action(_intent), do: {:error, "action_required"}
 
   defp fetch_seed_a(%{"seed_a" => seed_a}) when is_binary(seed_a), do: {:ok, seed_a}
@@ -2462,9 +2513,10 @@ defmodule Incrementalist.Game.CommandExecutor do
       0
     else
       roll = :rand.uniform(100)
-      
+
       Enum.reduce_while(weight_map, 0, fn {amount_str, weight}, acc ->
         next_acc = acc + weight
+
         if roll <= next_acc do
           {:halt, String.to_integer(amount_str)}
         else

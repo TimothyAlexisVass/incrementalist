@@ -27,6 +27,7 @@ import {
   orchardHexState
 } from "./view-model";
 import { humanizeSystemKey } from "./names";
+import orchardPlantsConfig from "../../../../../shared/requirements/plants.json";
 
 export function handleOrchardInteractions(
   input: InteractionState,
@@ -160,14 +161,14 @@ export class PlotActionModal implements Modal {
   private coinTreeBtnRect = { x: 0, y: 0, width: 320, height: 38 };
 
   // Harvestable plot buttons
-  private keepBtnRect = { x: 0, y: 0, width: 160, height: 40 };
-  private decompBtnRect = { x: 0, y: 0, width: 160, height: 40 };
+  private burnBtnRect = { x: 0, y: 0, width: 185, height: 42 };
+  private decompBtnRect = { x: 0, y: 0, width: 185, height: 42 };
 
   constructor(
     private readonly plotId: string,
     private readonly plotData: PlotState | null | undefined,
     private readonly onPlant: (seedId: string) => void,
-    private readonly onHarvest: (action: "keep" | "decompose") => void,
+    private readonly onHarvest: (action: "burn" | "decompose") => void,
     private readonly onClose: () => void
   ) {}
 
@@ -189,6 +190,10 @@ export class PlotActionModal implements Modal {
       // Empty plot
       modalWidth = 420;
       modalHeight = 320;
+    } else if (this.plotData.plant && this.plotData.plant.growth >= 100.0) {
+      // Harvestable plot
+      modalWidth = 440;
+      modalHeight = 360;
     }
 
     const modalX = (canvas.width - modalWidth) / 2;
@@ -282,40 +287,92 @@ export class PlotActionModal implements Modal {
 
       if (isReady) {
         // --- Harvestable ---
-        const readyText = resolveStableText(
-          `orchard.plot.${this.plotData.id}.plant.ready`,
-          "The plant is fully grown and ready to harvest!",
-          {
-            font: MODAL_BODY_FONT,
-            color: COLORS.overlay.bodyText,
-            align: "center",
-            baseline: "top"
-          }
-        );
+        const spec = (orchardPlantsConfig as any)[plant.plant_id];
+        const sizeVal = toNumber(spec.size);
+        let woodVal = 0;
+        let pmVal = sizeVal;
+        if (spec.plantType === "tree") {
+          woodVal = Math.floor(sizeVal * 0.9);
+          pmVal = Math.floor(sizeVal * 0.1);
+        } else if (spec.plantType === "bush") {
+          woodVal = Math.floor(sizeVal * 0.4);
+          pmVal = Math.floor(sizeVal * 0.6);
+        }
+
+        const seedKeys = Object.keys(spec.seedAmount || {}).map(Number);
+        const minSeeds = Math.min(...seedKeys);
+        const maxSeeds = Math.max(...seedKeys);
+        const seedLabel = humanizeSystemKey(spec.seed);
+        const seedsDisplay = minSeeds === maxSeeds ? `${minSeeds}` : `${minSeeds}-${maxSeeds}`;
+
+        const yieldLines = [
+          `• ${seedLabel}: +${seedsDisplay}`
+        ];
+        if (woodVal > 0) {
+          yieldLines.push(`• Wood: +${woodVal}`);
+        }
+        if (spec.harvestType === "resource") {
+          const minCoins = toNumber(spec.harvestAmount.min);
+          const maxCoins = toNumber(spec.harvestAmount.max);
+          yieldLines.push(`• Coins: +${minCoins}-${maxCoins}`);
+        }
 
         renderer.drawText({
-          text: readyText,
+          text: "The plant is fully grown and ready to harvest!",
           x: modalX + modalWidth / 2,
-          y: modalY + 60,
+          y: modalY + 55,
           font: MODAL_BODY_FONT,
           color: COLORS.overlay.bodyText,
           align: "center",
           baseline: "top"
         });
 
-        // Two actions
-        this.keepBtnRect = { x: modalX + 30, y: modalY + 100, width: 160, height: 40 };
-        this.decompBtnRect = { x: modalX + modalWidth - 190, y: modalY + 100, width: 160, height: 40 };
+        renderer.drawText({
+          text: "Harvest Yields (Added to inventory):",
+          x: modalX + 35,
+          y: modalY + 85,
+          font: MODAL_BODY_FONT,
+          color: COLORS.overlay.titleText,
+          align: "left",
+          baseline: "top"
+        });
 
-        const keepClicked = doButton(input, this.keepBtnRect, "Keep Yields", {
+        yieldLines.forEach((line, index) => {
+          renderer.drawText({
+            text: line,
+            x: modalX + 50,
+            y: modalY + 110 + index * 20,
+            font: MODAL_BODY_FONT,
+            color: COLORS.overlay.bodyText,
+            align: "left",
+            baseline: "top"
+          });
+        });
+
+        const biomassY = modalY + 110 + yieldLines.length * 20 + 10;
+        renderer.drawText({
+          text: `Leftover biomass (${pmVal} Plant Matter):`,
+          x: modalX + modalWidth / 2,
+          y: biomassY,
+          font: MODAL_BODY_FONT,
+          color: COLORS.overlay.titleText,
+          align: "center",
+          baseline: "top"
+        });
+
+        const btnY = biomassY + 30;
+        this.burnBtnRect = { x: modalX + 25, y: btnY, width: 185, height: 42 };
+        this.decompBtnRect = { x: modalX + modalWidth - 210, y: btnY, width: 185, height: 42 };
+
+        const burnClicked = doButton(input, this.burnBtnRect, "Burn (Clear Plot)", {
           activeSurface: COLORS.button.surface.active,
           inactiveSurface: COLORS.button.surface.inactive
         });
-        if (keepClicked) {
-          this.onHarvest("keep");
+        if (burnClicked) {
+          this.onHarvest("burn");
         }
 
-        const decompClicked = doButton(input, this.decompBtnRect, "Decompose on Plot", {
+        const decompClicked = doButton(input, this.decompBtnRect, "Decompose (Occupies Plot)", {
           activeSurface: COLORS.button.surface.active,
           inactiveSurface: COLORS.button.surface.inactive
         });
@@ -323,8 +380,7 @@ export class PlotActionModal implements Modal {
           this.onHarvest("decompose");
         }
 
-        // Cancel
-        this.cancelRect = { x: modalX + (modalWidth - 120) / 2, y: modalY + 170, width: 120, height: 34 };
+        this.cancelRect = { x: modalX + (modalWidth - 120) / 2, y: btnY + 60, width: 120, height: 34 };
         const cancelClicked = doButton(input, this.cancelRect, "Close", {
           activeSurface: COLORS.button.secondary.surface,
           inactiveSurface: COLORS.button.secondary.surface,

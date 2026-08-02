@@ -1,4 +1,4 @@
-import { AreaDefinition, ClimateState, SoilState } from "../../net/protocol";
+import { AreaDefinition, ClimateState, FurnaceState, SoilState } from "../../net/protocol";
 import { getAreaPresentation, getFurnaceLevelPresentation } from "../requirements";
 import { syncCloverfieldFromSnapshot } from "./cloverfield/view-model";
 import { syncOrchardFromSnapshot } from "./orchard/view-model";
@@ -7,6 +7,7 @@ export type AreaViewModel = {
   currentArea: string;
   availableAreas: AreaDefinition[];
   furnaceLevel: number;
+  furnace: FurnaceState | null;
   // Area specific visual state
   sage: {
     lastLevelForTip: number;
@@ -23,6 +24,7 @@ let areaViewModel: AreaViewModel = {
   currentArea: "sage",
   availableAreas: [],
   furnaceLevel: 1,
+  furnace: null,
   sage: {
     lastLevelForTip: -1,
     tipStartTime: 0,
@@ -41,6 +43,7 @@ export function getAreaViewModel() {
 export function updateAreaViewModel(snapshotState: any) {
   areaViewModel.currentArea = snapshotState.area;
   areaViewModel.furnaceLevel = snapshotState.furnace_level ?? 1;
+  areaViewModel.furnace = snapshotState.furnace;
   areaViewModel.availableAreas = (snapshotState.areas || [])
     .map((area: AreaDefinition) => resolveAreaPresentation(area, areaViewModel.furnaceLevel))
     .sort((a: AreaDefinition, b: AreaDefinition) => b.unlock_level - a.unlock_level);

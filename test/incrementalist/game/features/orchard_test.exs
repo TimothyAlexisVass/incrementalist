@@ -4,6 +4,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   alias BigNum
   alias Incrementalist.Game.{Commands, State, Time, Notices, Sessions}
   alias Incrementalist.Game.Persistence.{Player, PlayerState, PlayerStates}
+  alias Incrementalist.Game.Session.PlayerServer
   alias Incrementalist.Repo
   alias Incrementalist.Game.Features.Orchard.Soil, as: OrchardSoil
 
@@ -17,7 +18,15 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   test "orchard.unlock_plot unlocks a locked plot when having enough shards", %{player: player} do
     # plot_2 needs 2 * 100 = 200 shards
     # Initially player has 0 shards
-    result = Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.unlock_plot",
+        intent(0, %{"plot_id" => "plot_2"}),
+        @now
+      )
+
     assert result["type"] == "command.error"
     assert result["reason"] == "insufficient_shards"
 
@@ -29,7 +38,15 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     end)
 
     # Unlock plot_2
-    success = Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(1, %{"plot_id" => "plot_2"}), @now)
+    success =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.unlock_plot",
+        intent(1, %{"plot_id" => "plot_2"}),
+        @now
+      )
+
     assert success["type"] == "orchard.unlock_plot.result"
     assert success["status"] == "ok"
     assert "plot_2" in success["unlocked_plots"]
@@ -41,23 +58,35 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert Enum.any?(ps.state.plots, &(&1.id == "plot_2"))
   end
 
-  test "orchard.plant_seed plants clover patch on plot_1, consuming seeds and soil nutrients", %{player: player} do
+  test "orchard.plant_seed plants clover patch on plot_1, consuming seeds and soil nutrients", %{
+    player: player
+  } do
     # Clover Patch planting requires 50 clover seeds
     # Soil nitrogen is clamped/default. Let's make sure player has enough seeds and soil nutrients
     update_player_state(player.id, fn state ->
-      %{state | 
-        clover_seeds: BigNum.from_number(100),
-        soil: %{state.soil |
-          nitrogen: BigNum.from_number(20),
-          phosphorus: BigNum.from_number(20),
-          potassium: BigNum.from_number(20),
-          organic_matter: BigNum.from_number(10)
-        }
+      %{
+        state
+        | clover_seeds: BigNum.from_number(100),
+          soil: %{
+            state.soil
+            | nitrogen: BigNum.from_number(20),
+              phosphorus: BigNum.from_number(20),
+              potassium: BigNum.from_number(20),
+              organic_matter: BigNum.from_number(10)
+          }
       }
     end)
 
     # Plant a clover patch on plot_1
-    result = Commands.enqueue(player.id, "test_session", "orchard.plant_seed", intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.plant_seed",
+        intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}),
+        @now
+      )
+
     assert result["type"] == "orchard.plant_seed.result"
     assert result["status"] == "ok"
     assert result["plant_id"] == "clover_patch"
@@ -73,7 +102,9 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert plot.plant.growth == 0.0
   end
 
-  test "unified minute-by-minute projection simulates plant growth and soil nitrogen fixing", %{player: player} do
+  test "unified minute-by-minute projection simulates plant growth and soil nitrogen fixing", %{
+    player: player
+  } do
     # Plant a seed first
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
@@ -82,28 +113,31 @@ defmodule Incrementalist.Game.Features.OrchardTest do
         level: 1,
         planted_at: Time.iso8601(@now)
       }
-      
-      plots = Enum.map(state.plots, fn
-        p when p.id == "plot_1" -> %{p | plant: plant}
-        p -> p
-      end)
 
-      %{state | 
-        plots: plots,
-        soil: %{state.soil |
-          water_level: 100.0,
-          projected_at: Time.iso8601(@now),
-          nitrogen: BigNum.from_number(50),
-          phosphorus: BigNum.from_number(50),
-          potassium: BigNum.from_number(50),
-          organic_matter: BigNum.from_number(20)
-        }
+      plots =
+        Enum.map(state.plots, fn
+          p when p.id == "plot_1" -> %{p | plant: plant}
+          p -> p
+        end)
+
+      %{
+        state
+        | plots: plots,
+          soil: %{
+            state.soil
+            | water_level: 100.0,
+              projected_at: Time.iso8601(@now),
+              nitrogen: BigNum.from_number(50),
+              phosphorus: BigNum.from_number(50),
+              potassium: BigNum.from_number(50),
+              organic_matter: BigNum.from_number(20)
+          }
       }
     end)
 
     # Let 10 minutes pass
     future_time = DateTime.add(@now, 10 * 60_000, :millisecond)
-    
+
     ps = PlayerStates.get!(player.id)
     projected = OrchardSoil.project_state(ps.state, future_time)
 
@@ -115,7 +149,8 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert BigNum.compare(projected.soil.nitrogen, BigNum.zero()) > 0
   end
 
-  test "orchard.harvest_plot keep adds to inventory and clears plant", %{player: player} do
+  test "orchard.harvest_plot burn adds to inventory, clearing plot and adding to furnace queue",
+       %{player: player} do
     # Plant a fully grown plant on plot_1
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
@@ -124,28 +159,39 @@ defmodule Incrementalist.Game.Features.OrchardTest do
         level: 1,
         planted_at: Time.iso8601(@now)
       }
-      
-      plots = Enum.map(state.plots, fn
-        p when p.id == "plot_1" -> %{p | plant: plant}
-        p -> p
-      end)
+
+      plots =
+        Enum.map(state.plots, fn
+          p when p.id == "plot_1" -> %{p | plant: plant}
+          p -> p
+        end)
 
       %{state | plots: plots, clover_seeds: BigNum.zero()}
     end)
 
-    # Harvest with "keep"
-    result = Commands.enqueue(player.id, "test_session", "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "keep"}), @now)
+    # Harvest with "burn"
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.harvest_plot",
+        intent(0, %{"plot_id" => "plot_1", "action" => "burn"}),
+        @now
+      )
+
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
-    assert result["action"] == "keep"
+    assert result["action"] == "burn"
 
     # Verify clover seeds are gained
     ps = PlayerStates.get!(player.id)
     assert BigNum.compare(ps.state.clover_seeds, BigNum.zero()) > 0
+    assert BigNum.to_float(ps.state.furnace.burn_queue) == 50.0
 
     # Verify plot is cleared and depth is incremented
     plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
     assert is_nil(plot.plant)
+    assert is_nil(plot.decomposition)
     assert plot.depth == 2
   end
 
@@ -158,17 +204,26 @@ defmodule Incrementalist.Game.Features.OrchardTest do
         level: 1,
         planted_at: Time.iso8601(@now)
       }
-      
-      plots = Enum.map(state.plots, fn
-        p when p.id == "plot_1" -> %{p | plant: plant}
-        p -> p
-      end)
+
+      plots =
+        Enum.map(state.plots, fn
+          p when p.id == "plot_1" -> %{p | plant: plant}
+          p -> p
+        end)
 
       %{state | plots: plots}
     end)
 
     # Harvest with "decompose"
-    result = Commands.enqueue(player.id, "test_session", "orchard.harvest_plot", intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.harvest_plot",
+        intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}),
+        @now
+      )
+
     assert result["type"] == "orchard.harvest_plot.result"
     assert result["status"] == "ok"
     assert result["action"] == "decompose"
@@ -183,7 +238,43 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert plot.decomposition.progress == 0.0
   end
 
-  test "orchard command results keep decomposition progress for untouched plots within the same minute", %{player: player} do
+  test "orchard.harvest_plot rejects an unsupported harvest action", %{player: player} do
+    update_player_state(player.id, fn state ->
+      plant = %State.Plant{
+        plant_id: "clover_patch",
+        growth: 100.0,
+        level: 1,
+        planted_at: Time.iso8601(@now)
+      }
+
+      plots =
+        Enum.map(state.plots, fn
+          plot when plot.id == "plot_1" -> %{plot | plant: plant}
+          plot -> plot
+        end)
+
+      %{state | plots: plots}
+    end)
+
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.harvest_plot",
+        intent(0, %{"plot_id" => "plot_1", "action" => "discard"}),
+        @now
+      )
+
+    assert result["type"] == "command.error"
+    assert result["reason"] == "invalid_harvest_action"
+
+    ps = PlayerStates.get!(player.id)
+    plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
+    assert plot.plant
+  end
+
+  test "orchard command results keep decomposition progress for untouched plots within the same minute",
+       %{player: player} do
     update_player_state(player.id, fn state ->
       decomposition = %State.Decomposition{
         resource_id: "plant_matter",
@@ -210,7 +301,13 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_now = DateTime.add(@now, 30, :second)
 
     unlock_result =
-      Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.unlock_plot",
+        intent(0, %{"plot_id" => "plot_2"}),
+        first_now
+      )
 
     assert unlock_result["type"] == "orchard.unlock_plot.result"
 
@@ -224,6 +321,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     plant_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.plant_seed",
         intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
         second_now
@@ -236,7 +334,9 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert result_plot_plant_growth(plant_result, "plot_2") == 0.0
   end
 
-  test "orchard command results keep plant growth for untouched plots within the same minute", %{player: player} do
+  test "orchard command results keep plant growth for untouched plots within the same minute", %{
+    player: player
+  } do
     update_player_state(player.id, fn state ->
       plant = %State.Plant{
         plant_id: "clover_patch",
@@ -263,7 +363,13 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_now = DateTime.add(@now, 30, :second)
 
     unlock_result =
-      Commands.enqueue(player.id, "test_session", "orchard.unlock_plot", intent(0, %{"plot_id" => "plot_2"}), first_now)
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.unlock_plot",
+        intent(0, %{"plot_id" => "plot_2"}),
+        first_now
+      )
 
     assert unlock_result["type"] == "orchard.unlock_plot.result"
 
@@ -277,6 +383,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     plant_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.plant_seed",
         intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
         second_now
@@ -289,7 +396,8 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert result_plot_plant_growth(plant_result, "plot_2") == 0.0
   end
 
-  test "plots planted at different seconds keep distinct progress in subsequent orchard results", %{player: player} do
+  test "plots planted at different seconds keep distinct progress in subsequent orchard results",
+       %{player: player} do
     update_player_state(player.id, fn state ->
       plots =
         state.plots
@@ -320,6 +428,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_plant_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.plant_seed",
         intent(0, %{"plot_id" => "plot_1", "seed_id" => "clover_seeds"}),
         first_plant_at
@@ -333,6 +442,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     second_plant_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.plant_seed",
         intent(1, %{"plot_id" => "plot_2", "seed_id" => "clover_seeds"}),
         second_plant_at
@@ -346,6 +456,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     trigger_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.unlock_plot",
         intent(2, %{"plot_id" => "plot_4"}),
         trigger_at
@@ -359,7 +470,8 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert first_growth > second_growth
   end
 
-  test "decomposing a second plot does not over-advance an earlier decomposition within the minute", %{player: player} do
+  test "decomposing a second plot does not over-advance an earlier decomposition within the minute",
+       %{player: player} do
     update_player_state(player.id, fn state ->
       ready_plant_1 = %State.Plant{
         plant_id: "clover_patch",
@@ -398,6 +510,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     first_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.harvest_plot",
         intent(0, %{"plot_id" => "plot_1", "action" => "decompose"}),
         first_decompose_at
@@ -411,6 +524,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     second_result =
       Commands.enqueue(
         player.id,
+        "test_session",
         "orchard.harvest_plot",
         intent(1, %{"plot_id" => "plot_2", "action" => "decompose"}),
         second_decompose_at
@@ -426,14 +540,23 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   test "orchard.splice_seeds combines seeds into a coin tree seed", %{player: player} do
     # Give gold and ingredients
     update_player_state(player.id, fn state ->
-      %{state | 
-        coins: BigNum.from_number(5000),
-        clover_seeds: BigNum.from_number(100),
-        acorns: BigNum.from_number(10)
+      %{
+        state
+        | coins: BigNum.from_number(5000),
+          clover_seeds: BigNum.from_number(100),
+          acorns: BigNum.from_number(10)
       }
     end)
 
-    result = Commands.enqueue(player.id, "test_session", "orchard.splice_seeds", intent(0, %{"seed_a" => "clover_seeds", "seed_b" => "acorn"}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.splice_seeds",
+        intent(0, %{"seed_a" => "clover_seeds", "seed_b" => "acorn"}),
+        @now
+      )
+
     assert result["type"] == "orchard.splice_seeds.result"
     assert result["status"] == "ok"
     assert "coin_tree_seed" in result["spliced_seeds"]
@@ -449,7 +572,15 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       %{state | coins: BigNum.from_number(100), clover_seeds: BigNum.zero()}
     end)
 
-    result = Commands.enqueue(player.id, "test_session", "orchard.buy_seed", intent(0, %{"seed_id" => "clover_seeds", "amount" => 10}), @now)
+    result =
+      Commands.enqueue(
+        player.id,
+        "test_session",
+        "orchard.buy_seed",
+        intent(0, %{"seed_id" => "clover_seeds", "amount" => 10}),
+        @now
+      )
+
     assert result["type"] == "orchard.buy_seed.result"
     assert result["status"] == "ok"
 
@@ -462,7 +593,13 @@ defmodule Incrementalist.Game.Features.OrchardTest do
   # Helpers
   defp create_player do
     player = Sessions.authenticate_player(nil, @now)
+    :ok = PlayerServer.connect_channel(player.id, "test_session")
     _snapshot = Sessions.boot_player(player.id, false, @now)
+
+    on_exit(fn ->
+      PlayerServer.disconnect_channel(player.id)
+    end)
+
     Repo.get!(Player, player.id)
   end
 
@@ -503,6 +640,41 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     |> result_plot(plot_id)
     |> Map.fetch!("plant")
     |> Map.fetch!("growth")
+  end
+
+  test "furnace burning adds potassium to soil over time", %{player: player} do
+    update_player_state(player.id, fn state ->
+      %{
+        state
+        | furnace: %{state.furnace | burn_queue: BigNum.from_number(20)},
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    # Let 1 minute pass
+    future_time_1 = DateTime.add(@now, 60_000, :millisecond)
+    ps = PlayerStates.get!(player.id)
+    projected_1 = OrchardSoil.project_state(ps.state, future_time_1)
+
+    # Zero water prevents leaching, isolating the furnace yield.
+    # 10 plant matter burned. K gain = 10.0 * 0.02 = 0.2 K.
+    # Remaining burn queue = 10.0.
+    assert BigNum.to_float(projected_1.furnace.burn_queue) == 10.0
+    assert BigNum.to_float(projected_1.soil.potassium) == 0.2
+
+    # Let another minute pass
+    future_time_2 = DateTime.add(@now, 120_000, :millisecond)
+    projected_2 = OrchardSoil.project_state(ps.state, future_time_2)
+
+    # Remaining 10 plant matter burned. K gain = another 0.2 K (total 0.4 K).
+    # Remaining burn queue = 0.
+    assert BigNum.to_float(projected_2.furnace.burn_queue) == 0.0
+    assert BigNum.to_float(projected_2.soil.potassium) == 0.4
   end
 
   defp result_plot(result, plot_id) do

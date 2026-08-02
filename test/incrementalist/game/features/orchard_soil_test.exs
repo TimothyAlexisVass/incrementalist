@@ -11,7 +11,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert Soil.water_cap_from_organic_matter(BigNum.zero()) == 150
 
     mid_om = BigNum.from_number(1000)
-    assert_in_delta Soil.runoff_rate_from_organic_matter(mid_om), 0.75, 1.0e-9
+    assert_in_delta Soil.runoff_rate_from_organic_matter(mid_om), 0.750626566, 1.0e-9
     assert Soil.water_cap_from_organic_matter(mid_om) == 200
 
     max_om = BigNum.from_number(2000)
@@ -29,7 +29,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
         nitrogen: BigNum.from_number(10),
         phosphorus: BigNum.from_number(10),
         potassium: BigNum.from_number(10),
-        organic_matter: BigNum.from_number(0),
+        organic_matter: BigNum.from_number(5),
         projected_at: Time.iso8601(start_time)
       })
 
@@ -39,7 +39,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert_in_delta BigNum.to_float(projected.nitrogen), 9.4, 1.0e-9
     assert_in_delta BigNum.to_float(projected.phosphorus), 9.7, 1.0e-9
     assert_in_delta BigNum.to_float(projected.potassium), 9.4, 1.0e-9
-    assert_in_delta BigNum.to_float(projected.organic_matter), 0.0, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.organic_matter), 5.0, 1.0e-9
   end
 
   test "minute projection accumulates fractional dry-down without losing precision" do
@@ -52,7 +52,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
         nitrogen: BigNum.from_number(10),
         phosphorus: BigNum.from_number(10),
         potassium: BigNum.from_number(10),
-        organic_matter: BigNum.from_number(0),
+        organic_matter: BigNum.from_number(5),
         projected_at: Time.iso8601(start_time)
       })
 
@@ -62,7 +62,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert_in_delta BigNum.to_float(projected.nitrogen), 9.99, 1.0e-9
     assert_in_delta BigNum.to_float(projected.phosphorus), 9.995, 1.0e-9
     assert_in_delta BigNum.to_float(projected.potassium), 9.99, 1.0e-9
-    assert_in_delta BigNum.to_float(projected.organic_matter), 0.0, 1.0e-9
+    assert_in_delta BigNum.to_float(projected.organic_matter), 5.0, 1.0e-9
   end
 
   test "rain hour below cap does not leach nutrients or organic matter" do
@@ -75,7 +75,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
         nitrogen: BigNum.from_number(10),
         phosphorus: BigNum.from_number(10),
         potassium: BigNum.from_number(10),
-        organic_matter: BigNum.from_number(0),
+        organic_matter: BigNum.from_number(5),
         projected_at: Time.iso8601(start_time)
       })
 
@@ -85,7 +85,7 @@ defmodule Incrementalist.Game.Features.OrchardSoilTest do
     assert BigNum.compare(projected.nitrogen, BigNum.from_number(10)) == 0
     assert BigNum.compare(projected.phosphorus, BigNum.from_number(10)) == 0
     assert BigNum.compare(projected.potassium, BigNum.from_number(10)) == 0
-    assert BigNum.compare(projected.organic_matter, BigNum.zero()) == 0
+    assert BigNum.compare(projected.organic_matter, BigNum.from_number(5)) == 0
   end
 
   test "overflow during rain counts as water loss and leaches" do

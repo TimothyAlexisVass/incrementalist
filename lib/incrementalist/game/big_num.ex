@@ -170,9 +170,11 @@ defmodule BigNum do
     normalize(%BigNum{m: m, e: e})
   end
 
-  def compare(%BigNum{m: m1}, %BigNum{m: m2}) when m1 == 0.0 and m2 == 0.0, do: 0
-  def compare(%BigNum{m: m1}, %BigNum{m: m2}) when m1 >= 0 and m2 < 0, do: 1
-  def compare(%BigNum{m: m1}, %BigNum{m: m2}) when m1 < 0 and m2 >= 0, do: -1
+  def compare(%BigNum{m: m_a}, %BigNum{m: m_b}) when m_a == 0.0 and m_b == 0.0, do: 0
+
+  # Compare signs directly to avoid exponent-check bugs when comparing fractional numbers (e.g., 0.19) to 0
+  def compare(%BigNum{m: m_a}, %BigNum{m: m_b}) when m_a >= 0.0 and m_b <= 0.0, do: 1
+  def compare(%BigNum{m: m_a}, %BigNum{m: m_b}) when m_a <= 0.0 and m_b >= 0.0, do: -1
 
   def compare(%BigNum{} = a, %BigNum{} = b) do
     sign = if a.m < 0, do: -1, else: 1
@@ -184,6 +186,14 @@ defmodule BigNum do
       abs(a.m) < abs(b.m) -> -sign
       true -> 0
     end
+  end
+
+  def min(%BigNum{} = a, %BigNum{} = b) do
+    if compare(a, b) <= 0, do: a, else: b
+  end
+
+  def max(%BigNum{} = a, %BigNum{} = b) do
+    if compare(a, b) >= 0, do: a, else: b
   end
 
   def format(%BigNum{m: m}) when m == 0.0, do: "0"

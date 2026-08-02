@@ -134,6 +134,7 @@ export function applyPushEvent(state: ServerState, event: ServerPushEvent): void
       climate: event.climate,
       soil: event.soil,
       plots: event.plots,
+      furnace: event.furnace,
       has_bonustime_token: event.has_bonustime_token
     });
   } else if (event.type === "session.superseded") {
@@ -211,6 +212,7 @@ export function applyAuthoritativeData(
   if (data.achievements !== undefined) state.snapshot.state.achievements = data.achievements;
   if (data.stats !== undefined) state.snapshot.state.stats = data.stats;
   if (data.clover_hunt !== undefined) state.snapshot.state.clover_hunt = data.clover_hunt;
+  if (data.furnace !== undefined) state.snapshot.state.furnace = data.furnace;
   if (data.furnace_level !== undefined) state.snapshot.state.furnace_level = data.furnace_level;
   if (data.has_bonustime_token !== undefined) state.snapshot.state.has_bonustime_token = data.has_bonustime_token;
   if (data.bonustime !== undefined) state.snapshot.state.bonustime = data.bonustime;

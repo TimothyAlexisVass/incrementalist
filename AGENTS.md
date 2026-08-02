@@ -7,7 +7,7 @@ No other canvas is allowed except #incrementalist, not even a temporary one.
 ONLY Direct WebGL rendering to the #incrementalist canvas is allowed in this project.
 
 If a repo convention or principle is missing here, ask about it and suggest where to add it.
-NEVER STAGE CHANGES UNLESS EXPLICITLY ORDERED TO DO SO.
+NEVER STAGE OR UNSTAGE CHANGES UNLESS EXPLICITLY ORDERED TO DO SO.
 
 The game is under development and has not been deployed.
 IT IS FORBIDDEN TO ADD BACKWARDS COMPATIBILITY!

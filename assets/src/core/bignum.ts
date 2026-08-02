@@ -139,8 +139,9 @@ export function pow(a: BigNum, p: number): BigNum {
 
 export function compare(a: BigNum, b: BigNum): number {
   if (a.m === 0 && b.m === 0) return 0
-  if (a.m >= 0 && b.m < 0) return 1
-  if (a.m < 0 && b.m >= 0) return -1
+  // Compare signs directly to avoid exponent-check bugs when comparing fractional numbers (e.g. 0.19) to 0
+  if (a.m >= 0 && b.m <= 0) return 1
+  if (a.m <= 0 && b.m >= 0) return -1
 
   const sign = a.m < 0 ? -1 : 1
 

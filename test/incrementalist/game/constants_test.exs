@@ -81,7 +81,7 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert Constants.orchard_soil_default_phosphorus() == %BigNum{m: 5.0, e: 0}
     assert Constants.orchard_soil_default_potassium() == %BigNum{m: 5.0, e: 0}
     assert Constants.orchard_soil_default_organic_matter() == %BigNum{m: 2.0, e: 1}
-    assert Constants.orchard_soil_organic_matter_min() == 0
+    assert Constants.orchard_soil_organic_matter_min() == 5.0
     assert Constants.orchard_soil_organic_matter_max() == 2000
     assert Constants.orchard_soil_runoff_retention_factor_at_max() == 0.5
     assert Constants.orchard_soil_water_cap_base() == 150
@@ -90,6 +90,9 @@ defmodule Incrementalist.Game.ConstantsTest do
     assert Constants.orchard_soil_nk_leach_per_water_loss() == 0.1
     assert Constants.orchard_soil_phosphorus_leach_multiplier() == 0.5
     assert Constants.orchard_soil_organic_matter_leach_per_water_loss() == 0.05
+    assert Constants.orchard_soil_decomposition_biomass_multiplier() == 0.04
+    assert Constants.furnace_burn_rate_per_minute() == 10.0
+    assert Constants.furnace_ash_yield_ratio() == 0.02
   end
 
   test "orchard plant, splicing, and seed shop manifests load from shared requirements" do
@@ -120,7 +123,7 @@ defmodule Incrementalist.Game.ConstantsTest do
                "name" => "Acorn",
                "description" => "An oak acorn to grow a sturdy tree.",
                "coins" => %{"m" => 5.0, "e" => 2},
-               "shards" => %{"m" => 2.0, "e" => 1},
+               "shards" => %{"m" => 5.0, "e" => 0},
                "unlocked" => true
              },
              "coin_tree_seed" => %{

@@ -1,7 +1,7 @@
 {
   "clover_patch": {
     "seed": "clover_seeds",
-    "size": { "m": 2.0, "e": 0 },
+    "size": { "m": 5.0, "e": 1 },
     "plantType": "herbaceous",
     "baseGrowthTime": 100.0,
     "seedsToPlant": { "m": 5.0, "e": 1 },
@@ -22,7 +22,7 @@
   },
   "oak": {
     "seed": "acorn",
-    "size": { "m": 4.0, "e": 1 },
+    "size": { "m": 1.0, "e": 3 },
     "plantType": "tree",
     "baseGrowthTime": 25.0,
     "seedsToPlant": { "m": 1.0, "e": 0 },
@@ -44,7 +44,7 @@
   },
   "coin_tree": {
     "seed": "coin_tree_seed",
-    "size": { "m": 2.0, "e": 1 },
+    "size": { "m": 5.0, "e": 2 },
     "plantType": "tree",
     "baseGrowthTime": 20.0,
     "seedsToPlant": { "m": 1.0, "e": 0 },

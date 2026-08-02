@@ -12,8 +12,12 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
 
   def project_state(%State{} = state, now) do
     normalized_soil = normalize_soil(state.soil, now)
-    {projected_soil, projected_plots} = project_unified(normalized_soil, state.plots || [], now)
-    %{state | soil: projected_soil, plots: projected_plots}
+    normalized_furnace = normalize_furnace(state.furnace, now)
+
+    {projected_soil, projected_plots, projected_furnace} =
+      project_unified(normalized_soil, state.plots || [], normalized_furnace, now)
+
+    %{state | soil: projected_soil, plots: projected_plots, furnace: projected_furnace}
   end
 
   def visible_state(nil), do: visible_state(%SoilState{})
@@ -46,6 +50,15 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     bonus_at_max = Constants.orchard_soil_water_cap_bonus_at_max()
 
     base + trunc(Float.round(bonus_at_max * ratio))
+  end
+
+  defp normalize_furnace(%State.Furnace{} = furnace, now) do
+    queue = normalize_big_num(furnace.burn_queue) |> clamp_big_num_non_negative()
+
+    %State.Furnace{
+      burn_queue: queue,
+      projected_at: Time.iso8601(parse_projected_at(furnace.projected_at, now, @minute_ms))
+    }
   end
 
   @doc """
@@ -85,7 +98,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     end
   end
 
-  defp project_unified(%SoilState{} = soil, plots, now) do
+  defp project_unified(%SoilState{} = soil, plots, %State.Furnace{} = furnace, now) do
     hour_ms = Constants.climate_hour_ms()
     projected_at = parse_projected_at(soil.projected_at, now, @minute_ms)
     projected_at_ms = Time.to_unix_ms(projected_at)
@@ -98,24 +111,34 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
       |> max(0)
 
     if elapsed_minutes <= 0 do
-      {%{soil | projected_at: Time.iso8601(projected_at)}, plots}
+      {
+        %{soil | projected_at: Time.iso8601(projected_at)},
+        plots,
+        %{furnace | projected_at: Time.iso8601(projected_at)}
+      }
     else
       elapsed_full_hours = div(elapsed_minutes, 60)
       elapsed_remaining_minutes = rem(elapsed_minutes, 60)
 
-      {after_hours_soil, after_hours_plots} =
-        apply_steps({soil, plots}, elapsed_full_hours, fn hour_offset, {curr_soil, curr_plots} ->
+      {after_hours_soil, after_hours_plots, after_hours_furnace} =
+        apply_steps({soil, plots, furnace}, elapsed_full_hours, fn hour_offset,
+                                                                   {curr_soil, curr_plots,
+                                                                    curr_furnace} ->
           hour_start_ms = projected_at_ms + hour_offset * hour_ms
-          project_single_hour_unified(curr_soil, curr_plots, hour_start_ms)
+          project_single_hour_unified(curr_soil, curr_plots, curr_furnace, hour_start_ms)
         end)
 
       minutes_base_ms = projected_at_ms + elapsed_full_hours * hour_ms
 
-      {result_soil, result_plots} =
-        apply_steps({after_hours_soil, after_hours_plots}, elapsed_remaining_minutes, fn minute_offset, {curr_soil, curr_plots} ->
-          minute_start_ms = minutes_base_ms + minute_offset * @minute_ms
-          project_single_minute_unified(curr_soil, curr_plots, minute_start_ms)
-        end)
+      {result_soil, result_plots, result_furnace} =
+        apply_steps(
+          {after_hours_soil, after_hours_plots, after_hours_furnace},
+          elapsed_remaining_minutes,
+          fn minute_offset, {curr_soil, curr_plots, curr_furnace} ->
+            minute_start_ms = minutes_base_ms + minute_offset * @minute_ms
+            project_single_minute_unified(curr_soil, curr_plots, curr_furnace, minute_start_ms)
+          end
+        )
 
       {
         %{
@@ -123,26 +146,58 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
           | projected_at:
               Time.iso8601(DateTime.add(projected_at, elapsed_minutes * @minute_ms, :millisecond))
         },
-        result_plots
+        result_plots,
+        %{
+          result_furnace
+          | projected_at:
+              Time.iso8601(DateTime.add(projected_at, elapsed_minutes * @minute_ms, :millisecond))
+        }
       }
     end
   end
 
-  defp project_single_hour_unified(%SoilState{} = soil, plots, hour_start_ms) do
-    apply_steps({soil, plots}, 60, fn minute_offset, {curr_soil, curr_plots} ->
+  defp project_single_hour_unified(
+         %SoilState{} = soil,
+         plots,
+         %State.Furnace{} = furnace,
+         hour_start_ms
+       ) do
+    apply_steps({soil, plots, furnace}, 60, fn minute_offset,
+                                               {curr_soil, curr_plots, curr_furnace} ->
       minute_start_ms = hour_start_ms + minute_offset * @minute_ms
-      project_single_minute_unified(curr_soil, curr_plots, minute_start_ms)
+      project_single_minute_unified(curr_soil, curr_plots, curr_furnace, minute_start_ms)
     end)
   end
 
-  defp project_single_minute_unified(%SoilState{} = soil, plots, minute_start_ms) do
+  defp project_single_minute_unified(
+         %SoilState{} = soil,
+         plots,
+         %State.Furnace{} = furnace,
+         minute_start_ms
+       ) do
+    {next_furnace, soil_with_k} =
+      if BigNum.compare(furnace.burn_queue, BigNum.zero()) > 0 do
+        # Burn plant matter from the furnace queue to yield potassium in the soil
+        burn_rate = Constants.furnace_burn_rate_per_minute()
+        ash_ratio = Constants.furnace_ash_yield_ratio()
+        burned = BigNum.min(furnace.burn_queue, BigNum.from_number(burn_rate))
+        k_gain = BigNum.mul(burned, BigNum.from_number(ash_ratio))
+
+        {
+          %{furnace | burn_queue: BigNum.sub(furnace.burn_queue, burned)},
+          %{soil | potassium: BigNum.add(soil.potassium, k_gain)}
+        }
+      else
+        {furnace, soil}
+      end
+
     hour_index = climate_hour_index(minute_start_ms)
     weather_entry = Constants.climate_weather_entry(hour_index)
     rain_mm_per_minute = max(0.0, number(Map.get(weather_entry, "mm")) / 60.0)
 
-    runoff_rate = runoff_rate_from_organic_matter(soil.organic_matter)
-    water_cap = water_cap_from_organic_matter(soil.organic_matter)
-    current_water = clamp_number(soil.water_level, 0.0, number(water_cap))
+    runoff_rate = runoff_rate_from_organic_matter(soil_with_k.organic_matter)
+    water_cap = water_cap_from_organic_matter(soil_with_k.organic_matter)
+    current_water = clamp_number(soil_with_k.water_level, 0.0, number(water_cap))
 
     {next_water, water_lost} =
       if rain_mm_per_minute > 0.0 do
@@ -164,7 +219,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
         }
       end
 
-    leached_soil = apply_water_loss(%{soil | water_level: next_water}, water_lost)
+    leached_soil = apply_water_loss(%{soil_with_k | water_level: next_water}, water_lost)
 
     temperature_c = minute_temperature(minute_start_ms)
 
@@ -176,7 +231,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
         {next_soil, [next_plot | acc_plots]}
       end)
 
-    {final_soil, Enum.reverse(final_plots)}
+    {final_soil, Enum.reverse(final_plots), next_furnace}
   end
 
   defp project_plot_single_minute(plot, %SoilState{} = soil, temperature_c, minute_start_ms) do
@@ -240,12 +295,14 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
             size_val = decomp.amount
             p_coeff = if decomp.resource_id == "fruit", do: 0.2, else: 0.1
 
-            om_gain = size_val
-            p_gain = BigNum.from_number(BigNum.to_float(size_val) * p_coeff)
+            multiplier = Constants.orchard_soil_decomposition_biomass_multiplier()
+            om_gain = BigNum.from_number(BigNum.to_float(size_val) * multiplier)
+            p_gain = BigNum.from_number(BigNum.to_float(size_val) * p_coeff * multiplier)
 
             next_soil = %{
               soil
-              | organic_matter: clamp_big_num_organic_matter_max(BigNum.add(soil.organic_matter, om_gain)),
+              | organic_matter:
+                  clamp_big_num_organic_matter_max(BigNum.add(soil.organic_matter, om_gain)),
                 phosphorus: BigNum.add(soil.phosphorus, p_gain)
             }
 
@@ -389,9 +446,11 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
       %{"max" => max_val} ->
         max_f = to_float(normalize_big_num(max_val))
         if max_f > 0.0, do: min(1.0, BigNum.to_float(soil_val) / max_f), else: 0.0
+
       %{max: max_val} ->
         max_f = to_float(normalize_big_num(max_val))
         if max_f > 0.0, do: min(1.0, BigNum.to_float(soil_val) / max_f), else: 0.0
+
       _ ->
         0.0
     end
@@ -521,25 +580,23 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
   defp normalize_big_num(value) when is_number(value), do: BigNum.from_number(value)
   defp normalize_big_num(_), do: BigNum.zero()
 
-  defp normalize_big_num(%BigNum{} = value, _default), do: value
   defp normalize_big_num(nil, default), do: default
-
-  defp normalize_big_num(%{"m" => m, "e" => e}, _default) do
-    BigNum.new(number(m), trunc(number(e)))
-  end
-
-  defp normalize_big_num(_value, default), do: default
+  defp normalize_big_num(value, _default), do: normalize_big_num(value)
 
   defp organic_matter_ratio(%BigNum{} = organic_matter) do
+    min_value = number(Constants.orchard_soil_organic_matter_min())
     max_value = Constants.orchard_soil_organic_matter_max()
+    range = max_value - min_value
 
-    if max_value <= 0 do
+    if range <= 0 do
       0.0
     else
-      organic_matter
-      |> BigNum.to_float()
-      |> clamp_number(number(Constants.orchard_soil_organic_matter_min()), number(max_value))
-      |> Kernel./(max_value)
+      current_value =
+        organic_matter
+        |> BigNum.to_float()
+        |> clamp_number(min_value, number(max_value))
+
+      (current_value - min_value) / range
     end
   end
 

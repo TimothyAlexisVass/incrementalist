@@ -27,6 +27,13 @@
       "water_cap_bonus_at_max": 100
     },
     "base_dry_down_per_hour": 6,
+    "decomposition": {
+      "biomass_multiplier": 0.04
+    },
+    "furnace": {
+      "burn_rate_per_minute": 10.0,
+      "ash_yield_ratio": 0.02
+    },
     "leach": {
       "nitrogen_and_potassium_per_water_loss": 0.1,
       "phosphorus_multiplier": 0.5,

@@ -15,7 +15,7 @@ import {
   getOrchardViewModel
 } from "./view-model";
 import { getAreaViewModel } from "../view-model";
-import type { ClimateState, SoilState } from "../../../net/protocol";
+import type { ClimateState, FurnaceState, SoilState } from "../../../net/protocol";
 import { fromNumber, toNumber, type BigNum } from "../../../core/bignum";
 import { drawCurrencyAmount } from "../../../render/currency-icons";
 import { formatBigNum, formatDuration } from "../../../utils/format";
@@ -106,6 +106,8 @@ const ORCHARD_SOIL_BASE_DRY_DOWN_PER_HOUR = orchardSharedConfig.soil.base_dry_do
 const ORCHARD_SOIL_NK_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.nitrogen_and_potassium_per_water_loss;
 const ORCHARD_SOIL_P_LEACH_MULTIPLIER = orchardSharedConfig.soil.leach.phosphorus_multiplier;
 const ORCHARD_SOIL_OM_LEACH_PER_WATER_LOSS = orchardSharedConfig.soil.leach.organic_matter_per_water_loss;
+const FURNACE_BURN_RATE_PER_MINUTE = orchardSharedConfig.soil.furnace.burn_rate_per_minute;
+const FURNACE_ASH_YIELD_RATIO = orchardSharedConfig.soil.furnace.ash_yield_ratio;
 const orchardPlantSpecs = orchardPlantsConfig as Record<string, OrchardPlantSpec>;
 
 const orchardPlantImages = new Map<string, HTMLImageElement>();
@@ -892,9 +894,10 @@ function drawOrchardProgressBar(
 
 function renderSoilStats(input?: InteractionState) {
   const renderer = getActiveWebGLRenderer();
-  const { soil, climate } = getAreaViewModel().orchard;
+  const area = getAreaViewModel();
+  const { soil, climate } = area.orchard;
   if (!soil) return;
-  const deltaPerMinute = computeSoilDeltaPerMinute(soil, climate);
+  const deltaPerMinute = computeSoilDeltaPerMinute(soil, climate, area.furnace);
 
   const lines = [
     ["Nitrogen:", formatSoilBigNum(soil.nitrogen)],
@@ -1025,7 +1028,11 @@ function formatTooltipDelta(delta: number): string {
   return `(${sign}${delta.toFixed(3)}/min)`;
 }
 
-function computeSoilDeltaPerMinute(soil: SoilState, climate: ClimateState | null): SoilDelta {
+function computeSoilDeltaPerMinute(
+  soil: SoilState,
+  climate: ClimateState | null,
+  furnace: FurnaceState | null
+): SoilDelta {
   const rainMmPerMinute = Math.max(0, climate?.rain_mm ?? 0);
   const runoffRate = runoffRateFromOrganicMatter(soil.organic_matter);
   const waterCap = waterCapFromOrganicMatter(soil.organic_matter);
@@ -1051,11 +1058,21 @@ function computeSoilDeltaPerMinute(soil: SoilState, climate: ClimateState | null
   const pLoss = nkLoss * ORCHARD_SOIL_P_LEACH_MULTIPLIER;
   const organicMatterLoss = waterLost * ORCHARD_SOIL_OM_LEACH_PER_WATER_LOSS;
 
+  // Calculate potassium gain from the burning furnace queue for UI delta projection
+  let potassiumGain = 0;
+  if (furnace && furnace.burn_queue) {
+    const queueVal = toNumber(furnace.burn_queue);
+    if (queueVal > 0) {
+      const burned = Math.min(queueVal, FURNACE_BURN_RATE_PER_MINUTE);
+      potassiumGain = burned * FURNACE_ASH_YIELD_RATIO;
+    }
+  }
+
   return {
     water: nextWater - currentWater,
     nitrogen: -Math.min(nonNegativeFiniteOrInfinity(toNumber(soil.nitrogen)), nkLoss),
     phosphorus: -Math.min(nonNegativeFiniteOrInfinity(toNumber(soil.phosphorus)), pLoss),
-    potassium: -Math.min(nonNegativeFiniteOrInfinity(toNumber(soil.potassium)), nkLoss),
+    potassium: potassiumGain - Math.min(nonNegativeFiniteOrInfinity(toNumber(soil.potassium)), nkLoss),
     organicMatter: -Math.min(nonNegativeFiniteOrInfinity(toNumber(soil.organic_matter)), organicMatterLoss)
   };
 }

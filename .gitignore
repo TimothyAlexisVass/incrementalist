@@ -11,3 +11,5 @@ erl_crash.dump
 *.plt
 *.coverdata
 .DS_Store
+/.hex/
+/.mix/

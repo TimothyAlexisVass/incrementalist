@@ -204,6 +204,13 @@ defmodule Incrementalist.Game.Constants do
     |> Map.fetch!("base_dry_down_per_hour")
   end
 
+  def orchard_soil_decomposition_biomass_multiplier do
+    @orchard_soil
+    |> Map.fetch!("soil")
+    |> Map.fetch!("decomposition")
+    |> Map.fetch!("biomass_multiplier")
+  end
+
   def orchard_soil_nk_leach_per_water_loss do
     @orchard_soil
     |> Map.fetch!("soil")
@@ -238,6 +245,20 @@ defmodule Incrementalist.Game.Constants do
   # Furnace Constants
   def furnace_min_level, do: @furnace_min_level
   def furnace_max_level, do: @furnace_max_level
+
+  def furnace_burn_rate_per_minute do
+    @orchard_soil
+    |> Map.fetch!("soil")
+    |> Map.fetch!("furnace")
+    |> Map.fetch!("burn_rate_per_minute")
+  end
+
+  def furnace_ash_yield_ratio do
+    @orchard_soil
+    |> Map.fetch!("soil")
+    |> Map.fetch!("furnace")
+    |> Map.fetch!("ash_yield_ratio")
+  end
 
   def area_defs do
     @area_unlocking_entries

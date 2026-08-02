@@ -163,6 +163,23 @@ defmodule Incrementalist.Game.State do
     end
   end
 
+  defmodule Furnace do
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    @derive Jason.Encoder
+    embedded_schema do
+      embeds_one :burn_queue, BigNum, on_replace: :update
+      field :projected_at, :string
+    end
+
+    def changeset(schema \\ %__MODULE__{}, attrs) do
+      cast(schema, attrs, [:projected_at])
+      |> cast_embed(:burn_queue)
+    end
+  end
+
   defmodule Soil do
     use Ecto.Schema
     import Ecto.Changeset
@@ -413,6 +430,7 @@ defmodule Incrementalist.Game.State do
     embeds_one :sisu, Sisu, on_replace: :update
     embeds_one :clover_hunt, CloverHunt, on_replace: :update
     embeds_one :soil, Soil, on_replace: :update
+    embeds_one :furnace, Furnace, on_replace: :update
 
     field :unlocked_plots, {:array, :string}, default: ["plot_1"]
     field :spliced_seeds, {:array, :string}, default: []
@@ -468,6 +486,7 @@ defmodule Incrementalist.Game.State do
     |> cast_embed(:sisu)
     |> cast_embed(:clover_hunt)
     |> cast_embed(:soil)
+    |> cast_embed(:furnace)
     |> cast_embed(:wood)
     |> cast_embed(:plant_matter)
     |> cast_embed(:ash)
@@ -515,6 +534,7 @@ defmodule Incrementalist.Game.State do
     |> maybe_put_embed(:sisu)
     |> maybe_put_embed(:clover_hunt)
     |> maybe_put_embed(:soil)
+    |> maybe_put_embed(:furnace)
     |> maybe_put_embed(:quests)
     |> maybe_put_embed(:stats)
     |> maybe_put_embed(:bonustime)
@@ -602,6 +622,10 @@ defmodule Incrementalist.Game.State do
         phosphorus: Constants.orchard_soil_default_phosphorus(),
         potassium: Constants.orchard_soil_default_potassium(),
         organic_matter: Constants.orchard_soil_default_organic_matter(),
+        projected_at: utc_minute_boundary_iso(now)
+      },
+      furnace: %Furnace{
+        burn_queue: BigNum.zero(),
         projected_at: utc_minute_boundary_iso(now)
       },
       unlocked_plots: ["plot_1"],
@@ -699,18 +723,26 @@ defmodule Incrementalist.Game.State do
       %{
         "id" => p.id,
         "depth" => p.depth,
-        "plant" => if(p.plant, do: %{
-          "plant_id" => p.plant.plant_id,
-          "growth" => p.plant.growth,
-          "level" => p.plant.level,
-          "planted_at" => p.plant.planted_at
-        }, else: nil),
-        "decomposition" => if(p.decomposition, do: %{
-          "resource_id" => p.decomposition.resource_id,
-          "amount" => p.decomposition.amount,
-          "progress" => p.decomposition.progress,
-          "plant_type" => p.decomposition.plant_type
-        }, else: nil)
+        "plant" =>
+          if(p.plant,
+            do: %{
+              "plant_id" => p.plant.plant_id,
+              "growth" => p.plant.growth,
+              "level" => p.plant.level,
+              "planted_at" => p.plant.planted_at
+            },
+            else: nil
+          ),
+        "decomposition" =>
+          if(p.decomposition,
+            do: %{
+              "resource_id" => p.decomposition.resource_id,
+              "amount" => p.decomposition.amount,
+              "progress" => p.decomposition.progress,
+              "plant_type" => p.decomposition.plant_type
+            },
+            else: nil
+          )
       }
     end)
   end
@@ -789,6 +821,10 @@ defmodule Incrementalist.Game.State do
       "climate" => Climate.visible_state(now),
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "soil" => OrchardSoil.visible_state(projected_state.soil),
+      "furnace" => %{
+        "burn_queue" => projected_state.furnace.burn_queue,
+        "projected_at" => projected_state.furnace.projected_at
+      },
       "unlocked_plots" => projected_state.unlocked_plots || ["plot_1"],
       "spliced_seeds" => projected_state.spliced_seeds || [],
       "wood" => projected_state.wood || BigNum.zero(),

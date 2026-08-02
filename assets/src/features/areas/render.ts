@@ -19,11 +19,18 @@ import {
 } from "../../ui/managers/notices";
 import { GameChannel } from "../../net/game-channel";
 import { getActiveWebGLRenderer } from "../../renderer/webgl";
+import { resolveStableText } from "../../renderer/stable-text";
 import { hexToRgba } from "../../utils/color";
 import { drawLazyLoader } from "../../ui/components/utils/lazy-loader";
+import { toNumber } from "../../core/bignum";
+import { formatBigNum } from "../../utils/format";
+import orchardSharedConfig from "../../../../shared/requirements/orchard.json";
 
 const areaBackgroundImages = new Map<string, HTMLImageElement>();
 const GO_TO_AREA_BUTTON_PADDING = 3;
+const FURNACE_BURN_RATE_PER_MINUTE = orchardSharedConfig.soil.furnace.burn_rate_per_minute;
+const FURNACE_POTASSIUM_PER_MINUTE =
+  FURNACE_BURN_RATE_PER_MINUTE * orchardSharedConfig.soil.furnace.ash_yield_ratio;
 const FURNACE_UPGRADE_BUTTON = {
   width: 120,
   height: 34,
@@ -159,6 +166,86 @@ export function renderAreaSpecifics(
 
   if (model.currentArea === "furnace") {
     renderFurnaceUpgradeButton(input, model.furnaceLevel, blocked, channel, runCommand);
+
+    const furnace = model.furnace;
+    if (furnace) {
+      const renderer = getActiveWebGLRenderer();
+      if (renderer) {
+        const queueVal = toNumber(furnace.burn_queue);
+        const isBurning = queueVal > 0;
+        const x = DISPLAY_AREA_X + DISPLAY_AREA_WIDTH / 2;
+        const panelW = 280;
+        const panelH = 75;
+        const panelX = x - panelW / 2;
+        const panelY = DISPLAY_AREA_Y + DISPLAY_AREA_HEIGHT * 0.65;
+
+        // Draw elegant glassmorphic panel
+        renderer.drawRect({
+          x: panelX,
+          y: panelY,
+          width: panelW,
+          height: panelH,
+          color: [0.03, 0.03, 0.05, 0.75]
+        });
+
+        // Draw subtle outline
+        const borderCol: [number, number, number, number] = [0.4, 0.45, 0.5, 0.35];
+        renderer.drawRect({ x: panelX, y: panelY, width: panelW, height: 1, color: borderCol });
+        renderer.drawRect({ x: panelX, y: panelY + panelH - 1, width: panelW, height: 1, color: borderCol });
+        renderer.drawRect({ x: panelX, y: panelY, width: 1, height: panelH, color: borderCol });
+        renderer.drawRect({ x: panelX + panelW - 1, y: panelY, width: 1, height: panelH, color: borderCol });
+
+        renderer.drawText({
+          text: resolveStableText(
+            "furnace.status",
+            isBurning ? "Campfire Burning" : "Campfire Idle",
+            {
+              font: "bold 15px Arial",
+              color: isBurning ? "#ff9f43" : COLORS.panel.textDisabled,
+              align: "center",
+              baseline: "top"
+            }
+          ),
+          x,
+          y: panelY + 12,
+          font: "bold 15px Arial",
+          color: isBurning ? "#ff9f43" : COLORS.panel.textDisabled,
+          align: "center",
+          baseline: "top"
+        });
+
+        renderer.drawText({
+          text: resolveStableText(
+            "furnace.burn_queue",
+            `Queue: ${formatBigNum(furnace.burn_queue)} Plant Matter`,
+            {
+              font: "13px Arial",
+              color: COLORS.panel.textPrimary,
+              align: "center",
+              baseline: "top"
+            }
+          ),
+          x,
+          y: panelY + 32,
+          font: "13px Arial",
+          color: COLORS.panel.textPrimary,
+          align: "center",
+          baseline: "top"
+        });
+
+        if (isBurning) {
+          renderer.drawText({
+            text: `Rate: ${FURNACE_BURN_RATE_PER_MINUTE.toFixed(1)} / min (+${FURNACE_POTASSIUM_PER_MINUTE.toFixed(2)} Potassium / min)`,
+            x,
+            y: panelY + 50,
+            font: "12px Arial",
+            color: "#10b981",
+            align: "center",
+            baseline: "top"
+          });
+        }
+      }
+    }
   }
 }
 

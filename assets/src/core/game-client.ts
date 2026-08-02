@@ -202,6 +202,9 @@ export class GameClient {
         if (result.climate !== undefined) {
           this.store.state.snapshot.state.climate = result.climate;
         }
+        if (result.furnace !== undefined) {
+          this.store.state.snapshot.state.furnace = result.furnace;
+        }
 
         this.snapshotCache.save(this.store.state.snapshot);
 
@@ -222,6 +225,7 @@ export class GameClient {
     this.channel.onPushEvent = (event) => {
       applyPushEvent(this.store.state, event);
       if (this.store.state.snapshot) {
+        updateAreaViewModel(this.store.state.snapshot.state);
         notices.setSnapshot(this.store.state.snapshot);
         this.snapshotCache?.save(this.store.state.snapshot);
       }

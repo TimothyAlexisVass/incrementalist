@@ -137,7 +137,7 @@ export function plantSeed(channel: GameChannel, plotId: string, seedId: string) 
   return channel.pushCommand("orchard.plant_seed", { plot_id: plotId, seed_id: seedId });
 }
 
-export function harvestPlot(channel: GameChannel, plotId: string, action: "keep" | "decompose") {
+export function harvestPlot(channel: GameChannel, plotId: string, action: "burn" | "decompose") {
   return channel.pushCommand("orchard.harvest_plot", { plot_id: plotId, action });
 }
 
