@@ -149,7 +149,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     assert BigNum.compare(projected.soil.nitrogen, BigNum.zero()) > 0
   end
 
-  test "orchard.harvest_plot burn adds to inventory, clearing plot and adding to furnace queue",
+  test "orchard.harvest_plot burn timestamps a furnace batch and exposes only its aggregate queue",
        %{player: player} do
     # Plant a fully grown plant on plot_1
     update_player_state(player.id, fn state ->
@@ -169,6 +169,8 @@ defmodule Incrementalist.Game.Features.OrchardTest do
       %{state | plots: plots, clover_seeds: BigNum.zero()}
     end)
 
+    burned_at = DateTime.add(@now, 30, :second)
+
     # Harvest with "burn"
     result =
       Commands.enqueue(
@@ -176,7 +178,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
         "test_session",
         "orchard.harvest_plot",
         intent(0, %{"plot_id" => "plot_1", "action" => "burn"}),
-        @now
+        burned_at
       )
 
     assert result["type"] == "orchard.harvest_plot.result"
@@ -186,7 +188,28 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     # Verify clover seeds are gained
     ps = PlayerStates.get!(player.id)
     assert BigNum.compare(ps.state.clover_seeds, BigNum.zero()) > 0
-    assert BigNum.to_float(ps.state.furnace.burn_queue) == 50.0
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(ps.state.furnace)) == 50.0
+    assert [%State.Furnace.BurnBatch{} = batch] = ps.state.furnace.burn_batches
+    assert BigNum.to_float(batch.amount) == 50.0
+    assert {:ok, available_at, _offset} = DateTime.from_iso8601(batch.available_at)
+    assert DateTime.compare(available_at, burned_at) == :eq
+    assert Map.keys(result["furnace"]) |> Enum.sort() == ["burn_queue", "projected_at"]
+    refute Map.has_key?(result["furnace"], "burn_batches")
+
+    snapshot = Sessions.boot_player(player.id, false, burned_at)["snapshot"]
+    assert Map.keys(snapshot["state"]["furnace"]) |> Enum.sort() == ["burn_queue", "projected_at"]
+
+    Phoenix.PubSub.subscribe(Incrementalist.PubSub, PlayerServer.player_push_topic(player.id))
+    server = GenServer.whereis(PlayerServer.via_tuple(player.id))
+    send(server, {:emit_player_tick, Time.to_unix_ms(DateTime.add(@now, 1, :minute))})
+
+    assert_receive {:player_tick, tick}
+    assert Map.keys(tick["furnace"]) |> Enum.sort() == ["burn_queue", "projected_at"]
+    refute Map.has_key?(tick["furnace"], "burn_batches")
+
+    assert Commands.replay_pending(player.id) == result
+    replayed_state = PlayerStates.get!(player.id).state
+    assert length(replayed_state.furnace.burn_batches) == 1
 
     # Verify plot is cleared and depth is incremented
     plot = Enum.find(ps.state.plots, &(&1.id == "plot_1"))
@@ -646,7 +669,10 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     update_player_state(player.id, fn state ->
       %{
         state
-        | furnace: %{state.furnace | burn_queue: BigNum.from_number(20)},
+        | furnace: %{
+            state.furnace
+            | burn_batches: [burn_batch(20, @now)]
+          },
           soil: %{
             state.soil
             | water_level: 0.0,
@@ -664,7 +690,7 @@ defmodule Incrementalist.Game.Features.OrchardTest do
     # Zero water prevents leaching, isolating the furnace yield.
     # 10 plant matter burned. K gain = 10.0 * 0.02 = 0.2 K.
     # Remaining burn queue = 10.0.
-    assert BigNum.to_float(projected_1.furnace.burn_queue) == 10.0
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(projected_1.furnace)) == 10.0
     assert BigNum.to_float(projected_1.soil.potassium) == 0.2
 
     # Let another minute pass
@@ -673,8 +699,178 @@ defmodule Incrementalist.Game.Features.OrchardTest do
 
     # Remaining 10 plant matter burned. K gain = another 0.2 K (total 0.4 K).
     # Remaining burn queue = 0.
-    assert BigNum.to_float(projected_2.furnace.burn_queue) == 0.0
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(projected_2.furnace)) == 0.0
     assert BigNum.to_float(projected_2.soil.potassium) == 0.4
+    assert projected_2.furnace.burn_batches == []
+  end
+
+  test "a mid-minute batch burns only for the remaining UTC-minute time", %{player: player} do
+    mid_minute = DateTime.add(@now, 30, :second)
+
+    update_player_state(player.id, fn state ->
+      furnace = OrchardSoil.enqueue_burn(state.furnace, BigNum.from_number(10), mid_minute)
+
+      %{
+        state
+        | furnace: furnace,
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    state = PlayerStates.get!(player.id).state
+    at_12_01 = OrchardSoil.project_state(state, DateTime.add(@now, 1, :minute))
+
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(at_12_01.furnace)) == 5.0
+    assert BigNum.to_float(at_12_01.soil.potassium) == 0.1
+
+    after_12_01_minute = OrchardSoil.project_state(state, DateTime.add(@now, 2, :minute))
+
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(after_12_01_minute.furnace)) == 0.0
+    assert BigNum.to_float(after_12_01_minute.soil.potassium) == 0.2
+  end
+
+  test "an exact-boundary batch burns in that UTC minute", %{player: player} do
+    update_player_state(player.id, fn state ->
+      furnace = OrchardSoil.enqueue_burn(state.furnace, BigNum.from_number(10), @now)
+
+      %{
+        state
+        | furnace: furnace,
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    projected =
+      player.id
+      |> PlayerStates.get!()
+      |> Map.fetch!(:state)
+      |> OrchardSoil.project_state(DateTime.add(@now, 1, :minute))
+
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(projected.furnace)) == 0.0
+    assert BigNum.to_float(projected.soil.potassium) == 0.2
+  end
+
+  test "eligible furnace batches burn in FIFO order within a minute", %{player: player} do
+    update_player_state(player.id, fn state ->
+      furnace =
+        state.furnace
+        |> OrchardSoil.enqueue_burn(BigNum.from_number(6), @now)
+        |> OrchardSoil.enqueue_burn(BigNum.from_number(20), @now)
+
+      %{
+        state
+        | furnace: furnace,
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    projected =
+      player.id
+      |> PlayerStates.get!()
+      |> Map.fetch!(:state)
+      |> OrchardSoil.project_state(DateTime.add(@now, 1, :minute))
+
+    assert [%State.Furnace.BurnBatch{} = remaining_batch] = projected.furnace.burn_batches
+    assert BigNum.to_float(remaining_batch.amount) == 16.0
+    assert BigNum.to_float(projected.soil.potassium) == 0.2
+  end
+
+  test "a second mid-minute batch burns FIFO with only remaining-minute capacity", %{
+    player: player
+  } do
+    update_player_state(player.id, fn state ->
+      %{
+        state
+        | furnace: %{state.furnace | burn_batches: [burn_batch(15, @now)]},
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    first_projection =
+      player.id
+      |> PlayerStates.get!()
+      |> Map.fetch!(:state)
+      |> OrchardSoil.project_state(DateTime.add(@now, 1, :minute))
+
+    second_batch_at = DateTime.add(@now, 90, :second)
+
+    furnace =
+      OrchardSoil.enqueue_burn(first_projection.furnace, BigNum.from_number(20), second_batch_at)
+
+    state_with_second_batch = %{first_projection | furnace: furnace}
+
+    second_projection =
+      OrchardSoil.project_state(state_with_second_batch, DateTime.add(@now, 2, :minute))
+
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(second_projection.furnace)) == 15.0
+    assert BigNum.to_float(second_projection.soil.potassium) == 0.4
+
+    third_projection =
+      OrchardSoil.project_state(state_with_second_batch, DateTime.add(@now, 3, :minute))
+
+    assert BigNum.to_float(State.Furnace.remaining_burn_queue(third_projection.furnace)) == 5.0
+    assert_in_delta BigNum.to_float(third_projection.soil.potassium), 0.6, 1.0e-9
+  end
+
+  test "offline furnace projection is deterministic across reconnect boundaries", %{
+    player: player
+  } do
+    mid_minute = DateTime.add(@now, 30, :second)
+
+    update_player_state(player.id, fn state ->
+      furnace = OrchardSoil.enqueue_burn(state.furnace, BigNum.from_number(15), mid_minute)
+
+      %{
+        state
+        | furnace: furnace,
+          soil: %{
+            state.soil
+            | water_level: 0.0,
+              potassium: BigNum.zero(),
+              projected_at: Time.iso8601(@now)
+          }
+      }
+    end)
+
+    initial_state = PlayerStates.get!(player.id).state
+    offline = OrchardSoil.project_state(initial_state, DateTime.add(@now, 3, :minute))
+
+    reconnected =
+      initial_state
+      |> OrchardSoil.project_state(DateTime.add(@now, 1, :minute))
+      |> OrchardSoil.project_state(DateTime.add(@now, 3, :minute))
+
+    assert State.Furnace.remaining_burn_queue(offline.furnace) ==
+             State.Furnace.remaining_burn_queue(reconnected.furnace)
+
+    assert offline.soil.potassium == reconnected.soil.potassium
+  end
+
+  defp burn_batch(amount, available_at) do
+    %State.Furnace.BurnBatch{
+      amount: BigNum.from_number(amount),
+      available_at: Time.iso8601(available_at)
+    }
   end
 
   defp result_plot(result, plot_id) do

@@ -167,16 +167,53 @@ defmodule Incrementalist.Game.State do
     use Ecto.Schema
     import Ecto.Changeset
 
+    defmodule BurnBatch do
+      use Ecto.Schema
+      import Ecto.Changeset
+
+      @primary_key false
+      @derive Jason.Encoder
+      embedded_schema do
+        embeds_one :amount, BigNum, on_replace: :update
+        field :available_at, :string
+      end
+
+      def changeset(schema \\ %__MODULE__{}, attrs) do
+        schema
+        |> cast(attrs, [:available_at])
+        |> cast_embed(:amount)
+      end
+    end
+
     @primary_key false
     @derive Jason.Encoder
     embedded_schema do
-      embeds_one :burn_queue, BigNum, on_replace: :update
+      embeds_many :burn_batches, BurnBatch, on_replace: :delete
       field :projected_at, :string
     end
 
     def changeset(schema \\ %__MODULE__{}, attrs) do
       cast(schema, attrs, [:projected_at])
-      |> cast_embed(:burn_queue)
+      |> cast_embed(:burn_batches)
+    end
+
+    def remaining_burn_queue(%__MODULE__{} = furnace) do
+      Enum.reduce(furnace.burn_batches || [], BigNum.zero(), fn batch, total ->
+        case batch.amount do
+          %BigNum{} = amount -> BigNum.add(total, amount)
+          _ -> total
+        end
+      end)
+    end
+
+    def append_burn_batch(%__MODULE__{} = furnace, %BigNum{} = amount, available_at)
+        when is_binary(available_at) do
+      %{
+        furnace
+        | burn_batches:
+            (furnace.burn_batches || []) ++
+              [%BurnBatch{amount: amount, available_at: available_at}]
+      }
     end
   end
 
@@ -625,7 +662,7 @@ defmodule Incrementalist.Game.State do
         projected_at: utc_minute_boundary_iso(now)
       },
       furnace: %Furnace{
-        burn_queue: BigNum.zero(),
+        burn_batches: [],
         projected_at: utc_minute_boundary_iso(now)
       },
       unlocked_plots: ["plot_1"],
@@ -822,7 +859,7 @@ defmodule Incrementalist.Game.State do
       "clover_hunt" => CloverHunt.visible_state(projected_state.clover_hunt),
       "soil" => OrchardSoil.visible_state(projected_state.soil),
       "furnace" => %{
-        "burn_queue" => projected_state.furnace.burn_queue,
+        "burn_queue" => Furnace.remaining_burn_queue(projected_state.furnace),
         "projected_at" => projected_state.furnace.projected_at
       },
       "unlocked_plots" => projected_state.unlocked_plots || ["plot_1"],

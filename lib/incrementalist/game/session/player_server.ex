@@ -150,7 +150,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
         |> Map.put("soil", OrchardSoil.visible_state(projected_state.soil))
         |> Map.put("climate", ClimateCache.visible_state(now))
         |> Map.put("furnace", %{
-          "burn_queue" => projected_state.furnace.burn_queue,
+          "burn_queue" => State.Furnace.remaining_burn_queue(projected_state.furnace),
           "projected_at" => projected_state.furnace.projected_at
         })
       else
@@ -461,7 +461,7 @@ defmodule Incrementalist.Game.Session.PlayerServer do
         "soil" => OrchardSoil.visible_state(projected_state.soil),
         "plots" => Incrementalist.Game.State.visible_plots(projected_state.plots),
         "furnace" => %{
-          "burn_queue" => projected_state.furnace.burn_queue,
+          "burn_queue" => State.Furnace.remaining_burn_queue(projected_state.furnace),
           "projected_at" => projected_state.furnace.projected_at
         }
       }

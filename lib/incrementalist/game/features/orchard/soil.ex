@@ -20,6 +20,10 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
     %{state | soil: projected_soil, plots: projected_plots, furnace: projected_furnace}
   end
 
+  def enqueue_burn(%State.Furnace{} = furnace, %BigNum{} = amount, %DateTime{} = now) do
+    State.Furnace.append_burn_batch(furnace, amount, Time.iso8601(now))
+  end
+
   def visible_state(nil), do: visible_state(%SoilState{})
 
   def visible_state(%SoilState{} = soil) do
@@ -53,11 +57,37 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
   end
 
   defp normalize_furnace(%State.Furnace{} = furnace, now) do
-    queue = normalize_big_num(furnace.burn_queue) |> clamp_big_num_non_negative()
+    batches =
+      furnace.burn_batches
+      |> Kernel.||([])
+      |> Enum.map(&normalize_burn_batch(&1, now))
+      |> Enum.reject(&(BigNum.compare(&1.amount, BigNum.zero()) <= 0))
 
     %State.Furnace{
-      burn_queue: queue,
+      burn_batches: batches,
       projected_at: Time.iso8601(parse_projected_at(furnace.projected_at, now, @minute_ms))
+    }
+  end
+
+  defp normalize_burn_batch(%State.Furnace.BurnBatch{} = batch, _now) do
+    case Time.from_iso8601(batch.available_at) do
+      {:ok, available_at} ->
+        %State.Furnace.BurnBatch{
+          amount: batch.amount |> normalize_big_num() |> clamp_big_num_non_negative(),
+          available_at: Time.iso8601(available_at)
+        }
+
+      _ ->
+        empty_burn_batch()
+    end
+  end
+
+  defp normalize_burn_batch(_batch, _now), do: empty_burn_batch()
+
+  defp empty_burn_batch do
+    %State.Furnace.BurnBatch{
+      amount: BigNum.zero(),
+      available_at: nil
     }
   end
 
@@ -175,21 +205,7 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
          %State.Furnace{} = furnace,
          minute_start_ms
        ) do
-    {next_furnace, soil_with_k} =
-      if BigNum.compare(furnace.burn_queue, BigNum.zero()) > 0 do
-        # Burn plant matter from the furnace queue to yield potassium in the soil
-        burn_rate = Constants.furnace_burn_rate_per_minute()
-        ash_ratio = Constants.furnace_ash_yield_ratio()
-        burned = BigNum.min(furnace.burn_queue, BigNum.from_number(burn_rate))
-        k_gain = BigNum.mul(burned, BigNum.from_number(ash_ratio))
-
-        {
-          %{furnace | burn_queue: BigNum.sub(furnace.burn_queue, burned)},
-          %{soil | potassium: BigNum.add(soil.potassium, k_gain)}
-        }
-      else
-        {furnace, soil}
-      end
+    {next_furnace, soil_with_k} = burn_batches_for_minute(furnace, soil, minute_start_ms)
 
     hour_index = climate_hour_index(minute_start_ms)
     weather_entry = Constants.climate_weather_entry(hour_index)
@@ -232,6 +248,94 @@ defmodule Incrementalist.Game.Features.Orchard.Soil do
       end)
 
     {final_soil, Enum.reverse(final_plots), next_furnace}
+  end
+
+  defp burn_batches_for_minute(%State.Furnace{} = furnace, %SoilState{} = soil, minute_start_ms) do
+    burn_rate = BigNum.from_number(Constants.furnace_burn_rate_per_minute())
+    minute_end_ms = minute_start_ms + @minute_ms
+
+    {remaining_batches, burned} =
+      consume_burn_batches(
+        furnace.burn_batches || [],
+        burn_rate,
+        minute_start_ms * 1.0,
+        minute_end_ms,
+        BigNum.zero(),
+        []
+      )
+
+    if BigNum.compare(burned, BigNum.zero()) > 0 do
+      k_gain = BigNum.mul(burned, BigNum.from_number(Constants.furnace_ash_yield_ratio()))
+
+      {
+        %{furnace | burn_batches: remaining_batches},
+        %{soil | potassium: BigNum.add(soil.potassium, k_gain)}
+      }
+    else
+      {%{furnace | burn_batches: remaining_batches}, soil}
+    end
+  end
+
+  defp consume_burn_batches(
+         [],
+         _burn_rate,
+         _burn_cursor_ms,
+         _minute_end_ms,
+         burned,
+         remaining_reversed
+       ) do
+    {Enum.reverse(remaining_reversed), burned}
+  end
+
+  defp consume_burn_batches(
+         [batch | remaining],
+         burn_rate,
+         burn_cursor_ms,
+         minute_end_ms,
+         burned,
+         remaining_reversed
+       ) do
+    burn_starts_at_ms = max(burn_cursor_ms, burn_batch_available_at_ms(batch))
+
+    if burn_starts_at_ms >= minute_end_ms do
+      {Enum.reverse(remaining_reversed, [batch | remaining]), burned}
+    else
+      remaining_minute_ratio = (minute_end_ms - burn_starts_at_ms) / @minute_ms
+      available_capacity = BigNum.mul(burn_rate, BigNum.from_number(remaining_minute_ratio))
+      batch_burned = BigNum.min(batch.amount, available_capacity)
+      remaining_amount = BigNum.sub(batch.amount, batch_burned)
+
+      next_remaining_reversed =
+        if BigNum.compare(remaining_amount, BigNum.zero()) > 0 do
+          [%{batch | amount: remaining_amount} | remaining_reversed]
+        else
+          remaining_reversed
+        end
+
+      next_burn_cursor_ms =
+        if BigNum.compare(remaining_amount, BigNum.zero()) > 0 do
+          minute_end_ms
+        else
+          burn_starts_at_ms +
+            BigNum.to_float(BigNum.div(batch_burned, burn_rate)) * @minute_ms
+        end
+
+      consume_burn_batches(
+        remaining,
+        burn_rate,
+        next_burn_cursor_ms,
+        minute_end_ms,
+        BigNum.add(burned, batch_burned),
+        next_remaining_reversed
+      )
+    end
+  end
+
+  defp burn_batch_available_at_ms(%State.Furnace.BurnBatch{available_at: available_at}) do
+    case Time.from_iso8601(available_at) do
+      {:ok, available_at} -> Time.to_unix_ms(available_at) * 1.0
+      _ -> :infinity
+    end
   end
 
   defp project_plot_single_minute(plot, %SoilState{} = soil, temperature_c, minute_start_ms) do

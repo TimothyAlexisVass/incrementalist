@@ -1625,11 +1625,7 @@ defmodule Incrementalist.Game.CommandExecutor do
 
                 next_state =
                   if action == "burn" do
-                    # Add harvested plant matter straight to the furnace burn queue
-                    next_furnace = %{
-                      next_state.furnace
-                      | burn_queue: BigNum.add(next_state.furnace.burn_queue, pm_yield)
-                    }
+                    next_furnace = OrchardSoil.enqueue_burn(next_state.furnace, pm_yield, now)
 
                     next_plots =
                       Enum.map(next_state.plots, fn
@@ -1704,7 +1700,7 @@ defmodule Incrementalist.Game.CommandExecutor do
                    "coins" => next_state.coins,
                    "plots" => State.visible_plots(visible_plots),
                    "furnace" => %{
-                     "burn_queue" => next_state.furnace.burn_queue,
+                     "burn_queue" => State.Furnace.remaining_burn_queue(next_state.furnace),
                      "projected_at" => next_state.furnace.projected_at
                    },
                    "notices" => Notices.payload(next_notices)
