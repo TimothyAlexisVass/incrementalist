@@ -94,16 +94,16 @@ defmodule BigNum do
   end
 
   def div(_a, %BigNum{m: m}) when m == 0.0 do
-    raise ArithmeticError, message: "division by zero"
+    {:error, "division by zero"}
   end
 
-  def div(%BigNum{m: m}, _b) when m == 0.0, do: zero()
+  def div(%BigNum{m: m}, _b) when m == 0.0, do: {:ok, zero()}
 
   def div(%BigNum{} = a, %BigNum{} = b) do
-    normalize(%BigNum{
+    {:ok, normalize(%BigNum{
       m: a.m / b.m,
       e: a.e - b.e
-    })
+    })}
   end
 
   def add(%BigNum{m: m}, b) when m == 0.0, do: b
