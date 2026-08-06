@@ -12,7 +12,8 @@ config :incrementalist, Incrementalist.Repo,
 
 config :incrementalist, IncrementalistWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
-  secret_key_base: "qHeFVBCNTsLaD69zFLfhLP2huPa0AJh3A34aVC5FucEGnsmNhPAFvr74mPvLAxbt",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") || Base.encode64(:crypto.strong_rand_bytes(48)),
   server: false
 
 config :logger, level: :warning
